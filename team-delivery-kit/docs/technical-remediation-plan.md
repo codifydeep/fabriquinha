@@ -58,7 +58,13 @@ evidence must fail. Offline qualification is not evidence of a successful live
 agent round trip. Installing a changed adapter does not reset a failed planning
 task: a separately qualified, bounded recovery transition must preserve its
 failure and authorize any fresh dispatch. No such automatic retry is currently
-enabled for blocked planning tasks.
+enabled by the normal watchdog for blocked planning tasks. A controller-only
+maintenance transition can qualify one changed-protocol dispatch from an exact
+preserved plain-JSON rejection, closed execution and complete source reads.
+It requires a canary on the installed proxy image without credentials, network,
+socket or persistent mounts (the inherited `/opt/data` volume is replaced with
+a fixed empty tmpfs). This transition retains its predecessor and is consumed
+once; failure of the new typed attempt remains blocked, not retried indefinitely.
 
 The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
