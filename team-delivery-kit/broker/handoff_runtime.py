@@ -116,6 +116,20 @@ def task_base(broker, issue_id, task_id):
 
 
 class Effects:
+    def pre_red_format_rejection(self, route, recipient):
+        """Exact native binding plus a sanitized receipt from the pinned proxy."""
+        b=self.b
+        with b.db() as con:
+            rows=con.execute('SELECT request_id,agent_id,issue_id FROM native_bindings WHERE task_id=?',
+                             (recipient['id'],)).fetchall()
+        if (len(rows)!=1 or rows[0]['agent_id']!=route['cto']
+                or rows[0]['issue_id']!=route['issue_id']):
+            raise ValueError('independent CTO execution binding required')
+        try:import execution_diagnosis_recovery
+        except ImportError:from broker import execution_diagnosis_recovery
+        return execution_diagnosis_recovery.format_rejection(b,rows[0]['request_id'],
+            expected_image='sha256:6dc9a5903d4297fe8c686162af8755ace6e973f8472902fb0c597d06c3630099')
+
     def capture_report(self, issue):
         try: import capture_diagnosis
         except ImportError: from broker import capture_diagnosis

@@ -886,6 +886,9 @@ def run_sequence():
             if not resumed:
                 from citation_supervision import resume as resume_citation_supervision
                 resumed = resume_citation_supervision(ledger, plan, PRIVATE)
+            if not resumed:
+                from pre_red_supervision import resume as resume_pre_red_supervision
+                resumed = resume_pre_red_supervision(ledger, plan, PRIVATE)
         except Exception as error:
             print(json.dumps({'stage': 'blocked', 'sequence': plan['name'],
                               'recovery_verification': (type(error).__name__ + ':' + str(error))[:160]}), flush=True)

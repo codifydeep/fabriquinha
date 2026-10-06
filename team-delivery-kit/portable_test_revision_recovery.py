@@ -291,6 +291,12 @@ def schedule(private, context, spec, contract, managed):
     child_status = Path(private) / 'autonomy-status' / (selected['label'] + '.json')
     progress = json.loads(child_status.read_text()) if child_status.exists() else {}
     from portable_supervisor import COMPLETE, STOP
+    if progress.get('stage') in STOP:
+        from pre_red_supervision import qualified
+        if qualified(progress,child):
+            # Wake only supervision of the already existing native incident.
+            # Preserve the blocked receipt; the controller will re-read it.
+            progress={**progress,'stage':'qualified_supervision_reentry'}
     if progress.get('stage') in COMPLETE:
         if progress['stage'] == 'recovered_by_test_revision':
             descendant_path = root / (child['issue_id'] + '.json')

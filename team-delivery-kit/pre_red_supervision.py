@@ -1,0 +1,96 @@
+"""Resume observation of a qualified recovered incident, never its author."""
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+
+
+def eligible(status, managed):
+    if (not status or status.get('stage')!='escalation_required'
+            or not str(status.get('category','')).startswith('technical_decision_required:')
+            or not managed or managed.get('route',{}).get('enabled') is not True
+            or managed['route'].get('issue_id')!=status.get('issue_id')):return False
+    state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
+    proof=data.get('diagnostic_presentation_recovery') or {}
+    digest=hashlib.sha256(json.dumps(data.get('diagnostic') or {},sort_keys=True).encode()).hexdigest()
+    return (state.get('stage') in ('test_first_cto_diagnosis','test_first_cto_correction',
+                                  'test_first_cto_correction_wait')
+        and data.get('phase')=='test_first'
+        and proof.get('operation')=='bounded_pre_red_diagnostic_presentation_v1'
+        and proof.get('source_task')==state.get('source_task')
+        and proof.get('diagnostic_sha256')==digest
+        and proof.get('approval') is False and proof.get('author_restarted') is False
+        and bool(data.get('test_first_cto_wakeup')))
+
+
+def read_proof(context):
+    from evalctl import PROJECT
+    program='''import broker as b,json,native,sys
+issue=sys.argv[1]
+with b.db() as c:
+ route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
+ rows=c.execute('SELECT * FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC',(issue,)).fetchall()
+ recovered=[r for r in rows if json.loads(r['data']).get('diagnostic_presentation_recovery')]
+ if not route or len(recovered)!=1:print('null');sys.exit()
+ route=json.loads(route[0]);state=dict(recovered[0]);data=json.loads(state['data'])
+ latest=dict(rows[0])
+runs=native.issue_task_runs(json.loads((b.STATE/'native.json').read_text()),issue)
+tasks=[r for r in runs if r.get('agent_id')==route['cto'] and r.get('wakeup_id')==data.get('test_first_cto_wakeup')]
+task=tasks[0] if len(tasks)==1 else {}
+active=task.get('status') in ('queued','dispatched','running') and state['stage']=='test_first_cto_diagnosis'
+decided=task.get('status')=='completed' and data.get('cto_task')==task.get('id') and data.get('decision',{}).get('action')=='request_correction' and state['stage'] in ('test_first_cto_correction','test_first_cto_correction_wait')
+authors=[r for r in runs if r.get('agent_id')==route['author']]
+author=max(authors,key=lambda r:(r.get('created_at') or '',r['id'])) if authors else {}
+if state['stage']=='test_first_cto_correction_wait':
+ decided=decided and author.get('id')!=state['source_task'] and author.get('wakeup_id')==data.get('test_first_correction_wakeup') and author.get('status') in ('queued','dispatched','running','completed') and latest['stage'] not in ('test_first_blocked','technical_decision_required','diagnose_cto')
+print(json.dumps(dict(managed=dict(route=route,state=state),issue_id=issue,
+ contract_sha256=route['contract_sha256'],independent=route['cto']!=route['author'],
+ qualified=bool(task.get('id')) and (active or decided),task=task.get('id'),
+ delivery_approval=False,author_retry_authorized=False)))'''
+    return json.loads(subprocess.check_output(['docker','exec','-e','PYTHONPATH=/',
+        PROJECT+'-execution-broker-1','python','-c',program,context['issue_id']],text=True))
+
+
+def qualified(status, context, *, query=read_proof):
+    if (not status or status.get('stage')!='escalation_required'
+            or not str(status.get('category','')).startswith('technical_decision_required:')):return False
+    proof=query(context) or {}
+    return (proof.get('qualified') is True and proof.get('independent') is True
+        and proof.get('issue_id')==context['issue_id']
+        and proof.get('contract_sha256')==context['contract_sha256']
+        and proof.get('delivery_approval') is False and proof.get('author_retry_authorized') is False
+        and eligible(status,proof.get('managed')))
+
+
+def resume(ledger,plan,private,*,query=read_proof,read_delivery=None,verify=None,verify_ci=None):
+    from dependent_sequence import read_json,receipt_identity,read_stage_delivery,verify_predecessor,verify_recovery_ci
+    from portable_delivery import managed_handoff
+    from portable_test_revision_recovery import child_spec
+    labels=[s['spec']['label'] for s in plan['stages']];label=ledger.get('active')
+    if (ledger.get('stage')!='blocked' or ledger.get('category')!='RuntimeError:delivery_incomplete'
+            or ledger.get('plan_sha256')!=plan['sha256'] or label not in labels):return None
+    index=labels.index(label)
+    if index==0 or ledger.get('completed')!=labels[:index]:return None
+    stage=plan['stages'][index];context=read_json(Path(private)/('portable-context-'+label+'.json'))
+    if (not context or context.get('issue_id')!=ledger.get('issues',{}).get(label)
+            or context.get('contract_sha256')!=hashlib.sha256(json.dumps(stage['contract'],
+                sort_keys=True,separators=(',',':')).encode()).hexdigest()):return None
+    root=Path(private)/'test-revision-recovery';path=root/(context['issue_id']+'.json')
+    if path.is_symlink():raise ValueError('unsafe child recovery intent')
+    intent=read_json(path) or {};spec=intent.get('spec') or {}
+    if intent.get('parent_issue')!=context['issue_id'] or not spec.get('label'):return None
+    if child_spec(context,stage['spec'],managed_handoff(context))!=spec:return None
+    child=read_json(Path(private)/('portable-context-'+spec['label']+'.json'))
+    status=read_json(Path(private)/'autonomy-status'/(spec['label']+'.json'))
+    if (not child or child.get('issue_id')!=intent.get('child_issue')
+            or child.get('base_sha')!=context.get('base_sha')
+            or child.get('contract_sha256')!=context.get('contract_sha256')
+            or child.get('run_spec_sha256')!=hashlib.sha256(json.dumps(spec,
+                sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            or not qualified(status,child,query=query)):return None
+    previous=plan['stages'][index-1];receipt=(read_delivery or read_stage_delivery)(private,previous)
+    if not receipt_identity(receipt,previous) or receipt.get('merge_sha')!=context['base_sha']:return None
+    (verify or verify_predecessor)(receipt,previous,allow_advanced_main=False,require_live_qa=True)
+    (verify_ci or verify_recovery_ci)(receipt,previous)
+    return {**ledger,'stage':'working','pre_red_supervision_recovery':dict(
+        child_issue=child['issue_id'],category=ledger['category'],delivery_approval=False)}

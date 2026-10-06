@@ -17,14 +17,14 @@ FIXED_SOURCE_SHA = '9c730f78ca7bfbf08cafc9f426c881078ab7a2beb648e596fa66e0910f63
 FORMAT_PROXY_IMAGE = 'sha256:f6ac67c6ce961f82c9c488a720e5485dd4e63d53c796eb4a9fdfdd8a3d876b1e'
 
 
-def format_rejection(b, execution):
+def format_rejection(b, execution, *, expected_image=FORMAT_PROXY_IMAGE):
     """Read only sanitized validator receipts from the owned, pinned proxy."""
     if str(uuid.UUID(execution)) != execution:
         raise ValueError('canonical execution required')
     name = b.PREFIX + '-model-proxy-1'
     proxy = b.docker('GET', '/containers/' + name + '/json')
     labels = (proxy or {}).get('Config', {}).get('Labels', {})
-    if (not proxy or proxy['Image'] != FORMAT_PROXY_IMAGE
+    if (not proxy or proxy['Image'] != expected_image
             or not proxy.get('State', {}).get('Running')
             or labels.get('com.docker.compose.project') != b.PREFIX
             or labels.get('com.docker.compose.service') != 'model-proxy'):

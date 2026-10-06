@@ -317,13 +317,15 @@ def main():
             context = read_context(contract)
             managed = managed_handoff(context)
             from citation_supervision import eligible as stale_citation_blocker
+            from pre_red_supervision import qualified as recovered_pre_red
             if (stale_size_blocker(initial, managed) or stale_restart_blocker(initial, managed)
                     or stale_review_transport_blocker(initial, managed)
                     or stale_execution_diagnosis_blocker(initial, managed)
                     or stale_capsule_review_blocker(initial, managed)
                     or stale_citation_blocker(initial, managed)
                     or stale_worker_interruption_blocker(initial, managed)
-                    or stale_artifact_diagnosis_blocker(initial, managed)):
+                    or stale_artifact_diagnosis_blocker(initial, managed)
+                    or recovered_pre_red(initial,context)):
                 # Read current controller evidence; never rewrite status to success
                 # or blindly retry an unchanged terminal blocker.
                 run()

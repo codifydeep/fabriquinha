@@ -68,6 +68,46 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_failed_typed_length_diagnosis_gets_one_nonapproving_recovery(self):
+        rejection={'operation':'rejected_typed_decision_adapter_v1','category':'typed_schema_maxLength',
+                   'upstream_sha256':'a'*64,'worker_tool_executed':False,'delivery_approval':False}
+        self.effects.pre_red_format_rejection=lambda *_:rejection
+        data={'phase':'test_first','error':'test_first_cto_execution_failed',
+              'diagnostic':{'kind':'rejected_red'},'test_first_cto_wakeup':'old'}
+        cto={'id':'failed-cto','agent_id':'cto','status':'failed','wakeup_id':'old'}
+        with self.broker.db() as con:
+            handoffs.save(con,'tests','issue','test_first_blocked','cto',data,1)
+            prior=handoffs.load(con,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,
+            [self.test_task,cto],self.test_task,prior,self.effects)
+        with self.broker.db() as con: state=handoffs.load(con,'tests')
+        saved=json.loads(state['data'])
+        self.assertEqual(state['stage'],'technical_decision_required')
+        self.assertEqual(saved['decision_format_retry'],1)
+        self.assertFalse(saved['previous_invalid_decision']['verdict_replayed'])
+        self.assertEqual(self.effects.calls,0)
+        saved.update(error='test_first_cto_execution_failed',test_first_cto_wakeup='new')
+        with self.broker.db() as con:
+            handoffs.save(con,'tests','issue','test_first_blocked','cto',saved,2)
+            prior=handoffs.load(con,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,
+            [self.test_task,{**cto,'wakeup_id':'new'}],self.test_task,prior,self.effects)
+        self.assertEqual(self.effects.wakeups,[])
+
+    def test_other_transport_rejection_does_not_authorize_replay(self):
+        self.effects.pre_red_format_rejection=lambda *_:{'category':'typed_schema_enum'}
+        data={'phase':'test_first','error':'test_first_cto_execution_failed',
+              'diagnostic':{'kind':'rejected_red'},'test_first_cto_wakeup':'old'}
+        cto={'id':'failed-cto','agent_id':'cto','status':'failed','wakeup_id':'old'}
+        with self.broker.db() as con:
+            handoffs.save(con,'tests','issue','test_first_blocked','cto',data,1)
+            prior=handoffs.load(con,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,
+            [self.test_task,cto],self.test_task,prior,self.effects)
+        with self.broker.db() as con: state=handoffs.load(con,'tests')
+        self.assertEqual(state['stage'],'test_first_blocked')
+        self.assertNotIn('decision_format_retry',json.loads(state['data']))
+
     def test_large_diagnostic_is_preserved_but_not_serialized_into_wakeup(self):
         diagnostic={'kind':'rejected_red','reason':'unchanged new test',
                     'output_excerpt':'private traceback\n'*2000}

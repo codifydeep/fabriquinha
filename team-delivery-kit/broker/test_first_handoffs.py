@@ -224,6 +224,29 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                 data['diagnostic'] = diagnostic
                 save('test_first_blocked', route['cto'])
         diagnostic=data.get('diagnostic') or {}
+        if (data.get('error')=='test_first_cto_execution_failed'
+                and diagnostic and not data.get('decision_format_retry')
+                and not data.get('pre_red_format_checked')):
+            candidates=[r for r in runs if r.get('wakeup_id')==data.get('test_first_cto_wakeup')
+                and r.get('agent_id')==route['cto'] and r.get('status')=='failed']
+            if len(candidates)!=1:return
+            recipient=candidates[0]
+            rejection=effects.pre_red_format_rejection(route,recipient)
+            data['pre_red_format_checked']=recipient['id']
+            if (rejection.get('operation')=='rejected_typed_decision_adapter_v1'
+                    and rejection.get('category')=='typed_schema_maxLength'
+                    and rejection.get('delivery_approval') is False
+                    and rejection.get('worker_tool_executed') is False
+                    and re.fullmatch(r'[a-f0-9]{64}',rejection.get('upstream_sha256',''))):
+                data['previous_invalid_decision']={
+                    'cto_task':recipient['id'],'wakeup':data['test_first_cto_wakeup'],
+                    'rejection':rejection,'verdict_replayed':False,'delivery_approval':False}
+                data.update(decision_format_retry=1,error='technical_reason_exceeds_limit')
+                for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):
+                    data.pop(field,None)
+                save('technical_decision_required',route['cto'])
+            else:save('test_first_blocked',route['cto'])
+            return
         if (data.get('error')=='test_first_cto_requires_replanning'
                 and not data.get('artifact_diagnosis_replay')
                 and data.get('decision',{}).get('action')=='escalate_cto'
@@ -359,7 +382,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                if diagnostic.get('kind')=='rejected_test_write' else '')
             +
             '\nOutput reason in one complete sentence, aim below 900 characters; '
-            '1200 characters is the output-contract maximum. No preface or Markdown. '
+            '1200 characters is the output-contract maximum. Target420characters on format recovery. No preface or Markdown. '
             'This is a routing decision, not proof of delivery or release approval.'
             + ('\nHOST RESTART DIAGNOSIS: an author failed during a daemon restart; '
                'the immediately following author failed before broker admission. '
@@ -399,7 +422,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'setup/context managers. Do not merely delete coverage, install pytest, change the '
                'runner or edit product code. A collection/import failure is not behavioral Red. '
                'This changed-contract replan is allowed once; another failure remains blocked.' if qualified_framework else '')
-            + '\nDELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n')
+            + '\nDELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n')
         wakeup = effects.ensure_wakeup(issue, route['cto'], key, marker, instruction,
                                       allow_create=effects.remaining_calls() >= route['minimum_calls'])
         if wakeup is None:
