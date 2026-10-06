@@ -10,7 +10,7 @@ from portable_contract import safe_path
 
 FIELDS = {'label', 'title', 'description', 'review_instruction', 'qa_host_port',
           'container_port', 'dockerfile', 'implementer_registry', 'reviewer_registry'}
-OPTIONAL_FIELDS = {'runtime_env', 'browser_qa'}
+OPTIONAL_FIELDS = {'runtime_env', 'browser_qa', 'execution_context'}
 LABEL = re.compile(r'[A-Z][A-Z0-9]{1,31}-[1-9][0-9]{0,5}\Z')
 REGISTRY = re.compile(r'[a-z][a-z0-9-]{1,63}\.json\Z')
 ENV_NAME = re.compile(r'[A-Z][A-Z0-9_]{0,63}\Z')
@@ -26,6 +26,10 @@ def validate(data, contract):
         value = data[key]
         if not isinstance(value, str) or not value.strip() or len(value) > 12000:
             raise ValueError('invalid portable run ' + key)
+    if 'execution_context' in data:
+        from execution_context import resolve
+        for key, mode in [('description', 'implementation'), ('review_instruction', 'review')]:
+            resolve(data['execution_context'], data[key], mode)
     for key in ('qa_host_port', 'container_port'):
         value = data[key]
         if type(value) is not int or not 1024 <= value <= 65535:

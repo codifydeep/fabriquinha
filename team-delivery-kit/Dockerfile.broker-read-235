@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261006.234
+COPY execution_context.py /execution_context.py
+COPY broker/server.py /broker.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/review_context_recovery.py /review_context_recovery.py

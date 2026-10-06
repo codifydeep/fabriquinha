@@ -11,7 +11,7 @@ import sqlite3
 import time
 import uuid
 
-FIXED_SERVER_SHA = '67534a961cdab17f9c6977bed7ea846fe993f9a0f4034800e7686bd9a9b773f8'
+FIXED_SERVER_SHA = '95f97395dbff79bbe13cef80dfaf7d4a65541d375457fb81513c5adf0e9799e9'
 ERROR = 'hermes session/prompt failed: session/prompt: restricted broker stream failed: broker_internal (code=-32000)'
 
 

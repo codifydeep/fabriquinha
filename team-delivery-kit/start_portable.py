@@ -168,6 +168,8 @@ def main():
             'techlead': planning['techlead'], 'cto': planning['cto'],
             'contract_sha256': hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
             'review_instruction': review_instruction, 'minimum_calls': 8, 'enabled': True}
+        if spec and 'execution_context' in spec:
+            route['execution_context'] = spec['execution_context']
         if os.environ.get('DELIVERY_KIT_TEST_FIRST') == '1':
             route.update(test_first=True,
                          test_first_files=sorted(set(contract['test_files']) &

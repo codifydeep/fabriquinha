@@ -42,8 +42,12 @@ def register(broker, route):
     keys = {'issue_id', 'author', 'reviewer', 'techlead', 'cto', 'contract_sha256',
             'review_instruction', 'minimum_calls', 'enabled'}
     test_first_keys = keys | {'test_first', 'test_first_files'}
-    if not isinstance(route, dict) or set(route) not in (keys, test_first_keys):
+    if not isinstance(route, dict) or set(route) not in (keys, test_first_keys,
+            keys | {'execution_context'}, test_first_keys | {'execution_context'}):
         raise ValueError('invalid handoff route')
+    if 'execution_context' in route:
+        from execution_context import resolve
+        resolve(route['execution_context'], route['review_instruction'], 'review')
     if 'test_first' in route:
         from portable_contract import safe_path
         names = route['test_first_files']

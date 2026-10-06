@@ -1863,6 +1863,26 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         if additive:
             return {**frame,'params':{**frame['params'],'prompt':[{'type':'text','text':additive['note']}]}}
     title, description = issue.get('title'), issue.get('description')
+    from execution_context import registered as registered_context, reference as context_reference
+    with db() as con:
+        capsule = registered_context(con, mode, issue.get('id'), task.get('agent_id'), description)
+    if capsule is not None:
+        description = capsule['description']
+        receipt_task_id = task.get('task_id') or task.get('id')
+        if not isinstance(receipt_task_id, str) or not receipt_task_id:
+            raise ValueError('registered context execution identity required')
+        proof = dict(issue_id=issue.get('id'), task_id=receipt_task_id,
+                     agent_id=task.get('agent_id'), mode=mode,
+                     context_sha256=capsule['sha256'], delivery_approval=False)
+        with db() as con:
+            con.execute('CREATE TABLE IF NOT EXISTS execution_context_presentations('
+                        'task_id TEXT PRIMARY KEY, receipt TEXT)')
+            old = con.execute('SELECT receipt FROM execution_context_presentations WHERE task_id=?',
+                              (receipt_task_id,)).fetchone()
+            if old and json.loads(old[0]) != proof:
+                raise ValueError('registered execution context presentation drift')
+            con.execute('INSERT OR IGNORE INTO execution_context_presentations VALUES (?,?)',
+                        (receipt_task_id, json.dumps(proof, sort_keys=True)))
     current=None
     if mode=='implementation' and re.search(r'(?:^|\n)DELIVERY_DRIVER_CHECKPOINT_V3(?:\n|$)',task.get('handoff_note') or ''):
         try:import harness_repair_task
@@ -1874,7 +1894,7 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         except ImportError:from broker import harness_repair_task
         with db() as con:current=harness_repair_task.current_diagnosis_context(con,issue,task)
         title,description=current['title'],current['description']
-    if mode != 'planning':
+    if mode != 'planning' and capsule is None:
         from generated_context import compact as compact_generated_context
         description, context_presentation = compact_generated_context(description)
         if context_presentation:
@@ -1891,7 +1911,7 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
                     raise ValueError('generated context presentation drift')
                 con.execute('INSERT OR IGNORE INTO generated_context_presentations VALUES (?,?)',
                             (receipt_task_id, json.dumps(proof, sort_keys=True)))
-    description_limit = 8000 if mode == 'planning' else 4000
+    description_limit = 12000 if capsule is not None else (8000 if mode == 'planning' else 4000)
     if (mode != 'planning' and isinstance(description, str)
             and 4000 < len(description) <= 8000
             and has_verified_revision_brief(issue.get('id'))):
@@ -1902,8 +1922,13 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
     note = task.get('handoff_note') or ''
     if mode == 'review':
         note = compact_review_note(issue, task, note)
+        if capsule is not None:
+            ref = context_reference(capsule, 'review')
+            if note.count(ref) != 1:
+                raise ValueError('registered review context reference required')
+            note = note.replace(ref, capsule['review_instruction'])
     # Multica wraps the bounded 4000-character instruction with event context.
-    if not isinstance(note, str) or len(note) > (8000 if mode == 'planning' else 4000):
+    if not isinstance(note, str) or len(note) > (16000 if capsule is not None else (8000 if mode == 'planning' else 4000)):
         raise ValueError('invalid handoff note')
     if current is not None:
         note=current['handoff_note']

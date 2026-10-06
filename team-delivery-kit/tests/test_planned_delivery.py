@@ -62,6 +62,17 @@ class PlannedDeliveryTests(unittest.TestCase):
             derive(self.plan, self.tracked, self.stages, 'x' * 3600, self.cto,
                    name='NEW-1', prefix='new-1', project_config='descartavel2.json')
 
+    def test_opt_in_capsule_preserves_complete_brief_and_review(self):
+        from execution_context import resolve
+        brief = 'Complete approved behavior. ' * 170
+        outputs = derive(self.plan, self.tracked, self.stages, brief, self.cto,
+                         name='NEW-1', prefix='new-1', project_config='descartavel2.json',
+                         context_capsules=True)
+        spec = outputs['new-1-c1.run.json']
+        self.assertIn(brief, resolve(spec['execution_context'], spec['description'], 'implementation'))
+        self.assertIn('New API behavior', resolve(spec['execution_context'], spec['review_instruction'], 'review'))
+        self.assertLess(len(spec['description']), 4000)
+
     def test_cannot_edit_baseline_tests_or_predecessor_test(self):
         for path in ('tests/test_autoloss_livecheck.py', 'tests/test_new_api.py'):
             with self.subTest(path=path):

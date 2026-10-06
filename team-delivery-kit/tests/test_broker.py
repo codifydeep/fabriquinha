@@ -257,6 +257,27 @@ class BrokerTests(unittest.TestCase):
         self.assertNotIn('Run multica issue get', prompt)
         self.assertIn('Red-Green-Refactor', prompt)
 
+    def test_native_prompt_resolves_only_registered_immutable_context(self):
+        from execution_context import freeze, reference
+        capsule = freeze('Complete requirement. ' * 240, 'Exact independent review criteria.')
+        with broker.db() as con:
+            con.execute('CREATE TABLE delivery_routes(issue_id TEXT PRIMARY KEY,config TEXT)')
+            con.execute('INSERT INTO delivery_routes VALUES (?,?)', ('issue', json.dumps({
+                'enabled': True, 'author': 'author', 'reviewer': 'reviewer',
+                'execution_context': capsule})))
+        frame = {'method': 'session/prompt', 'params': {'sessionId': 's', 'prompt': []}}
+        issue = {'id': 'issue', 'title': 'Feature', 'description': reference(capsule, 'implementation')}
+        task = {'id': 'context-task', 'agent_id': 'author', 'handoff_note': ''}
+        prompt = broker.native_task_prompt(frame, 'implementation', issue, task)['params']['prompt'][0]['text']
+        self.assertIn(capsule['description'], prompt)
+        with broker.db() as con:
+            proof = json.loads(con.execute('SELECT receipt FROM execution_context_presentations WHERE task_id=?',
+                                          ('context-task',)).fetchone()[0])
+        self.assertEqual(proof['context_sha256'], capsule['sha256'])
+        self.assertIs(proof['delivery_approval'], False)
+        with self.assertRaises(ValueError):
+            broker.native_task_prompt(frame, 'implementation', issue, {**task, 'agent_id': 'reviewer'})
+
     def test_test_first_prompt_changes_only_after_controller_red(self):
         with broker.db() as con:
             con.execute('CREATE TABLE delivery_routes(issue_id TEXT PRIMARY KEY,config TEXT)')

@@ -25,7 +25,7 @@ from planning_ceo_answer import context as answered_context
 ROOT = Path(__file__).resolve().parent
 
 
-def derive(plan, tracked, stages, brief, cto, *, name, prefix, project_config):
+def derive(plan, tracked, stages, brief, cto, *, name, prefix, project_config, context_capsules=False):
     if (not isinstance(name, str) or not re.fullmatch(r'[A-Z][A-Z0-9-]{2,31}', name)
             or not isinstance(prefix, str) or not re.fullmatch(r'[a-z][a-z0-9-]{2,63}', prefix)
             or not isinstance(project_config, str)
@@ -93,10 +93,18 @@ def derive(plan, tracked, stages, brief, cto, *, name, prefix, project_config):
             'Finish with Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>. '
             'Deployment/browser QA is a separate mandatory gate.')
         description, _ = compact_generated_context(description)
+        capsule = None
+        if context_capsules:
+            from execution_context import freeze, reference
+            capsule = freeze(description, review)
+            description = reference(capsule, 'implementation')
+            review = reference(capsule, 'review')
         if len(description) > 4000:
             raise ValueError('generated execution context exceeds native bounds')
         spec = {**run, 'title': name + ' — ' + card['id'] + ' — ' + card['title'],
                 'description': description, 'review_instruction': bounded_review_instruction(review)}
+        if capsule is not None:
+            spec['execution_context'] = capsule
         validate_spec(spec, contract)
         stem = prefix + '-c' + str(index + 1)
         outputs[stem + '.contract.json'] = contract
