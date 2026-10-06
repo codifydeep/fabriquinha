@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 from broker.remediation_preparation import payload,validate_job,validate_proof
-from broker.remediation_workspace_probe import prepare
+from broker.remediation_workspace_probe import prepare,copy_original
 import test_revision_seed as fixtures
 
 
@@ -34,6 +34,31 @@ class RemediationPreparationTests(unittest.TestCase):
                        lambda i:i['Config'].update(Cmd=['arbitrary-command'])):
             bad=copy.deepcopy(info);mutate(bad)
             with self.assertRaises(ValueError):validate_job(self.b,bad,expected)
+
+    def test_copy_has_no_snapshot_and_seed_has_no_persistent_write_mount(self):
+        copy_spec=payload(self.b,self.value,'issue','target','copy')
+        seed_spec=payload(self.b,self.value,'issue','target','seed')
+        self.assertEqual(copy_spec['User'],'0:0')
+        self.assertNotIn('/previous',[m['Target'] for m in copy_spec['HostConfig']['Mounts']])
+        self.assertEqual(seed_spec['User'],'10000:10000')
+        self.assertTrue(all(m['ReadOnly'] for m in seed_spec['HostConfig']['Mounts']))
+        self.assertEqual(seed_spec['HostConfig']['CapDrop'],['ALL'])
+        self.assertNotIn('CapAdd',seed_spec['HostConfig'])
+        self.assertEqual(seed_spec['Cmd'],['/remediation_workspace_probe.py','seed'])
+
+    def test_split_copy_and_seed_preserve_private_snapshot_permissions(self):
+        import stat
+        f=fixtures.RevisionSeedTests();f.setUp()
+        try:
+            target=f.base.parent/'target';target.mkdir()
+            manifest=f.previous/'manifest.json';manifest.chmod(0o400)
+            before=(manifest.stat().st_uid,stat.S_IMODE(manifest.stat().st_mode),manifest.read_bytes())
+            copied=copy_original(f.base,target,f.env['BASE_MANIFEST_SHA256'])
+            proof=prepare(f.base,target,f.previous,f.work,f.env['BASE_MANIFEST_SHA256'],f.selection,copy=False)
+            self.assertEqual(copied['baseline_test_sha256'],proof['baseline_test_sha256'])
+            self.assertEqual(before,(manifest.stat().st_uid,stat.S_IMODE(manifest.stat().st_mode),manifest.read_bytes()))
+            self.assertFalse(proof['red_executed']);self.assertFalse(proof['execution_authorized'])
+        finally:f.doCleanups()
 
     def test_fixed_probe_copies_only_original_base_and_preserved_new_tests(self):
         f=fixtures.RevisionSeedTests();f.setUp()

@@ -111,6 +111,15 @@ exact Docker handle. Uncertain create/start acknowledgements never recreate a
 job; semantic failures retain it for diagnosis. Qualification registers the
 new base but still requires tests-only runtime and seed bindings before dispatch.
 
+Copy and seed qualification use separate jobs and receipts: root copies only
+the public, verified original base and cannot mount the private test snapshot;
+UID `10000:10000` reads the preserved test snapshot and the copied base with all
+persistent mounts read-only. Its only writes are to disposable tmpfs. Both jobs
+drop all capabilities and have no network, credentials or socket. Snapshot
+permissions/owners are never broadened to make root reading work. The legacy
+combined-job read denial remains failed; a once-only changed-identity recovery
+preserves it before starting the split protocol.
+
 The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
 release. Generalization and the plan-to-execution adapter remain qualification

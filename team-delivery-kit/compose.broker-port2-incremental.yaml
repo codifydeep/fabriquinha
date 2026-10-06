@@ -1,9 +1,9 @@
 # Scoped U1 trial: immutable workers/model; persistent ledger limits activation.
 services:
   execution-broker:
-    image: delivery-kit-execution-broker:20261006.269
+    image: delivery-kit-execution-broker:20261006.270
     environment:
-      BROKER_WORKER_IMAGE: sha256:81ea475c793efbb1fcd59ee7d674a7529bfe1abceeeac4a00998410cde2fb99b
+      BROKER_WORKER_IMAGE: sha256:a03377c27371b815b95c34d18d03be49973c3b016eef4ea25a1dcf952b2de23e
       BROKER_VALIDATOR_IMAGE: sha256:74765177be20629a84cd56a9b7c7d0a57fb4f38c2de7239724ed0f651b251dd3
       BROKER_INCREMENTAL_ENABLED: "1"
       BROKER_QA_CLEANUP_OBSERVER: "1"
