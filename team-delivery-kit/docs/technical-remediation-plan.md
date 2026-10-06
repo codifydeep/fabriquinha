@@ -101,6 +101,16 @@ Creating cards does not authorize writes or imply Red, Green, merge or deploy.
 Worker provisioning and runtime enforcement of the three-step contract remain
 required qualification gates; intake alone is not autonomous delivery.
 
+R1 base preparation runs a fixed offline job with the original base and historic
+NEW-test snapshot mounted read-only. It copies and hashes the original tree,
+verifies the protected baseline inventory, and rehearses NEW-test seeding in an
+empty tmpfs workspace. No application test or product code executes in this job.
+Its receipt explicitly says `red_executed=false` and grants no worker authority.
+The persistent watchdog observes an already-started preparation through its
+exact Docker handle. Uncertain create/start acknowledgements never recreate a
+job; semantic failures retain it for diagnosis. Qualification registers the
+new base but still requires tests-only runtime and seed bindings before dispatch.
+
 The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
 release. Generalization and the plan-to-execution adapter remain qualification

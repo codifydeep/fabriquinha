@@ -363,6 +363,9 @@ def reconcile_review_changes(b,source):
 
 
 def tick(b):
+    try:import remediation_preparation
+    except ImportError:from broker import remediation_preparation
+    remediation_preparation.tick(b)
     with b.db() as con:
         initialize(con)
         busy=con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()
