@@ -143,8 +143,14 @@ def child_spec(context, spec, managed):
     key = hashlib.sha256((context['issue_id'] + ':' + proposal['decision_task']).encode()).hexdigest()[:12]
     label = 'TESTREV' + key.upper() + '-1'
     result = {k: v for k, v in spec.items() if k != 'sha256'}
+    description=spec['description'];review=spec.get('review_instruction')
+    capsule=spec.get('execution_context')
+    if capsule:
+        from execution_context import resolve
+        description=resolve(capsule,description,'implementation')
+        review=resolve(capsule,review,'review')
     result.update(label=label, title=label + ' — CTO-sponsored new-test repair and full delivery',
-        description=spec['description'].split('\nCTO-SPONSORED NEW TEST REVISION:', 1)[0]
+        description=description.split('\nCTO-SPONSORED NEW TEST REVISION:', 1)[0]
         + '\nCTO-SPONSORED NEW TEST REVISION: ' + proposal['reason']
         + '\nThis is a NEW child on the ORIGINAL Git base, not permission to change '
         'the old snapshot. The controller seeds only the declared NEW test from '
@@ -193,8 +199,13 @@ def child_spec(context, spec, managed):
             'genuine nonmatch and accent-preserving casefold coverage. Do not alter product '
             'semantics to satisfy an incorrect expectation. The next candidate is checked '
             'deterministically before independent review and before any implementation permission.')
-    if len(result['title']) > 200 or len(result['description']) > 8000:
+    if len(result['title']) > 200 or len(result['description']) > (12000 if capsule else 8000):
         raise ValueError('test revision child brief exceeds bounded controller context')
+    if capsule:
+        from execution_context import freeze,reference
+        updated=freeze(result['description'],review)
+        result.update(execution_context=updated,description=reference(updated,'implementation'),
+                      review_instruction=reference(updated,'review'))
     return result
 
 

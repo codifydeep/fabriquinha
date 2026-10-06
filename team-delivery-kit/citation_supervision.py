@@ -6,16 +6,22 @@ import subprocess
 import time
 
 TEST_CATEGORY='test_revision_blocked:invalid_independent_test_review:ValueError'
+CONTEXT_CATEGORY='test_revision_recovery:ValueError:execution context reference mismatch'
 
 
 def eligible(status, managed):
-    if (not status or status.get('stage')!='escalation_required' or status.get('category')!=TEST_CATEGORY
+    if (not status or status.get('stage')!='escalation_required' or status.get('category') not in (TEST_CATEGORY,CONTEXT_CATEGORY)
             or not managed or managed.get('route',{}).get('enabled') is not True
             or managed['route'].get('issue_id')!=status.get('issue_id')):return False
     state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
     if state.get('stage') not in ('awaiting_test_revision_review','test_revision_approved',
                                   'test_review_cto_diagnosis','test_revision_required'):return False
     repair=data.get('citation_recovery') or {};prior=repair.get('prior_state') or {}
+    if status.get('category')==CONTEXT_CATEGORY:
+        from execution_context import validate
+        try:validate(managed['route'].get('execution_context'))
+        except (ValueError,TypeError):return False
+        if state.get('stage')!='test_revision_required' or not data.get('protocol_diagnosis'):return False
     return (repair.get('approval') is False and repair.get('author_restarted') is False
         and repair.get('attempt_limit')==1 and bool(repair.get('failed_task'))
         and prior.get('source_task')==state.get('source_task')
@@ -73,7 +79,8 @@ def resume(ledger, plan, private, *, query=read_proof, verify_initial=None, read
         read_stage_delivery, verify_predecessor, verify_recovery_ci)
     labels=[s['spec']['label'] for s in plan['stages']];label=ledger.get('active')
     if (ledger.get('stage')!='blocked' or ledger.get('plan_sha256')!=plan['sha256']
-            or ledger.get('category')!='RuntimeError:'+TEST_CATEGORY or label not in labels):return None
+            or ledger.get('category') not in ('RuntimeError:'+TEST_CATEGORY,'RuntimeError:'+CONTEXT_CATEGORY)
+            or label not in labels):return None
     index=labels.index(label)
     if ledger.get('completed')!=labels[:index]:return None
     stage=plan['stages'][index];context=read_json(Path(private)/('portable-context-'+label+'.json'))

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from citation_supervision import TEST_CATEGORY, eligible, resume
+from citation_supervision import TEST_CATEGORY, CONTEXT_CATEGORY, eligible, resume
 
 
 class CitationSupervisionTests(unittest.TestCase):
@@ -54,6 +54,9 @@ class CitationSupervisionTests(unittest.TestCase):
         self.assertIsNone(self.run_resume())
         self.proof['protocol_active']=True
         self.assertEqual(self.run_resume()['stage'],'working')
+        self.ledger['category']='RuntimeError:'+CONTEXT_CATEGORY
+        self.assertEqual(self.run_resume()['stage'],'working')
+        self.ledger['category']='RuntimeError:'+TEST_CATEGORY
         self.proof['protocol_active']=False
         self.proof['decision']={'action':'reject_test_revision'}
         self.assertEqual(self.run_resume()['stage'],'working')

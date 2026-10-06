@@ -184,6 +184,23 @@ class RevisionRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'CTO-sponsored'):
                 child_spec({'issue_id': 'parent'}, {'description': 'Scope'}, managed)
 
+    def test_capsule_child_refreezes_full_scope_without_mutating_parent(self):
+        from execution_context import freeze,reference,resolve
+        capsule=freeze('Full approved behavior and CEO answer.','Independent immutable review of all criteria.')
+        spec=dict(label='DEMO',execution_context=capsule,description=reference(capsule,'implementation'),
+            review_instruction=reference(capsule,'review'),browser_qa={'unchanged':True})
+        before=json.dumps(spec,sort_keys=True)
+        child=child_spec({'issue_id':'parent'},spec,self.managed())
+        self.assertEqual(json.dumps(spec,sort_keys=True),before)
+        self.assertNotEqual(child['execution_context']['sha256'],capsule['sha256'])
+        complete=resolve(child['execution_context'],child['description'],'implementation')
+        self.assertIn(capsule['description'],complete)
+        self.assertIn('Incorrect mock commit order.',complete)
+        self.assertEqual(resolve(child['execution_context'],child['review_instruction'],'review'),capsule['review_instruction'])
+        self.assertEqual(child['browser_qa'],spec['browser_qa'])
+        broken={**spec,'description':spec['description']+' modified pointer'}
+        with self.assertRaisesRegex(ValueError,'reference mismatch'):child_spec({'issue_id':'parent'},broken,self.managed())
+
     def test_semantic_child_uses_mechanical_findings_not_false_sponsor_prose(self):
         from broker.candidate_qualification import experiment_hash
         managed = self.managed()
