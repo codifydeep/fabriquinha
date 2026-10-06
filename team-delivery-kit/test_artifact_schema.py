@@ -35,18 +35,23 @@ def _selected(result,name,instruction):
 
 
 def revision_write_completed(history, target, sources):
-    """Freeze pre-write inspection; new bytes cannot invalidate old evidence."""
+    """Freeze pre-edit inspection; new bytes cannot invalidate old evidence."""
     calls={}
     for index,message in enumerate(history):
         if message.get('role')=='assistant':
             for call in message.get('tool_calls') or []:
                 fn=call.get('function') or {}
-                if fn.get('name')!='write_file':continue
+                if fn.get('name') not in ('write_file','patch'):continue
                 try:args=json.loads(fn.get('arguments','{}'))
                 except (ValueError,TypeError):continue
                 if (not isinstance(args,dict) or args.get('path')!=target
-                        or not isinstance(args.get('content'),str)
                         or not sources<=observations(history[:index],wire=True).keys()):continue
+                if fn['name']=='patch':
+                    if (isinstance(args.get('old_string'),str) and isinstance(args.get('new_string'),str)
+                            and args['old_string']!=args['new_string']):
+                        calls[call.get('id')]='patch'
+                    continue
+                if not isinstance(args.get('content'),str):continue
                 content=args['content'];size=len(content.encode())
                 if not 0<size<=32768:continue
                 if target.endswith('.py'):
@@ -58,6 +63,11 @@ def revision_write_completed(history, target, sources):
         if message.get('role')!='tool' or message.get('tool_call_id') not in calls:continue
         try:receipt=json.loads(message.get('content',''))
         except (ValueError,TypeError):continue
+        if calls[message['tool_call_id']]=='patch':
+            if (isinstance(receipt,dict) and receipt.get('success') is True and not receipt.get('error')
+                    and not receipt.get('already_applied') and not receipt.get('no_change')
+                    and isinstance(receipt.get('diff'),str) and receipt['diff'].strip()):return True
+            continue
         if (isinstance(receipt,dict) and not receipt.get('error') and receipt.get('success') is not False
                 and receipt.get('verified') is True and type(receipt.get('bytes_written')) is int
                 and receipt['bytes_written']==calls[message['tool_call_id']]

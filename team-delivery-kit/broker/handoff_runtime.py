@@ -128,7 +128,7 @@ class Effects:
         try:import execution_diagnosis_recovery
         except ImportError:from broker import execution_diagnosis_recovery
         return execution_diagnosis_recovery.format_rejection(b,rows[0]['request_id'],
-            expected_image='sha256:abd5858311cb429bc05bfb8abbd4e7e2138c619e9cdbaf75925d58c43a678403')
+            expected_image='sha256:ae1f1d76281235060a5001b07d63c701d79ba420055df3f6b809b7072f8c5734')
 
     def capture_report(self, issue):
         try: import capture_diagnosis

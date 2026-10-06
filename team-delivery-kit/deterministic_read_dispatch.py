@@ -53,6 +53,11 @@ def make(body,execution_id):
         if body.get('tool_choice')=={'type':'function','function':{'name':'read_file'}}:
             raise ValueError('invalid deterministic read contract')
         return None  # decision phase and other tools are never synthesized
+    # Transport bytes are different identities even for the same source page.
+    # Retain v1 rows for audit; never overwrite their response hashes.
+    scope={**scope,'scope':hashlib.sha256(json.dumps(dict(
+        namespace='controller-read-transport-v2',source_scope=scope['scope'],
+        streamed=body.get('stream') is True),sort_keys=True).encode()).hexdigest()}
     function=next(t['function'] for t in body['tools'] if t.get('function',{}).get('name')=='read_file')
     args={key:value['enum'][0] for key,value in function['parameters']['properties'].items()}
     dispatch_id='call_controller_read_'+scope['scope'][:24]

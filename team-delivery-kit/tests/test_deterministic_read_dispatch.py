@@ -13,6 +13,25 @@ EXECUTION=fixtures.EXECUTION
 
 
 class DeterministicReadTests(unittest.TestCase):
+    def test_handler_supports_stream_switch_without_upstream_or_overwriting_ledger(self):
+        with patch.object(proxy,'forward') as forward:
+            streamed=self.f.request({**self.body,'stream':True})
+            plain=self.f.request({**self.body,'stream':False})
+        self.assertEqual(streamed.status,200);self.assertEqual(plain.status,200)
+        forward.assert_not_called();self.assertEqual(proxy.load_calls(),0)
+        self.assertEqual(dispatch.status(str(self.f.counter),EXECUTION)['controller_read_requests'],2)
+
+    def test_json_and_streamed_dispatches_have_separate_durable_identities(self):
+        body=proxy.validate_request(copy.deepcopy(self.body))
+        first=dispatch.make({**body,'stream':True},EXECUTION)
+        second=dispatch.make({**body,'stream':False},EXECUTION)
+        self.assertNotEqual(first['scope']['scope'],second['scope']['scope'])
+        dispatch.record(str(self.f.counter),first);dispatch.record(str(self.f.counter),second)
+        dispatch.record(str(self.f.counter),first);dispatch.record(str(self.f.counter),second)
+        self.assertEqual(dispatch.status(str(self.f.counter),EXECUTION)['controller_read_requests'],2)
+        self.assertEqual(proxy.load_calls(),0)
+        self.assertEqual(observations([{'role':'assistant','content':second['data'].decode()}],wire=True),{})
+
     def test_seeded_200_line_read_is_supported_end_to_end_without_paid_call(self):
         wire=self.author_body();target='/workspace/tests/test_new.py'
         wire['messages'][0]['content']+='DELIVERY_TEST_REVISION_V1:'+target+'\nDELIVERY_SEEDED_EDIT_REQUIRED_V1:'+target+'\n'

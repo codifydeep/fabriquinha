@@ -6,6 +6,19 @@ from test_artifact_schema import apply
 
 
 class TestArtifactSchemaTests(unittest.TestCase):
+    def test_revision_patch_freezes_prior_inspection_but_not_red(self):
+        for receipt,accepted in [({'success':True,'diff':'-old\n+new'},True),
+                                 ({'success':True,'diff':'-old\n+new','already_applied':True},False),
+                                 ({'success':False,'diff':'-old\n+new'},False)]:
+            body=self.revision_history();body['tools'].append({'type':'function','function':{'name':'patch','parameters':{}}})
+            body['messages'] += [{'role':'assistant','tool_calls':[{'id':'patched','function':{
+                'name':'patch','arguments':json.dumps({'path':'/workspace/tests/test_new.py',
+                    'old_string':'assert False','new_string':'assert 1 == 2'})}}]},
+                {'role':'tool','tool_call_id':'patched','content':json.dumps(receipt)}]
+            result=apply(body)
+            if accepted:self.assertIs(result,body)
+            else:self.assertIsNot(result,body)
+
     def revision_history(self):
         body=self.body(read=True)
         body['messages'][0]['content']+='DELIVERY_TEST_REVISION_V1:/workspace/tests/test_new.py\n'

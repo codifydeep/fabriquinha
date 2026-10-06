@@ -5,6 +5,19 @@ from broker.postwrite_diagnosis import validate,qualified
 
 
 class PostwriteDiagnosisTests(unittest.TestCase):
+    def test_patch_repair_has_separate_once_only_certificate_not_a_reset(self):
+        c=sqlite3.connect(':memory:');self.addCleanup(c.close)
+        for table in ('postwrite_diagnoses','postpatch_diagnoses'):
+            c.execute('CREATE TABLE '+table+'(issue_id TEXT PRIMARY KEY,receipt TEXT)')
+        first=dict(source_task='first',author_retry_authorized=False,delivery_approval=False)
+        second=dict(source_task='second',author_retry_authorized=False,delivery_approval=False,
+                    repair_kind='postpatch_transport_v2')
+        c.execute('INSERT INTO postwrite_diagnoses VALUES (?,?)',('issue',json.dumps(first)))
+        c.execute('INSERT INTO postpatch_diagnoses VALUES (?,?)',('issue',json.dumps(second)))
+        self.assertTrue(qualified(c,'issue','first',{'postwrite_diagnosis':first}))
+        self.assertTrue(qualified(c,'issue','second',{'postwrite_diagnosis':second}))
+        self.assertFalse(qualified(c,'issue','second',{'postwrite_diagnosis':first}))
+
     def test_integrity_is_not_red_or_approval(self):
         proof=dict(operation='postwrite_snapshot_integrity_v1',verified=True,
             baseline_unchanged=True,changed=True,red_verified=False,delivery_approval=False,
