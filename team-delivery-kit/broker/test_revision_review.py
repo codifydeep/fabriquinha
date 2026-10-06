@@ -1100,7 +1100,14 @@ def resume_bootstrap(broker, payload):
                             'WHERE n.task_id=? AND e.operation=? AND e.category=?',
                             (payload['failed_task'], 'transport_start', 'bootstrap:broker_internal')).fetchone()
         if not error:
-            raise ValueError('recorded bootstrap incident missing')
+            try:
+                import review_dependency_recovery
+            except ImportError:
+                from broker import review_dependency_recovery
+            repaired=review_dependency_recovery.repaired(broker,con,payload,task,state)
+            if not repaired:
+                raise ValueError('recorded bootstrap incident missing')
+            state['dependency_recovery']=repaired
         state.update(status='dispatch_intent', bootstrap_retry=1, bootstrap_failed_task=payload['failed_task'])
         for field in ('wakeup_id', 'dispatched_at', 'reason'):
             state.pop(field, None)

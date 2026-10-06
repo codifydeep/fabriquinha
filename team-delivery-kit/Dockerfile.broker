@@ -24,6 +24,16 @@ COPY broker/failed_execution_diagnosis.py /failed_execution_diagnosis.py
 COPY broker/failed_test_checkpoint.py /failed_test_checkpoint.py
 COPY broker/failed_test_checkpoint_copy.py /failed_test_checkpoint_copy.py
 COPY broker/pre_red_snapshot_diagnostic.py /pre_red_snapshot_diagnostic.py
+COPY execution_context.py /execution_context.py
+COPY generated_context.py /generated_context.py
+COPY artifact_rejection_receipts.py /artifact_rejection_receipts.py
+COPY broker/artifact_rejection_evidence.py /artifact_rejection_evidence.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY broker/review_dependency_recovery.py /review_dependency_recovery.py
+COPY broker/worker_interruption_recovery.py /worker_interruption_recovery.py
+COPY broker/worker_interruption_snapshot.py /worker_interruption_snapshot.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py
 COPY broker/failed_execution_evidence.py /failed_execution_evidence.py
 COPY broker/assertion_witness.py /assertion_witness.py
 COPY broker/runtime_assertion_probe.py /runtime_assertion_probe.py

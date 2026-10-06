@@ -134,3 +134,23 @@ status text. Full offline coverage passed 1,800 tests (seven preexisting skips).
 The installed-image copy canary verifies identical manifests across a copy and
 resume; neither that canary nor unit tests qualify end-to-end delivery. Real
 independent review, implementation, PR, CI and same-SHA homologation remain gates.
+
+### Canonical image dependency repair
+
+The first real review of this checkpoint failed before model invocation. An
+offline reconstruction reproduced `ModuleNotFoundError` for `execution_context`:
+the canonical Dockerfile had omitted dependencies supplied only by historical
+overlay builds. The base Dockerfile now includes every Python dependency copied
+by those overlays, with a regression test comparing their exact copy mappings.
+An installed-image canary imports the dependency modules; rebuilding from the
+canonical file must not require the previous local overlay-image chain.
+
+The operator-only `review_dependency_recovery.record` records the exact failed
+review, wakeup, snapshot and old image, only before tool/model prompt execution,
+and only when the missing registered context dependency is reproduced. A changed
+image alone is insufficient to retry. The bootstrap recovery additionally
+constructs the real fixed prompt in a selected in-memory database, leaving the
+live route paused; a successful probe is tied to the exact failure and manifest.
+It consumes the existing one-time bootstrap recovery, not a new retry counter or
+author attempt. No failure is upgraded to a review verdict. Offline validation
+including packaging and recovery passed 1,808 tests, with seven preexisting skips.
