@@ -160,6 +160,32 @@ def stale_worker_interruption_blocker(status, managed):
         and receipt.get('author_retry_authorized') is False and receipt.get('delivery_approval') is False)
 
 
+def stale_capsule_review_blocker(status, managed):
+    """Refresh an obsolete projection, never approve or dispatch from activity."""
+    if (not status or status.get('stage') != 'escalation_required'
+            or status.get('category') != 'technical_decision_required:recipient_execution_failed'
+            or not managed or managed.get('route', {}).get('enabled') is not True
+            or managed['route'].get('issue_id') != status.get('issue_id')):
+        return False
+    state=managed.get('state') or {}
+    if state.get('stage') not in ('awaiting_acceptance','accepted','approved'):
+        return False
+    capsule=managed['route'].get('execution_context')
+    from execution_context import validate
+    try: validate(capsule)
+    except ValueError: return False
+    data=json.loads(state.get('data','{}'));receipt=data.get('review_context_recovery') or {}
+    request=receipt.get('request') or {};proof=receipt.get('presentation') or {}
+    manifest=data.get('evidence',{}).get('manifest_sha256')
+    return (receipt.get('operation')=='native_review_context_recovery_v1'
+        and receipt.get('approval') is False and receipt.get('author_restarted') is False
+        and request.get('issue_id')==status['issue_id'] and request.get('source_task')==state.get('source_task')
+        and proof.get('operation')=='registered_capsule_prompt_probe_v1'
+        and proof.get('context_sha256')==capsule['sha256']
+        and proof.get('manifest_sha256')==manifest and isinstance(manifest,str) and len(manifest)==64
+        and data.get('snapshot',{}).get('task_id')==state.get('source_task'))
+
+
 def stale_execution_diagnosis_blocker(status, managed):
     """Resume only the newly registered diagnostic, never its terminal verdict."""
     if (not status or status.get('stage') != 'escalation_required'
@@ -293,6 +319,7 @@ def main():
             if (stale_size_blocker(initial, managed) or stale_restart_blocker(initial, managed)
                     or stale_review_transport_blocker(initial, managed)
                     or stale_execution_diagnosis_blocker(initial, managed)
+                    or stale_capsule_review_blocker(initial, managed)
                     or stale_worker_interruption_blocker(initial, managed)
                     or stale_artifact_diagnosis_blocker(initial, managed)):
                 # Read current controller evidence; never rewrite status to success

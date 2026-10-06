@@ -493,6 +493,8 @@ with b.db() as c:
  qualified=recovery.qualified(c,issue,row['source_task'],d)
  presentation=c.execute('SELECT receipt FROM review_context_presentations WHERE task_id=?',(d.get('recipient_task'),)).fetchone() if c.execute("SELECT 1 FROM sqlite_master WHERE name='review_context_presentations'").fetchone() else None
  presentation=json.loads(presentation[0]) if presentation else {}
+ context_presentation=c.execute('SELECT receipt FROM execution_context_presentations WHERE task_id=?',(d.get('recipient_task'),)).fetchone() if c.execute("SELECT 1 FROM sqlite_master WHERE name='execution_context_presentations'").fetchone() else None
+ context_presentation=json.loads(context_presentation[0]) if context_presentation else {}
 runs=native.issue_task_runs(s,issue)
 author=next((x for x in runs if x['id']==row['source_task']),{})
 cto=next((x for x in runs if x['id']==used.get('cto_task')),{});
@@ -504,27 +506,51 @@ print(json.dumps(dict(issue_id=issue,enabled=r.get('enabled'),contract_sha256=r.
  baseline_tests_intact=d.get('evidence',{}).get('baseline_tests_intact'),review_retries=d.get('review_retries'),
  cto_task=cto.get('id'),cto_status=cto.get('status'),cto_agent=cto.get('agent_id'),cto_wakeup=cto.get('wakeup_id'),
  used=used,review_task=review.get('id'),review_agent=review.get('agent_id'),review_status=review.get('status'),
- review_wakeup=review.get('wakeup_id'),wakeup=d.get('wakeup_id'),presentation=presentation)))'''
+ review_wakeup=review.get('wakeup_id'),wakeup=d.get('wakeup_id'),presentation=presentation,
+ context_presentation=context_presentation,repair_context_sha256=repair.get('presentation',{}).get('context_sha256'))))'''
     from evalctl import PROJECT
     return json.loads(subprocess.check_output(['docker','exec','-e','PYTHONPATH=/',
         PROJECT+'-execution-broker-1','python','-c',script,context['issue_id']],text=True))
 
 
+def verify_initial_review_base(context, stage):
+    from prepare_issue_base import verified_main
+    if verified_main() != context.get('base_sha'):
+        raise ValueError('initial review recovery base or required CI drift')
+
+
 def resume_verified_review_context(ledger, plan, private, *, read_proof=read_review_context_recovery,
                                   read_delivery=read_stage_delivery, verify=verify_predecessor,
-                                  verify_ci=verify_recovery_ci):
+                                  verify_ci=verify_recovery_ci, verify_initial=verify_initial_review_base):
     """Supervise a fresh qualified review, never infer delivery from activity."""
     labels=[s['spec']['label'] for s in plan['stages']];label=ledger.get('active')
     if (ledger.get('stage')!='blocked' or ledger.get('plan_sha256')!=plan['sha256']
             or ledger.get('category')!='RuntimeError:technical_decision_required:recipient_execution_failed'
             or label not in labels):return None
     index=labels.index(label)
-    if index==0 or ledger.get('completed')!=labels[:index]:return None
+    if ledger.get('completed')!=labels[:index]:return None
     stage=plan['stages'][index];context=read_json(Path(private)/('portable-context-'+label+'.json'))
     contract_sha=hashlib.sha256(json.dumps(stage['contract'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
     if (not context or context.get('label')!=label or context.get('issue_id')!=ledger.get('issues',{}).get(label)
             or not context.get('durable_handoffs') or context.get('contract_sha256')!=contract_sha):return None
     p=read_proof(context) or {};req=p.get('request') or {};used=p.get('used') or {};presentation=p.get('presentation') or {}
+    capsule=stage['spec'].get('execution_context')
+    capsule_presentation=False
+    if capsule is not None:
+        from execution_context import validate
+        validate(capsule)
+        cp=p.get('context_presentation') or {}
+        spec_sha=hashlib.sha256(json.dumps(stage['spec'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        capsule_presentation=(context.get('run_spec_sha256')==spec_sha
+            and p.get('repair_context_sha256')==capsule['sha256']
+            and cp.get('issue_id')==context['issue_id'] and cp.get('task_id')==p.get('review_task')
+            and cp.get('agent_id')==p.get('reviewer') and cp.get('mode')=='review'
+            and cp.get('context_sha256')==capsule['sha256'] and cp.get('delivery_approval') is False)
+    legacy_presentation=(presentation.get('operation')=='registered_review_presentation_v1'
+        and presentation.get('approval') is False and presentation.get('source_task')==p.get('source_task')
+        and presentation.get('issue_id')==context['issue_id'] and presentation.get('wakeup_id')==p.get('wakeup')
+        and presentation.get('manifest_sha256')==p.get('manifest_sha256'))
+    if index==0 and not capsule_presentation:return None
     if (p.get('qualified') is not True or p.get('enabled') is not True or p.get('approval') is not False
             or p.get('issue_id')!=context['issue_id'] or p.get('contract_sha256')!=contract_sha
             or p.get('stage') not in ('awaiting_acceptance','accepted','approved')
@@ -539,13 +565,14 @@ def resume_verified_review_context(ledger, plan, private, *, read_proof=read_rev
             or p.get('review_agent')!=p['reviewer'] or p.get('review_status') not in ('running','completed')
             or p.get('review_task') in (req.get('failed_review'),p['source_task'],p['cto_task'])
             or p.get('review_wakeup')!=p['wakeup']
-            or presentation.get('operation')!='registered_review_presentation_v1' or presentation.get('approval') is not False
-            or presentation.get('source_task')!=p['source_task'] or presentation.get('issue_id')!=context['issue_id']
-            or presentation.get('wakeup_id')!=p['wakeup'] or presentation.get('manifest_sha256')!=p.get('manifest_sha256')
+            or not (capsule_presentation or legacy_presentation)
             or not re.fullmatch('[a-f0-9]{64}',str(p.get('manifest_sha256','')))):return None
-    prior_stage=plan['stages'][index-1];receipt=read_delivery(private,prior_stage)
-    if not receipt_identity(receipt,prior_stage) or receipt.get('merge_sha')!=context.get('base_sha'):return None
-    verify(receipt,prior_stage,allow_advanced_main=False,require_live_qa=True);verify_ci(receipt,prior_stage)
+    if index==0:
+        verify_initial(context,stage)
+    else:
+        prior_stage=plan['stages'][index-1];receipt=read_delivery(private,prior_stage)
+        if not receipt_identity(receipt,prior_stage) or receipt.get('merge_sha')!=context.get('base_sha'):return None
+        verify(receipt,prior_stage,allow_advanced_main=False,require_live_qa=True);verify_ci(receipt,prior_stage)
     event=dict(category=ledger['category'],stage_label=label,source_task=p['source_task'],
         cto_task=p['cto_task'],review_task=p['review_task'],status='supervision_resumed_not_delivered',at=time.time())
     return {**ledger,'stage':'working','updated_at':time.time(),
