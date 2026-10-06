@@ -17,6 +17,38 @@ def initialize(con):
                 'issue_id TEXT PRIMARY KEY, parent_issue TEXT UNIQUE, config TEXT, state TEXT)')
 
 
+def prepare_citation_recovery(state, red, task, reviewer, decision, paths):
+    """One fresh immutable review; never repair or accept the invalid verdict."""
+    prior=state.get('citation_recovery')
+    if prior:
+        if prior.get('failed_task')!=task['id']:
+            raise ValueError('citation recovery already consumed')
+        return state
+    failure=state.get('review_failure') or {};reads=state.get('read_evidence') or {}
+    if (state.get('status')!='blocked' or state.get('review_task') or state.get('decision')
+            or state.get('reason')!='invalid_independent_test_review:ValueError'
+            or failure.get('detail')!='finding quote not observed at exact line'
+            or failure.get('task_id')!=task['id'] or task.get('status')!='completed'
+            or task.get('agent_id')!=reviewer or task.get('wakeup_id')!=state.get('wakeup_id')
+            or state.get('terminal_contract')!='typed-review-v1' or state.get('evidence_policy')!=1
+            or state.get('source_task')!=red['task_id'] or state.get('candidate_volume')!=red['volume']
+            or state.get('manifest_sha256')!=red['red']['manifest_sha256']
+            or decision.get('manifest_sha256')!=state['manifest_sha256']
+            or decision.get('action')!='reject_test_revision' or decision.get('optional_files')!=[]
+            or not decision.get('findings') or not paths
+            or any(type(reads.get(path,{}).get('lines')) is not int
+                   or reads[path]['lines']<=0 or reads[path]['lines']!=reads[path].get('total_lines')
+                   for path in paths)):
+        raise ValueError('exact fully observed invalid citation required')
+    result=json.loads(json.dumps(state))
+    result['citation_recovery']=dict(failed_task=task['id'],invalid_decision=decision,
+        prior_state=json.loads(json.dumps(state)),approval=False,author_restarted=False,attempt_limit=1)
+    result.update(status='dispatch_intent')
+    for key in ('wakeup_id','dispatched_at','reason','review_failure','read_evidence'):
+        result.pop(key,None)
+    return result
+
+
 def prepare_typed_terminal_recovery(state, red, task, reviewer):
     """One new read-only review, not a recovered verdict or waived evidence."""
     if state.get('typed_terminal_recovery'):
@@ -571,6 +603,21 @@ def reconcile(broker, route, runs, effects, red):
             _save(broker, route, state)
         return True
     if state.get('status') == 'blocked':
+        if (not state.get('citation_recovery') and state.get('review_failure',{}).get('detail')
+                == 'finding quote not observed at exact line'):
+            failed=next((r for r in runs if r['id']==state['review_failure']['task_id']),None)
+            if failed:
+                paths=['/evidence/'+tree+'/'+name
+                    for tree in (('candidate',) if config.get('initial_review') else ('candidate','previous'))
+                    for name in route['test_first_files']]
+                decision=effects.decision(failed)
+                try:
+                    validate_evidence(broker,route,state,decision)
+                except ValueError as error:
+                    if str(error)=='finding quote not observed at exact line':
+                        state=prepare_citation_recovery(state,red,failed,config['reviewer'],decision,paths)
+                        _save(broker,route,state)
+                        return False
         if state.get('review_task') and state.get('read_evidence'):
             reconcile_rejection(broker, route, runs, effects, red, config, state)
         return False
@@ -585,7 +632,8 @@ def reconcile(broker, route, runs, effects, red):
                              ':acp:' + str(state.get('acp_retry', 0)) +
                              (':storage:1' if state.get('storage_retry') else '') +
                              (':challenge:1' if state.get('challenge_retry') else '')+
-                             (':typed-terminal:1' if state.get('typed_terminal_recovery') else '')).encode()).hexdigest()
+                             (':typed-terminal:1' if state.get('typed_terminal_recovery') else '')+
+                             (':citation-repair:1' if state.get('citation_recovery') else '')).encode()).hexdigest()
     initial = config.get('initial_review', False)
     paths = ['/evidence/' + tree + '/' + name
              for tree in (('candidate',) if initial else ('candidate', 'previous'))
@@ -641,6 +689,13 @@ def reconcile(broker, route, runs, effects, red):
     instruction += ('\nDELIVERY_TYPED_REVIEW_V1:'+digest+'\n'
         'After all required reads, submit the actual verdict using submit_test_review. '
         'No prose/fences; no terminal or file edits. All findings and snapshot checks remain mandatory.\n')
+    if state.get('citation_recovery'):
+        instruction += ('\nThe previous review was INVALID because its quoted source did not match the exact '
+            'numbered line. This is a fresh review of the SAME frozen tests, not permission to approve '
+            'or change the tests. Read all pages again. Copy each quote verbatim from its actual line '
+            'and verify the test symbol and line number. Independently judge behavioral coverage; '
+            'source-string assertions are not evidence of real HTTP/browser behavior. '
+            'Do not reuse an old verdict or invent a code location. One citation-format repair only.\n')
     if 'wakeup_id' not in state:
         state.update(status='dispatch_intent', manifest_sha256=digest, terminal_contract='typed-review-v1',
                      source_task=red['task_id'], candidate_volume=red['volume'],

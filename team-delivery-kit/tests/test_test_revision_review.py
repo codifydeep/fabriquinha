@@ -529,6 +529,28 @@ class RevisionReviewTests(unittest.TestCase):
         self.assertTrue(revision.reconcile(self.broker, self.route, [self.reviewer()], self.effects, self.red))
         self.assertTrue(revision.reconcile(self.broker, self.route, [], self.effects, self.red))
 
+    def test_invalid_quote_automatically_creates_only_one_fresh_readonly_review(self):
+        self.initial_submission()
+        self.effects.test_review_report=lambda *_:{'files':{}}
+        self.effects.read_evidence=lambda _:{'/evidence/candidate/tests/test_new.py':
+            dict(call_id='candidate',lines=51,total_lines=51,next_offset=None)}
+        revision.reconcile(self.broker,self.route,[],self.effects,self.red)
+        failed=self.reviewer('reject_test_revision')
+        failed['decision']['findings']=[{'quote':'incorrect source quote'}]
+        with patch('broker.test_revision_review.validate_evidence',side_effect=ValueError('finding quote not observed at exact line')):
+            self.assertFalse(revision.reconcile(self.broker,self.route,[failed],self.effects,self.red))
+            self.assertFalse(revision.reconcile(self.broker,self.route,[failed],self.effects,self.red))
+        with self.db() as con:
+            state=json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
+        self.assertEqual(state['status'],'dispatch_intent')
+        self.assertEqual(state['citation_recovery']['invalid_decision'],failed['decision'])
+        self.assertFalse(state['citation_recovery']['approval'])
+        revision.reconcile(self.broker,self.route,[failed],self.effects,self.red)
+        revision.reconcile(self.broker,self.route,[failed],self.effects,self.red)
+        self.assertEqual(len(self.created),2)
+        self.assertIn('Copy each quote verbatim',self.last_instruction)
+        self.assertIn('SAME frozen tests',self.last_instruction)
+
     def test_first_submission_mounts_only_genuine_candidate_readonly(self):
         self.initial_submission()
         revision.reconcile(self.broker, self.route, [], self.effects, self.red)

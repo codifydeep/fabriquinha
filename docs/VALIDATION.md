@@ -24,6 +24,12 @@ A suíte offline atual executou **1.706 testes, com sete skips existentes**. No 
 
 ## Evidências públicas e privadas
 
+### Revisão com citação inválida
+
+A primeira entrega de `BRIEFDEMO-2` passou por revisão, CI, merge no [PR 46](https://github.com/codifydeep/descartavel2/pull/46) e QA local no commit `0eec0496ce6a6d7c223a2f776625aec4579b4d41`. O card dependente foi despachado automaticamente nessa base. Sua revisão inicial dos novos testes foi bloqueada corretamente por uma citação que não corresponde à linha observada; esse parecer não foi aceito como aprovação ou rejeição válida.
+
+O controlador agora pode solicitar uma única revisão nova, somente de leitura, sobre os mesmos testes congelados quando esse erro exato estiver comprovado. O parecer inválido e o estado anterior permanecem preservados. A retomada do supervisor verifica identidade, independência, snapshot e evidências do predecessor, sem concluir a tarefa ou dispensar revisão. Uma nova falha não autoriza repetição infinita. A suíte offline executou **1.719 testes, com sete skips existentes**. O frontend e a homologação final deste ciclo ainda precisam de evidências; o ciclo continua sem comprovar execução integral sem reparos do operador.
+
 Somente o lock de proveniência das dependências e um fixture público de qualificação do guard permanecem em `team-delivery-kit/evaluation/`. O fixture contém propriedades de isolamento e hashes de imagem, sem conversas, credenciais ou identidades de contas. É uma fotografia de um ensaio sem modelo, não o status atual. Relatórios, diário operacional, transcrições, bases e recibos privados permanecem na instalação original.
 
 Para declarar prontidão, cumprir todos os gates de [ROADMAP.md](ROADMAP.md), incluindo um ciclo novo sem reparos e uma instalação limpa em outro ambiente.
