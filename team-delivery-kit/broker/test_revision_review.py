@@ -453,6 +453,13 @@ def seed_source(broker, issue_id):
     Legacy executions are never retroactively reseeded. The source is mounted
     solely in the offline seed container, not in the author's worker.
     """
+    try:
+        import remediation_runtime_guard
+    except ImportError:
+        from broker import remediation_runtime_guard
+    remediation_seed = remediation_runtime_guard.seed_source(broker, issue_id)
+    if remediation_seed is not None:
+        return remediation_seed
     with broker.db() as con:
         initialize(con)
         row = con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',
@@ -531,6 +538,11 @@ def seed_source(broker, issue_id):
 
 def reconcile(broker, route, runs, effects, red):
     """True only after approval of the exact new Red by an independent profile."""
+    try:
+        import remediation_runtime_guard
+    except ImportError:
+        from broker import remediation_runtime_guard
+    remediation_runtime_guard.require_historical_review(broker, route['issue_id'])
     with broker.db() as con:
         initialize(con)
         row = con.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',

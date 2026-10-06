@@ -158,6 +158,15 @@ def native_mode(request_id):
 def implementation_phase(issue_id):
     if not issue_id:
         return None
+    try:
+        import remediation_runtime_guard
+    except ImportError:
+        from broker import remediation_runtime_guard
+    from types import SimpleNamespace
+    remediation_phase = remediation_runtime_guard.phase(SimpleNamespace(
+        db=db, PREFIX=PREFIX, OWNER=OWNER, issue_base=issue_base, docker=docker), issue_id)
+    if remediation_phase:
+        return remediation_phase
     with db() as con:
         row = con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
                           (issue_id,)).fetchone()

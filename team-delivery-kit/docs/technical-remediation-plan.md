@@ -124,3 +124,21 @@ The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
 release. Generalization and the plan-to-execution adapter remain qualification
 gates; all product PR/CI, deployment and same-SHA browser-QA requirements remain.
+### R1 runtime fence (not dispatch approval)
+
+The controller recognizes remediation cards from their persistent execution
+contract, not worker prose or a fabricated recursive test-revision child.
+`remediation_runtime_guard.py` requires the exact qualified base, plan contract,
+author, NEW-test scope and preserved seed proof. R1 stays `tests_only`, including
+after a Red receipt exists. Product writes never become available on this card.
+The previous delivery is selected by exact manifest/test hashes in a read-only
+seed-helper mount; it is not a mutable worker mount.
+
+Missing qualification, route drift, duplicate bindings, changed base or foreign
+snapshot ownership fail closed. Unrelated legacy cards keep their existing
+policy. The ordinary first-submission review path is explicitly rejected for R1:
+it must not silently omit comparison against the previous NEW tests.
+
+This fence does not grant a worker, run Red, approve tests or declare delivery.
+The historical independent-review adapter and lossless author context must be
+validated before dispatch. Preparation alone remains insufficient for execution.

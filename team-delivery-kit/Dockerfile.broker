@@ -1,6 +1,7 @@
 FROM delivery-kit-hermes-runtime@sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf
 USER root
 COPY broker/server.py /broker.py
+COPY broker/remediation_runtime_guard.py /remediation_runtime_guard.py
 COPY broker/helper_cleanup.py /helper_cleanup.py
 COPY broker/host_restart_recovery.py /host_restart_recovery.py
 COPY broker/host_restart_snapshot.py /host_restart_snapshot.py

@@ -11,7 +11,8 @@ import sqlite3
 import time
 import uuid
 
-FIXED_SERVER_SHA = '72bf87e256faad1f7ac04ff373fd10b5aff1c016de2d5be505064a45e6da6ace'
+FIXED_SERVER_SHA = 'b9e307bddb51ea281535ae26b8dafb53fccdd3fb16bdc3a00040bd5bb5fe1fbc'
+PRE_REMEDIATION_SERVER_SHA = '72bf87e256faad1f7ac04ff373fd10b5aff1c016de2d5be505064a45e6da6ace'
 PREVIOUS_FIXED_SERVER_SHA = '9bd24852b561a3f11bb7d1c15baa7e5e572eda530b41a1e82e8f33a9369dae27'
 LEGACY_FIXED_SERVER_SHA = 'f51fc9f6edd64b03ba9f0a13920ec544c191e45ca6448d3a81df849dd3287573'
 ERROR = 'hermes session/prompt failed: session/prompt: restricted broker stream failed: broker_internal (code=-32000)'
@@ -87,7 +88,7 @@ def register(b, payload):
             raise ValueError('canonical review recovery identity required')
     actual_server_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
     if actual_server_sha not in {
-            FIXED_SERVER_SHA,PREVIOUS_FIXED_SERVER_SHA,LEGACY_FIXED_SERVER_SHA}:
+            FIXED_SERVER_SHA,PRE_REMEDIATION_SERVER_SHA,PREVIOUS_FIXED_SERVER_SHA,LEGACY_FIXED_SERVER_SHA}:
         raise ValueError('fixed native task_id receipt implementation required')
     issue, source = payload['issue_id'], payload['source_task']
     with b.LOCK, b.db() as con:
