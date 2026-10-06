@@ -13,27 +13,36 @@ def eligible(status, managed):
     state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
     proof=data.get('diagnostic_presentation_recovery') or {}
     digest=hashlib.sha256(json.dumps(data.get('diagnostic') or {},sort_keys=True).encode()).hexdigest()
+    postwrite=data.get('postwrite_diagnosis') or {};snapshot=postwrite.get('probe') or {}
+    postwrite_valid=(postwrite.get('operation')=='postwrite_phase_diagnosis_v1'
+        and postwrite.get('source_task')==state.get('source_task')
+        and postwrite.get('issue_id')==status.get('issue_id')
+        and postwrite.get('author_retry_authorized') is False and postwrite.get('delivery_approval') is False
+        and snapshot.get('verified') is True and snapshot.get('baseline_unchanged') is True
+        and snapshot.get('manifest_sha256')==data.get('diagnostic',{}).get('manifest_sha256'))
+    presentation_valid=(proof.get('operation')=='bounded_pre_red_diagnostic_presentation_v1'
+        and proof.get('source_task')==state.get('source_task')
+        and proof.get('diagnostic_sha256')==digest
+        and proof.get('approval') is False and proof.get('author_restarted') is False)
     return (state.get('stage') in ('test_first_cto_diagnosis','test_first_cto_correction',
                                   'test_first_cto_correction_wait')
         and data.get('phase')=='test_first'
-        and proof.get('operation')=='bounded_pre_red_diagnostic_presentation_v1'
-        and proof.get('source_task')==state.get('source_task')
-        and proof.get('diagnostic_sha256')==digest
-        and proof.get('approval') is False and proof.get('author_restarted') is False
+        and (presentation_valid or postwrite_valid)
         and bool(data.get('test_first_cto_wakeup')))
 
 
 def read_proof(context):
     from evalctl import PROJECT
-    program='''import broker as b,json,native,sys
+    program='''import broker as b,json,native,sys,postwrite_diagnosis
 issue=sys.argv[1]
 with b.db() as c:
  route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
  rows=c.execute('SELECT * FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC',(issue,)).fetchall()
- recovered=[r for r in rows if json.loads(r['data']).get('diagnostic_presentation_recovery')]
- if not route or len(recovered)!=1:print('null');sys.exit()
+ recovered=[r for r in rows if json.loads(r['data']).get('diagnostic_presentation_recovery') or json.loads(r['data']).get('postwrite_diagnosis')]
+ if not route or not recovered:print('null');sys.exit()
  route=json.loads(route[0]);state=dict(recovered[0]);data=json.loads(state['data'])
  latest=dict(rows[0])
+ certificate=not data.get('postwrite_diagnosis') or bool(postwrite_diagnosis.qualified(c,issue,state['source_task'],data))
 runs=native.issue_task_runs(json.loads((b.STATE/'native.json').read_text()),issue)
 tasks=[r for r in runs if r.get('agent_id')==route['cto'] and r.get('wakeup_id')==data.get('test_first_cto_wakeup')]
 task=tasks[0] if len(tasks)==1 else {}
@@ -45,7 +54,7 @@ if state['stage']=='test_first_cto_correction_wait':
  decided=decided and author.get('id')!=state['source_task'] and author.get('wakeup_id')==data.get('test_first_correction_wakeup') and author.get('status') in ('queued','dispatched','running','completed') and latest['stage'] not in ('test_first_blocked','technical_decision_required','diagnose_cto')
 print(json.dumps(dict(managed=dict(route=route,state=state),issue_id=issue,
  contract_sha256=route['contract_sha256'],independent=route['cto']!=route['author'],
- qualified=bool(task.get('id')) and (active or decided),task=task.get('id'),
+ qualified=certificate and bool(task.get('id')) and (active or decided),task=task.get('id'),
  delivery_approval=False,author_retry_authorized=False)))'''
     return json.loads(subprocess.check_output(['docker','exec','-e','PYTHONPATH=/',
         PROJECT+'-execution-broker-1','python','-c',program,context['issue_id']],text=True))

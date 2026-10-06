@@ -101,6 +101,7 @@ COPY broker/qa_artifacts.py /qa_artifacts.py
 COPY browser_runtime_probe.py /qa_runtime_probe.py
 COPY broker/candidate_correction.py /candidate_correction.py
 COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/postwrite_diagnosis.py /postwrite_diagnosis.py
 COPY broker/contract_revision.py /contract_revision.py
 COPY broker/tdd_evidence.py /tdd_evidence.py
 COPY broker/test_first_protocol.py /test_first_protocol.py

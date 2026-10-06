@@ -5,6 +5,18 @@ from pre_red_supervision import eligible,qualified
 
 
 class PreRedSupervisionTests(unittest.TestCase):
+    def test_postwrite_diagnosis_reentry_requires_matching_preserved_snapshot(self):
+        data=json.loads(self.managed['state']['data']);data.pop('diagnostic_presentation_recovery')
+        data['diagnostic']['manifest_sha256']='hash'
+        data['postwrite_diagnosis']=dict(operation='postwrite_phase_diagnosis_v1',
+            source_task='author',issue_id='issue',author_retry_authorized=False,delivery_approval=False,
+            probe=dict(verified=True,baseline_unchanged=True,manifest_sha256='hash'))
+        self.managed['state']['data']=json.dumps(data)
+        self.assertTrue(eligible(self.status,self.managed))
+        data['postwrite_diagnosis']['probe']['manifest_sha256']='other'
+        self.managed['state']['data']=json.dumps(data)
+        self.assertFalse(eligible(self.status,self.managed))
+
     def setUp(self):
         diagnostic={'kind':'rejected_red','manifest_sha256':'a'*64}
         data={'phase':'test_first','diagnostic':diagnostic,'test_first_cto_wakeup':'wake',
