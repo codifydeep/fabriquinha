@@ -114,6 +114,10 @@ def apply(body):
         if paths:
             body['tool_choice'] = 'none'
             size_instruction = (
+                'For reason aim below 300 characters; 600 characters is the hard limit. '
+                'Use one concise finding and next action, without repeating the plan or policies. '
+                if any(m.get('role')=='user' and isinstance(m.get('content'),str) and
+                    re.search(r'^DELIVERY_REMEDIATION_(?:PLAN|REVIEW)_V1:',m['content'],re.M) for m in body['messages']) else
                 'For root_cause aim below 600 characters; 1000 characters is the hard limit. '
                 'Explain only the causal chain and decisive observation; do not repeat SHA, '
                 'HTML excerpts, every stack frame or the full experiment in this field. '

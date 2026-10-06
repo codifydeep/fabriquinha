@@ -185,6 +185,7 @@ def instruction(config,state):
             'No editing, execution or delivery authority. Plan data: '+json.dumps(state['plan'],separators=(',',':'))+
             '\nDELIVERY_REMEDIATION_REVIEW_V1:'+state['plan_sha256'])
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:review:'+state['plan_sha256']
+        note+='\nDELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
     result=common+note
     if len(result)+100>4000:raise ValueError('split remediation context before dispatch')
     return result
@@ -267,13 +268,13 @@ class Effects:
     def wake(self,c,s,target,note):
         try:
             return native.ensure_planning_start(self.settings,s['issue_id'],target,c['source_task'],
-                digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),protocol='typed-remediation-v1')),note,
+                digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),protocol=s.get('review_protocol','typed-remediation-v1'))),note,
                 allow_create=self.native.remaining_calls()>=16)
         except (TimeoutError,urllib.error.URLError):
             raise DispatchObservationRequired() from None
     def observe_wake(self,c,s,target,note):
         return native.ensure_planning_start(self.settings,s['issue_id'],target,c['source_task'],
-            digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),protocol='typed-remediation-v1')),note,allow_create=False)
+            digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),protocol=s.get('review_protocol','typed-remediation-v1'))),note,allow_create=False)
     def task(self,tid,agent):return native.task_record(self.settings,tid,agent)
     def reads(self,task):return self.native.read_evidence(task)
     def result(self,task):

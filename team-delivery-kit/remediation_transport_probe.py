@@ -32,8 +32,24 @@ def run():
             try:typed.translate(body,wire(bad),'application/json')
             except StructuredResponseRejected:pass
             else:raise ValueError('negative control accepted')
+        if kind=='review':
+            body['messages'][0]['content']+='\n'+typed.REMEDIATION_LENGTH_MARKER
+            bad=copy.deepcopy(value);bad['reason']='x'*601
+            try:typed.translate(body,wire(bad),'application/json')
+            except StructuredResponseRejected as error:
+                if not getattr(error,'length_feedback',None):raise
+                body['messages'].extend(error.length_feedback)
+            else:raise ValueError('oversized reason accepted')
+            output,_,receipt=typed.translate(body,wire(value),'application/json')
+            assert json.loads(json.loads(output)['choices'][0]['message']['content'])==value
+            changed=copy.deepcopy(value);changed['decision']='request_changes'
+            try:typed.translate(body,wire(changed),'application/json')
+            except StructuredResponseRejected as error:
+                if error.category!='typed_remediation_feedback_identity_drift':raise
+            else:raise ValueError('format correction changed review verdict')
     return dict(operation='typed_remediation_transport_canary_v1',model_calls=0,worker_tool_executed=False,
                 delivery_approval=False,model_values_preserved=True,negative_controls_passed=True,
+                reason_only_feedback_qualified=True,
                 source_sha256={Path(m.__file__).name:hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest()
                                for m in (contract,typed)})
 

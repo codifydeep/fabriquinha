@@ -24,10 +24,18 @@ REVIEW_LENGTH_MARKER='DELIVERY_REVIEW_LENGTH_FEEDBACK_V1'
 RECOVERY_NAME='submit_worker_recovery_request'
 RECOVERY_MARKER='DELIVERY_TYPED_WORKER_RECOVERY_V1'
 REMEDIATION_NAME='submit_remediation_contract'
+REMEDIATION_LENGTH_MARKER='DELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
+
+
+def remediation_length_feedback_enabled(body):
+    if body.get('tool_choice')!={'type':'function','function':{'name':REMEDIATION_NAME}}:return False
+    spec=body.get('tools',[{}])[0].get('function',{}).get('parameters',{})
+    return ('decision' in spec.get('properties',{}) and any(m.get('role')=='user' and isinstance(m.get('content'),str)
+        and re.search(r'^'+REMEDIATION_LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
 
 
 def length_feedback_enabled(body):
-    return review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
+    return remediation_length_feedback_enabled(body) or review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
         {'type':'function','function':{'name':RECOVERY_NAME}}) and any(
         m.get('role')=='user' and isinstance(m.get('content'),str)
         and re.search(r'^'+LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
@@ -95,6 +103,24 @@ def validate_review_feedback_identity(body, decision):
         raise StructuredResponseRejected('typed_review_feedback_identity_drift') from None
 
 
+def validate_remediation_feedback_identity(body,decision):
+    if not remediation_length_feedback_enabled(body) or len(body.get('messages',[]))<2:return
+    submitted,reply=body['messages'][-2:]
+    if reply.get('role')!='tool' or not isinstance(reply.get('content'),str):return
+    try:feedback=json.loads(reply['content'])
+    except ValueError:return
+    if feedback.get('operation')!='format_only_remediation_feedback_v1':return
+    try:
+        call=submitted['tool_calls'][0]
+        if (submitted.get('role')!='assistant' or len(submitted['tool_calls'])!=1
+                or call['id']!=reply.get('tool_call_id') or call['function']['name']!=REMEDIATION_NAME):raise ValueError()
+        previous=json.loads(call['function']['arguments'],object_pairs_hook=_unique)
+        expected=copy.deepcopy(previous);expected['reason']=decision['reason']
+        if expected!=decision:raise ValueError()
+    except (ValueError,KeyError,IndexError,TypeError):
+        raise StructuredResponseRejected('typed_remediation_feedback_identity_drift') from None
+
+
 def length_feedback_preflight(counter_path,execution_id,body):
     if not length_feedback_enabled(body):return
     from deterministic_read_dispatch import ledger
@@ -115,6 +141,9 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
     if review_length_feedback_enabled(body):
         receipt['review_acceptance_by_proxy']=False
         receipt['manifest_sha256']=body['tools'][0]['function']['parameters']['properties']['manifest_sha256']['enum'][0]
+    if remediation_length_feedback_enabled(body):
+        receipt.update(operation='remediation_review_length_feedback_v1',plan_acceptance_by_proxy=False,
+            plan_sha256=body['tools'][0]['function']['parameters']['properties']['plan_sha256']['enum'][0])
     with ledger(counter_path) as con:
         con.execute('CREATE TABLE IF NOT EXISTS technical_length_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
         if con.execute('SELECT 1 FROM technical_length_feedback WHERE execution_id=?',(execution_id,)).fetchone():return None
@@ -518,6 +547,19 @@ def translate(body,data,media_type):
             parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
         violations=list(Draft202012Validator(schema).iter_errors(decision))
         if violations:
+            if (remediation_length_feedback_enabled(body) and len(violations)==1
+                    and violations[0].validator=='maxLength' and list(violations[0].path)==['reason']
+                    and schema['properties']['reason'].get('maxLength')==600
+                    and isinstance(decision.get('reason'),str) and 600<len(decision['reason'])<=4000):
+                error=StructuredResponseRejected('typed_schema_maxLength')
+                identity='format_'+hashlib.sha256(data).hexdigest()[:24]
+                error.length_feedback=[dict(role='assistant',content=None,tool_calls=[dict(id=identity,type='function',
+                    function=dict(name=name,arguments=arguments))]),dict(role='tool',tool_call_id=identity,
+                    content=json.dumps(dict(operation='format_only_remediation_feedback_v1',field='reason',maxLength=600,
+                    actualLength=len(decision['reason']),worker_tool_executed=False,plan_acceptance_by_proxy=False,
+                    instruction='Submit NEW valid arguments once. Condense only reason, target300characters. '
+                    'Preserve decision, evidence_sha256, plan_sha256 and all flags exactly. No action was executed or approved.')))]
+                raise error
             if (length_feedback_enabled(body) and len(violations)==1
                     and violations[0].validator=='maxLength' and list(violations[0].path)==['reason']
                     and schema['properties']['reason'].get('maxLength')==1200
@@ -550,6 +592,7 @@ def translate(body,data,media_type):
             keyword=next(iter(violations)).validator
             reject('schema_'+(keyword if keyword in allowed else 'violation'))
         validate_review_feedback_identity(body,decision)
+        validate_remediation_feedback_identity(body,decision)
         phase='adapter'
         text=json.dumps(decision,sort_keys=True,separators=(',',':'),allow_nan=False)
         common={'id':'chatcmpl-typed-'+hashlib.sha256(data).hexdigest()[:24],

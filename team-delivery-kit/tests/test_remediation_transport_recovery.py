@@ -1,6 +1,7 @@
 import copy
 import unittest
-from broker.remediation_transport_recovery import qualify,isolated_mounts
+from broker.remediation_transport_recovery import qualify,isolated_mounts,qualify_review
+from broker.technical_remediation_plan import digest
 
 
 class ChangedTransportRecoveryTests(unittest.TestCase):
@@ -35,3 +36,14 @@ class ChangedTransportRecoveryTests(unittest.TestCase):
             with self.assertRaises(ValueError):qualify(self.c,self.s,{**self.t,**extra},self.reads,self.e)
         for extra in (dict(status=402),dict(finish_reason='length'),dict(strict_schema=False)):
             with self.assertRaises(ValueError):qualify(self.c,self.s,self.t,self.reads,{**self.e,**extra})
+
+    def test_review_format_recovery_preserves_plan_and_rejects_repeat(self):
+        c={**self.c,'reviewer':'lead'};plan={'sample':'plan'}
+        s={**self.s,'plan_task':'plan-author','plan':plan,'plan_sha256':digest(plan)}
+        t={**self.t,'agent_id':'lead'}
+        e={**self.e,'structured_rejection_category':'typed_schema_maxLength',
+           'decision_rejection_persisted':True,'finish_reason':'tool_calls','tool_count':1}
+        qualify_review(c,s,t,self.reads,e)
+        for extra in (dict(review_format_recovery={'used':True}),dict(plan_sha256='a'*64),dict(review_task='accepted')):
+            with self.assertRaises(ValueError):qualify_review(c,{**s,**extra},t,self.reads,e)
+        with self.assertRaises(ValueError):qualify_review(c,s,t,{},e)

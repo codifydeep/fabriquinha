@@ -66,6 +66,15 @@ socket or persistent mounts (the inherited `/opt/data` volume is replaced with
 a fixed empty tmpfs). This transition retains its predecessor and is consumed
 once; failure of the new typed attempt remains blocked, not retried indefinitely.
 
+An independent plan review also has an opt-in, once-per-execution format repair
+for a sole oversized `reason`. The model must submit new arguments under the
+unchanged 600-character limit. The proxy preserves decision, evidence/plan
+hashes and flags exactly; it neither truncates an answer nor accepts a plan.
+Other invalid fields are ineligible. The durable call ledger fences retries and
+every provider attempt counts against the same hard budget. A failed review
+may receive one changed-protocol maintenance dispatch only after preserving its
+rejection and qualifying the new isolated canary, without rerunning the CTO.
+
 The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
 release. Generalization and the plan-to-execution adapter remain qualification
