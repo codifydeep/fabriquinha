@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261006.242
+COPY broker/handoff_runtime.py /handoff_runtime.py

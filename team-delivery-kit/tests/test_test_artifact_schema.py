@@ -6,6 +6,32 @@ from test_artifact_schema import apply
 
 
 class TestArtifactSchemaTests(unittest.TestCase):
+    def revision_history(self):
+        body=self.body(read=True)
+        body['messages'][0]['content']+='DELIVERY_TEST_REVISION_V1:/workspace/tests/test_new.py\n'
+        body['messages'] += [{'role':'assistant','tool_calls':[{'id':'historic','function':{
+            'name':'read_file','arguments':json.dumps({'path':'/workspace/tests/test_new.py','offset':1,'limit':50})}}]},
+            {'role':'tool','tool_call_id':'historic','content':json.dumps({'content':'1|def test_old(): assert False','total_lines':1})}]
+        return body
+
+    def test_revision_write_advances_after_real_read_before_mutation(self):
+        body=self.revision_history();content='def test_old():\n    assert 1 == 2\n'
+        self.add_write(body,{'bytes_written':len(content.encode()),'verified':True},content)
+        body['messages'] += [{'role':'assistant','tool_calls':[{'id':'changed','function':{
+            'name':'read_file','arguments':json.dumps({'path':'/workspace/tests/test_new.py','offset':1,'limit':50})}}]},
+            {'role':'tool','tool_call_id':'changed','content':json.dumps({'content':'1|def test_old():\n2|    assert 1 == 2','total_lines':2})}]
+        self.assertIs(apply(body),body)
+
+    def test_revision_failed_write_or_uninspected_target_does_not_advance(self):
+        for inspected in (True,False):
+            body=self.revision_history()
+            if not inspected:body['messages']=body['messages'][:-2]
+            content='def test_old(): assert False\n'
+            self.add_write(body,{'bytes_written':len(content.encode()),'verified':not inspected},content)
+            result=apply(body)
+            self.assertIsNot(result,body)
+            if not inspected:self.assertEqual(result['tool_choice']['function']['name'],'read_file')
+
     def surgical_body(self):
         body=self.body(read=True)
         body['messages'][0]['content']+='DELIVERY_SURGICAL_TEST_V1:/workspace/tests/test_new.py:'+'a'*64+'\n'

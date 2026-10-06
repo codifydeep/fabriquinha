@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261006.77
+COPY test_artifact_schema.py /test_artifact_schema.py

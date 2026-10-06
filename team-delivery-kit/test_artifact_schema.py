@@ -34,6 +34,37 @@ def _selected(result,name,instruction):
     return result
 
 
+def revision_write_completed(history, target, sources):
+    """Freeze pre-write inspection; new bytes cannot invalidate old evidence."""
+    calls={}
+    for index,message in enumerate(history):
+        if message.get('role')=='assistant':
+            for call in message.get('tool_calls') or []:
+                fn=call.get('function') or {}
+                if fn.get('name')!='write_file':continue
+                try:args=json.loads(fn.get('arguments','{}'))
+                except (ValueError,TypeError):continue
+                if (not isinstance(args,dict) or args.get('path')!=target
+                        or not isinstance(args.get('content'),str)
+                        or not sources<=observations(history[:index],wire=True).keys()):continue
+                content=args['content'];size=len(content.encode())
+                if not 0<size<=32768:continue
+                if target.endswith('.py'):
+                    try:tree=ast.parse(content)
+                    except SyntaxError:continue
+                    if not any(isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))
+                               and n.name.startswith('test_') for n in ast.walk(tree)):continue
+                calls[call.get('id')]=size
+        if message.get('role')!='tool' or message.get('tool_call_id') not in calls:continue
+        try:receipt=json.loads(message.get('content',''))
+        except (ValueError,TypeError):continue
+        if (isinstance(receipt,dict) and not receipt.get('error') and receipt.get('success') is not False
+                and receipt.get('verified') is True and type(receipt.get('bytes_written')) is int
+                and receipt['bytes_written']==calls[message['tool_call_id']]
+                and receipt.get('path',target)==target):return True
+    return False
+
+
 def apply(body):
     additive=additive_phase(body)
     surgical=marker_config(body)
@@ -97,6 +128,9 @@ def apply(body):
         start=max(i for i,m in enumerate(body['messages']) if m.get('role')=='user'
                   and re.search(r'DELIVERY_SURGICAL_TEST_V[1234]:',str(m.get('content',''))))
         read_history=body['messages'][start:]
+    if revisions and not edit_required and not surgical:
+        if revision_write_completed(read_history,target,sources):
+            return body  # Phase only: Red, protected bytes and review remain controller gates.
     if edit_required:
         # Editing invalidates comparisons of OLD/NEW lines in later reads.
         # Establish the inspection phase at the FIRST successful actual edit,
