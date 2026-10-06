@@ -12,9 +12,16 @@ class PreRedSupervisionTests(unittest.TestCase):
             probe=dict(baseline_unchanged=True,all_lines_observed=True,manifest_sha256='a'*64))
         self.managed['state']['data']=json.dumps(data)
         self.assertTrue(eligible(self.status,self.managed))
+        stale={**self.status,'category':'test_first_blocked:test_first_correction_failed_after_cto_diagnosis'}
+        self.assertTrue(eligible(stale,self.managed))
         data['read_capacity_diagnosis']['probe']['manifest_sha256']='different'
         self.managed['state']['data']=json.dumps(data)
         self.assertFalse(eligible(self.status,self.managed))
+        self.assertFalse(eligible(stale,self.managed))
+
+    def test_generic_blocked_projection_cannot_resume_without_capacity_certificate(self):
+        stale={**self.status,'category':'test_first_blocked:test_first_correction_failed_after_cto_diagnosis'}
+        self.assertFalse(eligible(stale,self.managed))
     def test_postwrite_diagnosis_reentry_requires_matching_preserved_snapshot(self):
         data=json.loads(self.managed['state']['data']);data.pop('diagnostic_presentation_recovery')
         data['diagnostic']['manifest_sha256']='hash'

@@ -7,7 +7,8 @@ import subprocess
 
 def eligible(status, managed):
     if (not status or status.get('stage')!='escalation_required'
-            or not str(status.get('category','')).startswith('technical_decision_required:')
+            or not (str(status.get('category','')).startswith('technical_decision_required:')
+                or status.get('category')=='test_first_blocked:test_first_correction_failed_after_cto_diagnosis')
             or not managed or managed.get('route',{}).get('enabled') is not True
             or managed['route'].get('issue_id')!=status.get('issue_id')):return False
     state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
@@ -35,6 +36,7 @@ def eligible(status, managed):
                                   'test_first_cto_correction_wait')
         and data.get('phase')=='test_first'
         and (presentation_valid or postwrite_valid or capacity_valid)
+        and (str(status.get('category','')).startswith('technical_decision_required:') or capacity_valid)
         and bool(data.get('test_first_cto_wakeup')))
 
 
@@ -70,7 +72,8 @@ print(json.dumps(dict(managed=dict(route=route,state=state),issue_id=issue,
 
 def qualified(status, context, *, query=read_proof):
     if (not status or status.get('stage')!='escalation_required'
-            or not str(status.get('category','')).startswith('technical_decision_required:')):return False
+            or not (str(status.get('category','')).startswith('technical_decision_required:')
+                or status.get('category')=='test_first_blocked:test_first_correction_failed_after_cto_diagnosis')):return False
     proof=query(context) or {}
     return (proof.get('qualified') is True and proof.get('independent') is True
         and proof.get('issue_id')==context['issue_id']
