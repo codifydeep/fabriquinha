@@ -42,6 +42,17 @@ if not failed:print('null');sys.exit()
 expected=revision.prepare_citation_recovery(repair['prior_state'],red,failed,config['reviewer'],repair['invalid_decision'],paths)
 fresh=[r for r in runs if r.get('agent_id')==config['reviewer'] and r.get('wakeup_id')==state.get('wakeup_id') and r['id']!=failed['id']]
 task=fresh[0] if len(fresh)==1 else {}
+diagnosis=state.get('rejection_diagnosis') or {};protocol=state.get('protocol_diagnosis') or {}
+cto=[r for r in runs if r.get('agent_id')==route['cto'] and r.get('wakeup_id')==diagnosis.get('wakeup_id')]
+cto=cto[0] if len(cto)==1 else {}
+protocol_active=(protocol.get('operation')=='invalid_review_citation_escalation_v1'
+ and protocol.get('approval') is False and protocol.get('author_restarted') is False
+ and protocol.get('failed_task')==task.get('id') and route['cto'] not in (route['author'],config['reviewer'])
+ and diagnosis.get('target')==route['cto'] and diagnosis.get('status') in ('awaiting_cto','revision_required')
+ and bool(cto.get('id')) and cto.get('status') in ('queued','dispatched','running','completed')
+ and (diagnosis.get('status')!='revision_required' or
+      diagnosis.get('decision_task')==cto['id'] and cto['status']=='completed'
+      and (diagnosis.get('decision') or {}).get('action')=='request_test_revision'))
 print(json.dumps(dict(qualified=expected.get('citation_recovery')==repair,issue_id=issue,
  enabled=route.get('enabled'),contract_sha256=route.get('contract_sha256'),source_task=red['task_id'],
  source_status=next((r['status'] for r in runs if r['id']==red['task_id']),None),
@@ -51,7 +62,7 @@ print(json.dumps(dict(qualified=expected.get('citation_recovery')==repair,issue_
  approval=repair.get('approval'),author_restarted=repair.get('author_restarted'),
  review_task=task.get('id'),review_status=task.get('status'),review_wakeup=task.get('wakeup_id'),
  wakeup=state.get('wakeup_id'),state_status=state.get('status'),decision=state.get('decision'),
- repair=repair)))'''
+ protocol_active=protocol_active,repair=repair)))'''
     return json.loads(subprocess.check_output(['docker','exec','-e','PYTHONPATH=/',
         PROJECT+'-execution-broker-1','python','-c',program,context['issue_id']],text=True))
 
@@ -72,7 +83,9 @@ def resume(ledger, plan, private, *, query=read_proof, verify_initial=None, read
             or not context.get('durable_handoffs')):return None
     proof=query(context) or {}
     valid_state=(proof.get('state_status') in ('awaiting_review','approved')
-        or proof.get('state_status')=='blocked' and (proof.get('decision') or {}).get('action')=='reject_test_revision')
+        or proof.get('state_status')=='blocked' and (
+            (proof.get('decision') or {}).get('action')=='reject_test_revision'
+            or proof.get('protocol_active') is True))
     if (proof.get('qualified') is not True or proof.get('enabled') is not True
             or proof.get('issue_id')!=context['issue_id'] or proof.get('contract_sha256')!=contract_sha
             or proof.get('independent') is not True or proof.get('source_status')!='completed'

@@ -3,6 +3,7 @@ USER root
 COPY model_proxy.py /model_proxy.py
 COPY model_policy.py /model_policy.py
 COPY decision_schema.py /decision_schema.py
+COPY observed_finding_locations.py /observed_finding_locations.py
 COPY work_proposal_contract.py /work_proposal_contract.py
 COPY structured_response_contract.py /structured_response_contract.py
 COPY typed_decision_contract.py /typed_decision_contract.py

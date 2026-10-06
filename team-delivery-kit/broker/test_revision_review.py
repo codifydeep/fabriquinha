@@ -620,6 +620,27 @@ def reconcile(broker, route, runs, effects, red):
                         return False
         if state.get('review_task') and state.get('read_evidence'):
             reconcile_rejection(broker, route, runs, effects, red, config, state)
+        elif state.get('citation_recovery') and state.get('review_failure',{}).get('detail') in (
+                'finding quote not observed at exact line','finding test or line does not exist',
+                'finding line outside test'):
+            failed=next((r for r in runs if r['id']==state['review_failure']['task_id']),None)
+            paths=['/evidence/'+tree+'/'+name
+                for tree in (('candidate',) if config.get('initial_review') else ('candidate','previous'))
+                for name in route['test_first_files']]
+            if (failed and failed['id']!=state['citation_recovery']['failed_task']
+                    and failed.get('status')=='completed' and failed.get('agent_id')==config['reviewer']
+                    and failed.get('wakeup_id')==state.get('wakeup_id')
+                    and all(state.get('read_evidence',{}).get(p,{}).get('lines',0)>0
+                        and state['read_evidence'][p]['lines']==state['read_evidence'][p].get('total_lines') for p in paths)):
+                decision=effects.decision(failed)
+                try:
+                    validate_evidence(broker,route,state,decision)
+                except ValueError as error:
+                    if str(error)==state['review_failure']['detail']:
+                        state.setdefault('protocol_diagnosis',dict(operation='invalid_review_citation_escalation_v1',
+                            failed_task=failed['id'],invalid_decision=decision,
+                            prior_failure=dict(state['review_failure']),approval=False,author_restarted=False))
+                        reconcile_rejection(broker,route,runs,effects,red,config,state,protocol_task=failed['id'])
         return False
     if not state.get('evidence_policy') and hasattr(effects, 'test_review_report'):
         state['comparison'] = effects.test_review_report(route['issue_id'], red, config.get('old_red'))
@@ -748,25 +769,52 @@ def reconcile(broker, route, runs, effects, red):
     return state['status'] == 'approved'
 
 
-def reconcile_rejection(broker, route, runs, effects, red, config, state):
+def reconcile_rejection(broker, route, runs, effects, red, config, state, protocol_task=None):
     """Preserve rejection; one CTO diagnosis can sponsor a NEW child, never approve."""
     cto = route['cto']
     if cto in (route['author'], config['reviewer']):
         raise ValueError('independent CTO required for rejected test review')
     diagnosis = state.setdefault('rejection_diagnosis', {})
     if diagnosis.get('status') in ('revision_required', 'blocked'):
-        return
+        if (diagnosis.get('status')!='blocked' or not protocol_task or not state.get('protocol_diagnosis')
+                or diagnosis.get('typed_transport_recovery')
+                or diagnosis.get('failure',{}).get('operation')!='task_completion'
+                or diagnosis.get('failure',{}).get('detail')!='CTO diagnosis did not complete'):
+            return
+        failed=next((r for r in runs if r['id']==diagnosis['failure']['task_id']),None)
+        trees=('candidate',) if config.get('initial_review') else ('candidate','previous')
+        required=['/evidence/'+tree+'/'+name for tree in trees for name in route['test_first_files']]
+        reads=effects.read_evidence(failed) if failed else {}
+        if (not failed or failed.get('status')!='failed' or failed.get('agent_id')!=cto
+                or failed.get('wakeup_id')!=diagnosis.get('wakeup_id')
+                or 'API call failed after 1 retries' not in str(failed.get('error',''))
+                or any(reads.get(p,{}).get('lines',0)<=0
+                    or reads[p]['lines']!=reads[p].get('total_lines') for p in required)):
+            return
+        prior=json.loads(json.dumps(diagnosis))
+        diagnosis.clear();diagnosis.update(status='dispatch_intent',target=cto,
+            typed_transport_recovery=dict(failed_task=failed['id'],prior_diagnosis=prior,
+                attempt_limit=1,approval=False,author_restarted=False))
     trees = ('candidate',) if config.get('initial_review') else ('candidate', 'previous')
     paths = ['/evidence/' + tree + '/' + name
              for tree in trees for name in route['test_first_files']]
     if 'wakeup_id' not in diagnosis:
-        marker = hashlib.sha256((route['issue_id'] + ':' + state['review_task'] +
-                                 ':test-review-cto:' + state['manifest_sha256']).encode()).hexdigest()
+        source=protocol_task or state['review_task']
+        marker = hashlib.sha256((route['issue_id'] + ':' + source +
+                                 ':test-review-cto:' + state['manifest_sha256']+
+                                 (':typed-transport:1' if diagnosis.get('typed_transport_recovery') else '')).encode()).hexdigest()
         instruction = (
+            ('CONTROLLER INVALID REVIEW PROTOCOL. Two reviews cited invalid locations. '
+             'Neither verdict was accepted; do not treat either as a valid rejection. '
+             'Independently inspect actual frozen test coverage against the issue criteria. '
+             'You may sponsor NEW tests only with your own concrete observed finding; '
+             'you cannot approve or override the invalid review. Implementation stays blocked. '
+             'Protocol failure: '+state['review_failure']['detail']+'. '
+             if protocol_task else
             'CONTROLLER REJECTED NEW-TEST REVIEW. Inspect the immutable tests; '
             'the review rejection remains valid and implementation stays blocked. '
-            'Review finding (a claim to assess, not unquestionable truth): ' + state['reason'] +
-            '. Original product criteria remain in the issue brief. Diagnose whether '
+            'Review finding (a claim to assess, not unquestionable truth): ' + state['reason'] + '. ')+
+            'Original product criteria remain in the issue brief. Diagnose whether '
             'the harness faithfully tests them; distinguish unit listener invocation '
             'from real browser dispatch and disabled-button semantics. Do not weaken '
             'coverage or claim a browser result. Return ONLY JSON: action '
@@ -782,9 +830,10 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state):
             ''.join('DELIVERY_REVIEW_READ_PATH:' + path + '\n' for path in paths))
         if state.get('evidence_policy'):
             instruction += evidence_instruction(state)
+            instruction += '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
         diagnosis.update(status='dispatch_intent', marker=marker, target=cto)
         _save_rejection(broker, route, state)
-        wakeup = effects.ensure_wakeup(route['issue_id'], cto, state['review_task'],
+        wakeup = effects.ensure_wakeup(route['issue_id'], cto, source,
                                       marker, instruction,
                                       allow_create=effects.remaining_calls() >= route['minimum_calls'])
         if wakeup is None:
@@ -851,7 +900,7 @@ def evidence_instruction(state):
             'added_method_count': sum(len(f['added_methods']) for f in facts),
             'assertion_ast_changed_method_count': sum(len(f['removed_assertion_ast']) for f in facts)
         }, separators=(',', ':'))
-    return ('\nDELIVERY_TEST_FINDINGS_V1\nController structural facts (method-scoped assertions, not semantic approval): ' + summary +
+    return ('\nDELIVERY_TEST_FINDINGS_V1\nDELIVERY_OBSERVED_FINDINGS_V1\nController structural facts (method-scoped assertions, not semantic approval): ' + summary +
             '\nA summary-only index omits names, not evidence: read all declared immutable test paths. '
             'Counts or digest alone cannot justify approval or rejection. '
             'Include findings: [] for approval; 1-3 concrete findings for rejection/revision. Each has '

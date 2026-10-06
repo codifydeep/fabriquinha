@@ -9,7 +9,7 @@ def observations(messages, wire=False):
             if receipt['lines'] == receipt['total_lines']}
 
 
-def coverage(messages, wire=False):
+def coverage(messages, wire=False, include_content=False):
     calls, found = {}, {}
     for message in messages:
         if wire and message.get('role') == 'assistant':
@@ -99,7 +99,8 @@ def coverage(messages, wire=False):
             continue
         receipt['next_offset'] = next((n for n in range(1, receipt['total_lines'] + 1)
                                        if n not in receipt['line_content']), None)
-        result[path] = {k: v for k, v in receipt.items() if k not in ('line_content', 'hashes')}
+        result[path] = {k: v for k, v in receipt.items()
+                        if k != 'hashes' and (include_content or k != 'line_content')}
     return result
 
 

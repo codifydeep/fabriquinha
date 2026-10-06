@@ -1,0 +1,4 @@
+FROM delivery-kit-model-proxy:20261006.75
+COPY decision_schema.py /decision_schema.py
+COPY artifact_read_evidence.py /artifact_read_evidence.py
+COPY observed_finding_locations.py /observed_finding_locations.py

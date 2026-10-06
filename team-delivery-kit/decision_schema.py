@@ -139,6 +139,9 @@ def apply(body):
         'action': {'type': 'string', 'enum': ['request_correction', 'request_test_revision', 'escalate_cto']},
         'reason': {'type': 'string', 'minLength': 1, 'maxLength': 1200},
         'optional_files': {'type': 'array', 'items': {'type': 'string'}, 'maxItems': 0}}
+    if mode=='technical' and any(m.get('role')=='user' and isinstance(m.get('content'),str)
+            and re.search(r'^DELIVERY_TYPED_TEST_DIAGNOSIS_V1$',m['content'],re.M) for m in body['messages']):
+        properties['action']['enum']=['request_test_revision','escalate_cto']
     versions={v for m in body['messages'] if m.get('role')=='user' and isinstance(m.get('content'),str)
         for v in re.findall(r'^DELIVERY_TEST_DECOMPOSITION_(V[12])$',m['content'],re.M)}
     if len(versions)>1:raise ValueError('conflicting decomposition versions')
@@ -230,6 +233,16 @@ def apply(body):
             'exact numbered source line and a real quote substring from that line. State expected and observed '
             'behavior separately. Removed methods/assertions must match controller diff. '
             'A narrow byte margin, stylistic preference or unverified historical allegation is not a regression.'})
+        from observed_finding_locations import MARKER as location_marker, constrain
+        if any(m.get('role')=='user' and isinstance(m.get('content'),str)
+               and re.search(r'^'+location_marker+r'$',m['content'],re.M) for m in body['messages']):
+            properties['findings']['items']=constrain(properties['findings']['items'],body['messages'],paths)
+            body['messages'].append({'role':'system','content':
+                'CITATION SELECTION: choose a complete location tuple from findings.items.anyOf. '
+                'Its tree/path/test/line/quote must belong to the SAME choice. Copy the exact '
+                'quote enum, not a paraphrase. Classes and setup/helpers use __module__; '
+                'only actual test methods have a named symbol. Select kind, expected and observed '
+                'independently based on the real behavior. The index is not semantic approval.'})
     if mode == 'qa':
         properties = {
             'decision': {'type':'string','enum':['repair','blocked']},

@@ -559,6 +559,44 @@ class RevisionReviewTests(unittest.TestCase):
         self.assertEqual(revision.planning_mounts(self.broker, 'request'), [
             {'Type': 'volume', 'Source': 'candidate', 'Target': '/evidence/candidate', 'ReadOnly': True}])
 
+    def test_second_invalid_citation_escalates_once_without_accepting_either_verdict(self):
+        self.initial_submission()
+        self.effects.test_review_report=lambda *_:{'files':{}}
+        self.effects.read_evidence=lambda _:{'/evidence/candidate/tests/test_new.py':
+            dict(call_id='candidate',lines=51,total_lines=51,next_offset=None)}
+        revision.reconcile(self.broker,self.route,[],self.effects,self.red)
+        failed=self.reviewer('reject_test_revision');failed['decision']['findings']=[{'quote':'bad'}]
+        with patch('broker.test_revision_review.validate_evidence',side_effect=ValueError('finding quote not observed at exact line')):
+            revision.reconcile(self.broker,self.route,[failed],self.effects,self.red)
+            revision.reconcile(self.broker,self.route,[failed],self.effects,self.red)
+        original_wakeup=self.effects.ensure_wakeup
+        self.effects.ensure_wakeup=lambda *args,**kwargs:{**original_wakeup(*args,**kwargs),'id':'fresh-wake'}
+        revision.reconcile(self.broker,self.route,[failed],self.effects,self.red)
+        second={**failed,'id':'second-review','wakeup_id':'fresh-wake'}
+        with patch('broker.test_revision_review.validate_evidence',side_effect=ValueError('finding test or line does not exist')):
+            revision.reconcile(self.broker,self.route,[second],self.effects,self.red)
+            revision.reconcile(self.broker,self.route,[second],self.effects,self.red)
+            revision.reconcile(self.broker,self.route,[second],self.effects,self.red)
+        self.assertEqual(len(self.created),3)  # two reviews, ONE CTO diagnosis
+        self.assertIn('Neither verdict was accepted',self.last_instruction)
+        self.assertIn('DELIVERY_OBSERVED_FINDINGS_V1',self.last_instruction)
+        with self.db() as con:
+            state=json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
+            self.assertEqual(handoffs.load(con,'new-tests')['owner'],'cto')
+        self.assertNotIn('review_task',state);self.assertNotIn('decision',state)
+        self.assertFalse(state['protocol_diagnosis']['approval'])
+        self.assertEqual(state['protocol_diagnosis']['failed_task'],'second-review')
+        # A fresh independent CTO can sponsor new tests, never approve old tests.
+        def validation(_broker,_route,_state,decision):
+            if decision['action']=='reject_test_revision':raise ValueError('finding test or line does not exist')
+        with patch('broker.test_revision_review.validate_evidence',side_effect=validation):
+            revision.reconcile(self.broker,self.route,[second,{**self.cto(),'wakeup_id':'fresh-wake'}],self.effects,self.red)
+        with self.db() as con:
+            state=json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
+        self.assertEqual(state['status'],'blocked')
+        self.assertEqual(state['rejection_diagnosis']['status'],'revision_required')
+        self.assertNotIn('decision',state)
+
     def test_first_submission_rejects_self_review_and_scope_drift(self):
         self.initial_submission()
         with self.assertRaisesRegex(ValueError, 'independent'):
@@ -719,6 +757,31 @@ class RevisionReviewTests(unittest.TestCase):
             state = json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
         self.assertEqual(state['status'], 'blocked')
         self.assertEqual(state['rejection_diagnosis']['status'], 'blocked')
+
+    def test_protocol_diagnosis_format_recovery_is_once_and_preserves_failure(self):
+        self.initial_submission();revision.reconcile(self.broker,self.route,[],self.effects,self.red)
+        with self.db() as con:state=json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
+        state.update(status='blocked',reason='invalid_independent_test_review:ValueError',
+            review_failure={'detail':'finding test or line does not exist'},
+            protocol_diagnosis={'operation':'invalid_review_citation_escalation_v1'},
+            rejection_diagnosis=dict(status='blocked',wakeup_id='old-cto',target='cto',
+                failure=dict(task_id='failed-cto',operation='task_completion',detail='CTO diagnosis did not complete')))
+        failed=dict(id='failed-cto',status='failed',agent_id='cto',wakeup_id='old-cto',
+            error='hermes provider error: API call failed after 1 retries')
+        self.effects.read_evidence=lambda _:{'/evidence/candidate/tests/test_new.py':dict(lines=10,total_lines=10)}
+        self.effects.test_review_report=lambda *_:{'files':{}}
+        state['evidence_policy']=1;state['comparison']={'files':{}}
+        revision.reconcile_rejection(self.broker,self.route,[failed],self.effects,self.red,
+            {'reviewer':'lead','initial_review':True},state,protocol_task='bad-review')
+        receipt=state['rejection_diagnosis']['typed_transport_recovery']
+        self.assertEqual(receipt['failed_task'],'failed-cto');self.assertFalse(receipt['approval'])
+        self.assertIn('DELIVERY_TYPED_TEST_DIAGNOSIS_V1',self.last_instruction)
+        self.assertEqual(len(self.created),2)
+        # A second failure remains visible, never consumes another retry.
+        state['rejection_diagnosis'].update(status='blocked',failure=receipt['prior_diagnosis']['failure'])
+        revision.reconcile_rejection(self.broker,self.route,[failed],self.effects,self.red,
+            {'reviewer':'lead','initial_review':True},state,protocol_task='bad-review')
+        self.assertEqual(len(self.created),2)
 
     def test_cto_compares_rejected_revision_with_previous_readonly(self):
         self.rejected()

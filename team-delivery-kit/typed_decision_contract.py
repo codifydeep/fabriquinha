@@ -14,6 +14,7 @@ NAME='submit_delivery_decision'
 MARKER='DELIVERY_TYPED_DECISION_V1'
 REVIEW_NAME='submit_test_review'
 REVIEW_MARKER='DELIVERY_TYPED_REVIEW_V1'
+TEST_DIAGNOSIS_MARKER='DELIVERY_TYPED_TEST_DIAGNOSIS_V1'
 EVIDENCE_NAME='submit_deployment_evidence'
 EVIDENCE_MARKER='DELIVERY_TYPED_DEPLOYMENT_EVIDENCE_V1'
 VALIDATION_NAME='submit_deployment_validation_request'
@@ -174,6 +175,14 @@ def apply(body):
                 or set(props['units'].get('items',{}).get('properties',{}))!=
                     {'id','depends_on','criteria','objective'}):
             raise ValueError('non-executing decomposition schema required')
+    elif any(m.get('role')=='user' and isinstance(m.get('content'),str)
+             and re.search(r'^'+TEST_DIAGNOSIS_MARKER+r'$',m['content'],re.M) for m in body['messages']):
+        props=schema.get('properties',{})
+        if (set(props)!={'action','reason','optional_files','findings'}
+                or props['action'].get('enum')!=['request_test_revision','escalate_cto']
+                or props['optional_files'].get('maxItems')!=0
+                or not props['findings'].get('items',{}).get('anyOf')):
+            raise ValueError('observed non-approving test diagnosis contract required')
     elif (set(schema.get('properties',{}))!={'action','reason','optional_files'}
             or not set(schema['properties']['action'].get('enum',[]))<=
                 {'request_correction','request_test_revision','escalate_cto'}):

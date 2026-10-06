@@ -52,6 +52,9 @@ class CitationSupervisionTests(unittest.TestCase):
         self.verify.assert_not_called()
         self.proof.update(state_status='blocked',decision=None)
         self.assertIsNone(self.run_resume())
+        self.proof['protocol_active']=True
+        self.assertEqual(self.run_resume()['stage'],'working')
+        self.proof['protocol_active']=False
         self.proof['decision']={'action':'reject_test_revision'}
         self.assertEqual(self.run_resume()['stage'],'working')
         self.verify.side_effect=ValueError('base CI drift')

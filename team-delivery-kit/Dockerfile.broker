@@ -64,6 +64,7 @@ COPY tests/test_c10_status_atomic.py /status_fixture.py
 COPY tests/surgical_line_registry_probe.py /line_probe.py
 COPY model_proxy.py /model_proxy.py
 COPY decision_schema.py /decision_schema.py
+COPY observed_finding_locations.py /observed_finding_locations.py
 COPY planning_schema.py /planning_schema.py
 COPY write_tool_schema.py /write_tool_schema.py
 COPY test_artifact_schema.py /test_artifact_schema.py
