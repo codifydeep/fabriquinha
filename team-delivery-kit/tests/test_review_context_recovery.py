@@ -11,6 +11,13 @@ from test_test_first_handoffs import Broker
 
 
 class ReviewContextRecoveryTests(unittest.TestCase):
+    def test_unregistered_broker_source_cannot_reopen_recovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source=Path(directory)/'changed.py';source.write_text('unregistered code')
+            with patch.object(self.b,'__file__',str(source)):
+                with self.assertRaisesRegex(ValueError,'fixed native task_id'):
+                    self.register()
+
     def test_capsule_probe_preserves_full_prompt_and_exact_frozen_identity(self):
         from execution_context import freeze, reference
         capsule=freeze('Complete acceptance. '*250,'Independent full review. '*160)

@@ -121,7 +121,8 @@ def author_phase_markers(config,state,task,path):
             or sub.get('wakeup_id') and task.get('wakeup_id')!=sub['wakeup_id']):return ''
     from portable_contract import safe_path
     safe_path(path)
-    return '\nDELIVERY_TEST_REVISION_V1:/workspace/'+path+'\nDELIVERY_DETERMINISTIC_READ_V1\n'
+    return ('\nDELIVERY_TEST_REVISION_V1:/workspace/'+path+
+            '\nDELIVERY_DETERMINISTIC_READ_V1\nDELIVERY_AUTHOR_READ_PAGE_V1:200\n')
 
 
 def registered_author_context(broker,issue,task):

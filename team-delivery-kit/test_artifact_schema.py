@@ -10,6 +10,7 @@ import re
 
 from artifact_read_evidence import observations, next_read
 from surgical_test_edit import marker_config,typed_schema
+from author_read_policy import page_size
 
 def additive_phase(body):
     marked=[]
@@ -173,7 +174,7 @@ def apply(body):
         chosen['function']['strict'] = True
         chosen['function']['parameters'] = {'type': 'object', 'properties': {
             'path': {'type': 'string', 'enum': [path]}, 'offset': {'type': 'integer', 'enum': [offset]},
-            'limit': {'type': 'integer', 'enum': [200 if edit_required else 50]}},
+            'limit': {'type': 'integer', 'enum': [200 if edit_required else page_size(body)]}},
             'required': ['path', 'offset', 'limit'], 'additionalProperties': False}
         name = 'read_file'
         instruction = 'TEST AUTHOR INSPECTION: read the selected source page, then proceed to actual test writing.'

@@ -9,6 +9,7 @@ from io import StringIO
 from model_policy import MODEL
 from model_proxy import validate_request
 from deterministic_read_dispatch import make
+from read_work_pattern import summarize
 
 
 def main():
@@ -73,6 +74,7 @@ def main():
         tool_counts={name:sum(call.get('function',{}).get('name')==name
             for m in messages for call in m.get('tool_calls') or [])
             for name in ('read_file','write_file','patch','terminal')},
+        read_work_pattern=summarize(messages),
         model_calls=0,delivery_approval=False,full_rpc_qualified=False)))
 
 

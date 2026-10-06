@@ -13,6 +13,19 @@ EXECUTION=fixtures.EXECUTION
 
 
 class DeterministicReadTests(unittest.TestCase):
+    def test_explicit_revision_200_read_does_not_grant_inspection_or_call_model(self):
+        wire=self.author_body()
+        wire['messages'][0]['content']+='DELIVERY_TEST_REVISION_V1:/workspace/tests/test_new.py\nDELIVERY_AUTHOR_READ_PAGE_V1:200\n'
+        with patch.object(proxy,'forward') as forward:reply=self.f.request(wire)
+        self.assertEqual(reply.status,200);forward.assert_not_called()
+        prepared=proxy.validate_request(copy.deepcopy(wire))
+        read=next(t['function'] for t in prepared['tools'] if t['function']['name']=='read_file')
+        self.assertEqual(read['parameters']['properties']['limit']['enum'],[200])
+        validate(prepared,reply.wfile.getvalue(),'text/event-stream')
+        self.assertIsNotNone(dispatch.artifact_identity(prepared,EXECUTION))
+        self.assertEqual(observations([{'role':'assistant','content':reply.wfile.getvalue().decode()}],wire=True),{})
+        self.assertEqual(proxy.load_calls(),0)
+
     def test_handler_supports_stream_switch_without_upstream_or_overwriting_ledger(self):
         with patch.object(proxy,'forward') as forward:
             streamed=self.f.request({**self.body,'stream':True})

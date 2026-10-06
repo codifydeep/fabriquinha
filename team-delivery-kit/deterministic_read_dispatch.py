@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import sqlite3
 from read_stream_recovery import identity
+from author_read_policy import page_size
 
 
 def artifact_identity(body, execution_id):
@@ -39,7 +40,7 @@ def artifact_identity(body, execution_id):
     if (path not in sources or not isinstance(path,str) or not re.fullmatch(r'/workspace/[A-Za-z0-9_./-]+',path)
             or any(p in ('','.', '..') for p in path.split('/')[2:]) or props['path'].get('type')!='string'
             or any(props[k].get('type')!='integer' or type(args[k]) is not int or args[k]<1 for k in ('offset','limit'))
-            or args['limit']!=(200 if seeded and seeded==revisions==artifacts else 50)):return None
+            or args['limit']!=(200 if seeded and seeded==revisions==artifacts else page_size(body))):return None
     scope=hashlib.sha256(json.dumps(dict(namespace='author-read-v1',execution=execution_id,model=body.get('model'),**args),sort_keys=True).encode()).hexdigest()
     return dict(scope=scope,execution_id=execution_id,request_sha256=hashlib.sha256(json.dumps(body,sort_keys=True).encode()).hexdigest())
 

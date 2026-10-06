@@ -1,0 +1,7 @@
+FROM delivery-kit-execution-broker:20261006.246
+COPY broker/server.py /broker.py
+COPY broker/adapted_test_review.py /adapted_test_review.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY author_read_policy.py /author_read_policy.py
+COPY test_artifact_schema.py /test_artifact_schema.py
+COPY deterministic_read_dispatch.py /deterministic_read_dispatch.py

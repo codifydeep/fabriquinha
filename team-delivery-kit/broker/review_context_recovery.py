@@ -11,7 +11,8 @@ import sqlite3
 import time
 import uuid
 
-FIXED_SERVER_SHA = 'f51fc9f6edd64b03ba9f0a13920ec544c191e45ca6448d3a81df849dd3287573'
+FIXED_SERVER_SHA = '9bd24852b561a3f11bb7d1c15baa7e5e572eda530b41a1e82e8f33a9369dae27'
+PREVIOUS_FIXED_SERVER_SHA = 'f51fc9f6edd64b03ba9f0a13920ec544c191e45ca6448d3a81df849dd3287573'
 ERROR = 'hermes session/prompt failed: session/prompt: restricted broker stream failed: broker_internal (code=-32000)'
 CAPSULE_ERROR = 'hermes session/prompt failed: session/prompt: restricted broker stream failed: native_prompt_bounds (code=-32000)'
 
@@ -83,7 +84,9 @@ def register(b, payload):
     for value in payload.values():
         if str(uuid.UUID(value)) != value:
             raise ValueError('canonical review recovery identity required')
-    if hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest() != FIXED_SERVER_SHA:
+    actual_server_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
+    if actual_server_sha not in {
+            FIXED_SERVER_SHA,PREVIOUS_FIXED_SERVER_SHA}:
         raise ValueError('fixed native task_id receipt implementation required')
     issue, source = payload['issue_id'], payload['source_task']
     with b.LOCK, b.db() as con:
@@ -165,11 +168,11 @@ def register(b, payload):
                 or checked.get('tdd') != evidence.get('tdd')):
             raise ValueError('frozen delivery or TDD drift')
         receipt = dict(operation='native_review_context_recovery_v1', request=payload,
-            fixed_server_sha256=FIXED_SERVER_SHA, presentation=presentation,
+            fixed_server_sha256=actual_server_sha, presentation=presentation,
             previous_blocker=data, at=time.time(), approval=False, author_restarted=False,
             preserved_review_retries=1, extra_review_limit=1)
         updated = dict(data, review_context_recovery=receipt,
-            diagnostic_revision=FIXED_SERVER_SHA + ':native-review-context-v1', trigger_task=failed['id'])
+            diagnostic_revision=actual_server_sha + ':native-review-context-v1', trigger_task=failed['id'])
         for key in ('instruction','dispatch_marker','dispatch_stage','target','wakeup_id',
                     'recipient_task','dispatched_at','control_error','control_error_count','decision','required_action','alerted'):
             updated.pop(key,None)

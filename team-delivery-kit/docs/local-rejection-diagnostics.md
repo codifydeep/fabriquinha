@@ -52,3 +52,25 @@ and replan through CTO, rather than reset the same task budget automatically.
 The new installed proxy diagnostic was verified by a real local HTTP canary:
 rejection persisted, no retry or delivery approval, zero model calls spent.
 This verifies diagnostics only, not autonomous delivery or product homologation.
+
+## Author inspection capacity
+
+The failed execution's 31 reads were distinct pages, not a read loop. Thirty
+occurred before its first edit; complete coverage was observed for five read
+files. A controller opt-in (`DELIVERY_AUTHOR_READ_PAGE_V1:200`) now permits
+200-line pages for an ordinary test revision. Old contexts still select 50;
+review, surgical and additive contracts are not broadened. Only the selected
+source path is dispatched, and real results must still cover every source line.
+Clipped or missing lines cannot count as inspected.
+
+The real installed Hermes `read_file_tool`, used on the preserved failed snapshot
+inside a networkless read-only container, read the four contract-required files
+fully in nine calls instead of 28. The fifth historical read was not part of that
+probe's required-source set. Both probes used the same frozen files; their hashes
+remained unchanged. This qualifies read capacity, not the agent's inspection or
+the full handoff. The reproducible [native probe](../tests/author_page_native_probe.py)
+is public; its operational receipt stays in the private evaluation archive.
+
+No retry counters were reset and no previous approvals were upgraded. The next
+recovery still needs an independent CTO decision linked to preserved evidence
+and the changed policy; a fresh worker alone does not resolve the incident.

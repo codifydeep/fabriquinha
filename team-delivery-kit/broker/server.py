@@ -2028,6 +2028,8 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
                         instruction+='\nDELIVERY_TEST_REVISION_V1:/workspace/'+next(iter(files))+'\n'
                         if trial.get('seeded_edit_required') is True:
                             instruction+='\nDELIVERY_SEEDED_EDIT_REQUIRED_V1:/workspace/'+next(iter(files))+'\n'
+                        elif not surgical and 'DELIVERY_AUTHOR_READ_PAGE_V1:200' not in instruction:
+                            instruction+='DELIVERY_AUTHOR_READ_PAGE_V1:200\n'
                 if trial.get('harness_maintenance_only'):
                     try:import harness_repair_task
                     except ImportError:from broker import harness_repair_task
