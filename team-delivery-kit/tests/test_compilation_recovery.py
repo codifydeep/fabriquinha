@@ -3,14 +3,25 @@ from pathlib import Path
 import tempfile
 import unittest
 import hashlib
+import sqlite3
 from unittest.mock import patch
 
 from brief_delivery_supervisor import supervise
-from compilation_recovery import qualified_revision, ROOT
+from compilation_recovery import qualified_revision, ROOT, active_lease_count
 from qa_postmerge_trial import digest
 
 
 class CompilationRecoveryTests(unittest.TestCase):
+    def test_real_broker_lease_states_exclude_every_inflight_execution(self):
+        with sqlite3.connect(':memory:') as con:
+            con.execute('CREATE TABLE leases(status TEXT)')
+            for status in ('closed', 'failed', 'expired', 'interrupted', 'cancelled', 'passed', 'lost'):
+                con.execute('INSERT INTO leases VALUES (?)', (status,))
+            self.assertEqual(active_lease_count(con), 0)
+            for expected, status in enumerate(('creating', 'running', 'closing'), start=1):
+                con.execute('INSERT INTO leases VALUES (?)', (status,))
+                self.assertEqual(active_lease_count(con), expected)
+
     def test_installed_proof_requires_idle_matching_code_and_blocked_cards(self):
         with tempfile.TemporaryDirectory() as folder:
             private = Path(folder)

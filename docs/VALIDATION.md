@@ -16,6 +16,12 @@ Houve reparos do operador antes da conclusão: não é a prova de um ciclo integ
 
 `BRIEFDEMO-2` foi preparado para um novo brief e dois cards dependentes. Produto solicitou esclarecimento de negócio sobre como exibir respostas válidas de um modo diferente de `demo`. Em 6 de outubro, o CEO confirmou que toda resposta diferente de `{"mode":"demo"}` deve exibir `Environment unavailable`. A retomada usa um recibo específico da pergunta, sem alterar retroativamente o brief original ou aprovar decisões técnicas. O resultado do novo ciclo ainda precisa ser verificado; não está homologado.
 
+### Retomada com contexto integral
+
+O contexto de implementação e revisão agora pode ser preservado em uma cápsula imutável ligada à rota do controlador. O broker instalado confere seu hash, issue, agente e modo. A retomada da compilação exige correspondência entre código instalado e código validado, cards bloqueados sem assignee e ausência de leases `creating`, `running` ou `closing`. Uma revisão de recuperação já consumida não autoriza repetição idêntica.
+
+A suíte offline atual executou **1.706 testes, com sete skips existentes**. No ensaio `BRIEFDEMO-2`, os testes iniciais do backend tiveram Red registrado e revisão independente aprovada; a implementação terminou e entrou no gate de revisão da entrega. Isso não comprova aprovação final, integração, implantação, QA ou homologação. O ensaio precisou de correção do controlador antes de avançar e não será apresentado como um ciclo integral sem intervenção.
+
 ## Evidências públicas e privadas
 
 Somente o lock de proveniência das dependências e um fixture público de qualificação do guard permanecem em `team-delivery-kit/evaluation/`. O fixture contém propriedades de isolamento e hashes de imagem, sem conversas, credenciais ou identidades de contas. É uma fotografia de um ensaio sem modelo, não o status atual. Relatórios, diário operacional, transcrições, bases e recibos privados permanecem na instalação original.

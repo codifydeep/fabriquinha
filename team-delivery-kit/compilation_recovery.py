@@ -8,6 +8,11 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parent
+ACTIVE_LEASE_QUERY = "SELECT count(*) FROM leases WHERE status IN ('creating','running','closing')"
+
+
+def active_lease_count(con):
+    return con.execute(ACTIVE_LEASE_QUERY).fetchone()[0]
 
 
 def qualified_revision(config, private):
@@ -37,7 +42,7 @@ def qualified_revision(config, private):
         PROJECT + '-execution-broker-1', 'python', '-c',
         'import hashlib,json,sqlite3; from pathlib import Path; '
         'c=sqlite3.connect("file:/broker-state/leases.sqlite?mode=ro",uri=True); '
-        'print(json.dumps(dict(active=c.execute("SELECT count(*) FROM leases WHERE status=\'active\'").fetchone()[0], '
+        'print(json.dumps(dict(active=c.execute(' + repr(ACTIVE_LEASE_QUERY) + ').fetchone()[0], '
         'hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in '
         '["/broker.py","/execution_context.py","/handoff_runtime.py"]})))'], text=True))
     sources = {'/broker.py': 'broker/server.py', '/execution_context.py': 'execution_context.py',
@@ -47,4 +52,5 @@ def qualified_revision(config, private):
     if installed.get('active') != 0 or installed.get('hashes') != expected:
         raise ValueError('idle installed context protection must match validated source')
     return digest(dict(input=config['sha256'], plan=mapped['plan_sha256'], installed=expected,
+                       preflight=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                        compiler=hashlib.sha256((ROOT / 'planned_delivery.py').read_bytes()).hexdigest()))
