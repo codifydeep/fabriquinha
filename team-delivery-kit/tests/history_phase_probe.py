@@ -4,6 +4,8 @@ import json
 import sqlite3
 import sys
 import uuid
+from contextlib import redirect_stdout,redirect_stderr
+from io import StringIO
 from model_policy import MODEL
 from model_proxy import validate_request
 from deterministic_read_dispatch import make
@@ -11,12 +13,18 @@ from deterministic_read_dispatch import make
 
 def main():
     session,execution=sys.argv[1:3]
+    flags=set(sys.argv[3:])
+    assert flags<={'--wire-sidecar','--active-only','--native-registry','--summary-without-tools'}
     assert str(uuid.UUID(session))==session and str(uuid.UUID(execution))==execution
     con=sqlite3.connect('file:/session/state.db?mode=ro',uri=True)
     con.row_factory=sqlite3.Row
-    messages=[]
-    for row in con.execute('SELECT role,content,tool_call_id,tool_calls FROM messages WHERE session_id=? ORDER BY id',(session,)):
+    messages=[];sidecars=0;excluded=0
+    for row in con.execute('SELECT role,content,tool_call_id,tool_calls,api_content,active FROM messages WHERE session_id=? ORDER BY id',(session,)):
+        if '--active-only' in flags and not row['active']:
+            excluded+=1;continue
         message={k:row[k] for k in ('role','content')}
+        if '--wire-sidecar' in flags and isinstance(row['api_content'],str):
+            message['content']=row['api_content'];sidecars+=1
         if row['tool_call_id']:message['tool_call_id']=row['tool_call_id']
         if row['tool_calls']:message['tool_calls']=json.loads(row['tool_calls'])
         messages.append(message)
@@ -25,6 +33,12 @@ def main():
         name=name,parameters={})) for name in ('read_file','write_file','patch','terminal')])
     body['tools'][1]['function']['parameters']={'type':'object','properties':{
         'path':{'type':'string'},'content':{'type':'string'}}}
+    if '--native-registry' in flags:
+        with redirect_stdout(StringIO()),redirect_stderr(StringIO()):
+            from model_tools import get_tool_definitions
+            body['tools']=get_tool_definitions(enabled_toolsets=['hermes-acp'],quiet_mode=True)
+    if '--summary-without-tools' in flags:
+        body.pop('tools',None)
     prefix_rejections=[]
     for end in range(1,len(messages)+1):
         if messages[end-1].get('role')!='tool':continue
@@ -47,11 +61,18 @@ def main():
                'seeded edit target drift','revision target drift','test artifact write failed twice; diagnosis required',
                'invalid deterministic read contract','unrecognized write_file signature',
                'typed source is initial-artifact only'}
+        known.add('test artifact requires existing read and write tools')
         outcome=dict(status='rejected',category=str(error) if str(error) in known else 'unclassified',
             exception_type=type(error).__name__,error_sha256=hashlib.sha256(str(error).encode()).hexdigest())
     con.close()
     print(json.dumps(dict(operation='private_history_phase_probe_v1',messages=len(messages),
         validation=outcome,prefix_rejections=prefix_rejections[-12:],
+        wire_sidecars=sidecars,inactive_excluded=excluded,
+        native_registry='--native-registry' in flags,tool_count=len(body.get('tools') or []),
+        assistant_tool_turns=sum(bool(m.get('tool_calls')) for m in messages if m.get('role')=='assistant'),
+        tool_counts={name:sum(call.get('function',{}).get('name')==name
+            for m in messages for call in m.get('tool_calls') or [])
+            for name in ('read_file','write_file','patch','terminal')},
         model_calls=0,delivery_approval=False,full_rpc_qualified=False)))
 
 

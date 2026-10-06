@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261006.245
+COPY broker/acp_result_contract.py /opt/hermes/acp_result_contract.py
+COPY broker/iteration_budget_contract.py /opt/hermes/iteration_budget_contract.py
+COPY broker/install_iteration_budget_contract.py /install_iteration_budget_contract.py
+RUN python /install_iteration_budget_contract.py
