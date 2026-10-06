@@ -12,6 +12,11 @@ def copies(path):
 
 
 class BrokerCanonicalPackagingTests(unittest.TestCase):
+    def test_all_proxy_overlay_dependencies_are_in_the_fresh_build(self):
+        required=set()
+        for path in ROOT.glob('Dockerfile*proxy*'):
+            required|={entry for entry in copies(path) if entry[0].endswith('.py')}
+        self.assertEqual(required-copies(ROOT/'Dockerfile.model-proxy'),set())
     def test_all_overlay_python_dependencies_are_in_the_fresh_build(self):
         required=set()
         for path in ROOT.glob('Dockerfile.broker-read-*'):

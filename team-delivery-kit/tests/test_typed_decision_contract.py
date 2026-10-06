@@ -10,6 +10,90 @@ from structured_response_contract import StructuredResponseRejected
 
 
 class TypedDecisionTests(unittest.TestCase):
+    def review_decision(self):
+        return dict(action='reject_test_revision',reason='Actual coverage missing',optional_files=[],
+            manifest_sha256='a'*64,findings=[dict(kind='missing_coverage',tree='candidate',
+                path='tests/test_new.py',test='__module__',line=1,quote='assert value',
+                expected='Real interaction',observed='Static check only')])
+
+    def test_review_feedback_corrects_length_only_and_never_approves_itself(self):
+        import sqlite3
+        for fields in (('reason',),('expected','observed')):
+            f=fixtures.ReadStreamRecoveryTests();f.setUp()
+            try:
+                body=self.review_body(findings=True);body['model']=proxy.MODEL
+                good=self.review_decision();bad=copy.deepcopy(good)
+                for field in fields:
+                    if field=='reason':bad[field]='x'*1300
+                    else:bad['findings'][0][field]='x'*501
+                with patch.object(proxy,'forward',side_effect=[
+                        (200,self.wire(bad,name=REVIEW_NAME),'application/json'),
+                        (200,self.wire(good,name=REVIEW_NAME),'application/json')]) as forward:
+                    reply=f.request(body)
+                self.assertEqual(reply.status,200);self.assertEqual(forward.call_count,2)
+                revised=forward.call_args_list[1].args[0]
+                self.assertEqual(json.loads(revised['messages'][-2]['tool_calls'][0]['function']['arguments']),bad)
+                feedback=json.loads(revised['messages'][-1]['content'])
+                self.assertFalse(feedback['worker_tool_executed'])
+                self.assertFalse(feedback['review_acceptance_by_proxy'])
+                with sqlite3.connect(f.counter.with_name('deterministic-reads.sqlite')) as con:
+                    receipt=json.loads(con.execute('SELECT receipt FROM technical_length_feedback').fetchone()[0])
+                    self.assertEqual(receipt['operation'],'review_length_feedback_v1')
+                    self.assertEqual(receipt['manifest_sha256'],'a'*64)
+                with patch.object(proxy,'forward') as again:
+                    self.assertEqual(f.request(body).status,502);again.assert_not_called()
+            finally:f.doCleanups()
+
+    def test_review_format_feedback_rejects_verdict_or_finding_drift(self):
+        for mutation in ('action','finding_removed','reference','unlisted_prose'):
+            f=fixtures.ReadStreamRecoveryTests();f.setUp()
+            try:
+                body=self.review_body(findings=True);body['model']=proxy.MODEL
+                good=self.review_decision();bad=copy.deepcopy(good);bad['reason']='x'*1300
+                if mutation=='action':good.update(action='approve_test_revision',findings=[])
+                if mutation=='finding_removed':good['findings']=[]
+                if mutation=='reference':good['findings'][0]['line']=2
+                if mutation=='unlisted_prose':good['findings'][0]['expected']='Changed expectation'
+                with patch.object(proxy,'forward',side_effect=[
+                        (200,self.wire(bad,name=REVIEW_NAME),'application/json'),
+                        (200,self.wire(good,name=REVIEW_NAME),'application/json')]) as forward:
+                    reply=f.request(body)
+                self.assertEqual(reply.status,502);self.assertEqual(forward.call_count,2)
+            finally:f.doCleanups()
+
+    def test_review_feedback_never_repairs_other_schema_failures(self):
+        body=self.review_body(findings=True,observed=True)
+        for mutation in ('enum','snapshot','path','symbol','unmarked','empty_findings','extra_field','bad_quote'):
+            request=copy.deepcopy(body);bad=self.review_decision();bad['reason']='x'*1300
+            if mutation=='enum':bad['action']='APPROVE'
+            if mutation=='snapshot':bad['manifest_sha256']='b'*64
+            if mutation=='path':bad['findings'][0]['path']='x'*201
+            if mutation=='symbol':bad['findings'][0]['test']='x'*201
+            if mutation=='empty_findings':bad['findings']=[]
+            if mutation=='extra_field':bad['unexpected']='not allowed'
+            if mutation=='bad_quote':bad['findings'][0]['quote']='unobserved source'
+            if mutation=='unmarked':
+                from typed_decision_contract import REVIEW_LENGTH_MARKER
+                request['messages']=[m for m in request['messages'] if m.get('content')!=REVIEW_LENGTH_MARKER+'\n']
+            with self.assertRaises(StructuredResponseRejected) as caught:
+                translate(request,self.wire(bad,name=REVIEW_NAME),'application/json')
+            self.assertFalse(hasattr(caught.exception,'length_feedback'),mutation)
+
+    def test_review_feedback_is_one_call_and_obeys_the_global_cap(self):
+        for cap,good in ((2,False),(1,True)):
+            f=fixtures.ReadStreamRecoveryTests();f.setUp()
+            try:
+                body=self.review_body(findings=True);body['model']=proxy.MODEL
+                bad=self.review_decision();bad['reason']='x'*1300
+                second=self.review_decision() if good else bad
+                with patch.object(proxy,'MAX_CALLS',cap),patch.object(proxy,'forward',side_effect=[
+                        (200,self.wire(bad,name=REVIEW_NAME),'application/json'),
+                        (200,self.wire(second,name=REVIEW_NAME),'application/json')]) as forward:
+                    reply=f.request(body)
+                self.assertEqual(reply.status,400 if cap==1 else 502)
+                self.assertEqual(forward.call_count,cap)
+                self.assertEqual(proxy.load_calls(),cap)
+            finally:f.doCleanups()
     def recovery_body(self):
         return schema({'messages':[{'role':'user','content':
             'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_EXECUTION_REPAIR_V1\n'
@@ -220,9 +304,9 @@ class TypedDecisionTests(unittest.TestCase):
             'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'}]}))
         self.decision={'action':'request_test_revision','reason':'Add actual negative-control tests','optional_files':[]}
 
-    def review_body(self,findings=False):
+    def review_body(self,findings=False,observed=False):
         sha='a'*64;path='/evidence/candidate/tests/test_new.py'
-        body={'messages':[{'role':'user','content':'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+sha+'\nDELIVERY_TYPED_REVIEW_V1:'+sha+'\nDELIVERY_REVIEW_READ_PATH:'+path+'\n'+('DELIVERY_TEST_FINDINGS_V1\n' if findings else '')},
+        body={'messages':[{'role':'user','content':'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+sha+'\nDELIVERY_TYPED_REVIEW_V1:'+sha+'\nDELIVERY_REVIEW_READ_PATH:'+path+'\n'+('DELIVERY_TEST_FINDINGS_V1\n' if findings else '')+('DELIVERY_OBSERVED_FINDINGS_V1\n' if observed else '')},
             {'role':'assistant','tool_calls':[{'id':'r','function':{'name':'read_file','arguments':json.dumps({'path':path})}}]},
             {'role':'tool','tool_call_id':'r','content':json.dumps({'content':'1|assert value\n','total_lines':1})}]}
         return apply(schema(body))

@@ -654,6 +654,7 @@ def reconcile(broker, route, runs, effects, red):
                              (':storage:1' if state.get('storage_retry') else '') +
                              (':challenge:1' if state.get('challenge_retry') else '')+
                              (':typed-terminal:1' if state.get('typed_terminal_recovery') else '')+
+                             (':format-repair:1' if state.get('format_recovery') else '')+
                              (':citation-repair:1' if state.get('citation_recovery') else '')).encode()).hexdigest()
     initial = config.get('initial_review', False)
     paths = ['/evidence/' + tree + '/' + name
@@ -717,6 +718,12 @@ def reconcile(broker, route, runs, effects, red):
             'and verify the test symbol and line number. Independently judge behavioral coverage; '
             'source-string assertions are not evidence of real HTTP/browser behavior. '
             'Do not reuse an old verdict or invent a code location. One citation-format repair only.\n')
+    if state.get('format_recovery'):
+        instruction += ('\nFresh independent review after a rejected oversized submission. '
+            'Read the same frozen evidence again and judge it independently. '
+            'Keep reason <=1200 characters and finding quote/expected/observed <=500 each. '
+            'The proxy permits one format-only correction, not a changed verdict or dropped findings. '
+            'Previous failure was not approval; implementation remains blocked.\n')
     if 'wakeup_id' not in state:
         state.update(status='dispatch_intent', manifest_sha256=digest, terminal_contract='typed-review-v1',
                      source_task=red['task_id'], candidate_volume=red['volume'],

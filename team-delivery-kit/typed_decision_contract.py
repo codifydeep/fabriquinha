@@ -20,15 +20,78 @@ EVIDENCE_MARKER='DELIVERY_TYPED_DEPLOYMENT_EVIDENCE_V1'
 VALIDATION_NAME='submit_deployment_validation_request'
 DECOMPOSITION_MARKER='DELIVERY_TYPED_DECOMPOSITION_V1'
 LENGTH_MARKER='DELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1'
+REVIEW_LENGTH_MARKER='DELIVERY_REVIEW_LENGTH_FEEDBACK_V1'
 RECOVERY_NAME='submit_worker_recovery_request'
 RECOVERY_MARKER='DELIVERY_TYPED_WORKER_RECOVERY_V1'
 
 
 def length_feedback_enabled(body):
-    return body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
+    return review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
         {'type':'function','function':{'name':RECOVERY_NAME}}) and any(
         m.get('role')=='user' and isinstance(m.get('content'),str)
-        and re.search(r'^'+LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[]))
+        and re.search(r'^'+LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
+
+
+def review_length_feedback_enabled(body):
+    return body.get('tool_choice')=={'type':'function','function':{'name':REVIEW_NAME}} and any(
+        m.get('role')=='user' and isinstance(m.get('content'),str)
+        and re.search(r'^'+REVIEW_LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[]))
+
+
+def review_length_violations(body, violations, decision, schema):
+    """Only bounded prose/citation fields; never enums, snapshot IDs or paths."""
+    if not review_length_feedback_enabled(body) or not 1<=len(violations)<=10:
+        return None
+    fields=[]
+    validation_only=copy.deepcopy(decision)
+    for violation in violations:
+        # The action-specific branches repeat the root constraints. A root
+        # length failure therefore also fails anyOf. Do not ignore that error:
+        # validate the complete schema below after substituting only bounded
+        # prose in a throwaway copy (never returned or accepted as a decision).
+        if (violation.validator=='anyOf' and not list(violation.path)
+                and list(violation.schema_path)==['anyOf']):continue
+        path=list(violation.path)
+        allowed=(path==['reason'] and violation.validator_value==1200 or
+            len(path)==3 and path[0]=='findings' and type(path[1]) is int and 0<=path[1]<=2
+            and path[2] in ('quote','expected','observed') and violation.validator_value==500)
+        if (violation.validator!='maxLength' or not allowed or not isinstance(violation.instance,str)
+                or not violation.validator_value<len(violation.instance)<=4000):return None
+        fields.append(dict(path=path,maxLength=violation.validator_value,actualLength=len(violation.instance)))
+        target=validation_only
+        for part in path[:-1]:target=target[part]
+        target[path[-1]]=violation.instance[:violation.validator_value]
+    if not fields or not Draft202012Validator(schema).is_valid(validation_only):return None
+    return fields
+
+
+def validate_review_feedback_identity(body, decision):
+    """A format repair cannot switch verdict, drop findings or change references."""
+    if not review_length_feedback_enabled(body) or len(body.get('messages',[]))<2:return
+    submitted,reply=body['messages'][-2:]
+    if reply.get('role')!='tool' or not isinstance(reply.get('content'),str):return
+    try:feedback=json.loads(reply['content'])
+    except ValueError:return
+    if not isinstance(feedback,dict) or feedback.get('operation')!='format_only_review_feedback_v1':return
+    try:
+        call=submitted['tool_calls'][0]
+        if (submitted.get('role')!='assistant' or len(submitted['tool_calls'])!=1
+                or call['id']!=reply.get('tool_call_id') or call['function']['name']!=REVIEW_NAME):
+            raise ValueError()
+        previous=json.loads(call['function']['arguments'],object_pairs_hook=_unique)
+        expected=copy.deepcopy(previous)
+        fields=feedback['fields']
+        if not 1<=len(fields)<=10:raise ValueError()
+        for field in fields:
+            path=field['path']
+            if path==['reason']:expected['reason']=decision['reason']
+            elif (len(path)==3 and path[0]=='findings' and type(path[1]) is int
+                    and 0<=path[1]<=2 and path[2] in ('quote','expected','observed')):
+                expected['findings'][path[1]][path[2]]=decision['findings'][path[1]][path[2]]
+            else:raise ValueError()
+        if expected!=decision:raise ValueError()
+    except (ValueError,KeyError,IndexError,TypeError):
+        raise StructuredResponseRejected('typed_review_feedback_identity_drift') from None
 
 
 def length_feedback_preflight(counter_path,execution_id,body):
@@ -45,9 +108,12 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
     if not feedback or not length_feedback_enabled(body):return None
     if not isinstance(execution_id,str) or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',execution_id):return None
     from deterministic_read_dispatch import ledger
-    receipt={'operation':'technical_length_feedback_v1','first_call':first_call,
+    receipt={'operation':'review_length_feedback_v1' if review_length_feedback_enabled(body) else 'technical_length_feedback_v1','first_call':first_call,
         'rejected_upstream_sha256':error.receipt['upstream_sha256'],'attempt_limit':1,
         'worker_tool_executed':False,'delivery_approval':False}
+    if review_length_feedback_enabled(body):
+        receipt['review_acceptance_by_proxy']=False
+        receipt['manifest_sha256']=body['tools'][0]['function']['parameters']['properties']['manifest_sha256']['enum'][0]
     with ledger(counter_path) as con:
         con.execute('CREATE TABLE IF NOT EXISTS technical_length_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
         if con.execute('SELECT 1 FROM technical_length_feedback WHERE execution_id=?',(execution_id,)).fetchone():return None
@@ -203,6 +269,8 @@ def apply(body):
         # At most one format-only response per execution, enforced by the
         # existing durable length-feedback ledger. No action/schema is broadened.
         result['messages'].append({'role':'user', 'content':LENGTH_MARKER + '\n'})
+    if name==REVIEW_NAME:
+        result['messages'].append({'role':'user','content':REVIEW_LENGTH_MARKER+'\n'})
     result['messages'].append({'role':'system','content':
         'TYPED DECISION PHASE: call '+name+' exactly once with every required schema field. '
         'Use actual tool arguments, not prose or a Markdown code block. This is a non-executing data submission. '
@@ -432,11 +500,24 @@ def translate(body,data,media_type):
                         'actualLength':len(decision['reason']),'worker_tool_executed':False,
                         'instruction':'Submit NEW valid arguments once. Condense reason to one actionable sentence, target420characters. No background or policy narration. Preserve factual classification and required fields. Nothing was executed or approved.'})}]
                 raise error
+            fields=review_length_violations(body,violations,decision,schema)
+            if fields:
+                error=StructuredResponseRejected('typed_schema_maxLength')
+                identity='format_'+hashlib.sha256(data).hexdigest()[:24]
+                error.length_feedback=[{'role':'assistant','content':None,'tool_calls':[{
+                    'id':identity,'type':'function','function':{'name':name,'arguments':arguments}}]},
+                    {'role':'tool','tool_call_id':identity,'content':json.dumps({
+                        'operation':'format_only_review_feedback_v1',
+                        'validation_response':'rejected_schema','fields':fields,'worker_tool_executed':False,
+                        'review_acceptance_by_proxy':False,
+                        'instruction':'Submit NEW schema-valid review arguments once. Shorten ONLY the listed overlong fields; keep every other argument identical. Use a shorter actual quote substring from the same observed source line when needed. Preserve factual findings, verdict, identifiers, line references and snapshot. Do not drop findings or infer approval. No tool executed and no verdict was accepted.'})}]
+                raise error
             # Validator messages/values can contain secrets. Export only a
             # fixed keyword, never instance values, paths or exception text.
             allowed={'type','required','additionalProperties','enum','minLength','maxLength','maxItems'}
             keyword=next(iter(violations)).validator
             reject('schema_'+(keyword if keyword in allowed else 'violation'))
+        validate_review_feedback_identity(body,decision)
         phase='adapter'
         text=json.dumps(decision,sort_keys=True,separators=(',',':'),allow_nan=False)
         common={'id':'chatcmpl-typed-'+hashlib.sha256(data).hexdigest()[:24],

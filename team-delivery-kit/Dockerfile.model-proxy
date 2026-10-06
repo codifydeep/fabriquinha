@@ -7,6 +7,8 @@ COPY observed_finding_locations.py /observed_finding_locations.py
 COPY work_proposal_contract.py /work_proposal_contract.py
 COPY structured_response_contract.py /structured_response_contract.py
 COPY typed_decision_contract.py /typed_decision_contract.py
+COPY typed_test_source.py /typed_test_source.py
+COPY artifact_rejection_receipts.py /artifact_rejection_receipts.py
 COPY planning_schema.py /planning_schema.py
 COPY write_tool_schema.py /write_tool_schema.py
 COPY test_artifact_schema.py /test_artifact_schema.py
