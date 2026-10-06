@@ -84,3 +84,35 @@ policy hash and verifies all baseline bytes. Registration creates a technical
 diagnostic only; it does not dispatch the author, approve a test or reset retries.
 The normal CTO handoff decides correction or escalation. Supervisor re-entry
 checks the durable certificate and actual native CTO task, not a status file.
+
+## Failed pre-Red artifacts: diagnostic is not acceptance
+
+The subsequent author execution again exhausted 40 tool turns. Its observed
+work pattern was 17 reads, 14 patches and seven terminal calls; the initial
+required reads fell from 30 to nine. Thus pagination improved, but did not by
+itself establish successful task completion. The native ACP error remained a
+generic internal error: the exact RPC failure category is not qualified by
+these counts alone. No identical author retry was released.
+
+An implementation-delivery validator is inappropriate for a tests-only phase:
+it requires changed product code, which is forbidden before Red. Use the
+operator-only `broker/pre_red_snapshot_diagnostic.py` to diagnose such a frozen
+failed snapshot, in a disposable sandbox with base and delivery read-only,
+network disabled, no credentials/socket, and the base contract's pinned image.
+It verifies the manifest, unchanged base and test framework, then executes only
+the base contract's fixed suite command. It emits hashes/counts/error categories,
+never raw test output. Temporary preparation is not a durable accepted snapshot.
+
+The latest real diagnostic executed 323 tests: exit 1, assertion failures,
+unchanged baseline, and an admissible *candidate* failing-suite shape. It did
+not capture historical Red, complete the failed native task, approve semantics,
+or unlock implementation. No model calls were used. This is evidence to consider
+a separately controlled checkpoint recovery, not permission to relabel a failed
+task or reinterpret a diagnostic receipt as accepted Red.
+
+Before any salvage can advance work, a new controller operation must bind the
+exact current failed task/snapshot, preserve its failed status, obtain independent
+review of completeness and assertions, run and durably capture a genuine Red,
+and reject stale/superseded candidates and repeated interventions. The existing
+completed-task gate remains unchanged until that mechanism is implemented and
+qualified. Product implementation, PR and homologation remain blocked meanwhile.
