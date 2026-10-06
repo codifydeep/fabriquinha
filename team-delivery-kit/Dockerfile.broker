@@ -32,6 +32,7 @@ COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
 COPY broker/review_context_recovery.py /review_context_recovery.py
 COPY broker/review_dependency_recovery.py /review_dependency_recovery.py
 COPY broker/review_format_recovery.py /review_format_recovery.py
+COPY broker/technical_replan_certificate.py /technical_replan_certificate.py
 COPY broker/worker_interruption_recovery.py /worker_interruption_recovery.py
 COPY broker/worker_interruption_snapshot.py /worker_interruption_snapshot.py
 COPY broker/worker_recovery_transport.py /worker_recovery_transport.py

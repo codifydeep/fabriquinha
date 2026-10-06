@@ -5,13 +5,23 @@ from pathlib import Path
 import subprocess
 
 
+def recoverable(status):
+    category=str((status or {}).get('category',''))
+    return ((status or {}).get('stage')=='escalation_required' and
+        (category.startswith('technical_decision_required:') or category in (
+            'test_first_blocked:test_first_correction_failed_after_cto_diagnosis',
+            'test_revision_recovery:ValueError:second test revision requires new technical replan')))
+
+
 def eligible(status, managed):
-    if (not status or status.get('stage')!='escalation_required'
-            or not (str(status.get('category','')).startswith('technical_decision_required:')
-                or status.get('category')=='test_first_blocked:test_first_correction_failed_after_cto_diagnosis')
+    if (not recoverable(status)
             or not managed or managed.get('route',{}).get('enabled') is not True
             or managed['route'].get('issue_id')!=status.get('issue_id')):return False
     state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
+    if state.get('stage')=='test_revision_required' and data.get('technical_replan_certificate'):
+        from portable_test_revision_recovery import next_revision_depth
+        try:return next_revision_depth(dict(issue_id=status['issue_id']),managed,'1')=='2'
+        except (ValueError,KeyError,TypeError):return False
     checkpoint=managed.get('failed_test_checkpoint') or {}
     if checkpoint:
         approved=(state.get('stage')=='test_revision_approved' and data.get('status')=='approved'
@@ -58,13 +68,21 @@ def eligible(status, managed):
 
 def read_proof(context):
     from evalctl import PROJECT
-    program='''import broker as b,json,native,sys,postwrite_diagnosis,read_capacity_diagnosis,failed_test_checkpoint
+    program='''import broker as b,json,native,sys,postwrite_diagnosis,read_capacity_diagnosis,failed_test_checkpoint,technical_replan_certificate,handoff_runtime
 issue=sys.argv[1]
 with b.db() as c:
  route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
  rows=c.execute('SELECT * FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC',(issue,)).fetchall()
  if route and rows:
   configuration=json.loads(route[0]);latest=dict(rows[0]);current=json.loads(latest['data'])
+  certificate=current.get('technical_replan_certificate') or {}
+  if latest['stage']=='test_revision_required' and certificate.get('operation')=='qualified_frozen_green_cto_replan_v1':
+   settings=json.loads((b.STATE/'native.json').read_text());effects=handoff_runtime.Effects(b,settings)
+   task=native.task_record(settings,certificate['decision_task'],configuration['cto'])
+   observed=technical_replan_certificate.qualify(configuration,current,task,effects.decision(task),effects.read_evidence(task))==certificate
+   print(json.dumps(dict(managed=dict(route=configuration,state=latest),issue_id=issue,
+     contract_sha256=configuration['contract_sha256'],independent=configuration['cto']!=configuration['author'],
+     qualified=observed,task=task['id'],delivery_approval=False,author_retry_authorized=False)));sys.exit()
   red=c.execute('SELECT task_id,receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
   trial=c.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()
   if red and trial:
@@ -116,9 +134,7 @@ print(json.dumps(dict(managed=dict(route=route,state=state),issue_id=issue,
 
 
 def qualified(status, context, *, query=read_proof):
-    if (not status or status.get('stage')!='escalation_required'
-            or not (str(status.get('category','')).startswith('technical_decision_required:')
-                or status.get('category')=='test_first_blocked:test_first_correction_failed_after_cto_diagnosis')):return False
+    if not recoverable(status):return False
     proof=query(context) or {}
     return (proof.get('qualified') is True and proof.get('independent') is True
         and proof.get('issue_id')==context['issue_id']

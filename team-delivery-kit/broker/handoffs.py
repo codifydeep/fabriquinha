@@ -1087,6 +1087,18 @@ def reconcile(con, route, runs, effects, *, now=None):
             data['required_action'] = 'independently_review_new_test_revision_then_recapture_red'
             if capture_proof:
                 data['technical_replan_certificate'] = capture_proof
+            elif failure.get('phase')=='frozen_green' and hasattr(effects,'read_evidence'):
+                try:
+                    import technical_replan_certificate
+                except ImportError:
+                    from broker import technical_replan_certificate
+                try:
+                    data['technical_replan_certificate']=technical_replan_certificate.qualify(
+                        route,data,recipient,decision,effects.read_evidence(recipient))
+                except ValueError:
+                    # A proposal may remain visible, but cannot acquire the
+                    # additional-depth certificate from incomplete inspection.
+                    data['replan_certificate_required']='complete_current_frozen_candidate_cto_inspection'
             return save(con, key, issue, 'test_revision_required', route['reviewer'], data, now)
         if decision['action'] == 'retry_review':
             if (data.get('failed_dispatch_stage') != 'ready_review'
