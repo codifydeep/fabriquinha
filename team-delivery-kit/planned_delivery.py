@@ -190,7 +190,8 @@ def main():
         raise ValueError('planning ledger identity drift')
     outputs = derive(plan, tracked_base(selection), config['stages'],
                      answered_context(brief_body(selection['brief'].read_text()), ledger), ledger['outputs']['cto']['proposal'],
-                     name=name, prefix=config['prefix'], project_config=config['project_config'])
+                     name=name, prefix=config['prefix'], project_config=config['project_config'],
+                     context_capsules=True)
     mapped = json.loads((PRIVATE / 'planned-cards' / (name + '.json')).read_text())
     if mapped['plan_sha256'] != digest(plan) or set(mapped['cards']) != {'C1', 'C2'}:
         raise ValueError('materialized plan identity drift')

@@ -6,6 +6,7 @@ immutable review, test-first, CI, merge and exact-SHA QA responsibilities.
 import fcntl
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -26,7 +27,9 @@ def verify_registration(config, private):
         raise ValueError('native brief input registration drift')
 
 
-def supervise(path, identity, run, *, reconcile_planning=False):
+def supervise(path, identity, run, *, reconcile_planning=False, compilation_revision=None):
+    if compilation_revision is not None and not re.fullmatch(r'[a-f0-9]{64}', compilation_revision):
+        raise ValueError('verified compilation revision required')
     path = Path(path)
     if path.is_symlink():
         raise ValueError('pipeline ledger must not be a symlink')
@@ -39,8 +42,13 @@ def supervise(path, identity, run, *, reconcile_planning=False):
         raise ValueError('invalid pipeline progress')
     if ledger.get('stage') == 'blocked':
         planning = reconcile_planning and ledger.get('active') == 'planning' and not completed
-        if not planning and (ledger.get('active') != 'executing' or completed != list(STEPS[:3])):
+        revisions = ledger.get('compilation_recovery_revisions', [])
+        compilation = (compilation_revision is not None and ledger.get('active') == 'compiling'
+                       and completed == list(STEPS[:2]) and compilation_revision not in revisions)
+        if not planning and not compilation and (ledger.get('active') != 'executing' or completed != list(STEPS[:3])):
             return 1
+        if compilation:
+            ledger['compilation_recovery_revisions'] = [*revisions, compilation_revision]
         # The existing sequence supervisor reconciles only evidence-qualified
         # recoveries; it does not blindly respawn an unresolved author. Keep
         # this route observable rather than strand a later broker recovery.
@@ -138,7 +146,13 @@ def main():
             if step == 'planning' and result and pending_clarification():
                 return child()  # one source re-read, not a supplied business answer
             return result
-        result = supervise(path, config['sha256'], run, reconcile_planning=pending_clarification())
+        revision = None
+        state = json.loads(path.read_text()) if path.exists() else {}
+        if state.get('stage') == 'blocked' and state.get('active') == 'compiling':
+            from compilation_recovery import qualified_revision
+            revision = qualified_revision(config, PRIVATE)
+        result = supervise(path, config['sha256'], run, reconcile_planning=pending_clarification(),
+                           compilation_revision=revision)
     ledger = json.loads(path.read_text())
     print(json.dumps({'name': config['name'], 'stage': ledger['stage'],
                       'active': ledger.get('active'), 'completed': ledger['completed']}))
