@@ -93,6 +93,14 @@ def parse_proposal(content, role):
         for story in stories:
             if set(story) != {'title', 'acceptance'} or not short(story['title'], 400) or not strings(story['acceptance'], 1, 8):
                 raise ValueError('invalid story')
+            # A valid JSON envelope is not evidence of a user-facing requirement.
+            # Reject proven protocol/reasoning leakage, not business decisions.
+            text = '\n'.join([story['title'], *story['acceptance']]).lower()
+            if any(marker in text for marker in (
+                    'my response must have role=', 'product schema response',
+                    'evidence_required_controller_side', 'let me re-read the task',
+                    'here i have to produce a product proposal')):
+                raise ValueError('planning output contains reasoning instead of product acceptance')
         if not strings(proposal['business_questions'], 0, 3):
             raise ValueError('invalid business questions')
     elif role == 'cto':
@@ -259,6 +267,30 @@ def source_clarification(ledger):
     return revised
 
 
+def product_protocol_revalidation(ledger):
+    """One revalidation of an already persisted malformed Product reply.
+
+    Never answer its questions or move a valid business question past the CEO.
+    Existing schema-retry logic performs the fresh agent execution.
+    """
+    if (not ledger or ledger.get('stage') != 'blocked_awaiting_ceo'
+            or ledger.get('rejected_product_protocol')
+            or set(ledger.get('outputs') or {}) != {'product'}):
+        return None
+    try:
+        parse_proposal(json.dumps(ledger['outputs']['product']['proposal']), 'product')
+    except ValueError as error:
+        if str(error) != 'planning output contains reasoning instead of product acceptance':
+            raise
+        revised = {**ledger, 'outputs': {}, 'stage': 'blocked', 'active': 'product',
+            'owner': 'techlead', 'category': 'ValueError:' + str(error),
+            'rejected_product_protocol': {'output': ledger['outputs']['product'],
+                'issue_id': ledger['issues']['product'], 'questions': ledger.get('questions',[])}}
+        revised.pop('questions', None)
+        return revised
+    return None
+
+
 def completed_output(issue_id, agent_id, *, timeout=600):
     account = json.loads(AUTH.read_text())
     workspace = json.loads((PRIVATE / 'workspace.json').read_text())['id']
@@ -326,6 +358,10 @@ def main():
             existing = resumed
             save_receipt(ledger_path, existing)
     body = answered_context(body, existing or {})
+    corrected = product_protocol_revalidation(existing)
+    if corrected is not None:
+        existing = corrected
+        save_receipt(ledger_path, existing)
     clarified = source_clarification(existing)
     if clarified:
         existing = clarified
@@ -468,6 +504,13 @@ def main():
                         'Update the Product acceptance accordingly; do not ask that resolved '
                         'question again. This answer does not approve architecture, tools, '
                         'merge, test exceptions or the entire brief. Return the Product schema.')
+            if retry:
+                context += (' Only user-visible acceptance belongs in stories. No internal '
+                    'monologue, schema commentary or questions about server topology, '
+                    'same-origin wiring or implementation: those choices belong to CTO. '
+                    'The original brief already requires query variants to behave identically '
+                    'and all non-200/failure responses to show Environment unavailable. '
+                    'Ask the CEO only if a new user-visible business choice is truly missing.')
         if clarification:
             context += ('\n\nSOURCE-GROUNDED CLARIFICATION: Re-read the SAME CEO request above '
                         'before asking the CEO anything. Previous questions: ' +

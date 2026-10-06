@@ -11,8 +11,10 @@
   architecture changes. Do not imply Temporal or complete autonomy is implemented
   unless the installed code and end-to-end evidence support that statement.
 - Preserve runtime paths during source reorganization; image COPY paths and
-  authorization hashes are part of the operational contract. Use reviewed PRs
-  for subsequent changes instead of unrelated product repositories.
+  authorization hashes are part of the operational contract. During this phase
+  the owner authorized automation commits directly to `fabriquinha/main`.
+  Product repositories still require their independent PR/review/CI contracts;
+  this authorization does not waive any product delivery gate.
 
 - Every new project container must appear in a Docker Desktop Compose group.
   Use Docker Compose for persistent services. For controller-created disposable

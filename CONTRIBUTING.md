@@ -7,6 +7,10 @@
 5. Exija revisão independente e mantenha aprovações vinculadas ao SHA/snapshot correto.
 6. Execute `python scripts/check_publication.py` e a suíte offline antes de publicar.
 
+Exceção autorizada pelo proprietário nesta fase de construção: a manutenção da
+automação pode ser commitada diretamente na `main` do `fabriquinha`, após checks.
+Isso não dispensa PRs, revisão independente ou CI dos produtos dos agentes.
+
 Não execute scripts de ensaio com credenciais reais nos checks públicos. Workflows não têm acesso ao Docker do host, ao LLM ou a credenciais de GitHub além do token read-only de checkout. Novos containers locais seguem o contrato de `AGENTS.md`.
 
 Ative o guard local antes de trabalhar: `git config core.hooksPath scripts/hooks`. O hook valida o conteúdo preparado no index antes do commit; o mesmo check roda na CI. Evite `--no-verify`.
