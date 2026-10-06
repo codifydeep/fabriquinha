@@ -65,6 +65,10 @@ flowchart LR
     I --> T[Tech Lead: diagnóstico e replanejamento]
     T -->|Questão técnica não resolvida| C[CTO: SPIKE e decisão com evidência]
     C --> N[Nova ação autorizada e limitada]
+    C -->|Revisões esgotadas| P[CTO: card de plano técnico distinto]
+    P --> Q[Tech Lead: revisão independente do plano exato]
+    Q -->|Rejeita| H[Impedimento visível: CTO e próxima ação]
+    Q -.->|Exige contrato executor validado| N
     N --> V{Resultado verificado?}
     V -->|Não| I
     V -->|Sim| R[Retoma o fluxo correspondente]
@@ -73,6 +77,11 @@ flowchart LR
 ```
 
 Voltar a existir um worker não resolve um incidente. Falta de evidência não vira sucesso. A plataforma bloqueia ações repetidas quando a recuperação exige nova decisão; não promete eliminar todo impedimento automaticamente.
+
+O novo caminho de replanejamento preserva as tentativas anteriores e os critérios
+aprovados; não zera contadores nem abre uma terceira revisão recursiva. A etapa
+de plano/revisão é não executora: sua aprovação ainda precisa ser consumida por
+um adaptador de execução validado. Veja o [contrato de replanejamento](team-delivery-kit/docs/technical-remediation-plan.md).
 
 ## Qualidade e segurança
 

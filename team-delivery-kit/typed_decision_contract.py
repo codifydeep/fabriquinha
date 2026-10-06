@@ -23,6 +23,7 @@ LENGTH_MARKER='DELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1'
 REVIEW_LENGTH_MARKER='DELIVERY_REVIEW_LENGTH_FEEDBACK_V1'
 RECOVERY_NAME='submit_worker_recovery_request'
 RECOVERY_MARKER='DELIVERY_TYPED_WORKER_RECOVERY_V1'
+REMEDIATION_NAME='submit_remediation_contract'
 
 
 def length_feedback_enabled(body):
@@ -123,6 +124,35 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
 
 
 def apply(body):
+    remediations={(kind,sha) for m in body.get('messages',[]) if m.get('role')=='user' and isinstance(m.get('content'),str)
+        for kind,sha in re.findall(r'^DELIVERY_TYPED_REMEDIATION_V1:(plan|review):([a-f0-9]{64})$',m['content'],re.M)}
+    if remediations:
+        if len(remediations)!=1:raise ValueError('one nonexecuting remediation contract required')
+        if not body.get('response_format') and body.get('tool_choice')=={'type':'function','function':{'name':'read_file'}}:
+            return body
+        kind,sha=next(iter(remediations))
+        notes='\n'.join(m['content'] for m in body['messages'] if m.get('role')=='user' and isinstance(m.get('content'),str))
+        contracts=set(re.findall(r'^DELIVERY_REMEDIATION_(PLAN|REVIEW)_V1:([a-f0-9]{64})$',notes,re.M))
+        if contracts!={(kind.upper(),sha)} or re.search(r'^DELIVERY_TYPED_(?:DECISION|REVIEW|DECOMPOSITION|DEPLOYMENT|WORK_PROPOSAL|RECOVERY)',notes,re.M):
+            raise ValueError('isolated matching remediation binding required')
+        from remediation_plan_contract import schema as remediation_schema
+        ids=sorted({c for m in body['messages'] if m.get('role')=='user' and isinstance(m.get('content'),str)
+            for c in re.findall(r'^DELIVERY_REMEDIATION_CRITERION:(A[0-9]{2})$',m['content'],re.M)})
+        spec=body.get('response_format',{}).get('json_schema',{})
+        expected=remediation_schema(kind,sha,ids)
+        if kind=='plan' and not 1<=len(ids)<=32:
+            raise ValueError('bounded complete criterion identities required')
+        if (spec.get('name')!='delivery_decision_v1' or spec.get('strict') is not True
+                or spec.get('schema')!=expected):
+            raise ValueError('exact nonauthorizing remediation schema required')
+        result=copy.deepcopy(body);result.pop('response_format',None);result.pop('parallel_tool_calls',None)
+        result['tools']=[dict(type='function',function=dict(name=REMEDIATION_NAME,strict=True,
+            description='Submit only recovery plan/review data. No worker tool executes and no delivery is approved.',parameters=expected))]
+        result['tool_choice']=dict(type='function',function=dict(name=REMEDIATION_NAME))
+        result['messages'].append(dict(role='system',content='Call '+REMEDIATION_NAME+' exactly once with actual schema-valid arguments. '
+            'No prose, fences, JSON text or simulated call. Keep reason within600 characters. '
+            'All execution_authorized/release_homologated flags remain false.'))
+        return result
     recoveries={v for m in body.get('messages',[]) if m.get('role')=='user' and isinstance(m.get('content'),str)
         for v in re.findall(r'^'+RECOVERY_MARKER+r':([a-f0-9]{64})$',m['content'],re.M)}
     if recoveries:
@@ -284,13 +314,15 @@ def selected(body):
                                      {'type':'function','function':{'name':REVIEW_NAME}},
                                      {'type':'function','function':{'name':EVIDENCE_NAME}},
                                      {'type':'function','function':{'name':VALIDATION_NAME}},
-                                     {'type':'function','function':{'name':RECOVERY_NAME}})
+                                     {'type':'function','function':{'name':RECOVERY_NAME}},
+                                     {'type':'function','function':{'name':REMEDIATION_NAME}})
 
 
 def normalize_technical_padding(body,data,media_type):
     """Normalize <=16 ASCII formatting chars; never prose, review or arguments."""
     if body.get('tool_choice') not in ({'type':'function','function':{'name':NAME}},
-            {'type':'function','function':{'name':RECOVERY_NAME}}):return data,None
+            {'type':'function','function':{'name':RECOVERY_NAME}},
+            {'type':'function','function':{'name':REMEDIATION_NAME}}):return data,None
     return _normalize_ascii_padding(data,media_type,'technical_ascii_padding_normalization_v1')
 
 
@@ -549,6 +581,9 @@ def translate(body,data,media_type):
             if len(digests)!=1:reject('recovery_binding')
             receipt.update(mode='worker_recovery_request',recovery_evidence_sha256=next(iter(digests)),
                            author_retry_authorized=False,validation_executed=False)
+        if name==REMEDIATION_NAME:
+            receipt.update(mode='technical_remediation_plan_or_review',execution_authorized=False,
+                           release_homologated=False,plan_acceptance_by_proxy=False)
         return output,media_type,receipt
     except Exception as error:
         if not isinstance(error,StructuredResponseRejected):

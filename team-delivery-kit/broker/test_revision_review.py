@@ -1147,6 +1147,11 @@ def planning_mounts(broker, request_id):
                               (request_id,)).fetchone()
         if not binding:
             return []
+        try: import technical_remediation_plan
+        except ImportError: from broker import technical_remediation_plan
+        remediation = technical_remediation_plan.mounts(broker, dict(binding))
+        if remediation:
+            return remediation
         try:import u3_coverage_integration
         except ImportError:from broker import u3_coverage_integration
         integration=u3_coverage_integration.mounts(broker,{**dict(binding),'request_id':request_id})

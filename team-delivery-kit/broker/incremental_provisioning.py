@@ -46,7 +46,7 @@ class NativeIssues:
         req=urllib.request.Request('http://backend:8080/api'+path,headers=headers,
             data=json.dumps(body).encode() if body is not None else None)
         with urllib.request.urlopen(req,timeout=10) as response:return json.load(response)
-    def ensure(self,desired):
+    def ensure(self,desired,*,allow_create=True):
         issues=[];offset=0
         while True:
             page=self.request('/issues?limit=100&offset='+str(offset))
@@ -61,6 +61,7 @@ class NativeIssues:
             offset+=len(page['issues'])
         matches=[i for i in issues if i.get('title')==desired['title']]
         if len(matches)>1:raise ValueError('duplicate incremental unit issue')
+        if not matches and not allow_create:return None
         result=matches[0] if matches else self.request('/issues',desired)
         if (any(result.get(k)!=desired[k] for k in ('title','description','parent_issue_id','project_id','stage'))
                 or result.get('workspace_id')!=self.settings['workspace_id']

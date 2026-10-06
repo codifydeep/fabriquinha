@@ -139,6 +139,8 @@ def apply(body):
         'action': {'type': 'string', 'enum': ['request_correction', 'request_test_revision', 'escalate_cto']},
         'reason': {'type': 'string', 'minLength': 1, 'maxLength': 1200},
         'optional_files': {'type': 'array', 'items': {'type': 'string'}, 'maxItems': 0}}
+    from remediation_plan_contract import apply_properties as remediation_properties
+    properties = remediation_properties(body, properties, mode)
     if mode=='technical' and any(m.get('role')=='user' and isinstance(m.get('content'),str)
             and re.search(r'^DELIVERY_TYPED_TEST_DIAGNOSIS_V1$',m['content'],re.M) for m in body['messages']):
         properties['action']['enum']=['request_test_revision','escalate_cto']

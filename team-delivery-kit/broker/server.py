@@ -2382,6 +2382,8 @@ def main():
                     candidate_qualification.tick(handoff_context())
                     import assertion_replan
                     assertion_replan.tick(handoff_context())
+                    import technical_remediation_plan
+                    technical_remediation_plan.tick(handoff_context())
                     import test_decomposition
                     test_decomposition.tick(handoff_context())
                     import u3_controls_execution
