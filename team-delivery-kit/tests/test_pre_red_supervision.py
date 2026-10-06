@@ -5,6 +5,22 @@ from pre_red_supervision import eligible,qualified
 
 
 class PreRedSupervisionTests(unittest.TestCase):
+    def test_completed_review_can_resume_observation_without_catching_transient_wait(self):
+        data=dict(source_task='author',status='approved',manifest_sha256='a'*64,
+            review_task='review',read_contract='complete-lines-v2',
+            decision=dict(action='approve_test_revision',manifest_sha256='a'*64))
+        managed=dict(route=self.managed['route'],state=dict(source_task='author',
+            stage='test_revision_approved',data=json.dumps(data)),
+            failed_test_checkpoint=dict(operation='failed_test_checkpoint_v1',status='red_captured',
+                issue_id='issue',source_task='author',delivery_approved=False,native_task_completed=False))
+        stale={**self.status,'category':'test_first_blocked:test_first_correction_failed_after_cto_diagnosis'}
+        self.assertTrue(eligible(stale,managed))
+        for key,value in (('read_contract','legacy'),('review_task',None),('status','blocked')):
+            changed={**data,key:value};managed['state']['data']=json.dumps(changed)
+            self.assertFalse(eligible(stale,managed))
+        data['decision']['manifest_sha256']='b'*64
+        managed['state']['data']=json.dumps(data)
+        self.assertFalse(eligible(stale,managed))
     def test_failed_checkpoint_resumes_review_observation_only(self):
         data=dict(source_task='author',status='awaiting_review',manifest_sha256='a'*64)
         managed=dict(route=self.managed['route'],state=dict(source_task='author',

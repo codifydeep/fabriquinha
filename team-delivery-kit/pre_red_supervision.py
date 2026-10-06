@@ -14,14 +14,19 @@ def eligible(status, managed):
     state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
     checkpoint=managed.get('failed_test_checkpoint') or {}
     if checkpoint:
+        approved=(state.get('stage')=='test_revision_approved' and data.get('status')=='approved'
+            and data.get('read_contract')=='complete-lines-v2'
+            and data.get('decision',{}).get('action')=='approve_test_revision'
+            and data['decision'].get('manifest_sha256')==data.get('manifest_sha256')
+            and bool(data.get('review_task')))
         return (checkpoint.get('operation')=='failed_test_checkpoint_v1'
             and checkpoint.get('status')=='red_captured'
             and checkpoint.get('issue_id')==status.get('issue_id')
             and checkpoint.get('source_task')==state.get('source_task')==data.get('source_task')
             and checkpoint.get('delivery_approved') is False
             and checkpoint.get('native_task_completed') is False
-            and state.get('stage')=='awaiting_test_revision_review'
-            and data.get('status') in ('dispatch_intent','awaiting_review')
+            and (approved or (state.get('stage')=='awaiting_test_revision_review'
+                and data.get('status') in ('dispatch_intent','awaiting_review')))
             and bool(data.get('manifest_sha256')))
     proof=data.get('diagnostic_presentation_recovery') or {}
     digest=hashlib.sha256(json.dumps(data.get('diagnostic') or {},sort_keys=True).encode()).hexdigest()
@@ -61,6 +66,25 @@ with b.db() as c:
  if route and rows:
   configuration=json.loads(route[0]);latest=dict(rows[0]);current=json.loads(latest['data'])
   red=c.execute('SELECT task_id,receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
+  trial=c.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()
+  if red and trial:
+   review_config,review_state=map(json.loads,trial)
+   approved_checkpoint=failed_test_checkpoint.proof(c,issue,red['task_id'])
+   red_receipt=json.loads(red['receipt'])
+   if (approved_checkpoint and failed_test_checkpoint.qualified(c,issue,red['task_id'],red_receipt)
+       and review_state.get('status')=='approved' and review_state.get('source_task')==red['task_id']
+       and review_state.get('manifest_sha256')==red_receipt['red']['manifest_sha256']
+       and latest['stage'] in ('author_active','ready_review','dispatch_intent','awaiting_acceptance','accepted','approved','ready_publish','published','qa_active','done')):
+    runs=native.issue_task_runs(json.loads((b.STATE/'native.json').read_text()),issue)
+    reviewed=[r for r in runs if r['id']==review_state.get('review_task') and r.get('status')=='completed'
+        and r.get('agent_id')==review_config['reviewer'] and r.get('wakeup_id')==review_state.get('wakeup_id')]
+    successors=[r for r in runs if r['id']==latest['source_task'] and r['id']!=red['task_id']
+        and r.get('agent_id')==configuration['author'] and r.get('status') in ('queued','dispatched','running','completed')]
+    original=[r for r in runs if r['id']==red['task_id'] and r.get('status')=='failed' and r.get('agent_id')==configuration['author']]
+    projection=dict(source_task=red['task_id'],stage='test_revision_approved',data=json.dumps(review_state))
+    print(json.dumps(dict(managed=dict(route=configuration,state=projection,failed_test_checkpoint=approved_checkpoint),
+       issue_id=issue,contract_sha256=configuration['contract_sha256'],independent=review_config['reviewer']!=configuration['author'],
+       qualified=len(reviewed)==len(successors)==len(original)==1,task=latest['source_task'],delivery_approval=False,author_retry_authorized=False)));sys.exit()
   checkpoint=failed_test_checkpoint.proof(c,issue,latest['source_task'])
   if checkpoint and red and failed_test_checkpoint.qualified(c,issue,red['task_id'],json.loads(red['receipt'])) and latest['stage']=='awaiting_test_revision_review' and current.get('status') in ('dispatch_intent','awaiting_review'):
    runs=native.issue_task_runs(json.loads((b.STATE/'native.json').read_text()),issue)
