@@ -70,6 +70,41 @@ class TechnicalRemediationPlanTests(unittest.TestCase):
         s={**self.state,'stage':'plan_approved'}
         self.assertEqual(advance(self.config,s,[],SimpleNamespace()),s)
 
+    def rejected_review(self):
+        state={**self.state,'stage':'awaiting_review','owner':'lead','plan':self.plan,
+               'plan_sha256':digest(self.plan),'plan_task':self.task['id'],'plan_wakeup':'wake-plan'}
+        task={**self.task,'id':'review-task','agent_id':'lead'}
+        value=dict(decision='request_changes',evidence_sha256=digest(self.plan),plan_sha256=digest(self.plan),
+                   reason='Clarify creation of a distinct immutable test delivery.',execution_authorized=False,release_homologated=False)
+        fx=SimpleNamespace(task=lambda *args:task,result=lambda _:value,reads=lambda _:self.reads)
+        return state,task,value,fx
+
+    def test_requested_changes_return_to_cto_preserving_exact_plan_and_verdict(self):
+        state,task,value,fx=self.rejected_review()
+        result=advance(self.config,state,[task],fx,now=120)
+        self.assertEqual(result['stage'],'plan_dispatch')
+        self.assertEqual(result['owner'],'cto')
+        self.assertEqual(result['plan_revisions'][0]['plan'],self.plan)
+        self.assertEqual(result['plan_revisions'][0]['review'],value)
+        self.assertFalse(result['execution_authorized'])
+        self.assertNotIn('wakeup_id',result)
+        self.assertIn(value['reason'],instruction(self.config,result))
+        self.assertEqual(self.config['original_depth'],2)
+
+    def test_rejected_plan_correction_is_bounded_and_not_an_identical_retry(self):
+        state,task,value,fx=self.rejected_review()
+        history=dict(plan=self.plan,plan_sha256=digest(self.plan),plan_task='plan-task',plan_wakeup='wake-plan',
+                     review=value,review_task='review-task',review_wakeup='wake-plan')
+        state['plan_revisions']=[copy.deepcopy(history),copy.deepcopy(history)]
+        result=advance(self.config,state,[task],fx,now=120)
+        self.assertEqual(result['stage'],'blocked')
+        self.assertEqual(len(result['plan_revisions']),3)
+        repeat={**self.state,'plan_revisions':[history]}
+        fx=SimpleNamespace(task=lambda *args:self.task,result=lambda _:self.plan,reads=lambda _:self.reads)
+        result=advance(self.config,repeat,[self.task],fx,now=120)
+        self.assertEqual(result['stage'],'blocked')
+        self.assertIn('repeats independently rejected',result['required_action'])
+
     def test_uncertain_wakeup_is_observed_not_recreated(self):
         def failed(*args):raise DispatchObservationRequired()
         fx=SimpleNamespace(wake=failed)

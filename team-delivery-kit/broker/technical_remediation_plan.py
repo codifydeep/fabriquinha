@@ -178,6 +178,17 @@ def instruction(config,state):
             'Return compact schema JSON or retain_hold with no steps.\nDELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
             ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria'])))
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)
+        if state.get('plan_revisions'):
+            last=state['plan_revisions'][-1]
+            note=('CTO: correct the independently rejected plan after complete source inspection. Preserve ALL acceptance, '
+                  'baseline and snapshot immutability, genuine Red, independent reviews, PR/CI and same-SHA QA. '
+                  'R1=new_tests_only; R2=product_only; R3=controller_only, strictly dependent. '
+                  'Return a distinct proposal or retain_hold. No edits, depth reset or execution authority. '
+                  'reason<=600 chars.\nDELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
+                  ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria']))+
+                  'DELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)+'\n')
+            note+='Prior plan: '+json.dumps(last['plan'],separators=(',',':'))
+            note+=' Independent review: '+json.dumps(last['review'],separators=(',',':'))
     else:
         note=('INDEPENDENT TECH LEAD: review this EXACT CTO plan against ALL approved acceptance and immutable source. '
             'Reject weakened/removal of tests, omitted criteria, permission to edit frozen files, depth reset, bypassed Red/reviews/CI/QA, '
@@ -187,7 +198,8 @@ def instruction(config,state):
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:review:'+state['plan_sha256']
         note+='\nDELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
     result=common+note
-    if len(result)+100>4000:raise ValueError('split remediation context before dispatch')
+    prefix='DELIVERY_PLANNING_START '+('0'*64)+'\nSource: '+config['source_task']+'\n'
+    if len(result)+len(prefix)>4000:raise ValueError('split remediation context before dispatch')
     return result
 
 
@@ -242,9 +254,23 @@ def advance(config,state,runs,fx,now=None):
         return state
     task=fx.task(tasks[0]['id'],state['owner'])
     body=fx.result(task);accepted=validate_result(config,state,task,body,fx.reads(task))
-    if not accepted:return {**state,'stage':'blocked','owner':config['cto'],'decision_task':task['id'],
-                            'required_action':'CTO resolve retained hold or rejected recovery plan; no identical retry'}
+    if not accepted:
+        if state['stage']=='awaiting_review':
+            revisions=state.get('plan_revisions',[])+[dict(plan=state['plan'],plan_sha256=state['plan_sha256'],
+                plan_task=state['plan_task'],plan_wakeup=state['plan_wakeup'],review=body,
+                review_task=task['id'],review_wakeup=state['wakeup_id'])]
+            new={**state,'plan_revisions':revisions,'owner':config['cto'],'decision_task':task['id']}
+            if len(revisions)>2:
+                return {**new,'stage':'blocked','required_action':'CTO diagnose exhausted distinct plan corrections; no identical retry'}
+            new.update(stage='plan_dispatch',required_action='CTO revise exact independently rejected plan')
+            for field in ('wakeup_id','dispatched_at'):new.pop(field,None)
+            return new
+        return {**state,'stage':'blocked','owner':config['cto'],'decision_task':task['id'],
+                'required_action':'CTO resolve retained hold or rejected recovery plan; no identical retry'}
     if state['stage']=='awaiting_plan':
+        if any(digest(body)==r['plan_sha256'] for r in state.get('plan_revisions',[])):
+            return {**state,'stage':'blocked','owner':config['cto'],'decision_task':task['id'],
+                    'required_action':'CTO proposal repeats independently rejected plan; no identical retry'}
         return {**state,'stage':'review_dispatch','plan':body,'plan_sha256':digest(body),
                 'plan_task':task['id'],'plan_wakeup':state['wakeup_id'],'owner':config['reviewer']}
     return {**state,'stage':'plan_approved','review':body,'review_task':task['id'],
@@ -268,13 +294,13 @@ class Effects:
     def wake(self,c,s,target,note):
         try:
             return native.ensure_planning_start(self.settings,s['issue_id'],target,c['source_task'],
-                digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),protocol=s.get('review_protocol','typed-remediation-v1'))),note,
+                digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),revision=len(s.get('plan_revisions',[])),protocol=s.get('review_protocol','typed-remediation-v1'))),note,
                 allow_create=self.native.remaining_calls()>=16)
         except (TimeoutError,urllib.error.URLError):
             raise DispatchObservationRequired() from None
     def observe_wake(self,c,s,target,note):
         return native.ensure_planning_start(self.settings,s['issue_id'],target,c['source_task'],
-            digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),protocol=s.get('review_protocol','typed-remediation-v1'))),note,allow_create=False)
+            digest(dict(evidence=digest(c),stage=s['stage'],plan=s.get('plan_sha256'),revision=len(s.get('plan_revisions',[])),protocol=s.get('review_protocol','typed-remediation-v1'))),note,allow_create=False)
     def task(self,tid,agent):return native.task_record(self.settings,tid,agent)
     def reads(self,task):return self.native.read_evidence(task)
     def result(self,task):
@@ -304,6 +330,36 @@ def mounts(b,binding):
             or labels.get('delivery-kit.diagnostic-only')!='true'):
         raise ValueError('immutable recovery snapshot ownership drift')
     return [dict(Type='volume',Source=c['volume'],Target='/evidence/candidate',ReadOnly=True)]
+
+
+def reconcile_review_changes(b,source):
+    """Controller maintenance: consume the SAME rejected review, not invent one."""
+    with b.LOCK:
+        with b.db() as con:
+            row=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
+            c,s=map(json.loads,row)
+            if s.get('review_feedback_reconciliation'):return s
+            if (s.get('stage')!='blocked' or s.get('category') or s.get('review_task')
+                    or not s.get('decision_task') or s.get('plan_revisions')
+                    or s.get('required_action')!='CTO resolve retained hold or rejected recovery plan; no identical retry'
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()):
+                raise ValueError('idle legacy independent review rejection required')
+        fx=Effects(b);task=fx.task(s['decision_task'],c['reviewer'])
+        runs=native.issue_task_runs(fx.settings,s['issue_id'])
+        if (any(t['status'] in ('queued','running') for t in runs)
+                or [t['id'] for t in runs if t.get('wakeup_id')==s['wakeup_id']]!=[task['id']]):
+            raise ValueError('one unchanged terminal independent review required')
+        body=fx.result(task);pending={**s,'stage':'awaiting_review','owner':c['reviewer']}
+        if body.get('decision')!='request_changes' or validate_result(c,pending,task,body,fx.reads(task)):
+            raise ValueError('same exact rejected plan required')
+        new=advance(c,pending,[task],fx)
+        new['review_feedback_reconciliation']=dict(previous=s,review_task=task['id'],model_calls=0,
+            delivery_approval=False,revision_depth_reset=False)
+        with b.db() as con:
+            if json.loads(con.execute('SELECT state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()[0])!=s:
+                raise ValueError('review rejection changed')
+            con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
+        return new
 
 
 def tick(b):

@@ -21,8 +21,12 @@ architecture question. Planning is separate from permission to execute.
    criteria, incorrect dependencies or edit scopes, mismatched hashes, stale
    task/wakeup identities, and incomplete source reads.
 5. Tech Lead reviews the exact plan independently after full source inspection.
-   A rejection remains a visible technical hold; it does not automatically
-   repeat the same planning request or ask the CEO for a technical decision.
+   A semantic rejection returns the exact plan and independent feedback to the
+   CTO. At most two distinct plan corrections are allowed; repeated proposals,
+   retained holds, invalid executions and exhausted corrections remain visible
+   technical holds. No rejected plan is approved or identical request repeated.
+   All proposal/review pairs remain durable; the CEO is not asked to decide
+   technical architecture. This correction count is not test-revision depth.
 6. An approval records `plan_approved` only. It cannot change the original depth,
    authorize a worker, approve a delivery, invent Green, merge, deploy or mark
    the release homologated. The next gate is a separately validated executor
@@ -74,6 +78,11 @@ Other invalid fields are ineligible. The durable call ledger fences retries and
 every provider attempt counts against the same hard budget. A failed review
 may receive one changed-protocol maintenance dispatch only after preserving its
 rejection and qualifying the new isolated canary, without rerunning the CTO.
+
+Legacy blocked `request_changes` can be reconciled only from the same completed
+independent native verdict, exact plan hash, wakeup and complete source reads.
+Reconciliation creates no verdict and makes no model call. The subsequent CTO
+correction is a new native execution, with a revision-specific dispatch key.
 
 The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
