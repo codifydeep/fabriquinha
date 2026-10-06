@@ -278,6 +278,24 @@ class BrokerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             broker.native_task_prompt(frame, 'implementation', issue, {**task, 'agent_id': 'reviewer'})
 
+    def test_registered_review_aggregate_preserves_both_full_contexts(self):
+        from execution_context import freeze, reference
+        capsule = freeze('Complete requirement. ' * 240, 'Complete review criterion. ' * 150)
+        with broker.db() as con:
+            con.execute('CREATE TABLE delivery_routes(issue_id TEXT PRIMARY KEY,config TEXT)')
+            con.execute('INSERT INTO delivery_routes VALUES (?,?)', ('issue', json.dumps({
+                'enabled': True, 'author': 'author', 'reviewer': 'reviewer', 'execution_context': capsule})))
+        frame = {'method': 'session/prompt', 'params': {'sessionId': 's', 'prompt': []}}
+        issue = {'id': 'issue', 'title': 'Feature', 'description': reference(capsule, 'implementation')}
+        task = {'id': 'review-context-task', 'agent_id': 'reviewer',
+                'handoff_note': reference(capsule, 'review') + '\n' + 'Controller receipt evidence. ' * 50}
+        result = broker.native_task_prompt(frame, 'review', issue, task)
+        text = result['params']['prompt'][0]['text']
+        self.assertGreater(len(text), 10000)
+        self.assertIn(capsule['description'], text)
+        self.assertIn(capsule['review_instruction'], text)
+        self.assertIn('Do not edit files', text)
+
     def test_test_first_prompt_changes_only_after_controller_red(self):
         with broker.db() as con:
             con.execute('CREATE TABLE delivery_routes(issue_id TEXT PRIMARY KEY,config TEXT)')

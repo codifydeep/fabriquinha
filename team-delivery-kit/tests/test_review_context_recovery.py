@@ -11,6 +11,40 @@ from test_test_first_handoffs import Broker
 
 
 class ReviewContextRecoveryTests(unittest.TestCase):
+    def test_capsule_probe_preserves_full_prompt_and_exact_frozen_identity(self):
+        from execution_context import freeze, reference
+        capsule=freeze('Complete acceptance. '*250,'Independent full review. '*160)
+        route=dict(self.route,enabled=True,execution_context=capsule)
+        recorded=dict(self.recorded,author='author',reviewer='reviewer',target='reviewer',
+                      dispatch_marker='c'*64,instruction=reference(capsule,'review'))
+        failed=dict(self.runs[1],handoff_note=reference(capsule,'review')+'\n'+'Controller TDD receipt. '*60)
+        with patch.dict('os.environ',{'BROKER_WORKER_IMAGE':'sha256:'+'d'*64}):
+            proof=recovery.probe(self.b,dict(id=self.issue,title='Frontend',
+                description=reference(capsule,'implementation')),failed,recorded,route=route)
+        self.assertFalse(proof['approval'])
+        self.assertEqual(proof['source_task'],self.source)
+        self.assertEqual(proof['context_sha256'],capsule['sha256'])
+        self.assertGreater(proof['prompt_characters'],10000)
+        self.assertLessEqual(proof['prompt_characters'],32000)
+
+    def test_capsule_failure_requires_registered_hash_and_changed_aggregate_bound(self):
+        from execution_context import freeze
+        self.data['recipient_error']=recovery.CAPSULE_ERROR
+        self.runs[1]['error']=recovery.CAPSULE_ERROR
+        with self.b.db() as con:
+            handoffs.save(con,self.source,self.issue,'technical_decision_required','cto',self.data,3)
+        with self.assertRaises(ValueError): self.register()
+        capsule=freeze('Complete requirement. '*240,'Independent review. '*180)
+        self.route['execution_context']=capsule
+        with self.b.db() as con:
+            con.execute('UPDATE delivery_routes SET config=? WHERE issue_id=?',(json.dumps(self.route),self.issue))
+        self.presentation.update(operation='registered_capsule_prompt_probe_v1',
+            context_sha256=capsule['sha256'],prompt_characters=11500)
+        receipt=self.register()
+        self.assertFalse(receipt['approval'])
+        self.assertFalse(receipt['author_restarted'])
+        self.assertEqual(receipt['preserved_review_retries'],1)
+
     def test_real_prompt_probe_uses_task_id_without_mutating_live_handoff(self):
         instruction='Read the immutable delivery and the complete controller TDD receipt.'
         marker='c'*64

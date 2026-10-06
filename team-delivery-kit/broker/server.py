@@ -2059,7 +2059,10 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
             + correction_text +
             f'Issue: {title}\nDescription: {description}\n'
             f'Handoff note: {note}\n\n{instruction}')
-    if len(text) > (16000 if mode == 'planning' else 10000):
+    # Registered capsules bound description to 12k and the expanded note to
+    # 16k. Reserve 4k for fixed controller instructions; never extend the
+    # legacy limit for an unregistered issue or agent-provided marker.
+    if len(text) > (32000 if capsule is not None else (16000 if mode == 'planning' else 10000)):
         raise ValueError('task prompt too large')
     return {**frame, 'params': {**frame['params'],
             'prompt': [{'type': 'text', 'text': text}]}}

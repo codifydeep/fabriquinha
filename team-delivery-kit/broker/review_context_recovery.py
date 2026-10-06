@@ -11,8 +11,9 @@ import sqlite3
 import time
 import uuid
 
-FIXED_SERVER_SHA = '95f97395dbff79bbe13cef80dfaf7d4a65541d375457fb81513c5adf0e9799e9'
+FIXED_SERVER_SHA = 'f51fc9f6edd64b03ba9f0a13920ec544c191e45ca6448d3a81df849dd3287573'
 ERROR = 'hermes session/prompt failed: session/prompt: restricted broker stream failed: broker_internal (code=-32000)'
+CAPSULE_ERROR = 'hermes session/prompt failed: session/prompt: restricted broker stream failed: native_prompt_bounds (code=-32000)'
 
 
 def qualified(con, issue, source, data):
@@ -23,7 +24,7 @@ def qualified(con, issue, source, data):
     return bool(row and row[0] == source and json.loads(row[1]) == data.get('review_context_recovery'))
 
 
-def probe(b, issue, failed, recorded):
+def probe(b, issue, failed, recorded, *, route=None):
     """Actual native task_binding shape on minimal in-memory historical state.
 
     Load an independent copy of the fixed public broker module. Never swap the
@@ -40,6 +41,9 @@ def probe(b, issue, failed, recorded):
         con.execute('INSERT INTO delivery_handoffs VALUES (?,?,?,?,?)',
             (recorded['source_task'], issue['id'], 'awaiting_acceptance', failed['agent_id'], json.dumps(recorded)))
         con.execute('INSERT INTO snapshots VALUES (?,?)', (recorded['source_task'], 'complete'))
+        if route and route.get('execution_context'):
+            con.execute('CREATE TABLE delivery_routes(issue_id TEXT PRIMARY KEY,config TEXT)')
+            con.execute('INSERT INTO delivery_routes VALUES (?,?)',(issue['id'],json.dumps(route)))
         @contextlib.contextmanager
         def memory_db():
             with con:
@@ -49,6 +53,14 @@ def probe(b, issue, failed, recorded):
             wakeup_id=failed['wakeup_id'], handoff_note=failed['handoff_note'])
         frame = isolated.native_task_prompt(dict(method='session/prompt', params=dict(prompt=[])),
                                            'review', issue, binding)
+        if route and route.get('execution_context'):
+            capsule=route['execution_context']; text=frame['params']['prompt'][0]['text']
+            if capsule['description'] not in text or capsule['review_instruction'] not in text:
+                raise ValueError('complete capsule contexts must survive prompt presentation')
+            return dict(operation='registered_capsule_prompt_probe_v1', approval=False,
+                source_task=recorded['source_task'], manifest_sha256=recorded['evidence']['manifest_sha256'],
+                context_sha256=capsule['sha256'], prompt_sha256=hashlib.sha256(text.encode()).hexdigest(),
+                prompt_characters=len(text), original_characters=len(failed['handoff_note']))
         row = con.execute('SELECT receipt FROM review_context_presentations WHERE task_id=?',
                           (failed['id'],)).fetchone()
         if not row:
@@ -88,13 +100,15 @@ def register(b, payload):
         if not row or row['issue_id'] != issue or not route_row:
             raise ValueError('current review source required')
         data, route = json.loads(row['data']), json.loads(route_row[0])
+        capsule_failure = (data.get('recipient_error') == CAPSULE_ERROR
+                           and isinstance(route.get('execution_context'),dict))
         latest = con.execute('SELECT source_task FROM delivery_handoffs WHERE issue_id=? '
                              'ORDER BY updated DESC LIMIT 1', (issue,)).fetchone()
         if (latest[0] != source or row['stage'] != 'technical_decision_required'
                 or data.get('required_action') != 'diagnose_repeated_review_execution_failure'
                 or data.get('review_retries') != 1 or route.get('enabled') is not True
                 or data.get('failed_dispatch_stage') != 'ready_review'
-                or data.get('recipient_error') != ERROR or data.get('validation_failure')
+                or (data.get('recipient_error') != ERROR and not capsule_failure) or data.get('validation_failure')
                 or data.get('error') != 'recipient_execution_failed'
                 or data.get('decision',{}).get('action') != 'retry_review'
                 or data.get('decision',{}).get('optional_files') != []):
@@ -113,7 +127,7 @@ def register(b, payload):
         authors = [r for r in runs if r.get('agent_id') == route['author']]
         diagnosis = next((r for r in runs if r['id'] == data.get('recipient_task')), {})
         if (any(r.get('status') in ('queued','dispatched','running') for r in runs)
-                or failed.get('status') != 'failed' or failed.get('error') != ERROR
+                or failed.get('status') != 'failed' or failed.get('error') != data.get('recipient_error')
                 or failed.get('agent_id') != route['reviewer'] or not failed.get('wakeup_id')
                 or recorded.get('target') != route['reviewer']
                 or recorded.get('snapshot') != data.get('snapshot')
@@ -132,13 +146,17 @@ def register(b, payload):
         snapshot = con.execute('SELECT status FROM snapshots WHERE task_id=?', (source,)).fetchone()
         if not snapshot or snapshot['status'] != 'complete':
             raise ValueError('complete immutable delivery required')
-        presentation = probe(b, native.issue_record(settings, issue), failed, recorded)
+        presentation = probe(b, native.issue_record(settings, issue), failed, recorded,
+                             route=route if capsule_failure else None)
         evidence = data['evidence']
         if (presentation.get('approval') is not False or presentation.get('source_task') != source
                 or presentation.get('manifest_sha256') != evidence.get('manifest_sha256')
-                or presentation.get('original_characters',0) <= 4000
-                or not 0 < presentation.get('effective_characters',0) <= 4000
-                or not 0 < presentation.get('prompt_characters',0) <= 10000):
+                or (not capsule_failure and (presentation.get('original_characters',0) <= 4000
+                    or not 0 < presentation.get('effective_characters',0) <= 4000
+                    or not 0 < presentation.get('prompt_characters',0) <= 10000))
+                or (capsule_failure and (presentation.get('operation') != 'registered_capsule_prompt_probe_v1'
+                    or presentation.get('context_sha256') != route['execution_context']['sha256']
+                    or not 10000 < presentation.get('prompt_characters',0) <= 32000))):
             raise ValueError('exact bounded nonapproving prompt probe required')
         checked = handoff_runtime.Effects(b, settings).validate(data['snapshot'], source)
         if (checked.get('baseline_tests_intact') is not True
