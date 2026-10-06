@@ -11,6 +11,7 @@ import subprocess
 
 TEST = 'tests/test_service_mode_indicator.py'
 APP = 'app/static/app.js'
+READ_FILES = (TEST, APP, 'app/static/index.html', 'app/static/style.css')
 
 
 def extract_template(source):
@@ -50,6 +51,20 @@ def run(root, expected_test_hash):
     before = hashes()
     if before[TEST] != expected_test_hash:
         raise ValueError('frozen test hash mismatch')
+    manifest_bytes = (root / 'manifest.json').read_bytes()
+    manifest = json.loads(manifest_bytes)['files']
+    def verified_files():
+        result = {}
+        for path in READ_FILES:
+            file = root / path
+            if file.is_symlink() or not file.is_file() or not file.resolve().is_relative_to(root.resolve()):
+                raise ValueError('fixed manifest file required')
+            digest = hashlib.sha256(file.read_bytes()).hexdigest()
+            if digest != manifest[path]['sha256']:
+                raise ValueError('snapshot manifest drift')
+            result[path] = digest
+        return result
+    before = verified_files()
     template = extract_template((root / TEST).read_text())
     source_path = json.dumps(str(root / APP))
     script = template % {'source_path': source_path, 'source_filename': source_path}
@@ -58,10 +73,11 @@ def run(root, expected_test_hash):
     if process.returncode:
         raise ValueError('fixed harness execution failed')
     facts = shape(json.loads(process.stdout))
-    if hashes() != before:
+    if verified_files() != before or (root / 'manifest.json').read_bytes() != manifest_bytes:
         raise ValueError('immutable inputs changed')
     return {'operation': 'service_mode_harness_schema_v1', 'input_sha256': before,
             'report_sha256': hashlib.sha256(process.stdout.encode()).hexdigest(),
+            'snapshot_manifest_sha256': hashlib.sha256(manifest_bytes).hexdigest(),
             'facts': facts, 'inputs_unchanged': True, 'delivery_approval': False,
             'valid_red_green_receipt': False}
 

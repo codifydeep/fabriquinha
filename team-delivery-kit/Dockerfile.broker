@@ -37,6 +37,8 @@ COPY broker/worker_interruption_recovery.py /worker_interruption_recovery.py
 COPY broker/worker_interruption_snapshot.py /worker_interruption_snapshot.py
 COPY broker/worker_recovery_transport.py /worker_recovery_transport.py
 COPY broker/failed_execution_evidence.py /failed_execution_evidence.py
+COPY broker/service_mode_harness_spike.py /service_mode_harness_spike.py
+COPY broker/service_mode_schema_evidence.py /service_mode_schema_evidence.py
 COPY broker/assertion_witness.py /assertion_witness.py
 COPY broker/runtime_assertion_probe.py /runtime_assertion_probe.py
 COPY broker/event_trace.cjs /event_trace.cjs
