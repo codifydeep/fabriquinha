@@ -143,6 +143,16 @@ def qualified(status, context, *, query=read_proof):
         and eligible(status,proof.get('managed')))
 
 
+def resumed_projection(ledger,child_issue):
+    """Keep the old incident in history, not in the live working status."""
+    result={**ledger,'stage':'working','pre_red_supervision_recovery':dict(
+        child_issue=child_issue,category=ledger['category'],owner=ledger.get('owner'),
+        next_action=ledger.get('next_action'),delivery_approval=False)}
+    for key in ('category','owner','next_action','board_notification_error'):
+        result.pop(key,None)
+    return result
+
+
 def resume(ledger,plan,private,*,query=read_proof,read_delivery=None,verify=None,verify_ci=None):
     from dependent_sequence import read_json,receipt_identity,read_stage_delivery,verify_predecessor,verify_recovery_ci
     from portable_delivery import managed_handoff
@@ -173,5 +183,4 @@ def resume(ledger,plan,private,*,query=read_proof,read_delivery=None,verify=None
     if not receipt_identity(receipt,previous) or receipt.get('merge_sha')!=context['base_sha']:return None
     (verify or verify_predecessor)(receipt,previous,allow_advanced_main=False,require_live_qa=True)
     (verify_ci or verify_recovery_ci)(receipt,previous)
-    return {**ledger,'stage':'working','pre_red_supervision_recovery':dict(
-        child_issue=child['issue_id'],category=ledger['category'],delivery_approval=False)}
+    return resumed_projection(ledger,child['issue_id'])

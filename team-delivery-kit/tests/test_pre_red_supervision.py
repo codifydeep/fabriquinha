@@ -1,10 +1,20 @@
 import hashlib
 import json
 import unittest
-from pre_red_supervision import eligible,qualified
+from pre_red_supervision import eligible,qualified,resumed_projection
 
 
 class PreRedSupervisionTests(unittest.TestCase):
+    def test_resumed_projection_preserves_history_without_reporting_stale_block(self):
+        previous=dict(stage='blocked',category='RuntimeError:delivery_incomplete',owner='cto',
+            next_action='Inspect',board_notification_error='old',active='card',completed=['predecessor'])
+        result=resumed_projection(previous,'child')
+        self.assertEqual(previous['stage'],'blocked')
+        self.assertEqual(result['stage'],'working');self.assertEqual(result['active'],'card')
+        self.assertEqual(result['completed'],['predecessor'])
+        self.assertFalse(result['pre_red_supervision_recovery']['delivery_approval'])
+        self.assertEqual(result['pre_red_supervision_recovery']['category'],previous['category'])
+        for key in ('category','owner','next_action','board_notification_error'):self.assertNotIn(key,result)
     def test_completed_review_can_resume_observation_without_catching_transient_wait(self):
         data=dict(source_task='author',status='approved',manifest_sha256='a'*64,
             review_task='review',read_contract='complete-lines-v2',
