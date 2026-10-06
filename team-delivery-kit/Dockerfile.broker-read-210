@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261005.209
+LABEL delivery-kit.parent-image="sha256:b875afa675251651c6cd69cc624e521d323a161bb6dcf7df2be5be8e6c539eee"
+COPY broker/server.py /broker.py
+COPY broker/qa_cleanup_observer.py /qa_cleanup_observer.py
+COPY execute_u3_qa.py /execute_u3_qa.py

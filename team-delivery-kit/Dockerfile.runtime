@@ -1,0 +1,19 @@
+FROM ghcr.io/multica-ai/multica-backend@sha256:60dc856bc44c01a3c73e8153e211be6c22cc6cbb66dde8b20e01de5b6e75e41f AS multica
+FROM nousresearch/hermes-agent@sha256:87f93bfd77e8e13b5c37ab1dab48cea2da166095f2b60c9160d5c568d4aa43c7
+USER root
+COPY --from=multica /app/multica /usr/local/bin/multica
+RUN mkdir -p /eval-state/multica /eval-state/hermes /eval-state/workspaces \
+    && chown -R 10000:10000 /eval-state
+ENV HOME=/eval-state \
+    HERMES_HOME=/eval-state/hermes \
+    MULTICA_WORKSPACES_ROOT=/eval-state/workspaces \
+    MULTICA_DAEMON_MAX_CONCURRENT_TASKS=2 \
+    MULTICA_AGENT_TIMEOUT=15m \
+    MULTICA_AGENT_IDLE_WATCHDOG=3m \
+    MULTICA_AGENT_TOOL_WATCHDOG=3m \
+    MULTICA_GC_ENABLED=false \
+    MULTICA_DAEMON_AUTO_RELOAD=0
+USER 10000:10000
+WORKDIR /eval-state
+ENTRYPOINT []
+CMD ["multica", "daemon", "start", "--foreground", "--no-auto-reload"]

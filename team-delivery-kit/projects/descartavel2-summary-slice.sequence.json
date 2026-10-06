@@ -1,0 +1,1 @@
+{"project_config": "descartavel2.json", "sequence": "FEEDBACK-SUMMARY-1", "stages": [{"contract": "descartavel2-summary-slice-api.contract.json", "depends_on": null, "run_spec": "descartavel2-summary-slice-api.run.json"}, {"contract": "descartavel2-summary-slice-ui.contract.json", "depends_on": "SUMA-1", "run_spec": "descartavel2-summary-slice-ui.run.json"}]}

@@ -1,0 +1,3 @@
+FROM delivery-kit-model-proxy:20261006.73
+COPY model_proxy.py /model_proxy.py
+COPY typed_test_source.py /typed_test_source.py

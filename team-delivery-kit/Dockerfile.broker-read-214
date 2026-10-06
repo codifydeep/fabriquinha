@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261005.213
+COPY broker/qa_cleanup_observer.py /qa_cleanup_observer.py
+COPY broker/lifecycle_publication.py /lifecycle_publication.py

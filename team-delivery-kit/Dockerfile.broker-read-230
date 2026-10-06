@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261006.229
+COPY generated_context.py /generated_context.py
+COPY broker/server.py /broker.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+COPY broker/pre_red_infra_replan.py /pre_red_infra_replan.py

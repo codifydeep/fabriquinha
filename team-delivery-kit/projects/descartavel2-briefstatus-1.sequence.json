@@ -1,0 +1,1 @@
+{"project_config": "descartavel2.json", "sequence": "BRIEFSTATUS-1-DELIVERY", "stages": [{"contract": "descartavel2-briefstatus-1-c1.contract.json", "depends_on": null, "run_spec": "descartavel2-briefstatus-1-c1.run.json"}, {"contract": "descartavel2-briefstatus-1-c2.contract.json", "depends_on": "BRIEFAPI-1", "run_spec": "descartavel2-briefstatus-1-c2.run.json"}]}

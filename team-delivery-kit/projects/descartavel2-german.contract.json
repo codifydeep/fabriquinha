@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "repository": "codifydeep/descartavel2",
+  "base_branch": "main",
+  "files": ["AGENTS.md", "Dockerfile.slug", "serve_slug.py", "slugapp.py", "slug_tests/__init__.py", "slug_tests/test_slug_base.py", "slug_tests/test_truncate.py", "slug_tests/test_unicode.py", "slug_tests/test_german.py"],
+  "protected_files": ["AGENTS.md", "Dockerfile.slug", "serve_slug.py", "slug_tests/__init__.py", "slug_tests/test_slug_base.py", "slug_tests/test_truncate.py", "slug_tests/test_unicode.py"],
+  "editable_files": ["slugapp.py", "slug_tests/test_german.py"],
+  "test_files": ["slug_tests/test_slug_base.py", "slug_tests/test_truncate.py", "slug_tests/test_unicode.py", "slug_tests/test_german.py"],
+  "test_roots": ["slug_tests"],
+  "test_command": ["python3", "-m", "unittest", "discover", "-s", "slug_tests", "-q"],
+  "test_image": "python@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+  "test_success_pattern": "Ran [1-9][0-9]* tests? in [^\\n]+\\n\\nOK",
+  "test_count_pattern": "Ran ([0-9]+) tests? in ",
+  "qa_cases": [
+    {"path": "/health", "status": 200, "expected_json": {"status": "ok"}},
+    {"path": "/slug?text=Hello+World", "status": 200, "expected_json": {"result": "hello-world"}},
+    {"path": "/slug?text=Ol%C3%A1+Mundo", "status": 200, "expected_json": {"result": "ola-mundo"}},
+    {"path": "/slug?text=A%C3%A7%C3%A3o", "status": 200, "expected_json": {"result": "acao"}},
+    {"path": "/slug?text=Stra%C3%9Fe", "status": 200, "expected_json": {"result": "strasse"}},
+    {"path": "/truncate?text=Hello+World&limit=6", "status": 200, "expected_json": {"result": "hello"}}
+  ]
+}

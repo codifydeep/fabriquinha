@@ -1,0 +1,10 @@
+FROM estudo-hermes-saas:0.21.50
+USER root
+COPY product_*.py review_boundary.py review_controller.py semantic_delivery.py /opt/hermes/
+COPY hermes_state_registry.py /opt/hermes/
+COPY release_lifecycle.py /opt/hermes/
+COPY tests/test_reviewed_integrity_guard.py /opt/hermes/governance-probes/
+COPY skills /opt/hermes/company-skills
+COPY lobby-toolchain/run.mjs lobby-toolchain/vitest.config.mjs /opt/hermes/project-validator/
+COPY patches/install_product_tools.py /tmp/install_product_tools.py
+RUN PYTHONPATH=/opt/hermes python /tmp/install_product_tools.py && python -m compileall -q /opt/hermes/product_boundary.py /opt/hermes/product_worker_service.py

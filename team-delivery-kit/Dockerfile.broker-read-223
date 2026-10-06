@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261006.222
+COPY broker/handoffs.py /handoffs.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_interruption_recovery.py /worker_interruption_recovery.py
+COPY broker/worker_interruption_snapshot.py /worker_interruption_snapshot.py
+COPY broker/host_restart_recovery.py /host_restart_recovery.py

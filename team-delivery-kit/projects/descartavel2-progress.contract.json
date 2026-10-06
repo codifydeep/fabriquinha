@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "repository": "codifydeep/descartavel2",
+  "base_branch": "main",
+  "files": [
+    "AGENTS.md", "Dockerfile.slug", "calc.py", "serve_slug.py", "slugapp.py", "test_calc.py",
+    "slug_tests/__init__.py", "slug_tests/test_german.py", "slug_tests/test_ligature.py",
+    "slug_tests/test_slug_base.py", "slug_tests/test_truncate.py", "slug_tests/test_unicode.py",
+    "node_fixture/Dockerfile", "node_fixture/server.js", "node_fixture/score.js",
+    "node_fixture/tests/score.test.js", "node_fixture/tests/tier.test.js",
+    "node_fixture/tests/progress.test.js"
+  ],
+  "protected_files": [
+    "AGENTS.md", "Dockerfile.slug", "calc.py", "serve_slug.py", "slugapp.py", "test_calc.py",
+    "slug_tests/__init__.py", "slug_tests/test_german.py", "slug_tests/test_ligature.py",
+    "slug_tests/test_slug_base.py", "slug_tests/test_truncate.py", "slug_tests/test_unicode.py",
+    "node_fixture/Dockerfile", "node_fixture/server.js",
+    "node_fixture/tests/score.test.js", "node_fixture/tests/tier.test.js"
+  ],
+  "editable_files": ["node_fixture/score.js", "node_fixture/tests/progress.test.js"],
+  "test_files": ["node_fixture/tests/score.test.js", "node_fixture/tests/tier.test.js", "node_fixture/tests/progress.test.js"],
+  "test_roots": ["node_fixture/tests"],
+  "test_command": ["node", "--test"],
+  "test_image": "node@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85",
+  "test_success_pattern": "(?m)^# pass [1-9][0-9]*$",
+  "test_count_pattern": "(?m)^# tests ([0-9]+)$",
+  "qa_cases": [
+    {"path": "/health", "status": 200, "expected_json": {"status": "ok"}},
+    {"path": "/tier?points=49", "status": 200, "expected_json": {"result": "bronze"}},
+    {"path": "/tier?points=50", "status": 200, "expected_json": {"result": "silver"}},
+    {"path": "/progress?points=0", "status": 200, "expected_json": {"result": 50}},
+    {"path": "/progress?points=49", "status": 200, "expected_json": {"result": 1}},
+    {"path": "/progress?points=50", "status": 200, "expected_json": {"result": 50}},
+    {"path": "/progress?points=99", "status": 200, "expected_json": {"result": 1}},
+    {"path": "/progress?points=100", "status": 200, "expected_json": {"result": 0}}
+  ]
+}

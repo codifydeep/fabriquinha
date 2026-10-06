@@ -1,0 +1,11 @@
+{
+  "label": "DEP-2",
+  "title": "DEP-2 — compose score summary from prior card",
+  "description": "Disposable Node fixture, second card; it must begin only after DEP-1 has merged, passed CI and passed local QA. Add and export scoreSummary(points) in node_fixture/score.js. It must return {tier: tierForScore(points), pointsToNextTier: pointsToNextTier(points)} using both existing functions, preserving their behavior and tests. Add node_fixture/tests/summary.test.js before code, observe Red, then Green and the full suite. Cover scores 49, 50, 99, 100, invalid negative/NaN/infinity, and confirm the dependency is actually used. Do not change progress.test.js or any earlier Node/Python test. Use exactly: cd /workspace && node --test 2>&1. No GitHub, Docker, network, credentials or other projects.",
+  "review_instruction": "Review frozen /delivery only. Verify scoreSummary uses the existing tierForScore and pointsToNextTier functions, returns exact object fields, tests thresholds and invalid input, and preserves every baseline test including progress.test.js. Run the controlled complete suite; do not edit. Request changes for missing dependency evidence. End with one standalone line Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <finding>, then evidence. No GitHub, Docker, network, credentials or other projects.",
+  "qa_host_port": 19325,
+  "container_port": 8080,
+  "dockerfile": "node_fixture/Dockerfile",
+  "implementer_registry": "portable-dep2-implementer.json",
+  "reviewer_registry": "portable-dep2-reviewer.json"
+}

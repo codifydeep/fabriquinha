@@ -1,0 +1,11 @@
+{
+  "label": "CALC-3",
+  "title": "CALC-3 — portable clamp delivery with matched worker image",
+  "description": "Disposable calculator pilot. Implement clamp(value, lower, upper) in calc.py: clip to inclusive integer bounds, and raise ValueError when lower > upper. Create test_clamp.py before editing code, show a failing Red run, then Green and the complete suite. Include below, inside, above, and invalid-bound tests. Preserve test_calc.py and all protected files byte-for-byte. Use exactly: cd /workspace && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. Do not use GitHub, Docker, network, credentials or another project.",
+  "review_instruction": "Review frozen /delivery only, without edits. Require test_clamp.py to cover below, inside, above, and invalid bounds, confirm pre-existing tests are unchanged, and run the controlled full-suite validation. If anything is missing, request changes from the original implementer. End with one standalone line Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>, then concise evidence. No GitHub, Docker, network, credentials or other projects.",
+  "qa_host_port": 19321,
+  "container_port": 8080,
+  "dockerfile": "Dockerfile.calc",
+  "implementer_registry": "portable-calc-implementer-v1.json",
+  "reviewer_registry": "portable-calc-reviewer-v1.json"
+}

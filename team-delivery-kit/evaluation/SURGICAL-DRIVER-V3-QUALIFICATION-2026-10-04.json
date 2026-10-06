@@ -1,0 +1,29 @@
+{
+  "schema": "surgical-driver-registry-probe-v3",
+  "status": "passed",
+  "worker_image": "sha256:2df9594b24f840f405400db778478a769ea5fed2b0e981b18299c56a9a4764e9",
+  "image_tag": "delivery-kit-execution-broker:20261004.126",
+  "actual_registry": true,
+  "actual_default_selection": true,
+  "actual_acp_selection": true,
+  "proxy_protocol_fixture": true,
+  "readless_edit_denied": true,
+  "generic_write_and_terminal_denied": true,
+  "direct_handler_fenced": true,
+  "invalid_syntax_preserves_bytes": true,
+  "outside_driver_change_preserves_bytes": true,
+  "test_weakening_preserves_bytes": true,
+  "stale_edit_denied": true,
+  "fixed_node_check": true,
+  "uid": 10000,
+  "network": "none",
+  "credentials_absent": true,
+  "delivery_approval": false,
+  "model_calls": 0,
+  "fixture_lifecycle": "docker_run_rm_tmpfs",
+  "limitations": [
+    "Isolated fixture, not a repaired product harness",
+    "Proxy protocol exercised with synthetic protocol messages, not model calls",
+    "Does not certify functional Red, Green, full product suite or independent review"
+  ]
+}

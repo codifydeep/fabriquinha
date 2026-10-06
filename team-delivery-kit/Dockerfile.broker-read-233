@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261006.232
+COPY broker/server.py /broker.py

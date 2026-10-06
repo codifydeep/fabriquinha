@@ -1,0 +1,2 @@
+# Matches the existing pinned Hermes runtime dependency; no global install needed.
+jsonschema==4.26.0

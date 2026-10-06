@@ -1,0 +1,8 @@
+{
+  "sequence": "NODE-CRASH-1",
+  "project_config": "descartavel2.json",
+  "stages": [
+    {"contract": "descartavel2-percent.contract.json", "run_spec": "descartavel2-percent.run.json", "depends_on": null},
+    {"contract": "descartavel2-overview.contract.json", "run_spec": "descartavel2-overview.run.json", "depends_on": "CRASH-1"}
+  ]
+}

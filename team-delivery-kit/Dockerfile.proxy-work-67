@@ -1,0 +1,4 @@
+FROM delivery-kit-model-proxy:20261005.66
+COPY work_proposal_contract.py /work_proposal_contract.py
+COPY decision_schema.py /decision_schema.py
+COPY typed_decision_contract.py /typed_decision_contract.py

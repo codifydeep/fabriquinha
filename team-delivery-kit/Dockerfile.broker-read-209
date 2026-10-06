@@ -1,0 +1,11 @@
+# Local incremental build; operator verifies this tag's ID before build.
+FROM delivery-kit-execution-broker:20261005.208
+LABEL delivery-kit.parent-image="sha256:26008e0257bd9115a0c7dccea90fa4ffb96a2a4363f22910bc173c8a462348f2"
+COPY broker/server.py /broker.py
+COPY broker/u3_delivery_review.py /u3_delivery_review.py
+COPY broker/review_tool_policy.py /opt/hermes/review_tool_policy.py
+COPY broker/review_read_gate.py /opt/hermes/review_read_gate.py
+COPY artifact_read_evidence.py /opt/hermes/artifact_read_evidence.py
+COPY broker/install_acp_tool_arguments.py /install_acp_tool_arguments.py
+COPY tests/review_read_registry_canary.py /review_read_canary.py
+RUN python /install_acp_tool_arguments.py --upgrade-tools-only

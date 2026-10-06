@@ -1,0 +1,11 @@
+{
+  "label": "DEP-1",
+  "title": "DEP-1 — compute points to next tier with TDD",
+  "description": "Disposable Node fixture, first of two dependent cards. Add and export pointsToNextTier(points) in node_fixture/score.js. For finite nonnegative points return 50-points below 50, 100-points from 50 through 99, and 0 at 100 or above. Reject negative, NaN and infinite inputs with RangeError. Create node_fixture/tests/progress.test.js first; observe Red, then Green, then run the complete suite. Cover 0, 49, 50, 99, 100, above 100 and invalid inputs. Preserve all existing Node and Python tests byte-for-byte. Use exactly: cd /workspace && node --test 2>&1. No GitHub, Docker, network, credentials or other projects.",
+  "review_instruction": "Review frozen /delivery only. Require progress tests for 0, 49, 50, 99, 100, above 100 and invalid points, unchanged baseline tests, and complete-suite evidence. Do not edit or replay Red. Request changes if needed. End with one standalone line Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <finding>, then evidence. No GitHub, Docker, network, credentials or other projects.",
+  "qa_host_port": 19324,
+  "container_port": 8080,
+  "dockerfile": "node_fixture/Dockerfile",
+  "implementer_registry": "portable-dep1-implementer.json",
+  "reviewer_registry": "portable-dep1-reviewer.json"
+}

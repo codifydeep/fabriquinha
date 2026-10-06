@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "repository": "codifydeep/descartavel",
+  "base_branch": "main",
+  "files": ["AGENTS.md", "Dockerfile.calc", "serve_calc.py", "calc.py", "test_calc.py", "test_clamp.py"],
+  "protected_files": ["AGENTS.md", "Dockerfile.calc", "serve_calc.py", "test_calc.py"],
+  "editable_files": ["calc.py", "test_clamp.py"],
+  "test_files": ["test_calc.py", "test_clamp.py"],
+  "test_roots": ["."],
+  "test_command": ["python3", "-m", "unittest", "discover", "-s", ".", "-q"],
+  "test_image": "python@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+  "test_success_pattern": "Ran [1-9][0-9]* tests? in [^\\n]+\\n\\nOK",
+  "test_count_pattern": "Ran ([0-9]+) tests? in ",
+  "qa_cases": [
+    {"path": "/health", "status": 200, "expected_json": {"status": "ok"}},
+    {"path": "/add?left=2&right=3", "status": 200, "expected_json": {"result": 5}},
+    {"path": "/multiply?left=2&right=3", "status": 200, "expected_json": {"result": 6}},
+    {"path": "/clamp?value=7&lower=0&upper=10", "status": 200, "expected_json": {"result": 7}},
+    {"path": "/clamp?value=-4&lower=0&upper=10", "status": 200, "expected_json": {"result": 0}},
+    {"path": "/clamp?value=14&lower=0&upper=10", "status": 200, "expected_json": {"result": 10}}
+  ]
+}

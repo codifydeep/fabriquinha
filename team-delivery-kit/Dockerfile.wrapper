@@ -1,0 +1,6 @@
+FROM delivery-kit-hermes-runtime:20260928.1
+USER root
+COPY acp_wrapper.py /opt/acp_wrapper.py
+COPY model_policy.py /opt/model_policy.py
+RUN printf '#!/bin/sh\nexec python /opt/acp_wrapper.py "$@"\n' > /usr/local/bin/hermes-isolated && chmod 755 /usr/local/bin/hermes-isolated
+USER 10000:10000

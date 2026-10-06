@@ -1,0 +1,21 @@
+FROM delivery-kit-hermes-runtime@sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf
+USER root
+COPY model_proxy.py /model_proxy.py
+COPY model_policy.py /model_policy.py
+COPY decision_schema.py /decision_schema.py
+COPY work_proposal_contract.py /work_proposal_contract.py
+COPY structured_response_contract.py /structured_response_contract.py
+COPY typed_decision_contract.py /typed_decision_contract.py
+COPY planning_schema.py /planning_schema.py
+COPY write_tool_schema.py /write_tool_schema.py
+COPY test_artifact_schema.py /test_artifact_schema.py
+COPY artifact_response_contract.py /artifact_response_contract.py
+COPY surgical_test_edit.py /surgical_test_edit.py
+COPY c10_status_atomic.py /c10_status_atomic.py
+COPY c10_micro_drain.py /c10_micro_drain.py
+COPY artifact_read_evidence.py /artifact_read_evidence.py
+COPY read_stream_recovery.py /read_stream_recovery.py
+COPY deterministic_read_dispatch.py /deterministic_read_dispatch.py
+COPY read_stream_recovery_probe.py /read_stream_recovery_probe.py
+USER 10000:10000
+ENTRYPOINT ["python", "/model_proxy.py"]

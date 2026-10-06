@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261005.211
+COPY broker/qa_cleanup_observer.py /qa_cleanup_observer.py
+COPY broker/u3_work_proposal.py /u3_work_proposal.py
+COPY work_proposal_contract.py /work_proposal_contract.py
+COPY decision_schema.py /decision_schema.py
+COPY typed_decision_contract.py /typed_decision_contract.py

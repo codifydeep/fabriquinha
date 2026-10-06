@@ -1,0 +1,7 @@
+# Temporary local-only signup window, restricted to the synthetic pilot operator.
+# bootstrap_multica.py restores the base configuration in a finally block.
+services:
+  backend:
+    environment:
+      ALLOW_SIGNUP: 'true'
+      ALLOWED_EMAILS: operator@delivery-kit.invalid

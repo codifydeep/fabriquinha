@@ -1,0 +1,11 @@
+{
+  "label": "CALC-2",
+  "title": "CALC-2 — retry portable integer clamp delivery",
+  "description": "Fresh run after CALC-1 failed before ACP initialization, with no model call or code change. Disposable calculator fixture only. Implement clamp(value, lower, upper) in calc.py. Return the nearest inclusive integer bound, or the value if already inside. Raise ValueError for lower > upper. Create test_clamp.py first; show Red, Green, then the full suite. Test below, inside, above, and invalid bounds. Preserve test_calc.py and all other protected files byte-for-byte. Execute exactly: cd /workspace && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. No GitHub, Docker, network, credentials or other projects.",
+  "review_instruction": "Review frozen /delivery only and do not edit. Check tests for below, inside, above, and invalid bounds, unchanged pre-existing tests, and full-suite evidence. Use the controlled review validation tool. Request changes if evidence is insufficient. End with one standalone line Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>, followed by concise evidence. No GitHub, Docker, network, credentials or other projects.",
+  "qa_host_port": 19320,
+  "container_port": 8080,
+  "dockerfile": "Dockerfile.calc",
+  "implementer_registry": "portable-calc-implementer-v1.json",
+  "reviewer_registry": "portable-calc-reviewer-v1.json"
+}

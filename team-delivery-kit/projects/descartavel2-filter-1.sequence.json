@@ -1,0 +1,1 @@
+{"project_config": "descartavel2.json", "sequence": "FILTER-1-DELIVERY", "stages": [{"contract": "descartavel2-filter-1-api.contract.json", "depends_on": null, "run_spec": "descartavel2-filter-1-api.run.json"}, {"contract": "descartavel2-filter-1-ui.contract.json", "depends_on": "FILTERAPI-1", "run_spec": "descartavel2-filter-1-ui.run.json"}]}

@@ -1,0 +1,5 @@
+{
+  "worker_image": "sha256:e9944c646bf8ad5381b8506b5eddcdeac27952d6c125789f833eda9d97f846ff",
+  "test_image": "delivery-kit-hermes-runtime@sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf",
+  "deployment_image": "delivery-kit-port2-feedback-bootstrap@sha256:1aa9925199dbabd4f0b9684be1b688753301d06d284d2b66dd2668f8a64b7190"
+}

@@ -1,0 +1,94 @@
+FROM nousresearch/hermes-agent@sha256:87f93bfd77e8e13b5c37ab1dab48cea2da166095f2b60c9160d5c568d4aa43c7
+
+USER root
+RUN mkdir -p /run/coordination-read && chown 10000:10000 /run/coordination-read
+
+# Modern local builder; the controller owns the socket, never the workers.
+COPY --from=docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c /usr/local/libexec/docker/cli-plugins/docker-buildx /usr/local/lib/docker/cli-plugins/docker-buildx
+
+COPY delivery_gate.py /opt/hermes/delivery_gate.py
+COPY review_policy.py release_policy.py /opt/hermes/
+COPY review_merge.py /opt/hermes/
+COPY publication_merge.py /opt/hermes/
+COPY publication_access.py /opt/hermes/
+COPY recovery_actions.py /opt/hermes/
+COPY triage_recovery.py /opt/hermes/
+COPY semantic_delivery.py /opt/hermes/
+COPY persistent_stop.py review_block_event.py /opt/hermes/
+COPY incident_completion.py review_board_read.py /opt/hermes/
+COPY e2e_controller.py e2e_boundary.py e2e_policy.py e2e_fault.py /opt/hermes/
+COPY planning_flow.py planning_recovery.py /opt/hermes/
+COPY planning_status.py /opt/hermes/
+COPY pr_review_packet.py /opt/hermes/
+COPY planning_corrections.py /opt/hermes/
+COPY planning_drafts.py planning_author_recovery.py /opt/hermes/
+COPY patches/patch_planning_claims.py /tmp/
+RUN python3 /tmp/patch_planning_claims.py
+COPY coordination_reader.py /opt/hermes/
+COPY http_probe_runner.py /opt/hermes/
+COPY host_receipt.py /opt/hermes/
+COPY host_recovery.py incident_supervisor.py /opt/hermes/
+COPY e2e_fixture /opt/hermes/e2e_fixture
+COPY patches/patch_e2e_tools.py /tmp/
+COPY patches/patch_persistent_stop.py /tmp/
+COPY patches/patch_semantic_scope.py /tmp/
+COPY coordination_store.py session_parent_guard.py /opt/hermes/
+COPY attempt_guard.py /opt/hermes/
+COPY board_scope.py /opt/hermes/
+COPY patches/patch_board_scope.py /tmp/
+COPY team_control.py /opt/hermes/
+COPY delivery_receipts.py /opt/hermes/
+COPY scratch_evidence.py scratch_validation.py /opt/hermes/
+COPY validation_runner.py /opt/hermes/
+COPY immutable_delivery.py review_controller.py review_boundary.py review_recovery.py /opt/hermes/
+COPY product_boundary.py product_controller.py product_workspace.py product_tdd.py product_claim.py product_handoff.py product_verdict.py product_docker_runner.py product_test_sandbox.py /opt/hermes/
+COPY product_worker_service.py /opt/hermes/
+COPY patches/patch_dashboard_history.py /tmp/patch_dashboard_history.py
+RUN python /tmp/patch_dashboard_history.py
+COPY patches/patch_immutable_review.py /tmp/
+COPY patches/patch_review_catalogue.py /tmp/
+COPY patches/patch_iteration_diagnosis.py /tmp/
+COPY patches/patch_scratch_retention.py /tmp/
+COPY patches/patch_team_commands.py patches/patch_scoped_unblock.py /tmp/
+COPY patches/patch_distinct_decisions.py /tmp/
+COPY patches/patch_attempt_guard.py /tmp/
+COPY patches/patch_session_parent.py /tmp/
+COPY patches/patch_review_matrix.py patches/patch_maintenance_gate.py patches/patch_native_handoffs.py /tmp/
+COPY patches/patch_delivery_evidence.py /tmp/patch_delivery_evidence.py
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gh docker-compose \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory /Users/weber/Documents/projetos_pessoais_desenv/hermes/truco-online \
+    && git config --system credential.https://github.com.helper '!gh auth git-credential'
+
+COPY patches/patch_kanban_active_pr.py /tmp/patch_kanban_active_pr.py
+COPY patches/patch_kanban_review_invariants.py /tmp/patch_kanban_review_invariants.py
+COPY patches/patch_kanban_worktree_review_gate.py /tmp/patch_kanban_worktree_review_gate.py
+COPY patches/patch_kanban_handoff_invariants.py /tmp/patch_kanban_handoff_invariants.py
+COPY patches/patch_kanban_workspace_write_root.py /tmp/patch_kanban_workspace_write_root.py
+RUN python3 /tmp/patch_kanban_active_pr.py \
+    && python3 /tmp/patch_kanban_review_invariants.py \
+    && python3 /tmp/patch_kanban_worktree_review_gate.py \
+    && python3 /tmp/patch_kanban_handoff_invariants.py \
+    && python3 /tmp/patch_kanban_workspace_write_root.py \
+    && python3 /tmp/patch_delivery_evidence.py \
+    && python3 /tmp/patch_scratch_retention.py \
+    && python3 /tmp/patch_iteration_diagnosis.py \
+    && python3 /tmp/patch_review_matrix.py \
+    && python3 /tmp/patch_maintenance_gate.py \
+    && python3 /tmp/patch_native_handoffs.py \
+    && python3 /tmp/patch_session_parent.py \
+    && python3 /tmp/patch_attempt_guard.py \
+    && python3 /tmp/patch_board_scope.py \
+    && python3 /tmp/patch_scoped_unblock.py \
+    && python3 /tmp/patch_team_commands.py \
+    && python3 /tmp/patch_distinct_decisions.py \
+    && python3 /tmp/patch_immutable_review.py \
+    && python3 /tmp/patch_semantic_scope.py \
+    && python3 /tmp/patch_review_catalogue.py \
+    && python3 /tmp/patch_persistent_stop.py \
+    && python3 /tmp/patch_e2e_tools.py \
+    && python3 -m py_compile /opt/hermes/hermes_cli/kanban_db.py \
+    && python3 -m py_compile /opt/hermes/tools/kanban_tools.py \
+    && rm /tmp/patch_kanban_active_pr.py /tmp/patch_kanban_review_invariants.py /tmp/patch_kanban_worktree_review_gate.py /tmp/patch_kanban_handoff_invariants.py /tmp/patch_kanban_workspace_write_root.py

@@ -1,0 +1,18 @@
+{
+  "label": "AUTOLOSS-2",
+  "title": "AUTOLOSS-2 — pulse alias with automatic interruption qualification",
+  "description": "Disposable worker interruption recovery evaluation only. Add GET /pulse as a liveness alias of /health: HTTP200, application/json, exact JSON {status: ok}. Query strings do not change the route. Preserve /health, /ready, /healthz, feedback API and browser behavior. PHASE1 write ONLY tests/test_autoloss_pulse.py (max32768 bytes) with real app.server.Handler and local ephemeral HTTPServer. Cover /pulse, /pulse?probe=1, JSON content type and unchanged /health and /healthz. Preserve every pre-existing test byte-for-byte. Run exactly cd /workspace && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. Controller captures Red and obtains independent test review. PHASE2 edit ONLY app/server.py after controller handoff; never edit frozen tests or recreate Red. No new dependencies, architecture or services. No GitHub, Docker, keys, internet or administrative tools. Real tools only. The operator may terminate the exact isolated worker; this does not change the product requirements or review gates.",
+  "review_instruction": "Review immutable /delivery only, no edits or generic commands. Require actual /pulse and query-string routing under the real Handler, JSON content type and preserved /health and /healthz. Require genuine controller Red, independent frozen-test approval, full Green and unchanged prior tests. Run only cd /delivery && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. Finish with Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>. CI and same-merge deployment/browser QA remain mandatory. Worker interruption is not a code defect and cannot waive gates.",
+  "qa_host_port": 19454,
+  "container_port": 8080,
+  "dockerfile": "Dockerfile.feedback-bootstrap",
+  "implementer_registry": "pilot-backend-data.json",
+  "reviewer_registry": "pilot-techlead-reviewer.json",
+  "runtime_env": {
+    "FEEDBACK_DB_PATH": "/tmp/feedback.db"
+  },
+  "browser_qa": {
+    "scenario": "feedback-board-search-generation-v1",
+    "browser_image": "sha256:72cb1ba338b9f4047a52a8fea4702ebebebc7eb9dac11aba9c1becf605c12b4b"
+  }
+}

@@ -1,0 +1,24 @@
+# Preserve the latest qualified image; no model calls or Docker socket.
+services:
+  app:
+    image: sha256:1c87631d6775e0dbdc3dd02f4168bfb26cda424aecbb6335fe3f14782e9e9eaf
+    container_name: delivery-kit-port2-browserfix-2-qa
+    ports: ["127.0.0.1:19438:8080"]
+    environment:
+      FEEDBACK_DB_PATH: /tmp/feedback.db
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=8m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    restart: "no"
+    labels:
+      delivery-kit.lifecycle: homologation
+      delivery-kit.source-sha: 67e6fcb718ac27e42f64fd2c35f76419c999eaf6
+    volumes: ["retained-data:/opt/data"]
+volumes:
+  retained-data:
+    external: true
+    name: d24036e7b52f884a4b7a651bcc423acd1eb35397122fc6abd2aa9c08ad97b61d

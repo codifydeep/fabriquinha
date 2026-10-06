@@ -1,0 +1,11 @@
+{
+  "label": "CRASH-2",
+  "title": "CRASH-2 — compose a score overview after predecessor delivery",
+  "description": "Disposable Node fixture, second card depends on CRASH-1. Add and export scoreOverview(points) in node_fixture/score.js. Return an object with tier and pointsToNextTier from the existing scoreSummary(points), plus tierProgressPercent from the CRASH-1 function. Reject invalid values through the composed functions. Add node_fixture/tests/overview.test.js first, observe Red then Green, and run the complete suite. Cover 49, 50, 75 and 100, invalid values, and composition. Preserve all existing tests including percent.test.js byte-for-byte. Use exactly cd /workspace && node --test 2>&1. No GitHub, Docker, network, credentials or other projects.",
+  "review_instruction": "Review immutable /delivery only. Require tests for 49, 50, 75, 100, invalid inputs and composition with the predecessor function. Verify percent.test.js is unchanged and run the full suite. Do not edit or replay Red. End with one standalone Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <finding>, then evidence.",
+  "qa_host_port": 19327,
+  "container_port": 8080,
+  "dockerfile": "node_fixture/Dockerfile",
+  "implementer_registry": "portable-crash2-implementer.json",
+  "reviewer_registry": "portable-crash2-reviewer.json"
+}

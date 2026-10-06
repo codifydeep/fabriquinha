@@ -1,0 +1,24 @@
+services:
+  execution-broker:
+    image: delivery-kit-eval-broker:20260928.18
+    environment:
+      BROKER_WORKER_IMAGE: ${BROKER_WORKER_IMAGE:?Immutable worker image ID required}
+      BROKER_MODEL_NETWORK: ${DELIVERY_KIT_COMPOSE_PROJECT:-delivery-kit-eval}_model
+      BROKER_NAMESPACE: ${DELIVERY_KIT_COMPOSE_PROJECT:-delivery-kit-eval}
+    user: '0:0'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - broker_state:/broker-state
+    networks: [execution, api]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    restart: unless-stopped
+volumes:
+  broker_state:
+networks:
+  execution: {internal: true}

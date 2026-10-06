@@ -1,0 +1,11 @@
+services:
+  execution-broker:
+    image: delivery-kit-execution-broker:20261002.52
+    environment:
+      BROKER_NAMESPACE: delivery-kit-port2
+      BROKER_MODEL_NETWORK: delivery-kit-port2_model
+      BROKER_WORKER_IMAGE: sha256:8f0ea8805cc11dda757e15c754105b1fe791f949119e65ebf5ccafeace8d4302
+      BROKER_TEST_ARTIFACT_GATE: '1'
+    networks: [execution, api, model]
+networks:
+  model: {internal: true}

@@ -1,0 +1,69 @@
+# Independent minimal deployment configuration for the official Multica images.
+# No worker runtime is started here. No host paths, sockets or cloud credentials.
+name: delivery-kit-eval
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
+    environment:
+      POSTGRES_DB: multica_eval
+      POSTGRES_USER: multica_eval
+      POSTGRES_PASSWORD: ${EVAL_DB_PASSWORD:?Run evalctl.py init}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [database]
+    mem_limit: 384m
+    cpus: 0.75
+    pids_limit: 150
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U multica_eval -d multica_eval']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  backend:
+    image: ghcr.io/multica-ai/multica-backend@sha256:60dc856bc44c01a3c73e8153e211be6c22cc6cbb66dde8b20e01de5b6e75e41f
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports: ['127.0.0.1:${EVAL_BACKEND_PORT:-19080}:8080']
+    environment:
+      DATABASE_URL: postgres://multica_eval:${EVAL_DB_PASSWORD:?Run evalctl.py init}@postgres:5432/multica_eval?sslmode=disable
+      JWT_SECRET: ${EVAL_JWT_SECRET:?Run evalctl.py init}
+      PORT: '8080'
+      FRONTEND_ORIGIN: http://localhost:${EVAL_FRONTEND_PORT:-19300}
+      MULTICA_APP_URL: http://localhost:${EVAL_FRONTEND_PORT:-19300}
+      APP_ENV: production
+      ALLOW_SIGNUP: 'false'
+      DO_NOT_TRACK: 'true'
+      ANALYTICS_DISABLED: 'true'
+      MULTICA_CLOUD_URL: ''
+      MULTICA_LLM_API_KEY: ''
+      MULTICA_LLM_BASE_URL: ''
+      MULTICA_LLM_MAX_RETRIES: '0'
+    volumes:
+      - uploads:/app/data/uploads
+    networks: [database, api]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.75
+    pids_limit: 150
+    restart: unless-stopped
+  frontend:
+    image: ghcr.io/multica-ai/multica-web@sha256:b88402be269b6d4ea20bb22404b7532e4d7663f45c1c4952cf040f598398a03e
+    depends_on: [backend]
+    ports: ['127.0.0.1:${EVAL_FRONTEND_PORT:-19300}:3000']
+    environment:
+      HOSTNAME: 0.0.0.0
+      REMOTE_API_URL: http://backend:8080
+      NEXT_TELEMETRY_DISABLED: '1'
+    networks: [api]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 0.75
+    pids_limit: 150
+    restart: unless-stopped
+volumes:
+  pgdata:
+  uploads:
+networks:
+  database: {internal: true}
+  api:

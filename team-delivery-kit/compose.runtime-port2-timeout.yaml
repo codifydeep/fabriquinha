@@ -1,0 +1,3 @@
+services:
+  runtime:
+    image: delivery-kit-hermes-wrapper:20260930.3

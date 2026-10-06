@@ -1,0 +1,7 @@
+# Reuse the already-installed browser; no network install or floating dependency.
+FROM reforma-browser@sha256:5e5d4783dacfcf7fd1124c5ef86688c334f012e04571c1cb21584e821107c61e
+USER root
+RUN cp -a /root/.cache/ms-playwright /opt/qa-browsers && chmod -R a+rX /opt/qa-browsers
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/qa-browsers HOME=/tmp
+USER 10000:10000
+ENTRYPOINT ["python"]

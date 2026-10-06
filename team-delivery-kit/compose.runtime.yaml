@@ -1,0 +1,22 @@
+services:
+  runtime:
+    image: delivery-kit-hermes-wrapper:20260928.1
+    profiles: [runtime]
+    command: [multica, daemon, start, --foreground, --no-auto-reload, --no-auto-update]
+    user: '10000:10000'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    volumes:
+      - runtime_state:/eval-state
+    networks: [api, execution]
+    mem_limit: 1g
+    cpus: 1
+    pids_limit: 256
+    # An operator stop remains stopped; an unplanned daemon/host restart recovers.
+    restart: unless-stopped
+volumes:
+  runtime_state:
+networks:
+  execution: {internal: true}

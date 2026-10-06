@@ -1,0 +1,65 @@
+import importlib.util
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch,Mock
+
+
+with patch.dict(os.environ, {'BROKER_WORKER_IMAGE': 'sha256:' + 'a' * 64}):
+    spec = importlib.util.spec_from_file_location('broker_server_diagnostics', Path(__file__).parents[1] / 'broker/server.py')
+    server = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(server)
+
+
+class BrokerDiagnosticTests(unittest.TestCase):
+    def test_only_container_create_gets_bounded_longer_deadline(self):
+        conn=Mock();conn.getresponse.return_value.status=204;conn.getresponse.return_value.read.return_value=b''
+        for method,path,deadline in [('POST','/containers/create?name=public',30),('GET','/containers/public/json',10),('DELETE','/containers/public',10)]:
+            with patch.object(server,'DockerConnection',return_value=conn) as factory:
+                server.docker(method,path,{'Image':'public-fixture'} if method=='POST' else None)
+                factory.assert_called_once_with('localhost',timeout=deadline)
+    def test_bootstrap_primary_failure_survives_cleanup_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            with server.db() as con:
+                con.execute('CREATE TABLE leases(request_id TEXT PRIMARY KEY,scenario TEXT,name TEXT,status TEXT,deadline REAL)')
+                con.execute('CREATE TABLE broker_errors(request_id TEXT,operation TEXT,category TEXT,at REAL)')
+            primary=server.DockerOperationTimeout('POST','/volumes/create')
+            with patch.object(server,'config',side_effect=primary),patch.object(server,'remove_owned',side_effect=TimeoutError('slow cleanup')):
+                with self.assertRaises(server.DockerOperationTimeout):
+                    server.submit({'request_id':'request','scenario':'acp-session'},trusted_acp=True)
+            with server.db() as con:
+                self.assertEqual(con.execute('SELECT status FROM leases').fetchone()[0],'closing')
+                errors=[tuple(r) for r in con.execute('SELECT operation,category FROM broker_errors')]
+            self.assertEqual(errors,[('worker_submit','bootstrap:docker_volumes_create'),('bootstrap_cleanup','prompt_timeout')])
+    def test_docker_timeout_identifies_operation_without_private_path(self):
+        for method,path,category in [('POST','/containers/create?name=secret','docker_containers_create'),
+                ('DELETE','/containers/private-id?force=true','docker_containers_delete'),
+                ('POST','/volumes/create','docker_volumes_create')]:
+            with self.subTest(category=category):
+                self.assertEqual(server.failure_category(server.DockerOperationTimeout(method,path)),category)
+        conn=Mock();conn.getresponse.side_effect=TimeoutError('secret details')
+        with patch.object(server,'DockerConnection',return_value=conn):
+            with self.assertRaises(server.DockerOperationTimeout) as caught:server.docker('GET','/containers/private/json')
+        self.assertEqual(server.failure_category(caught.exception),'docker_containers_inspect')
+        self.assertNotIn('private',str(caught.exception));conn.close.assert_called_once()
+    def test_timeout_has_safe_explicit_category(self):
+        self.assertEqual(server.failure_category(TimeoutError('secret prompt contents')), 'prompt_timeout')
+
+    def test_internal_exception_does_not_expose_message(self):
+        self.assertEqual(server.failure_category(RuntimeError('secret token')), 'broker_runtime')
+        self.assertEqual(server.failure_category(RuntimeError('ACP response size limit')),
+                         'acp_response_size')
+
+    def test_safe_categories_separate_infrastructure_failures(self):
+        self.assertEqual(server.failure_category(sqlite3.OperationalError('secret SQL')), 'broker_sqlite')
+        self.assertEqual(server.failure_category(subprocess.CalledProcessError(1, ['secret'])), 'worker_process')
+        self.assertEqual(server.failure_category(OSError('secret path')), 'worker_io')
+
+    def test_model_limit_completion_is_not_reviewable(self):
+        self.assertTrue(server.model_output_limit({'result': {'output':
+            'No visible answer was produced. The model hit its output-token limit.'}}))
+        self.assertFalse(server.model_output_limit({'result': {'output': 'Tests passed.'}}))
+        self.assertFalse(server.model_output_limit({'result': None}))

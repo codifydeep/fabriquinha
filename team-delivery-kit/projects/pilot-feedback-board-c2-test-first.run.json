@@ -1,0 +1,11 @@
+{
+  "label": "FBTDD-2",
+  "title": "PILOT-FEEDBACK-BOARD-STDLIB — C2 — controller-enforced test-first UI",
+  "description": "Disposable feedback-board C2. Work only in the assigned /workspace. Phase 1 is TESTS ONLY: add tests/test_board_ui.py for GET /, the named static assets and content types, traversal rejection, form fields, list rendering, empty and duplicate errors, completion toggle and ~2-second polling. Do not modify app/server.py or app/static/* in this phase. Submit tests; the controller runs the pinned full suite on the frozen C1 implementation and must record a real Red failure in the new tests. Phase 2 begins only after controller authorization: implement GET / and /static/* in app/server.py, preserve C1 API routes, and add app/static/index.html, app.js and style.css. The browser UI must add title and description, show a clear empty state and human-readable errors, clear inputs after success, toggle completion, and synchronize a second browser by polling. Run the exact pinned command: cd /workspace && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. Preserve every pre-existing test and protected file byte-for-byte. Do not use GitHub, Docker, network or credentials. A text claim of Red or Green is not evidence; the controller verifies both phases.",
+  "review_instruction": "Review only the frozen /delivery and controller receipts; never edit, replay Red or approve a prior revision. Verify Red on the frozen C1 base, Green and the full suite on the identical new-test hashes; all original tests unchanged. Check GET /, static content types, traversal rejection, C1 API preservation, form and list behavior, errors, toggle and cross-browser polling. Request changes for missing behavior or evidence. Run only the permitted validation command. Finish with Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>.",
+  "qa_host_port": 19424,
+  "container_port": 8080,
+  "dockerfile": "Dockerfile.feedback-bootstrap",
+  "implementer_registry": "pilot-frontend.json",
+  "reviewer_registry": "pilot-techlead-reviewer.json"
+}

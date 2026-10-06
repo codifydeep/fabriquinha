@@ -1,0 +1,11 @@
+{
+  "label": "CALC-1",
+  "title": "CALC-1 — implement integer clamp with TDD",
+  "description": "Disposable calculator fixture only. Implement clamp(value, lower, upper) in calc.py. For valid integer bounds lower <= upper, return lower if value is below it, upper if above it, otherwise value. Raise ValueError when lower > upper. Add test_clamp.py before code, observe a failing Red test, then Green, then the complete suite. Test below, inside, above, and invalid bounds. Preserve test_calc.py and all other protected files byte-for-byte. Run exactly: cd /workspace && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. No GitHub, Docker, network, credentials or other projects.",
+  "review_instruction": "Review only frozen /delivery; never edit files. Verify test_clamp.py covers below, inside, above, and invalid bounds and test_calc.py remains unchanged. Execute the controlled full-suite validation, not a Red replay. Request changes if coverage or evidence is missing. End with exactly one standalone line Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>, followed by concise evidence. No GitHub, Docker, network, credentials or other projects.",
+  "qa_host_port": 19318,
+  "container_port": 8080,
+  "dockerfile": "Dockerfile.calc",
+  "implementer_registry": "portable-calc-implementer-v1.json",
+  "reviewer_registry": "portable-calc-reviewer-v1.json"
+}

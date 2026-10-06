@@ -1,0 +1,26 @@
+{
+  "multica": {
+    "repository": "https://github.com/multica-ai/multica",
+    "version": "v0.6.0",
+    "commit": "ea94c7cd5bbce9c8e1f28c5fa049c47ee7651d02",
+    "backend": "ghcr.io/multica-ai/multica-backend@sha256:60dc856bc44c01a3c73e8153e211be6c22cc6cbb66dde8b20e01de5b6e75e41f",
+    "frontend": "ghcr.io/multica-ai/multica-web@sha256:b88402be269b6d4ea20bb22404b7532e4d7663f45c1c4952cf040f598398a03e"
+  },
+  "postgres": {
+    "tag_observed": "pgvector/pgvector:pg17",
+    "image": "pgvector/pgvector@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f"
+  },
+  "local_evaluation_images": {
+    "runtime_tag": "delivery-kit-hermes-runtime:20260928.1",
+    "runtime_observed_image_id": "sha256:f74ca9ca3898aa7c90b4399eeec925c452b1d0adf2056f4c699eda410ac06fd2",
+    "broker_tag": "delivery-kit-eval-broker:20260928.11",
+    "broker_observed_image_id": "sha256:4ff537c2307efc944ef546362081ea528eb6c57f71746435b2dd6e1794c1ec44",
+    "wrapper_tag": "delivery-kit-hermes-wrapper:20260928.1",
+    "wrapper_observed_image_id": "sha256:564a07d8ce8bd21c813e86704e8d6e5469b880f6e5d7b1b7f4a50369538a9233",
+    "model_proxy_tag": "delivery-kit-eval-model-proxy:20260928.7",
+    "model_proxy_observed_image_id": "sha256:bba6fd303c6a4e375c43c16215d2373acbf08eeb85b75cb8d960a4dbd20bb6e4",
+    "published": false
+  },
+  "tested_platform": "linux/arm64",
+  "verified_on": "2026-09-28"
+}

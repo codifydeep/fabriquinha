@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261006.227
+COPY broker/artifact_rejection_evidence.py /artifact_rejection_evidence.py
+COPY artifact_rejection_receipts.py /artifact_rejection_receipts.py

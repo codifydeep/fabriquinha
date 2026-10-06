@@ -1,0 +1,24 @@
+services:
+  model-proxy:
+    image: delivery-kit-eval-model-proxy:20260928.7
+    build:
+      context: .
+      dockerfile: Dockerfile.model-proxy
+    environment:
+      MODEL_PROXY_MAX_CALLS: '64'
+    user: '10000:10000'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [model, model_egress]
+    volumes:
+      - model_secret:/secret:ro
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    restart: 'no'
+volumes:
+  model_secret:
+networks:
+  model: {internal: true}
+  model_egress: {}

@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261005.67
+COPY typed_decision_contract.py /typed_decision_contract.py

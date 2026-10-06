@@ -1,0 +1,8 @@
+{
+  "sequence": "NODE-DEPEND-1",
+  "project_config": "descartavel2.json",
+  "stages": [
+    {"contract": "descartavel2-progress.contract.json", "run_spec": "descartavel2-progress.run.json", "depends_on": null},
+    {"contract": "descartavel2-summary.contract.json", "run_spec": "descartavel2-summary.run.json", "depends_on": "DEP-1"}
+  ]
+}

@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261006.223
+COPY broker/worker_interruption_recovery.py /worker_interruption_recovery.py

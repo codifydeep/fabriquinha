@@ -1,0 +1,12 @@
+# Opt-in for the second installation after seeding a private model_meter volume.
+# Do not apply to an existing proxy until its in-memory count has been migrated.
+services:
+  model-proxy:
+    image: delivery-kit-eval-model-proxy:20260928.8
+    environment:
+      MODEL_PROXY_MAX_CALLS: ${MODEL_PROXY_MAX_CALLS:-64}
+      MODEL_PROXY_COUNTER_PATH: /meter/calls.json
+    volumes:
+      - model_meter:/meter
+volumes:
+  model_meter:

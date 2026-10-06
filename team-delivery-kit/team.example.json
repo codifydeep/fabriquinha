@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "template_only": true,
+  "project": {
+    "repository": "https://github.com/OWNER/REPOSITORY",
+    "release_branch": "release/v0.1",
+    "test_commands": [["npm", "test", "--", "--run"]]
+  },
+  "execution": {"max_workers": 2, "max_per_role": 1, "paid_fallback": false},
+  "quality": {
+    "tdd_required": true,
+    "immutable_review": true,
+    "independent_review": true,
+    "protect_existing_tests": true,
+    "same_commit_deploy_qa": true,
+    "instrumentation_assessment_required": true
+  },
+  "roles": {
+    "produto": {"enabled": true, "responsibilities": ["Brief, acceptance, research and product decisions"], "reviewer": "techlead", "escalates_to": "ceo"},
+    "designer": {"enabled": true, "responsibilities": ["UX, UI and accessibility"], "reviewer": "produto", "escalates_to": "produto"},
+    "cto": {"enabled": true, "responsibilities": ["Architecture, technical decisions and diagnostic experiments"], "reviewer": "techlead", "escalates_to": "technical_incident"},
+    "techlead": {"enabled": true, "responsibilities": ["Delivery ownership, decomposition, integration and technical escalation"], "reviewer": "cto", "escalates_to": "cto"},
+    "backend_data": {"enabled": true, "responsibilities": ["Backend, data contracts and event implementation"], "reviewer": "techlead", "escalates_to": "techlead"},
+    "frontend": {"enabled": true, "responsibilities": ["Web implementation and client instrumentation"], "reviewer": "techlead", "escalates_to": "techlead"},
+    "mobile": {"enabled": false, "responsibilities": ["Mobile implementation when in scope"], "reviewer": "techlead", "escalates_to": "techlead"},
+    "devops": {"enabled": true, "responsibilities": ["Local deployment, operational metrics, reliability and rollback"], "reviewer": "quality_security", "escalates_to": "techlead"},
+    "quality_security": {"enabled": true, "responsibilities": ["Independent QA, regression and security"], "reviewer": "techlead", "escalates_to": "cto"},
+    "observability_engineer": {"enabled": false, "responsibilities": ["Telemetry schemas, instrumentation standards and data quality"], "reviewer": "quality_security", "escalates_to": "cto"},
+    "product_analyst": {"enabled": false, "responsibilities": ["Product behavior insights and experiment design"], "reviewer": "produto", "escalates_to": "produto"}
+  }
+}
