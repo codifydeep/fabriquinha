@@ -84,6 +84,23 @@ independent native verdict, exact plan hash, wakeup and complete source reads.
 Reconciliation creates no verdict and makes no model call. The subsequent CTO
 correction is a new native execution, with a revision-specific dispatch key.
 
+## Execution intake
+
+`remediation_execution` revalidates the actual completed CTO proposal and
+independent review, complete immutable-source reads, original Git base and
+unchanged delivery context before persisting a distinct execution contract.
+All three steps carry every criterion and narrowly disjoint edit permissions.
+The original revision depth and lineage remain attached; the new contract is
+not a reset of the historical attempts.
+
+Intake provisions only an unassigned R1 issue with a durable pre-POST intent.
+An uncertain response is reconciled by read-only lookup, never another POST.
+R1 remains `provision_pending`, with execution authority false, until its base
+and preserved test seed are independently qualified. R2 and R3 remain dependent.
+Creating cards does not authorize writes or imply Red, Green, merge or deploy.
+Worker provisioning and runtime enforcement of the three-step contract remain
+required qualification gates; intake alone is not autonomous delivery.
+
 The first intake is qualified for the service-mode diagnostic fixture. This
 does not claim generic remediation for every project or a complete autonomous
 release. Generalization and the plan-to-execution adapter remain qualification
