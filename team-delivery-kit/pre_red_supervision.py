@@ -24,25 +24,33 @@ def eligible(status, managed):
         and proof.get('source_task')==state.get('source_task')
         and proof.get('diagnostic_sha256')==digest
         and proof.get('approval') is False and proof.get('author_restarted') is False)
+    capacity=data.get('read_capacity_diagnosis') or {};experiment=capacity.get('probe') or {}
+    capacity_valid=(capacity.get('operation')=='read_capacity_diagnosis_v1'
+        and capacity.get('source_task')==state.get('source_task')
+        and capacity.get('issue_id')==status.get('issue_id')
+        and capacity.get('author_retry_authorized') is False and capacity.get('delivery_approval') is False
+        and experiment.get('baseline_unchanged') is True and experiment.get('all_lines_observed') is True
+        and experiment.get('manifest_sha256')==data.get('diagnostic',{}).get('manifest_sha256'))
     return (state.get('stage') in ('test_first_cto_diagnosis','test_first_cto_correction',
                                   'test_first_cto_correction_wait')
         and data.get('phase')=='test_first'
-        and (presentation_valid or postwrite_valid)
+        and (presentation_valid or postwrite_valid or capacity_valid)
         and bool(data.get('test_first_cto_wakeup')))
 
 
 def read_proof(context):
     from evalctl import PROJECT
-    program='''import broker as b,json,native,sys,postwrite_diagnosis
+    program='''import broker as b,json,native,sys,postwrite_diagnosis,read_capacity_diagnosis
 issue=sys.argv[1]
 with b.db() as c:
  route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
  rows=c.execute('SELECT * FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC',(issue,)).fetchall()
- recovered=[r for r in rows if json.loads(r['data']).get('diagnostic_presentation_recovery') or json.loads(r['data']).get('postwrite_diagnosis')]
+ recovered=[r for r in rows if any(json.loads(r['data']).get(k) for k in ('diagnostic_presentation_recovery','postwrite_diagnosis','read_capacity_diagnosis'))]
  if not route or not recovered:print('null');sys.exit()
  route=json.loads(route[0]);state=dict(recovered[0]);data=json.loads(state['data'])
  latest=dict(rows[0])
  certificate=not data.get('postwrite_diagnosis') or bool(postwrite_diagnosis.qualified(c,issue,state['source_task'],data))
+ if data.get('read_capacity_diagnosis'):certificate=bool(read_capacity_diagnosis.qualified(c,issue,state['source_task'],data))
 runs=native.issue_task_runs(json.loads((b.STATE/'native.json').read_text()),issue)
 tasks=[r for r in runs if r.get('agent_id')==route['cto'] and r.get('wakeup_id')==data.get('test_first_cto_wakeup')]
 task=tasks[0] if len(tasks)==1 else {}

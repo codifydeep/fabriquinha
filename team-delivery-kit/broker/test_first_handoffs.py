@@ -325,13 +325,17 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import postwrite_diagnosis
         with broker.db() as con:
             qualified_postwrite=postwrite_diagnosis.qualified(con,issue,key,data)
+        try:import read_capacity_diagnosis
+        except ImportError:from broker import read_capacity_diagnosis
+        with broker.db() as con:
+            qualified_capacity=read_capacity_diagnosis.qualified(con,issue,key,data)
         qualified_framework=(framework.get('kind')=='unpinned_pytest_cto_replan_v1'
             and framework.get('request',{}).get('issue_id')==issue
             and framework.get('request',{}).get('source_task')==key
             and framework.get('proof',{}).get('verified') is True
             and framework.get('proof',{}).get('framework_mismatch') is True
             and framework.get('diagnostic_sha256')==hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest())
-        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite):
+        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity):
             block('test_first_correction_failed_after_cto_diagnosis')
             return
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
@@ -345,6 +349,8 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             suffix += ':preserved-pretool-infrastructure-v1'
         if qualified_restart:
             suffix += ':verified-host-restart-v1'
+        if qualified_capacity:
+            suffix += ':verified-read-capacity-v1'
         if data.get('decision_format_retry'):
             suffix += ':bounded-format-1'
         marker = hashlib.sha256((issue + ':' + key + ':test-first-cto' + suffix).encode()).hexdigest()

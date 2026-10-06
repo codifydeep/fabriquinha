@@ -74,3 +74,13 @@ is public; its operational receipt stays in the private evaluation archive.
 No retry counters were reset and no previous approvals were upgraded. The next
 recovery still needs an independent CTO decision linked to preserved evidence
 and the changed policy; a fresh worker alone does not resolve the incident.
+
+The controller-only `read_capacity_diagnosis.register` records this changed
+condition once per issue. It requires the latest failed author, exact native
+session, complete frozen snapshot, no Red and no active leases/tasks, a completed
+independent CTO corrective lineage, and the measured policy/proxy installed.
+The v2 native probe binds session, source task, snapshot manifest, test hashes and
+policy hash and verifies all baseline bytes. Registration creates a technical
+diagnostic only; it does not dispatch the author, approve a test or reset retries.
+The normal CTO handoff decides correction or escalation. Supervisor re-entry
+checks the durable certificate and actual native CTO task, not a status file.
