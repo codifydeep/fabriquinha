@@ -118,6 +118,10 @@ def main():
             if planning_path.is_symlink() or not planning_path.is_file():
                 return False
             state = json.loads(planning_path.read_text())
+            from planning_ceo_answer import pending
+            if state.get('configuration_sha256') == config['selection']['configuration_sha256']:
+                if pending(PRIVATE, config['name'], state):
+                    return True
             return (state.get('stage') == 'blocked_awaiting_ceo'
                     and not state.get('brief_clarification_product')
                     and state.get('configuration_sha256') == config['selection']['configuration_sha256'])

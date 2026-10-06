@@ -43,3 +43,22 @@ Não execute `compose.onboarding.yaml`, os overrides `port2` ou scripts de recup
 O Desktop usa o endereço da **API**, não a porta do frontend. O arquivo `~/.multica/desktop.json` da versão avaliada suporta `schemaVersion`, `apiUrl`, `wsUrl` e `appUrl`. Consulte a documentação oficial da versão instalada antes de alterar; feche e reabra o app após mudanças.
 
 Na instalação sem provedor de email, códigos temporários são registrados localmente. Não publique logs de autenticação. Na referência houve uma falha de atualização do stream de `docker logs`: não conclua que o pedido não chegou apenas por ausência nos logs; confira metadados no banco ou o retorno HTTP, sem expor segredos.
+
+## Resposta humana de produto
+
+Quando um planejamento estiver em `blocked_awaiting_ceo`, o operador pode registrar
+a resposta realmente recebida do CEO, com as variáveis de instância corretas:
+
+```bash
+python planning_ceo_answer.py --run IDENTIDADE-DO-ENSAIO \
+  --answer 'Resposta explícita do CEO à pergunta pendente' \
+  --source 'Canal humano e data da decisão'
+```
+
+O registro é privado, imutável e ligado ao brief, configuração, commit-base,
+issue, execução de Produto e hash das perguntas. Não inicia tarefas sozinho.
+O supervisor registrado detecta o recibo e pede uma nova proposta a Produto,
+preservando a pergunta anterior; CTO, Tech Lead e execução recebem a mesma
+clarificação. Replay não duplica retomadas. Outra pergunta não é respondida
+implicitamente. O registro não autoriza ferramentas, merge, exceções de testes
+ou aprovação completa do brief. Workers não devem poder escrever nessa área.

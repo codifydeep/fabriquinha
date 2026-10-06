@@ -215,8 +215,9 @@ def capability_context(selection):
             'Never edit pre-existing tests. File scopes remain your proposal, not an executed change.')
 
 
-def issue_for(role, description, agent_id, *, retry=False, recovery=False, schema=False, run_name=NAME, wire=False, capability=False, clarification=False):
-    title = run_name + ' — ' + role + ('-briefclarification1' if clarification else '-capability1' if capability else '-wire1' if wire else '-schema1' if schema else '-recovery1' if recovery else '-retry1' if retry else '')
+def issue_for(role, description, agent_id, *, retry=False, recovery=False, schema=False, run_name=NAME, wire=False, capability=False, clarification=False, ceo_answer=False):
+    suffix = ('-capability1' if capability else '-wire1' if wire else '-schema1' if schema else '-recovery1' if recovery else '-retry1' if retry else '')
+    title = run_name + ' — ' + role + ('-ceoanswer1' + suffix if ceo_answer else '-briefclarification1' if clarification else suffix)
     if len(description) > 8000:
         raise ValueError('planning context exceeds issue limit')
     matches = [card for card in cli('list')['issues'] if card['title'] == title]
@@ -317,6 +318,14 @@ def main():
                             capability_techlead=1, rejected_capability_category=str(error),
                             rejected_capability_output=existing['outputs'].pop('techlead'))
             save_receipt(ledger_path, existing)
+    from planning_ceo_answer import receipt_at, resume, context as answered_context
+    human_answer = receipt_at(PRIVATE, name)
+    if human_answer is not None:
+        resumed = resume(existing, human_answer)
+        if resumed is not None:
+            existing = resumed
+            save_receipt(ledger_path, existing)
+    body = answered_context(body, existing or {})
     clarified = source_clarification(existing)
     if clarified:
         existing = clarified
@@ -452,7 +461,13 @@ def main():
                         'characters. Use at most two concise entries per array. Choose a '
                         'single concrete stack and record unresolved details as risks. '
                         'No Markdown, tool use, or explanations outside JSON.')
-        clarification = role == 'product' and bool(ledger.get('brief_clarification_product'))
+        ceo_answer = role == 'product' and bool(ledger.get('ceo_answer'))
+        clarification = role == 'product' and bool(ledger.get('brief_clarification_product')) and not ceo_answer
+        if ceo_answer:
+            context += ('\nThe CEO has answered the exact pending business question above. '
+                        'Update the Product acceptance accordingly; do not ask that resolved '
+                        'question again. This answer does not approve architecture, tools, '
+                        'merge, test exceptions or the entire brief. Return the Product schema.')
         if clarification:
             context += ('\n\nSOURCE-GROUNDED CLARIFICATION: Re-read the SAME CEO request above '
                         'before asking the CEO anything. Previous questions: ' +
@@ -490,7 +505,7 @@ def main():
         try:
             issue_id = issue_for(role, context, registry['agents'][role],
                                  retry=retry, recovery=recovery, schema=schema, run_name=name, wire=wire, capability=capability,
-                                 clarification=clarification)
+                                 clarification=clarification, ceo_answer=ceo_answer)
             ledger['issues'][role] = issue_id
             ledger['stage'] = 'working_' + role
             save_receipt(ledger_path, ledger)

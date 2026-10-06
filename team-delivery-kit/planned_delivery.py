@@ -20,6 +20,7 @@ from review_instruction import bounded as bounded_review_instruction
 from generated_context import compact as compact_generated_context
 from qa_postmerge_trial import digest, write_once
 from release_eval import save_receipt
+from planning_ceo_answer import context as answered_context
 
 ROOT = Path(__file__).resolve().parent
 
@@ -180,7 +181,7 @@ def main():
             or ledger.get('brief_sha256') != hashlib.sha256(selection['brief'].read_bytes()).hexdigest()):
         raise ValueError('planning ledger identity drift')
     outputs = derive(plan, tracked_base(selection), config['stages'],
-                     brief_body(selection['brief'].read_text()), ledger['outputs']['cto']['proposal'],
+                     answered_context(brief_body(selection['brief'].read_text()), ledger), ledger['outputs']['cto']['proposal'],
                      name=name, prefix=config['prefix'], project_config=config['project_config'])
     mapped = json.loads((PRIVATE / 'planned-cards' / (name + '.json')).read_text())
     if mapped['plan_sha256'] != digest(plan) or set(mapped['cards']) != {'C1', 'C2'}:

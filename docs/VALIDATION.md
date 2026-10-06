@@ -14,7 +14,7 @@ Houve reparos do operador antes da conclusão: não é a prova de um ciclo integ
 
 ## Próximo fluxo
 
-`BRIEFDEMO-2` foi preparado para um novo brief e dois cards dependentes. Produto solicitou esclarecimento de negócio sobre como exibir respostas válidas de um modo diferente de `demo`. Aguardava decisão do CEO no momento da exportação; não foi homologado nem retomado pela publicação deste repositório.
+`BRIEFDEMO-2` foi preparado para um novo brief e dois cards dependentes. Produto solicitou esclarecimento de negócio sobre como exibir respostas válidas de um modo diferente de `demo`. Em 6 de outubro, o CEO confirmou que toda resposta diferente de `{"mode":"demo"}` deve exibir `Environment unavailable`. A retomada usa um recibo específico da pergunta, sem alterar retroativamente o brief original ou aprovar decisões técnicas. O resultado do novo ciclo ainda precisa ser verificado; não está homologado.
 
 ## Evidências públicas e privadas
 

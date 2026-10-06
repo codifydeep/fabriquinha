@@ -130,7 +130,7 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 Referência em 6 de outubro de 2026:
 
 - `BRIEFSTATUS-1` percorreu dois cards dependentes, PRs, CI e QA HTTP/browser em dois contextos; reparos anteriores do operador impedem classificá-lo como prova integral sem intervenção.
-- `BRIEFDEMO-2` é um novo ciclo e está aguardando esclarecimento de negócio do CEO; não foi entregue.
+- `BRIEFDEMO-2` é um novo ciclo; a clarificação de negócio foi respondida pelo CEO e a retomada está em validação. Não foi entregue.
 - O Truco continua fora dos ensaios de qualificação. Não confundir a aplicação descartável com o produto final.
 - Instalação limpa, configuração portátil, recuperação totalmente autônoma e entrega de um produto completo ainda são lacunas.
 
