@@ -1,5 +1,6 @@
 """Fixed-model OpenRouter relay for the isolated evaluation; never logs payloads or keys."""
 import http.client
+import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -19,6 +20,7 @@ import deterministic_read_dispatch
 import typed_decision_contract
 import typed_test_source
 import planning_schema
+import proxy_request_rejections
 from structured_response_contract import validate as validate_structured_response, StructuredResponseRejected
 
 PLACEHOLDER = 'Bearer ' + PLACEHOLDER_KEY
@@ -300,6 +302,7 @@ class Handler(BaseHTTPRequestHandler):
         response_metrics = {}
         recovery = None
         padding_receipt = None
+        stage, request_sha, local_rejection = 'admission', None, None
         route, execution_id = execution_route(self.path)
         started = time.monotonic()
         started_at = time.time()
@@ -311,28 +314,39 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('unapproved authorization')
             if not 0 < size <= MAX_BODY:
                 raise ValueError('request body size limit')
-            incoming = json.loads(self.rfile.read(size))
+            stage = 'decode'
+            raw_request = self.rfile.read(size)
+            request_sha = hashlib.sha256(raw_request).hexdigest()
+            incoming = json.loads(raw_request)
             requested_stream = incoming.get('stream') is True
+            stage = 'contract'
             body = validate_request(incoming)
+            stage = 'metrics'
             request_metrics = safe_request_metrics(body)
+            stage = 'read_dispatch'
             dispatch=deterministic_read_dispatch.make(body,execution_id)
             if dispatch:
+                stage = 'read_validation'
                 validate_artifact_response(body,dispatch['data'],dispatch['media_type'])
+                stage = 'read_ledger'
                 deterministic_read_dispatch.record(COUNTER_PATH,dispatch)
                 status,data,content_type=200,dispatch['data'],dispatch['media_type']
                 reason='controller_read_dispatch'
                 response_metrics['read_request_provenance']='controller_request_not_read_evidence'
             else:
+                stage = 'preflight'
                 typed_decision_contract.length_feedback_preflight(COUNTER_PATH,execution_id,body)
                 scope=read_stream_recovery.identity(body,execution_id)
                 read_stream_recovery.preflight(COUNTER_PATH,scope)
             for attempt in range(0 if dispatch else 2):
+                stage = 'upstream'
                 call_number = reserve_call()  # every attempt persists before network side effect
                 if recovery:read_stream_recovery.retry_reserved(COUNTER_PATH,recovery,call_number)
                 status, data, content_type = forward(body)
                 if status == 402:pause_provider(call_number)
                 reason = 'upstream_response'
                 if status == 200:
+                    stage = 'response'
                     response_metrics = safe_response_metrics(data, content_type)
                     data,content_type=typed_test_source.translate(body,data,content_type)
                     padding_receipt=None
@@ -388,6 +402,8 @@ class Handler(BaseHTTPRequestHandler):
                     recovery=None
                 break
         except (ValueError, TypeError, json.JSONDecodeError) as error:
+            if execution_id and request_sha and call_number is None:
+                local_rejection = proxy_request_rejections.describe(error,stage,execution_id,request_sha)
             status = 400
             reason = str(error) if str(error) in (
                 'unapproved model', 'messages required', 'invalid output budget',
@@ -428,6 +444,8 @@ class Handler(BaseHTTPRequestHandler):
                 status, reason = 402, 'upstream_payment_paused'
                 data = b'{"error":{"code":"upstream_payment_paused"}}'
         except Exception as error:
+            if execution_id and request_sha and call_number is None:
+                local_rejection = proxy_request_rejections.describe(error,stage,execution_id,request_sha)
             status = 503  # never return upstream bodies or local exception text
             reason = type(error).__name__
         finally:
@@ -445,6 +463,15 @@ class Handler(BaseHTTPRequestHandler):
                           'duration_seconds': round(time.monotonic() - started, 3),
                           'response_deadline_seconds': RESPONSE_DEADLINE_SECONDS,
                           **request_metrics, **response_metrics}
+        if local_rejection:
+            try:
+                proxy_request_rejections.record(COUNTER_PATH,local_rejection)
+                event['local_rejection'] = local_rejection
+            except Exception:
+                status=503
+                event.update(status=status,category='request_rejection_receipt_unavailable')
+                data=b'{"error":{"code":"request_rejection_receipt_unavailable"}}'
+                content_type='application/json'
         if event.get('artifact_rejection_category'):
             try:
                 import artifact_rejection_receipts

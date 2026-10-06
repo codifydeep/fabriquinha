@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261006.80
+COPY proxy_request_rejections.py /proxy_request_rejections.py

@@ -25,6 +25,15 @@ def main():
         name=name,parameters={})) for name in ('read_file','write_file','patch','terminal')])
     body['tools'][1]['function']['parameters']={'type':'object','properties':{
         'path':{'type':'string'},'content':{'type':'string'}}}
+    prefix_rejections=[]
+    for end in range(1,len(messages)+1):
+        if messages[end-1].get('role')!='tool':continue
+        try:
+            prefix=validate_request({**body,'messages':messages[:end]})
+            make(prefix,execution)
+        except (ValueError,TypeError) as error:
+            prefix_rejections.append(dict(message_count=end,exception_type=type(error).__name__,
+                error_sha256=hashlib.sha256(str(error).encode()).hexdigest()))
     try:
         result=validate_request(body)
         selected=(result.get('tool_choice') or {}).get('function',{}).get('name')
@@ -42,7 +51,8 @@ def main():
             exception_type=type(error).__name__,error_sha256=hashlib.sha256(str(error).encode()).hexdigest())
     con.close()
     print(json.dumps(dict(operation='private_history_phase_probe_v1',messages=len(messages),
-        validation=outcome,model_calls=0,delivery_approval=False,full_rpc_qualified=False)))
+        validation=outcome,prefix_rejections=prefix_rejections[-12:],
+        model_calls=0,delivery_approval=False,full_rpc_qualified=False)))
 
 
 if __name__=='__main__':main()
