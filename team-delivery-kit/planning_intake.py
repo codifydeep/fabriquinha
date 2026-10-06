@@ -291,6 +291,34 @@ def product_protocol_revalidation(ledger):
     return None
 
 
+def cto_context_replan(ledger):
+    """Let CTO author a concise replacement once; never truncate its decisions."""
+    if (not ledger or ledger.get('stage') != 'blocked' or ledger.get('active') != 'techlead'
+            or ledger.get('category') != 'ValueError:planning context exceeds issue limit'
+            or ledger.get('cto_context_replanned')
+            or set(ledger.get('outputs') or {}) != {'product', 'cto'}):
+        return None
+    revised = {**ledger, 'outputs': {'product': ledger['outputs']['product']},
+        'stage': 'replanning_cto_context', 'active': 'cto', 'owner': 'cto',
+        'cto_context_replanned': 1, 'schema_cto': 1,
+        'prior_cto_context': {'output': ledger['outputs']['cto'],
+            'issue_id': ledger['issues']['cto'], 'category': ledger['category'],
+            'techlead_issue_id': ledger['issues'].get('techlead')}}
+    revised.pop('category', None)
+    return revised
+
+
+def mark_working(ledger, role):
+    if role not in ROLES:raise ValueError('unknown planning role')
+    if ledger.get('category'):
+        incident={k:ledger.get(k) for k in ('category','active','owner')}
+        history=ledger.setdefault('prior_planning_incidents',[])
+        if incident not in history:history.append(incident)
+    ledger.pop('category',None)
+    ledger.pop('next_action',None)
+    ledger.update(stage='working_'+role,active=role,owner=role)
+
+
 def completed_output(issue_id, agent_id, *, timeout=600):
     account = json.loads(AUTH.read_text())
     workspace = json.loads((PRIVATE / 'workspace.json').read_text())['id']
@@ -361,6 +389,10 @@ def main():
     corrected = product_protocol_revalidation(existing)
     if corrected is not None:
         existing = corrected
+        save_receipt(ledger_path, existing)
+    replanned = cto_context_replan(existing)
+    if replanned is not None:
+        existing = replanned
         save_receipt(ledger_path, existing)
     clarified = source_clarification(existing)
     if clarified:
@@ -528,6 +560,12 @@ def main():
                         '"technical_decisions":["decision"],"risks":[]}. '
                         'Replace values with real choices for this brief. Keep the whole '
                         'reply under 1000 characters. Do not copy the Product role field.')
+            if ledger.get('cto_context_replanned'):
+                context += (' The prior CTO reply exceeded downstream handoff capacity. '
+                    'Author a fresh, concise proposal, not a transcript or token fragments. '
+                    'Treat JSON examples as JSON objects, not byte serialization contracts. '
+                    'Keep risk statements actionable; do not introduce business scope. '
+                    'The full original brief and CEO answer above remain binding.')
         elif schema and role == 'techlead':
             context += ('\n\nTECHLEAD EXECUTION CONTRACT: Return JSON only with keys role, cards, '
                         'integration_order. Use 1 to 5 cards with IDs C1..C5 in dependency '
@@ -550,7 +588,7 @@ def main():
                                  retry=retry, recovery=recovery, schema=schema, run_name=name, wire=wire, capability=capability,
                                  clarification=clarification, ceo_answer=ceo_answer)
             ledger['issues'][role] = issue_id
-            ledger['stage'] = 'working_' + role
+            mark_working(ledger, role)
             save_receipt(ledger_path, ledger)
             task_id, answer = completed_output(issue_id, registry['agents'][role])
             proposal = parse_proposal(answer, role)
