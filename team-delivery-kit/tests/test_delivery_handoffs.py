@@ -494,6 +494,28 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(data['validation_failure'], receipt)
         self.assertIn('/evidence/candidate', data['instruction'])
 
+    def test_failed_execution_diagnosis_counts_envelope_and_preserves_all_failures(self):
+        self.test_artifact_diagnosis_fits_native_wakeup_with_realistic_failures()
+        data=json.loads(handoffs.load(self.con,'source')['data'])
+        failure=data['validation_failure']
+        data.update(source_status='failed',source_failure_reason='agent_error.provider_server_error',
+            failed_execution_diagnostic=dict(status='diagnostic_only_not_approved'),
+            phase_evidence=dict(phase='implementation',red_exit_code=1,red_manifest='c'*64,
+                independent_test_review='approved',frozen_test_hashes={'tests/test_new.py':'d'*64}),
+            diagnostic_revision='failed-snapshot-v1')
+        self.route['test_first_files']=['tests/test_new.py']
+        for key in ('wakeup_id','recipient_task','dispatch_marker','dispatch_stage','instruction','target'):
+            data.pop(key,None)
+        handoffs.save(self.con,'source',self.route['issue_id'],'diagnose_cto','cto',data,120)
+        self.tick(now=121)
+        current=json.loads(handoffs.load(self.con,'source')['data'])
+        note='DELIVERY_HANDOFF '+'a'*64+'\n'+current['instruction']
+        self.assertLessEqual(len(note),4000)
+        self.assertEqual(current['validation_failure'],failure)
+        for item in failure['failures']:self.assertIn(item['qualified_name'],note)
+        self.assertIn('unchanged Red hashes',note)
+        self.assertIn('never authority',note)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

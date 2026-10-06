@@ -13,7 +13,7 @@ try:
 except ImportError:
     from broker import handoffs, native
 
-FIXED_SOURCE_SHA = 'f29c0fe3b6843603b64462ace6203c531e608add6ac12310410b0b1ada77f384'
+FIXED_SOURCE_SHA = '00e322d56688afab58196177b7f3607a0107b11fb76ea3e96140bc5f896390b4'
 FORMAT_PROXY_IMAGE = 'sha256:f6ac67c6ce961f82c9c488a720e5485dd4e63d53c796eb4a9fdfdd8a3d876b1e'
 
 
