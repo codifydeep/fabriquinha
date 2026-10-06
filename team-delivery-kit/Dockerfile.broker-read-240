@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261006.239
+COPY broker/acp_result_contract.py /opt/hermes/acp_result_contract.py
+COPY broker/install_acp_result_contract.py /install_acp_result_contract.py
+RUN python /install_acp_result_contract.py

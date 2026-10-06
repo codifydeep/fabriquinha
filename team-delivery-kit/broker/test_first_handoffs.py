@@ -321,7 +321,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         if data.get('decision_format_retry'):
             suffix += ':bounded-format-1'
         marker = hashlib.sha256((issue + ':' + key + ':test-first-cto' + suffix).encode()).hexdigest()
-        technical_evidence=data
+        technical_evidence=diagnostic_presentation(data)
         if qualified_restart:
             technical_evidence=dict(source_task=key, diagnostic=diagnostic,
                 proof=data['host_restart_recovery']['proof'],
@@ -459,6 +459,24 @@ def technical_recovery(broker, route, runs, source, prior, effects):
 
 
 
+def diagnostic_presentation(data):
+    """Bounded index of durable evidence, never replace or validate a verdict."""
+    diagnostic=data.get('diagnostic') or {}
+    if not isinstance(diagnostic,dict):raise ValueError('structured pre-Red diagnostic required')
+    result={'source_task':data.get('source_task'),'error':data.get('error'),
+        'diagnostic':{k:diagnostic[k] for k in ('kind','category','task_id','issue_id','reason',
+            'exit_code','command','manifest_sha256','test_sha256','output_sha256','tests_executed',
+            'red_verified','delivery_approval') if k in diagnostic},
+        'full_diagnostic_sha256':hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest(),
+        'output_excerpt_omitted':len(str(diagnostic.get('output_excerpt') or ''))>512,
+        'delivery_approval':False,'author_retry_authorized':False}
+    excerpt=diagnostic.get('output_excerpt')
+    if isinstance(excerpt,str) and len(excerpt)<=512:
+        result['diagnostic']['output_excerpt']=excerpt
+    if len(json.dumps(result,sort_keys=True))>2000:raise ValueError('pre-Red diagnostic index exceeds fixed bound')
+    return result
+
+
 def reconcile(broker, route, runs, effects):
     """Return implementation-only runs once Red has been proven; else None."""
     issue = route['issue_id']
@@ -476,6 +494,20 @@ def reconcile(broker, route, runs, effects):
             surgical_execution=bool(source.get('wakeup_id') and any(
                 json.loads(row[0]).get('surgical_wakeup')==source['wakeup_id'] for row in
                 con.execute('SELECT data FROM delivery_handoffs WHERE issue_id=?',(issue,))))
+            if prior and prior['stage']=='diagnose_cto':
+                preserved=json.loads(prior['data'])
+                if (preserved.get('phase')=='test_first'
+                        and preserved.get('control_error')=='ValueError:handoff instruction too large'
+                        and not preserved.get('test_first_cto_wakeup')):
+                    presentation=diagnostic_presentation(preserved)
+                    preserved.setdefault('diagnostic_presentation_recovery',dict(
+                        operation='bounded_pre_red_diagnostic_presentation_v1',
+                        prior_control_error=preserved['control_error'],source_task=source['id'],
+                        diagnostic_sha256=presentation['full_diagnostic_sha256'],
+                        approval=False,author_restarted=False))
+                    handoffs.save(con,source['id'],issue,'technical_decision_required',
+                        route['cto'],preserved,time.time())
+                    prior=handoffs.load(con,source['id'])
         failed_authors = [run for run in authors if run['status'] == 'failed']
         completed_authors = [run for run in authors if run['status'] == 'completed']
         if prior and prior['stage'] in ('test_first_cto_diagnosis', 'test_first_cto_correction',

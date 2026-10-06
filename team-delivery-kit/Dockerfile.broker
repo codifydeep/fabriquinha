@@ -148,6 +148,9 @@ COPY broker/install_acp_tool_arguments.py /install_acp_tool_arguments.py
 RUN python /install_acp_tool_arguments.py
 COPY broker/install_acp_turn_limit.py /install_acp_turn_limit.py
 RUN python /install_acp_turn_limit.py
+COPY broker/acp_result_contract.py /opt/hermes/acp_result_contract.py
+COPY broker/install_acp_result_contract.py /install_acp_result_contract.py
+RUN python /install_acp_result_contract.py
 COPY broker/install_file_line_count.py /install_file_line_count.py
 RUN python /install_file_line_count.py
 COPY broker/install_controller_denial_message.py /install_controller_denial_message.py

@@ -68,6 +68,45 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_large_diagnostic_is_preserved_but_not_serialized_into_wakeup(self):
+        diagnostic={'kind':'rejected_red','reason':'unchanged new test',
+                    'output_excerpt':'private traceback\n'*2000}
+        data={'phase':'test_first','source_task':'tests','error':'ValueError:unchanged',
+              'diagnostic':diagnostic}
+        with self.broker.db() as con:
+            handoffs.save(con,'tests','issue','technical_decision_required','cto',data,1)
+            prior=handoffs.load(con,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,
+            [self.test_task],self.test_task,prior,self.effects)
+        instruction=self.effects.wakeups[-1][0][4]
+        self.assertLess(len(instruction),4000)
+        self.assertNotIn('private traceback',instruction)
+        self.assertIn('full_diagnostic_sha256',instruction)
+        with self.broker.db() as con:
+            saved=json.loads(handoffs.load(con,'tests')['data'])
+        self.assertEqual(saved['diagnostic'],diagnostic)
+        self.assertEqual(self.effects.calls,0)
+
+    def test_presentation_recovery_does_not_recapture_red_or_restart_author(self):
+        data={'phase':'test_first','source_task':'tests','error':'ValueError:unchanged',
+              'diagnostic':{'kind':'rejected_red','output_excerpt':'x'*8000},
+              'control_error':'ValueError:handoff instruction too large'}
+        with self.broker.db() as con:
+            handoffs.save(con,'tests','issue','diagnose_cto','cto',data,1)
+        test_first_handoffs.reconcile(self.broker,self.route,[self.test_task],self.effects)
+        with self.broker.db() as con:
+            saved=json.loads(handoffs.load(con,'tests')['data'])
+        self.assertEqual(saved['diagnostic'],data['diagnostic'])
+        self.assertFalse(saved['diagnostic_presentation_recovery']['approval'])
+        self.assertFalse(saved['diagnostic_presentation_recovery']['author_restarted'])
+        self.assertEqual(self.effects.calls,0)
+        self.assertEqual(self.effects.wakeups[-1][0][1],'cto')
+
+    def test_oversized_structured_index_fails_closed(self):
+        with self.assertRaisesRegex(ValueError,'fixed bound'):
+            test_first_handoffs.diagnostic_presentation(
+                {'diagnostic':{'reason':'x'*5000}})
+
     def test_new_validator_evidence_reopens_only_cto_diagnosis_once(self):
         diagnostic=dict(kind='rejected_test_write',operation='rejected_test_write_v1',
             category='artifact_test_methods_missing',issue_id='issue',task_id='tests',

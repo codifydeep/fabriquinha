@@ -24,6 +24,14 @@ A suíte offline atual executou **1.706 testes, com sete skips existentes**. No 
 
 ## Evidências públicas e privadas
 
+### Falha de transporte e handoff pré-Red
+
+O autor da correção dos testes recebeu um timeout de 120 segundos do proxy, mas o adaptador ACP antigo retornou fim de turno e o Multica registrou a execução como concluída. Nenhum teste foi alterado nessa execução; a captura de Red recusou corretamente o snapshot inalterado. O diagnóstico completo ultrapassava o limite do handoff e impedia o acionamento do CTO.
+
+O adaptador agora propaga os campos estruturados de falha como erro, sem interpretar frases do modelo ou divulgar a mensagem do provedor. O handoff usa um índice limitado com hash do diagnóstico completo, que continua preservado. A reconciliação pode recuperar esse erro específico de apresentação sem repetir a execução do autor nem conceder aprovação. A imagem corrigida é usada também pelos próximos workers.
+
+A suíte offline executou **1.734 testes, com sete skips existentes**. Um probe isolado executou o guard instalado e verificou falha, limpeza do estado de execução e preservação do histórico, sem chamadas ao modelo; não qualifica o RPC completo. Após a instalação, a reconciliação normal iniciou um diagnóstico independente do CTO. A recuperação do supervisor, os novos testes, a integração frontend e a homologação final ainda não estão comprovados. O ensaio continua com intervenções do operador e não demonstra autonomia integral.
+
 ### Revisão com citação inválida
 
 A primeira entrega de `BRIEFDEMO-2` passou por revisão, CI, merge no [PR 46](https://github.com/codifydeep/descartavel2/pull/46) e QA local no commit `0eec0496ce6a6d7c223a2f776625aec4579b4d41`. O card dependente foi despachado automaticamente nessa base. Sua revisão inicial dos novos testes foi bloqueada corretamente por uma citação que não corresponde à linha observada; esse parecer não foi aceito como aprovação ou rejeição válida.
