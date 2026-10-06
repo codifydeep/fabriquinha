@@ -811,7 +811,7 @@ def snapshot_submission(payload, *, diagnostic=False):
             helper_cleanup.schedule(handoff_context(), name, task_id)
 
 
-def capture_test_first_red(payload):
+def capture_test_first_red(payload, *, _failed_checkpoint=None):
     """Freeze a completed tests-only task, then run pinned Red off-network."""
     if not isinstance(payload, dict) or set(payload) != {'task_id'}:
         raise ValueError('test-first requires task identity only')
@@ -827,7 +827,7 @@ def capture_test_first_red(payload):
                             (task_id,)).fetchone()
         if prior:
             return json.loads(prior['receipt'])
-        row = con.execute('SELECT n.issue_id,n.agent_id,n.scope,g.mode,l.status '
+        row = con.execute('SELECT n.issue_id,n.request_id,n.agent_id,n.scope,g.mode,l.status '
                           'FROM native_bindings n JOIN grants g USING(request_id) '
                           'JOIN leases l USING(request_id) WHERE n.task_id=? '
                           'ORDER BY g.attempt DESC LIMIT 1', (task_id,)).fetchone()
@@ -846,11 +846,17 @@ def capture_test_first_red(payload):
         task = task_record(settings, task_id, row['agent_id'])
         runs = [r for r in issue_task_runs(settings, row['issue_id'])
                 if r.get('agent_id') == row['agent_id']]
-        if (task.get('status') != 'completed' or task.get('issue_id') != row['issue_id']
+        checkpoint_volume = None
+        if _failed_checkpoint is not None:
+            import failed_test_checkpoint
+            checkpoint_volume = failed_test_checkpoint.validate_capture(
+                handoff_context(), con, row, _failed_checkpoint, route)
+        if (task.get('status') != ('failed' if checkpoint_volume else 'completed')
+                or task.get('issue_id') != row['issue_id']
                 or not runs or max(runs, key=lambda r: (r.get('created_at') or '', r['id']))['id'] != task_id):
             raise ValueError('test-first source is stale or incomplete')
         if con.execute("SELECT 1 FROM native_bindings n JOIN leases l USING(request_id) "
-                       "WHERE n.scope=? AND l.status IN ('creating','running')",
+                       "WHERE n.scope=? AND l.status IN ('creating','starting','running','closing')",
                        (row['scope'],)).fetchone():
             raise ValueError('test-first source workspace remains active')
         base = handoff_runtime.task_base(handoff_context(), row['issue_id'], task_id)
@@ -873,16 +879,19 @@ def capture_test_first_red(payload):
                 raise ValueError('foreign test-first copy job')
             docker('DELETE', '/containers/' + old['Id'] + '?force=true')
         docker('POST', '/containers/create?name=' + job, {
-            'Image': OFFLINE_IMAGE, 'User': '10000:10000', 'Entrypoint': ['python'],
-            'Cmd': ['/test_first_copy.py'], 'NetworkDisabled': True,
+            'Image': IMAGE if checkpoint_volume else OFFLINE_IMAGE,
+            'User': '10000:10000', 'Entrypoint': ['python'],
+            'Cmd': ['/failed_test_checkpoint_copy.py' if checkpoint_volume else '/test_first_copy.py'],
+            'NetworkDisabled': True,
             'Env': ['TEST_FIRST_RESUME=' + ('1' if existing else '0')],
             'Labels': labels | {'com.docker.compose.project': PREFIX},
             'HostConfig': {'ReadonlyRootfs': True, 'NetworkMode': 'none',
                            'CapDrop': ['ALL'], 'SecurityOpt': ['no-new-privileges'],
                            'Memory': 134217728, 'NanoCpus': 500000000, 'PidsLimit': 16,
+                           'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=32m,mode=1777'},
                            'Mounts': [{'Type': 'volume', 'Source': base['volume'],
                                        'Target': '/base', 'ReadOnly': True},
-                                      {'Type': 'volume', 'Source': work_volume,
+                                  {'Type': 'volume', 'Source': checkpoint_volume or work_volume,
                                        'Target': '/workspace', 'ReadOnly': True},
                                       {'Type': 'volume', 'Source': volume,
                                        'Target': '/snapshot'}]}})

@@ -12,6 +12,17 @@ def eligible(status, managed):
             or not managed or managed.get('route',{}).get('enabled') is not True
             or managed['route'].get('issue_id')!=status.get('issue_id')):return False
     state=managed.get('state') or {};data=json.loads(state.get('data','{}'))
+    checkpoint=managed.get('failed_test_checkpoint') or {}
+    if checkpoint:
+        return (checkpoint.get('operation')=='failed_test_checkpoint_v1'
+            and checkpoint.get('status')=='red_captured'
+            and checkpoint.get('issue_id')==status.get('issue_id')
+            and checkpoint.get('source_task')==state.get('source_task')==data.get('source_task')
+            and checkpoint.get('delivery_approved') is False
+            and checkpoint.get('native_task_completed') is False
+            and state.get('stage')=='awaiting_test_revision_review'
+            and data.get('status') in ('dispatch_intent','awaiting_review')
+            and bool(data.get('manifest_sha256')))
     proof=data.get('diagnostic_presentation_recovery') or {}
     digest=hashlib.sha256(json.dumps(data.get('diagnostic') or {},sort_keys=True).encode()).hexdigest()
     postwrite=data.get('postwrite_diagnosis') or {};snapshot=postwrite.get('probe') or {}
@@ -42,11 +53,21 @@ def eligible(status, managed):
 
 def read_proof(context):
     from evalctl import PROJECT
-    program='''import broker as b,json,native,sys,postwrite_diagnosis,read_capacity_diagnosis
+    program='''import broker as b,json,native,sys,postwrite_diagnosis,read_capacity_diagnosis,failed_test_checkpoint
 issue=sys.argv[1]
 with b.db() as c:
  route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
  rows=c.execute('SELECT * FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC',(issue,)).fetchall()
+ if route and rows:
+  configuration=json.loads(route[0]);latest=dict(rows[0]);current=json.loads(latest['data'])
+  red=c.execute('SELECT task_id,receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
+  checkpoint=failed_test_checkpoint.proof(c,issue,latest['source_task'])
+  if checkpoint and red and failed_test_checkpoint.qualified(c,issue,red['task_id'],json.loads(red['receipt'])) and latest['stage']=='awaiting_test_revision_review' and current.get('status') in ('dispatch_intent','awaiting_review'):
+   runs=native.issue_task_runs(json.loads((b.STATE/'native.json').read_text()),issue)
+   sources=[r for r in runs if r['id']==red['task_id'] and r.get('agent_id')==configuration['author'] and r.get('status')=='failed']
+   reviewers=[r for r in runs if r.get('wakeup_id')==current.get('wakeup_id') and r.get('agent_id')==configuration['techlead'] and r.get('status') in ('queued','dispatched','running','completed')]
+   observed=bool(sources) and (current['status']=='dispatch_intent' or len(reviewers)==1)
+   print(json.dumps(dict(managed=dict(route=configuration,state=latest,failed_test_checkpoint=checkpoint),issue_id=issue,contract_sha256=configuration['contract_sha256'],independent=configuration['techlead']!=configuration['author'],qualified=observed,task=reviewers[0]['id'] if reviewers else None,delivery_approval=False,author_retry_authorized=False)));sys.exit()
  recovered=[r for r in rows if any(json.loads(r['data']).get(k) for k in ('diagnostic_presentation_recovery','postwrite_diagnosis','read_capacity_diagnosis'))]
  if not route or not recovered:print('null');sys.exit()
  route=json.loads(route[0]);state=dict(recovered[0]);data=json.loads(state['data'])

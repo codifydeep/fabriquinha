@@ -68,6 +68,32 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_failed_checkpoint_still_requires_independent_test_review(self):
+        from unittest.mock import patch
+        from broker import failed_test_checkpoint as checkpoint
+        red=self.effects.capture_test_first_red({'task_id':'tests'})
+        red['issue_id']='issue'
+        failed={**self.test_task,'status':'failed'}
+        with self.broker.db() as con:
+            con.execute('UPDATE test_first_red SET receipt=?',(json.dumps(red),))
+            checkpoint.initialize(con)
+            proof=dict(operation='failed_test_checkpoint_v1',status='red_captured',
+                native_task_completed=False,delivery_approved=False,
+                red_receipt_sha256=checkpoint.digest(red))
+            con.execute('INSERT INTO failed_test_checkpoints VALUES (?,?,?)',
+                        ('issue','tests',json.dumps(proof)))
+        with patch('broker.test_revision_review.reconcile',return_value=False) as review:
+            self.assertIsNone(test_first_handoffs.reconcile(self.broker,self.route,[failed],self.effects))
+            review.assert_called_once()
+        self.assertEqual(self.effects.wakeups,[])
+        self.assertEqual(failed['status'],'failed')
+
+    def test_failed_source_without_checkpoint_proof_cannot_use_red(self):
+        self.effects.capture_test_first_red({'task_id':'tests'})
+        failed={**self.test_task,'status':'failed'}
+        with self.assertRaisesRegex(ValueError,'source identity drift'):
+            test_first_handoffs.reconcile(self.broker,self.route,[failed],self.effects)
+
     def test_failed_typed_length_diagnosis_gets_one_nonapproving_recovery(self):
         rejection={'operation':'rejected_typed_decision_adapter_v1','category':'typed_schema_maxLength',
                    'upstream_sha256':'a'*64,'worker_tool_executed':False,'delivery_approval':False}

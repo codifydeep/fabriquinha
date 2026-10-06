@@ -5,6 +5,21 @@ from pre_red_supervision import eligible,qualified
 
 
 class PreRedSupervisionTests(unittest.TestCase):
+    def test_failed_checkpoint_resumes_review_observation_only(self):
+        data=dict(source_task='author',status='awaiting_review',manifest_sha256='a'*64)
+        managed=dict(route=self.managed['route'],state=dict(source_task='author',
+            stage='awaiting_test_revision_review',data=json.dumps(data)),
+            failed_test_checkpoint=dict(operation='failed_test_checkpoint_v1',status='red_captured',
+                issue_id='issue',source_task='author',delivery_approved=False,native_task_completed=False))
+        stale={**self.status,'category':'test_first_blocked:test_first_correction_failed_after_cto_diagnosis'}
+        proof=dict(qualified=True,independent=True,issue_id='issue',contract_sha256='hash',
+            delivery_approval=False,author_retry_authorized=False,managed=managed)
+        self.assertTrue(qualified(stale,dict(issue_id='issue',contract_sha256='hash'),query=lambda _:proof))
+        managed['failed_test_checkpoint']['native_task_completed']=True
+        self.assertFalse(eligible(stale,managed))
+        managed['failed_test_checkpoint']['native_task_completed']=False
+        managed['state']['stage']='test_revision_blocked'
+        self.assertFalse(eligible(stale,managed))
     def test_capacity_receipt_only_resumes_matching_snapshot_observation(self):
         data=json.loads(self.managed['state']['data']);data.pop('diagnostic_presentation_recovery')
         data['read_capacity_diagnosis']=dict(operation='read_capacity_diagnosis_v1',

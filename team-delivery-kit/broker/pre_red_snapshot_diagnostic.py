@@ -19,7 +19,7 @@ except ImportError:
 from test_runner_policy import validate_argv
 
 
-def inspect(snapshot, base, *, run=subprocess.run):
+def prepare_snapshot(snapshot, base, frozen, *, resume=False):
     snapshot, base = Path(snapshot), Path(base)
     raw = (snapshot / 'manifest.json').read_bytes()
     manifest = json.loads(raw)
@@ -43,15 +43,23 @@ def inspect(snapshot, base, *, run=subprocess.run):
             raise ValueError('diagnostic snapshot hash mismatch')
     with tempfile.TemporaryDirectory() as temporary:
         workspace = Path(temporary) / 'workspace'
-        frozen = Path(temporary) / 'frozen'
-        workspace.mkdir(); frozen.mkdir()
+        workspace.mkdir()
         # prepare_red checks unchanged baseline, new tests, syntax and framework.
         # Omit only the snapshot's controller manifest, not any artifact file.
         for name in manifest['files']:
             target = workspace / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((snapshot / name).read_bytes())
-        prepared = prepare_red(base, workspace, frozen, contract)
+        return prepare_red(base, workspace, frozen, contract, resume=resume)
+
+
+def inspect(snapshot, base, *, run=subprocess.run):
+    snapshot, base = Path(snapshot), Path(base)
+    raw = (snapshot / 'manifest.json').read_bytes()
+    with tempfile.TemporaryDirectory() as temporary:
+        frozen = Path(temporary) / 'frozen'
+        frozen.mkdir()
+        prepared = prepare_snapshot(snapshot, base, frozen)
     validate_argv(prepared['command'], prepared['test_roots'])
     result = run(prepared['command'], cwd=snapshot, capture_output=True,
                  text=True, timeout=60)

@@ -318,6 +318,13 @@ class Effects:
     def capture_test_first_red(self, payload):
         return self.b.capture_test_first_red(payload)
 
+    def capture_failed_test_checkpoint(self, issue, task):
+        try:
+            import failed_test_checkpoint
+        except ImportError:
+            from broker import failed_test_checkpoint
+        return failed_test_checkpoint.capture(self.b, issue, task)
+
     def test_first_failure(self, issue_id, task_id):
         import uuid
         if str(uuid.UUID(task_id)) != task_id:

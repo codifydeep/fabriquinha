@@ -522,6 +522,10 @@ def reconcile(broker, route, runs, effects):
         if not authors:
             return None
         source = authors[-1]
+        if source['status'] == 'failed' and hasattr(effects, 'capture_failed_test_checkpoint'):
+            checkpoint = effects.capture_failed_test_checkpoint(issue, source['id'])
+            if checkpoint and checkpoint.get('status') == 'red_captured':
+                return None  # Next tick validates checkpoint provenance and independent review.
         with broker.db() as con:
             prior = handoffs.load(con, source['id'])
             surgical_execution=bool(source.get('wakeup_id') and any(
@@ -687,7 +691,15 @@ def reconcile(broker, route, runs, effects):
         return None
     test_task, red = red_row['task_id'], json.loads(red_row['receipt'])
     source = next((r for r in authors if r['id'] == test_task), None)
-    if not source or source['status'] != 'completed' or red['task_id'] != test_task:
+    checkpoint_source = False
+    if source and source['status'] == 'failed':
+        try:
+            import failed_test_checkpoint
+        except ImportError:
+            from broker import failed_test_checkpoint
+        with broker.db() as con:
+            checkpoint_source = failed_test_checkpoint.qualified(con, issue, test_task, red)
+    if not source or (source['status'] != 'completed' and not checkpoint_source) or red['task_id'] != test_task:
         raise ValueError('test-first Red source identity drift')
     try:
         import test_revision_review

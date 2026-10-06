@@ -110,9 +110,27 @@ or unlock implementation. No model calls were used. This is evidence to consider
 a separately controlled checkpoint recovery, not permission to relabel a failed
 task or reinterpret a diagnostic receipt as accepted Red.
 
-Before any salvage can advance work, a new controller operation must bind the
-exact current failed task/snapshot, preserve its failed status, obtain independent
-review of completeness and assertions, run and durably capture a genuine Red,
-and reject stale/superseded candidates and repeated interventions. The existing
-completed-task gate remains unchanged until that mechanism is implemented and
-qualified. Product implementation, PR and homologation remain blocked meanwhile.
+The controller-only `failed_test_checkpoint.capture` now binds the latest failed
+tests-only task, closed lease, exact scope/request, unchanged route and immutable
+owned snapshot. It durably registers one intervention per issue, then copies only
+verified baseline plus new tests into a separate Red volume and executes the
+same pinned full suite. Snapshot/Red failure is durable and not retried each tick.
+Restart after Red persistence completes the same checkpoint, without duplicates.
+The prior handoff is archived in the private checkpoint receipt before its active
+projection advances. The original native task remains **failed**, permanently.
+
+The ordinary completed-task API is unchanged: its HTTP endpoint cannot request
+this private path. A private keyword alone also cannot authorize it; capture
+requires matching durable controller intent, immutable snapshot and ownership.
+Only a matching checkpoint with newly captured Red can satisfy the handoff's
+source-provenance check for a failed task. Independent immutable test review still
+checks all approved acceptance criteria and the exact candidate; no checkpoint
+approves a delivery or directly dispatches product implementation.
+
+The host supervisor can resume observation of an old blocked projection only
+after authoritative checkpoint/Red evidence and the actual independent review
+lineage exist. It cannot resume a rejected or superseded candidate by interpreting
+status text. Full offline coverage passed 1,800 tests (seven preexisting skips).
+The installed-image copy canary verifies identical manifests across a copy and
+resume; neither that canary nor unit tests qualify end-to-end delivery. Real
+independent review, implementation, PR, CI and same-SHA homologation remain gates.

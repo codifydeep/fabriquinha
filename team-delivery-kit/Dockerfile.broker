@@ -21,6 +21,9 @@ COPY broker/handoffs.py /handoffs.py
 COPY broker/suite_failure.py /suite_failure.py
 COPY broker/suite_diagnosis_repair.py /suite_diagnosis_repair.py
 COPY broker/failed_execution_diagnosis.py /failed_execution_diagnosis.py
+COPY broker/failed_test_checkpoint.py /failed_test_checkpoint.py
+COPY broker/failed_test_checkpoint_copy.py /failed_test_checkpoint_copy.py
+COPY broker/pre_red_snapshot_diagnostic.py /pre_red_snapshot_diagnostic.py
 COPY broker/failed_execution_evidence.py /failed_execution_evidence.py
 COPY broker/assertion_witness.py /assertion_witness.py
 COPY broker/runtime_assertion_probe.py /runtime_assertion_probe.py
