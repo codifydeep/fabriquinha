@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261007.95
+COPY model_proxy.py /model_proxy.py
+COPY artifact_response_contract.py /artifact_response_contract.py
+COPY forced_tool_feedback.py /forced_tool_feedback.py
+COPY artifact_rejection_receipts.py /artifact_rejection_receipts.py

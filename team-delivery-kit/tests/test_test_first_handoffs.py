@@ -198,6 +198,29 @@ class TestFirstHandoffTests(unittest.TestCase):
         test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
         with self.broker.db() as c:self.assertEqual(handoffs.load(c,'tests')['stage'],'test_first_blocked')
 
+    def test_forced_patch_evidence_reopens_cto_not_author_and_cannot_loop(self):
+        diagnostic=dict(kind='rejected_forced_tool_response',operation='rejected_forced_tool_response_v1',
+            tool='patch',category='incomplete_forced_tool_response',issue_id='issue',task_id='tests',
+            write_executed=False,tests_executed=False,red_verified=False,delivery_approval=False)
+        data=dict(phase='test_first',error='test_first_cto_requires_replanning',diagnostic=diagnostic,
+            cto_task='old-cto',decision=dict(action='escalate_cto',optional_files=[]),test_first_cto_wakeup='old')
+        with self.broker.db() as c:
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',data,1);prior=handoffs.load(c,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:state=handoffs.load(c,'tests')
+        saved=json.loads(state['data']);self.assertEqual(state['stage'],'technical_decision_required')
+        self.assertFalse(saved['forced_tool_diagnosis_replay']['author_retry_authorized']);self.assertNotIn('decision',saved)
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,state,self.effects)
+        args=self.effects.wakeups[-1][0];self.assertEqual(args[1],'cto')
+        self.assertIn('PROXY PATCH RESPONSE REJECTION',args[4]);self.assertIn('legacy receipt',args[4])
+        saved.update(error='test_first_cto_requires_replanning',decision=dict(action='escalate_cto',optional_files=[]))
+        with self.broker.db() as c:
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',saved,2);prior=handoffs.load(c,'tests')
+        count=len(self.effects.wakeups)
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:self.assertEqual(handoffs.load(c,'tests')['stage'],'test_first_blocked')
+        self.assertEqual(len(self.effects.wakeups),count)
+
     def test_dispatched_author_is_pending_not_technical_failure(self):
         dispatched={**self.test_task,'status':'dispatched'}
         test_first_handoffs.reconcile(self.broker,self.route,[dispatched],self.effects)

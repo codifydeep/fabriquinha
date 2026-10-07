@@ -273,6 +273,24 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             data['error']='proxy_rejected_test_methods_missing'
             save('technical_decision_required',route['cto'])
             return
+        if (data.get('error')=='test_first_cto_requires_replanning'
+                and not data.get('forced_tool_diagnosis_replay')
+                and data.get('decision',{}).get('action')=='escalate_cto'
+                and diagnostic.get('kind')=='rejected_forced_tool_response'
+                and diagnostic.get('operation')=='rejected_forced_tool_response_v1'
+                and diagnostic.get('tool')=='patch'
+                and diagnostic.get('category')=='incomplete_forced_tool_response'
+                and diagnostic.get('issue_id')==issue and diagnostic.get('task_id')==key
+                and all(diagnostic.get(k) is False for k in
+                    ('write_executed','tests_executed','red_verified','delivery_approval'))):
+            data['forced_tool_diagnosis_replay']=dict(previous_cto_task=data.get('cto_task'),
+                previous_decision=data.get('decision'),
+                diagnostic_sha256=hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest(),
+                author_retry_authorized=False,delivery_approval=False)
+            for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):data.pop(field,None)
+            data['error']='proxy_rejected_forced_patch_response'
+            save('technical_decision_required',route['cto'])
+            return
         # One changed, explicitly bounded output contract, never a blind author
         # retry or reinterpretation of the rejected technical decision.
         if (data.get('error') == 'test_first_cto_invalid_decision:ValueError'
@@ -352,6 +370,8 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         if qualified_byte_budget:suffix+=':preserved-seed-byte-budget-v1'
         if data.get('artifact_diagnosis_replay'):
             suffix+=':proxy-artifact-evidence-v1'
+        if data.get('forced_tool_diagnosis_replay'):
+            suffix+=':proxy-forced-patch-evidence-v1'
         if qualified_structure:
             suffix += ':nonempty-no-methods-replan-v1'
         if qualified_framework:
@@ -401,6 +421,15 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'Only the new test may be corrected; inspect the workspace before writing. '
                'Do not disable the gate or treat this as an OpenRouter outage.'
                if diagnostic.get('kind')=='rejected_test_write' else '')
+            + ('\nPROXY PATCH RESPONSE REJECTION: the exact owned proxy refused an incomplete forced patch response '
+               'BEFORE forwarding that response to the worker. Earlier reads may have executed. '
+               'No Red or successful patch follows from this receipt. A legacy receipt without shape counts does '
+               'not prove truncation, multiple calls or a provider outage. The changed proxy can make ONE format '
+               'correction only for a newly measured complete response containing multiple pinned patch calls; '
+               'it forwards none of the rejected calls, then revalidates every original gate. '
+               'Decide whether a concrete tests-only correction is warranted, or name the remaining diagnostic. '
+               'Never disable the gate, approve Red or ask the CEO to decide a technical issue.'
+               if diagnostic.get('kind')=='rejected_forced_tool_response' else '')
             +
             '\nOutput reason in one complete sentence, aim below 900 characters; '
             '1200 characters is the output-contract maximum. Target420characters on format recovery. No preface or Markdown. '

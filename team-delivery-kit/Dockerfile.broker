@@ -131,6 +131,7 @@ COPY typed_decision_contract.py /typed_decision_contract.py
 COPY plan_length_feedback.py /plan_length_feedback.py
 COPY typed_test_source.py /typed_test_source.py
 COPY read_stream_recovery.py /read_stream_recovery.py
+COPY forced_tool_feedback.py /forced_tool_feedback.py
 COPY read_stream_recovery_probe.py /read_stream_recovery_probe.py
 COPY deterministic_read_dispatch.py /deterministic_read_dispatch.py
 COPY broker/incremental_checkpoints.py /incremental_checkpoints.py

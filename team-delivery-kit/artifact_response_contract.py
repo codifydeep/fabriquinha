@@ -102,6 +102,12 @@ def validate(body, data, media_type):
                     value['name'] += function.get('name') or ''
                     value['arguments'] += function.get('arguments') or ''
         if not done or finish != 'tool_calls' or len(calls) != 1:
+            diagnostic=dict(schema='forced-tool-shape-v1',
+                response_sha256=hashlib.sha256(data).hexdigest(),
+                streaming=streaming,stream_complete=done,
+                finish_reason=finish if finish in ('stop','length','tool_calls','content_filter') else 'other',
+                tool_calls=len(calls),all_selected_tools=bool(calls) and
+                all(value['name']==selected for value in calls.values()))
             raise ValueError('incomplete forced tool response')
         call = next(iter(calls.values()))
         if call['name'] != selected:

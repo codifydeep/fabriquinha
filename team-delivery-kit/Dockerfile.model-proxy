@@ -22,6 +22,7 @@ COPY c10_status_atomic.py /c10_status_atomic.py
 COPY c10_micro_drain.py /c10_micro_drain.py
 COPY artifact_read_evidence.py /artifact_read_evidence.py
 COPY read_stream_recovery.py /read_stream_recovery.py
+COPY forced_tool_feedback.py /forced_tool_feedback.py
 COPY deterministic_read_dispatch.py /deterministic_read_dispatch.py
 COPY proxy_request_rejections.py /proxy_request_rejections.py
 COPY author_read_policy.py /author_read_policy.py

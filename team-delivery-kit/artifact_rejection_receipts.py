@@ -20,6 +20,27 @@ def ledger(counter_path):
 CATEGORIES={'artifact_test_methods_missing','artifact_test_syntax_invalid'}
 
 def from_event(event):
+    if (event.get('event')=='model_proxy_request' and event.get('status')==502
+            and event.get('artifact_selected_tool')=='patch' and event.get('artifact_contract_present') is True
+            and event.get('artifact_rejection_category')=='incomplete_forced_tool_response'):
+        execution=event.get('execution_id');call=event.get('call_number')
+        if not isinstance(execution,str) or str(uuid.UUID(execution))!=execution:return None
+        if type(call) is not int or call<1:return None
+        result=dict(operation='rejected_forced_tool_response_v1',execution_id=execution,call_number=call,
+            category='incomplete_forced_tool_response',tool='patch',write_executed=False,
+            tests_executed=False,red_verified=False,delivery_approval=False)
+        shape=event.get('artifact_rejection_diagnostic')
+        if shape:
+            import re
+            if (not isinstance(shape,dict) or set(shape)!={'schema','response_sha256','streaming','stream_complete',
+                    'finish_reason','tool_calls','all_selected_tools'} or shape['schema']!='forced-tool-shape-v1'
+                    or not re.fullmatch(r'[a-f0-9]{64}',str(shape['response_sha256']))
+                    or any(type(shape[k]) is not bool for k in ('streaming','stream_complete','all_selected_tools'))
+                    or shape['finish_reason'] not in ('stop','length','tool_calls','content_filter','other')
+                    or type(shape['tool_calls']) is not int or not 0<=shape['tool_calls']<=64):
+                raise ValueError('invalid forced-tool shape receipt')
+            result['structure']=shape
+        return result  # Old logs cannot retroactively prove a particular shape.
     if (event.get('event')!='model_proxy_request' or event.get('status')!=502
             or event.get('artifact_selected_tool')!='write_file'
             or event.get('artifact_contract_present') is not True

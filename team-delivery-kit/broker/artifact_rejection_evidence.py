@@ -20,7 +20,7 @@ def durable_receipts(b,proxy,execution):
     receipts=json.loads(raw)
     for receipt in receipts:
         canonical=from_event(dict(event='model_proxy_request',status=502,
-            artifact_selected_tool='write_file',artifact_contract_present=True,
+            artifact_selected_tool=receipt.get('tool'),artifact_contract_present=True,
             artifact_rejection_category=receipt.get('category'),execution_id=execution,
             artifact_rejection_diagnostic=receipt.get('structure'),
             call_number=receipt.get('call_number')))
@@ -73,7 +73,8 @@ def fetch(b,issue,task):
                 receipt=from_event(event)
                 if receipt:receipts.append(receipt)
     if len(receipts)!=1:return None
-    result=dict(kind='rejected_test_write',issue_id=issue,task_id=task,
+    result=dict(kind='rejected_forced_tool_response' if receipts[0]['operation']=='rejected_forced_tool_response_v1'
+        else 'rejected_test_write',issue_id=issue,task_id=task,
         provenance=provenance,proxy_image=proxy['Image'],**receipts[0])
     path.parent.mkdir(mode=0o700,exist_ok=True)
     if path.parent.is_symlink():raise ValueError('unsafe evidence directory')

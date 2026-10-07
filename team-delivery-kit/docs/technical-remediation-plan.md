@@ -695,3 +695,31 @@ Native publication and all admission checks remain prerequisites for dispatch.
 This removes two passive waiting states; it does not grant a worker capability,
 approve tests or bypass the independent R1/R2/R3 gates. Installed preparation has
 started automatically; its complete handoff and delivery are not yet qualified.
+
+### Forced patch-response shape and bounded feedback
+
+`artifact_response_contract` now records response hash, stream completeness,
+terminal category and actual tool-call count when a forced response is rejected.
+It never records arguments or infers parallel calls from the number of available
+tools. The existing exact-one-call validator is unchanged.
+
+`forced_tool_feedback` permits one durable format correction per execution only
+for a measured, complete response containing multiple calls to the pinned patch
+tool for a NEW test. None of those calls is selected or forwarded. The model must
+propose a fresh single call with the unchanged schema; path, size, artifact and
+worker fences still apply. Both upstream attempts reserve calls before network
+side effects. A claimed correction survives restart; interrupted or failed
+corrections cannot rearm, and all downstream TDD/review gates remain required.
+Uncertain/incomplete streams, wrong tools, arbitrary paths and other failures
+are ineligible. This does not assume a historical rejection had multiple calls.
+
+The proxy stores sanitized forced-patch rejection receipts independently of
+container logs. An exact receipt can reopen only the CTO diagnosis once when
+the prior decision requested controller diagnostics; it does not approve a test
+or grant an author retry. The old decision remains recorded. Legacy events that
+were never persisted remain unqualified when their source logs are unavailable.
+
+The installed candidate passed the fixed offline HTTP/ledger probe without
+network or credentials; the complete suite covers 2,304 tests with seven existing
+skips. Real-model feedback, recovery of the blocked release and end-to-end
+autonomous delivery remain unqualified.

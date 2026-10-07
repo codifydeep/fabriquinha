@@ -16,6 +16,7 @@ from write_tool_schema import apply as apply_write_tool_schema
 from test_artifact_schema import apply as apply_test_artifact_schema
 from artifact_response_contract import metrics as artifact_metrics, validate as validate_artifact_response
 import read_stream_recovery
+import forced_tool_feedback
 import deterministic_read_dispatch
 import typed_decision_contract
 import typed_test_source
@@ -301,6 +302,7 @@ class Handler(BaseHTTPRequestHandler):
         request_metrics = {}
         response_metrics = {}
         recovery = None
+        patch_feedback = None
         padding_receipt = None
         stage, request_sha, local_rejection = 'admission', None, None
         route, execution_id = execution_route(self.path)
@@ -339,10 +341,13 @@ class Handler(BaseHTTPRequestHandler):
                 typed_decision_contract.format_feedback_preflight(COUNTER_PATH,execution_id,body)
                 scope=read_stream_recovery.identity(body,execution_id)
                 read_stream_recovery.preflight(COUNTER_PATH,scope)
+                patch_scope=forced_tool_feedback.identity(body,execution_id)
+                forced_tool_feedback.preflight(COUNTER_PATH,patch_scope)
             for attempt in range(0 if dispatch else 2):
                 stage = 'upstream'
                 call_number = reserve_call()  # every attempt persists before network side effect
                 if recovery:read_stream_recovery.retry_reserved(COUNTER_PATH,recovery,call_number)
+                if patch_feedback:forced_tool_feedback.retry_reserved(COUNTER_PATH,patch_feedback,call_number)
                 status, data, content_type = forward(body)
                 if status == 402:pause_provider(call_number)
                 reason = 'upstream_response'
@@ -388,6 +393,14 @@ class Handler(BaseHTTPRequestHandler):
                     try:validate_artifact_response(typed_test_source.validation_body(body), data, content_type)
                     except ValueError as error:
                         if attempt==0:
+                            revised=forced_tool_feedback.claim(COUNTER_PATH,patch_scope,error,body,call_number)
+                            if revised is not None:
+                                patch_feedback=patch_scope
+                                print(json.dumps(dict(event='model_proxy_patch_feedback',execution_id=execution_id,
+                                    first_call=call_number,attempt_limit=1,worker_tool_executed=False,
+                                    response_forwarded=False)),flush=True)
+                                body=revised
+                                continue
                             recovery=read_stream_recovery.claim(COUNTER_PATH,scope,call_number,
                                 getattr(error,'category',None),content_type)
                             if recovery:
@@ -405,6 +418,10 @@ class Handler(BaseHTTPRequestHandler):
                         'validated_read' if status==200 else 'upstream_status')
                     response_metrics['read_stream_recovered']=status==200
                     recovery=None
+                if patch_feedback:
+                    forced_tool_feedback.finish(COUNTER_PATH,patch_feedback,status==200)
+                    response_metrics['patch_feedback_passed']=status==200
+                    patch_feedback=None
                 break
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             if execution_id and request_sha and call_number is None:
@@ -454,6 +471,10 @@ class Handler(BaseHTTPRequestHandler):
             status = 503  # never return upstream bodies or local exception text
             reason = type(error).__name__
         finally:
+            if patch_feedback:
+                try:forced_tool_feedback.finish(COUNTER_PATH,patch_feedback,False)
+                except Exception:
+                    status,reason,data,content_type=503,'patch_feedback_receipt_unavailable',b'{}','application/json'
             if recovery:
                 try:
                     read_stream_recovery.finish(COUNTER_PATH,recovery,False,

@@ -21,6 +21,25 @@ class RejectionReceiptTests(unittest.TestCase):
         for flag in ('write_executed','tests_executed','red_verified','delivery_approval'):
             self.assertIs(receipt[flag],False)
 
+    def test_forced_patch_receipt_does_not_invent_legacy_shape(self):
+        event=dict(self.event,artifact_selected_tool='patch',artifact_rejection_category='incomplete_forced_tool_response')
+        receipt=r.from_event(event)
+        self.assertEqual(receipt['operation'],'rejected_forced_tool_response_v1')
+        self.assertEqual(receipt['tool'],'patch');self.assertNotIn('structure',receipt)
+        self.assertNotIn('private_payload',receipt);self.assertIs(receipt['write_executed'],False)
+        with tempfile.TemporaryDirectory() as folder:
+            counter=Path(folder)/'calls.json';counter.write_text('{"calls":0}')
+            r.record(counter,event);r.record(counter,event);self.assertEqual(r.read(counter,EXEC),[receipt])
+
+    def test_forced_patch_shape_cannot_store_payload_or_unbounded_counts(self):
+        shape=dict(schema='forced-tool-shape-v1',response_sha256='a'*64,streaming=True,
+            stream_complete=True,finish_reason='tool_calls',tool_calls=2,all_selected_tools=True)
+        event=dict(self.event,artifact_selected_tool='patch',artifact_rejection_category='incomplete_forced_tool_response',
+            artifact_rejection_diagnostic=shape)
+        self.assertEqual(r.from_event(event)['structure'],shape)
+        for changed in (dict(source='PRIVATE'),dict(tool_calls=1000),dict(stream_complete=1)):
+            with self.assertRaises(ValueError):r.from_event(dict(event,artifact_rejection_diagnostic=dict(shape,**changed)))
+
     def test_unrelated_rejections_are_not_test_diagnostics(self):
         for key,value in [('status',200),('artifact_selected_tool','read_file'),
                           ('artifact_contract_present',False),('artifact_rejection_category','unknown')]:
