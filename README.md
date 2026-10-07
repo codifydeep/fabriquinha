@@ -32,6 +32,12 @@ continuação; registrar a observação não concede retry ou aprovação. Execu
 antigas sem recibo não são convertidas retroativamente em evidência válida. O
 probe integrado pode exercitar o booleano de rede padrão e conferir a sobrevivência
 dos recibos após a retirada, sem sessões, prompts ou chamadas de modelo.
+O [probe instalado de 7 de outubro](team-delivery-kit/evaluation/STARTUP-POLICY-OBSERVATIONS-2026-10-07.json)
+comprovou esse comportamento com Docker, wrapper, ACP e inicialização Hermes reais:
+uma criação, um start e um transporte, sem chamadas ao modelo. A identidade nativa
+desse teste é uma fixture descartável, não um handoff real do Multica. O incidente
+legado do CTO continua sem a inspeção original; esse probe não a reconstitui nem
+aprova uma entrega.
 
 ## O que queremos construir
 
