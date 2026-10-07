@@ -149,6 +149,7 @@ COPY broker/test_first_protocol.py /test_first_protocol.py
 COPY broker/test_author_activity.py /test_author_activity.py
 COPY broker/test_first_handoffs.py /test_first_handoffs.py
 COPY broker/cto_prompt_bound_recovery.py /cto_prompt_bound_recovery.py
+COPY broker/bound_failure_context.py /bound_failure_context.py
 COPY broker/pre_red_infra_replan.py /pre_red_infra_replan.py
 COPY broker/selected_read_recovery.py /selected_read_recovery.py
 COPY broker/test_bootstrap_recovery.py /test_bootstrap_recovery.py

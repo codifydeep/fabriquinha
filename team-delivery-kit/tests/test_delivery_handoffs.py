@@ -329,6 +329,22 @@ class HandoffTests(unittest.TestCase):
         self.assertIn('new_frozen_test', data['instruction'])
         self.assertLess(len('DELIVERY_HANDOFF ' + 'a' * 64 + '\n' + data['instruction']), 4000)
 
+    def test_inherited_red_failure_uses_lossless_context_without_local_red(self):
+        from broker.suite_failure import evidence, FrozenSuiteFailure
+        from broker.bound_failure_context import expand
+        self.effects.test_first_red=lambda task:dict(issue_id='r1',task_id='test-author')
+        output='\n'.join('FAIL: test_case_'+str(n)+' (tests.test_new.Cases.test_case_'+str(n)+')'
+                         for n in range(30))+'\nRan 323 tests\nFAILED (failures=30)'
+        self.effects.failure=FrozenSuiteFailure(evidence(1,output,'source','frozen'))
+        self.tick()
+        row=handoffs.load(self.con,'source');data=json.loads(row['data'])
+        self.assertTrue(data['artifact_diagnosis'])
+        self.assertLess(len('DELIVERY_HANDOFF '+'a'*64+'\n'+data['instruction']),4000)
+        full=expand(data['instruction'],'issue',dict(agent_id=data['target'],wakeup_id=data['wakeup_id']),
+                    lambda source:row)
+        for n in range(30):self.assertIn('tests.test_new.Cases.test_case_'+str(n),full)
+        self.assertNotIn('approve',str(data.get('decision','')))
+
     def test_correction_budget_is_issue_scoped_not_reset_for_each_author_task(self):
         data = {'contract_sha256': self.route['contract_sha256'], 'error': 'artifact_validation: new code and test files required',
                 'dispatch_stage': 'correct_author'}

@@ -1301,6 +1301,11 @@ def diagnostic_mounts(broker, binding):
                                  (failure.get('source_task'), 'complete')).fetchone()
         red = con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',
                           (binding['issue_id'],)).fetchone()
+    if red is None:
+        try:import remediation_red_reference
+        except ImportError:from broker import remediation_red_reference
+        reference=remediation_red_reference.qualified(broker,binding['issue_id'])
+        red=(json.dumps(reference['red']),) if reference is not None else None
     if not source or not red or source[0] != failure.get('volume'):
         raise ValueError('diagnostic immutable artifacts missing')
     old = json.loads(red[0])

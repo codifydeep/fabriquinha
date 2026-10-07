@@ -427,6 +427,22 @@ def reconcile(con, route, runs, effects, *, now=None):
     if data['contract_sha256'] != route['contract_sha256']:
         raise ValueError('handoff contract revision drift')
     stage = prior['stage'] if prior else 'observed'
+    try:import bound_failure_context
+    except ImportError:from broker import bound_failure_context
+    if (stage=='technical_decision_required'
+            and data.get('control_error')=='ValueError:handoff instruction too large'
+            and (data.get('validation_failure') or {}).get('category')=='executed_test_failure'
+            and not data.get('wakeup_id') and not data.get('recipient_task')
+            and not data.get('bound_failure_recovery') and source['status']=='completed'
+            and bound_failure_context.verified_red(effects,key)):
+        data.update(artifact_diagnosis=True,
+            bound_failure_recovery=dict(operation='lossless_frozen_failure_context_v1',
+                failure_sha256=bound_failure_context.digest(data['validation_failure']),
+                approval=False,author_restarted=False),
+            diagnostic_revision=data['validation_failure']['output_sha256']+':lossless-context-v1')
+        for field in ('control_error','control_error_count','instruction','dispatch_marker','dispatch_stage','target'):
+            data.pop(field,None)
+        stage=save(con,key,issue,'diagnose_cto',route['cto'],data,now)
     # One evidence-bound repair of an oversized diagnosis after pre-model
     # reviewer failure. Return to CTO, never approve or restart the author.
     if (stage == 'technical_decision_required'
@@ -607,7 +623,8 @@ def reconcile(con, route, runs, effects, *, now=None):
                 failure = getattr(error, 'validation_failure', None)
                 if isinstance(failure, dict):
                     data['validation_failure'] = failure
-                    if (route.get('test_first') and failure.get('category') == 'executed_test_failure'
+                    if ((route.get('test_first') or bound_failure_context.verified_red(effects,key))
+                            and failure.get('category') == 'executed_test_failure'
                             and failure.get('volume')):
                         data['artifact_diagnosis'] = True
                         data['diagnostic_revision'] = failure['output_sha256'] + ':bound-artifacts-v1'
@@ -741,6 +758,10 @@ def reconcile(con, route, runs, effects, *, now=None):
                     proof=data['assertion_trace_evidence']['proof']
                     summary['validation_failure']['assertion_trace_anchors']=proof['anchors']
                 summary['validation_failure']['failure_count'] = len(failure.get('failures', []))
+            if (data.get('artifact_diagnosis') and data.get('validation_failure')
+                    and (data.get('bound_failure_recovery') or
+                         (not route.get('test_first') and bound_failure_context.verified_red(effects,key)))):
+                summary,_=bound_failure_context.project(summary,key,data['validation_failure'])
             instruction = ('Diagnose this delivery handoff. Evidence: ' + json.dumps(summary, sort_keys=True, separators=(',', ':'))
                 + '\nReturn only JSON with action (request_correction, retry_review, revise_contract, request_test_revision, escalate_cto), '
                   'reason and optional_files (list). request_correction needs an actionable reason. '

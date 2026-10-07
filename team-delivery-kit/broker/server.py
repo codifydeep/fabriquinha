@@ -1959,6 +1959,11 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
     if current is not None:
         note=current['handoff_note']
         if not isinstance(note,str) or not 0<len(note)<=4000:raise ValueError('bounded current maintenance handoff required')
+    if mode=='planning' and 'DELIVERY_BOUND_FAILURE_CONTEXT_V1:' in note:
+        import bound_failure_context
+        with db() as con:
+            note=bound_failure_context.expand(note,issue['id'],task,
+                lambda source:con.execute('SELECT issue_id,data FROM delivery_handoffs WHERE source_task=?',(source,)).fetchone())
     if mode=='planning':
         compact=compact_diagnosis_note(issue,task,note)
         if compact is not None:

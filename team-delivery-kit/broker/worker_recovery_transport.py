@@ -12,7 +12,7 @@ try:
 except ImportError:
     from broker import handoffs,native,worker_interruption_recovery
 
-SOURCE_SHA='ff9a28ce73ff1c85cb69bba9a8be9ce4006561827cc79c0615f004e9c86f1109'
+SOURCE_SHA='d3241e2c2c4ddb2d1035e153bb4e44f75fd1d636ca33b87cf2df08c009b02ae6'
 PROXY_IMAGE='sha256:55e34ae248147017aad74670c5e50a7f6e9c9783b3759f917459fe76bf456ddd'
 
 
