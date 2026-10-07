@@ -106,14 +106,14 @@ def provision(b,source,*,now=None):
         return new
 
 
-def publish_hold(b,source,category):
+def publish_hold(b,source,category,*,required_action='diagnose exact R2 input/root/create intent; no identical retry'):
     """Project an unresolved technical hold through the existing handoff channel."""
     with b.db() as con:
         parent=json.loads(con.execute('SELECT state FROM remediation_executions WHERE source_task=?',(source,)).fetchone()[0])
         origin=parent['steps']['R1']['issue_id']
         route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(origin,)).fetchone()[0])
         hold=dict(category=category,owner=route['techlead'],
-            required_action='diagnose exact R2 input/root/create intent; no identical retry',
+            required_action=required_action,
             execution_authorized=False,release_homologated=False)
         if parent.get('r2_issue_hold')==hold:return
         parent.update(r2_issue_hold=hold,required_action=hold['required_action'])

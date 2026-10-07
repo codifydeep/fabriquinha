@@ -253,3 +253,24 @@ Semantic failures and thirty-minute observation deadlines retain a technical
 hold and project it into the existing Tech Lead handoff channel. Preparation
 receipts grant no worker execution or release approval. R2 context/route,
 dispatch, real Green, independent product review and R3 remain to be validated.
+
+### Lossless product execution and review contexts
+
+`remediation_product_context.py` registers a paused R2 runtime after base
+qualification and fresh independent R1 verification. Its capsule keeps every
+criterion and the full original brief/review as quoted historical data, while
+the active instructions explicitly restrict implementation to product files.
+The reviewer examines the immutable delivery; it neither edits tests nor
+reconstructs Red. Oversized contexts fail instead of truncating requirements.
+
+Registration compares the original and R1 full-suite commands with the durable
+R1 runtime hash, admits only original-base hashes, and installs an explicit
+foreign Red reference without copying or relabelling its receipt. A crash after
+registering a paused route can resume the same context, never a different route.
+Only R1/R2 active leases impede Red-reference registration; unrelated workers
+cannot starve a preparation operation that grants no execution authority.
+
+The watchdog performs this registration automatically, but `dispatch_ready`
+and execution authorization remain false. Exact native context presentation,
+durable dispatch/capacity control and R3 completion are separate required gates;
+the live trial remains paused until their executor is qualified.

@@ -372,6 +372,9 @@ def tick(b):
     try:import remediation_r2_preparation
     except ImportError:from broker import remediation_r2_preparation
     remediation_r2_preparation.tick(b)
+    try:import remediation_product_context
+    except ImportError:from broker import remediation_product_context
+    remediation_product_context.tick(b)
     with b.db() as con:
         initialize(con)
         busy=con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()

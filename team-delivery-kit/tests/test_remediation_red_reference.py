@@ -95,6 +95,18 @@ class RemediationRedReferenceTests(unittest.TestCase):
         self.assertIsNone(references.seed_source(self.b,'unrelated'))
         self.assertIsNone(references.task_red(self.b,'unknown-task'))
 
+    def test_unrelated_workers_do_not_starve_paused_reference_registration(self):
+        with self.b.db() as con:
+            con.execute('INSERT INTO leases VALUES (?,?)',('other','running'))
+            con.execute('INSERT INTO native_bindings VALUES (?,?,?,?,?)',('other-task','other-issue','other-scope','other-agent','other'))
+        self.assertFalse(self.register()['execution_authorized'])
+
+    def test_dependency_worker_prevents_reference_registration(self):
+        with self.b.db() as con:
+            con.execute('INSERT INTO leases VALUES (?,?)',('dependency','closing'))
+            con.execute('INSERT INTO native_bindings VALUES (?,?,?,?,?)',('review','r1','scope','lead','dependency'))
+        with self.assertRaises(ValueError):self.register()
+
     def test_registration_cannot_rebind_an_issue_to_another_execution(self):
         self.register()
         with self.b.db() as c:

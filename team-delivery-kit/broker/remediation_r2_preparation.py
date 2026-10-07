@@ -174,4 +174,5 @@ def tick(b):
                     latest.update(stage='blocked',category=category,owner='techlead',
                         required_action='inspect exact original base, approved Red and preserved Docker job; no identical retry')
                     con.execute('UPDATE remediation_r2_preparations SET state=? WHERE source_task=?',(json.dumps(latest,sort_keys=True),source))
-            issues.publish_hold(b,source,category)
+            issues.publish_hold(b,source,category,
+                required_action='inspect exact original base, approved Red and preserved Docker preparation job; no identical retry')

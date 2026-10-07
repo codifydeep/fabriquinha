@@ -70,8 +70,10 @@ def register(b,issue,source,effects):
         review.verify(b,expected['origin_issue'],r1,expected['red'],effects)
         with b.db() as con:
             initialize(con)
-            if con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone():
-                raise ValueError('idle Red reference registration required')
+            if con.execute("SELECT 1 FROM native_bindings n JOIN leases l USING(request_id) "
+                    "WHERE n.issue_id IN (?,?) AND l.status IN ('creating','starting','running','closing')",
+                    (issue,expected['origin_issue'])).fetchone():
+                raise ValueError('R1/R2 dependency leases must close before reference registration')
             old=con.execute('SELECT source_task,body FROM remediation_red_references WHERE issue_id=?',(issue,)).fetchone()
             if old:
                 if old[0]!=source or json.loads(old[1])!=expected:raise ValueError('immutable R2 reference drift')
