@@ -140,5 +140,28 @@ policy. The ordinary first-submission review path is explicitly rejected for R1:
 it must not silently omit comparison against the previous NEW tests.
 
 This fence does not grant a worker, run Red, approve tests or declare delivery.
-The historical independent-review adapter and lossless author context must be
+The lossless author context and complete execution adapter must still be
 validated before dispatch. Preparation alone remains insufficient for execution.
+
+### Historical R1 review adapter
+
+`remediation_test_review.py` registers a separate immutable R1 review policy,
+without a recursive child or first-submission classification. It verifies the
+previous real Red and binds its exact task, volume, manifest, test hashes and
+original baseline. Reviewer and CTO remain independent of the author.
+
+Only a fresh controller-captured full-suite Red can enter review: original
+baseline, pinned command/image, complete test scope, changed NEW tests and no
+reduction of the executed test count. The ordinary read-only comparison/review
+mechanism mounts both immutable trees, requires complete reads and independently
+checks semantic findings. Structural loss of methods/assertions cannot be
+overridden by an approving model verdict. Existing approval is rechecked against
+the exact candidate, prior snapshot, comparison and actual reads.
+
+R1 approval records a durable gate and pauses that tests-only card. It cannot
+fall through to normal same-card product implementation. R2 requires its own
+qualified dependent execution. Recursive registration from a remediation card
+is rejected rather than resetting the original exhausted revision depth.
+
+Deterministic validation is not a live model review, product Green, CI, deploy or
+homologation. Those gates remain unproven until their actual operations complete.

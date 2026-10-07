@@ -707,6 +707,12 @@ def reconcile(broker, route, runs, effects):
         from broker import test_revision_review
     if not test_revision_review.reconcile(broker, route, runs, effects, red):
         return None
+    try:
+        import remediation_test_review
+    except ImportError:
+        from broker import remediation_test_review
+    if remediation_test_review.record_gate(broker, route, red, effects):
+        return None  # R1 never creates an implement-after-red wakeup on this card.
     marker = hashlib.sha256((issue + ':' + test_task + ':implement-after-red').encode()).hexdigest()
     instruction = ('CONTROLLER RED VERIFIED: ' + red['red']['manifest_sha256'] + '. '
                    'Now implement product code in the same /workspace. The tests-only '

@@ -336,6 +336,12 @@ def register(broker, payload):
             raise ValueError('canonical revision identity required')
     if payload['issue_id'] == payload['parent_issue']:
         raise ValueError('old issue cannot be overwritten')
+    try:
+        import remediation_runtime_guard
+    except ImportError:
+        from broker import remediation_runtime_guard
+    if remediation_runtime_guard.lookup(broker, payload['parent_issue']) is not None:
+        raise ValueError('remediation cannot reset original depth through a recursive child')
     with broker.LOCK, broker.db() as con:
         initialize(con)
         prior = con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',
@@ -542,7 +548,7 @@ def reconcile(broker, route, runs, effects, red):
         import remediation_runtime_guard
     except ImportError:
         from broker import remediation_runtime_guard
-    remediation_runtime_guard.require_historical_review(broker, route['issue_id'])
+    remediation_runtime_guard.require_historical_review(broker, route['issue_id'], route, red, effects)
     with broker.db() as con:
         initialize(con)
         row = con.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',
@@ -656,6 +662,12 @@ def reconcile(broker, route, runs, effects, red):
         return False
     if not state.get('evidence_policy') and hasattr(effects, 'test_review_report'):
         state['comparison'] = effects.test_review_report(route['issue_id'], red, config.get('old_red'))
+        if config.get('remediation_run_id'):
+            try:
+                import remediation_test_review
+            except ImportError:
+                from broker import remediation_test_review
+            remediation_test_review.validate_comparison(config, red, state['comparison'])
         state['evidence_policy'] = 1
     marker = hashlib.sha256((route['issue_id'] + ':' + red['task_id'] +
                              ':independent-test-revision:' + digest +
@@ -716,6 +728,9 @@ def reconcile(broker, route, runs, effects, red):
             'implementation only, not delivery.\nDELIVERY_STRUCTURED_DECISION_V1:test_review:' + digest + '\n'
             + ''.join('DELIVERY_REVIEW_READ_PATH:' + path + '\n' for path in paths)
             + evidence_instruction(state))
+    if config.get('remediation_run_id'):
+        instruction = instruction.replace('Approval permits implementation only, not delivery.',
+            'Approval completes the R1 test gate only; R1 stays tests-only. R2 requires separate controller authorization.')
     if scope:
         # This must follow the evidence-policy rewrite above; the old placement
         # was overwritten and never reached the reviewer.
@@ -941,6 +956,12 @@ def validate_evidence(broker, route, state, decision):
     if report['summary'] != state['comparison']:
         raise ValueError('comparison evidence identity drift')
     test_review_facts.validate_findings(decision, report)
+    try:
+        import remediation_runtime_guard, remediation_test_review
+    except ImportError:
+        from broker import remediation_runtime_guard, remediation_test_review
+    if remediation_runtime_guard.lookup(broker, route['issue_id']) is not None:
+        remediation_test_review.preserve_coverage(decision, report['summary'])
 
 
 def _save_rejection(broker, route, state):

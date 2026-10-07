@@ -76,8 +76,12 @@ def seed_source(b, issue):
                 selection={key: seed[key] for key in ('manifest_sha256', 'test_sha256')})
 
 
-def require_historical_review(b, issue):
+def require_historical_review(b, issue, route=None, red=None, effects=None):
     if lookup(b, issue) is not None:
-        # Never masquerade as a first submission and omit the historical seed.
-        # A subsequent adapter must bind actual Red + historical comparison.
-        raise ValueError('remediation historical independent review adapter required')
+        if route is None or red is None or effects is None:
+            raise ValueError('remediation historical independent review adapter required')
+        try:
+            import remediation_test_review
+        except ImportError:
+            from broker import remediation_test_review
+        return remediation_test_review.verify(b, issue, route, red, effects)
