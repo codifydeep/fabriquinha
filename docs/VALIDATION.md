@@ -31,6 +31,15 @@ ativação; pausas de fases já admitidas e outros bloqueios não são removidos
 A versão instalada passou por **2.277 testes, com sete skips existentes**.
 Isso ainda não prova Green, revisão do produto, PR/CI ou homologação do R2.
 
+A consulta de status foi corrigida para distinguir admissões históricas da
+cadeia atual pela dependência explícita entre issues. Ela revalida o hash do
+contrato, exige uma única cadeia conectada e rejeita ciclos ou ramificações
+ambíguas; não escolhe por horário nem por aparência de sucesso. A consulta
+real identificou R2 na instalação corrente. A suíte offline executou **2.279
+testes, com sete skips existentes**. Metadados de status continuam sem poder
+de execução ou aprovação. O autor R2 terminou sua execução nativa; os gates
+do controlador e da revisão independente precisam ser verificados separados.
+
 ### Recuperação do artefato salvo sem repetir a edição
 
 O controlador agora mantém checkpoints de falha por **issue e execução**.

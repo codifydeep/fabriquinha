@@ -3,10 +3,29 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock
-from remediation_admission_status import project
+from remediation_admission_status import project,select_current
 
 
 class AdmissionStatusTests(unittest.TestCase):
+    def record(self,source,issue,phases):
+        return dict(intent={'source_task':source},source_issue=issue,phase_issues=phases,state={})
+
+    def test_current_admission_follows_explicit_dependency_not_order(self):
+        old=self.record('old','origin',['r1-old','r2-old'])
+        new=self.record('new','r2-old',['r1-new','r2-new'])
+        for records in ([old,new],[new,old]):
+            self.assertIs(select_current(records),new)
+        self.assertIsNone(select_current([]))
+
+    def test_parallel_disconnected_or_cyclic_lineages_fail_closed(self):
+        old=self.record('old','origin',['r2-old'])
+        new=self.record('new','r2-old',['r2-new'])
+        for records in ([old,self.record('parallel','origin',['parallel'])],
+                [old,new,self.record('unrelated','other',['unrelated'])],
+                [self.record('a','b-issue',['a-issue']),self.record('b','a-issue',['b-issue'])],
+                [old,old]):
+            with self.assertRaises(ValueError):select_current(records)
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.value=dict(root_issue='root',stage='awaiting_budget',remaining_calls=206,required_calls=256,
