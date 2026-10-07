@@ -2092,14 +2092,20 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
     # legacy limit for an unregistered issue or agent-provided marker.
     if len(text) > (32000 if capsule is not None else (16000 if mode == 'planning' else 10000)):
         raise ValueError('task prompt too large')
-    return {**frame, 'params': {**frame['params'],
+    rendered = {**frame, 'params': {**frame['params'],
             'prompt': [{'type': 'text', 'text': text}]}}
+    if capsule is not None:
+        try:from acp_transport import ControllerPrompt
+        except ImportError:from broker.acp_transport import ControllerPrompt
+        return ControllerPrompt(rendered,capsule)
+    return rendered
 
 
 def failure_category(error):
     if isinstance(error,DockerOperationTimeout):return 'docker_'+error.operation
     if isinstance(error, ValueError) and str(error) in {
-            'bounded issue brief required', 'invalid handoff note', 'task prompt too large'}:
+            'bounded issue brief required', 'invalid handoff note', 'task prompt too large',
+            'only bounded text prompts are qualified'}:
         return 'native_prompt_bounds'
     if str(error) == 'issue workspace seed failed':
         return 'workspace_seed'

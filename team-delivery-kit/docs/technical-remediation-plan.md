@@ -567,3 +567,12 @@ evidence precede retirement. The exact stopped ID, ownership and mount are
 revalidated immediately before removal. Uncertain deletion is observed once,
 not repeated; unresolved helpers remain preserved for scoped investigation.
 Snapshot volumes, current deployments and unrelated projects are never removed.
+
+Registered context rendering and ACP transport share a 32,000-character bound
+only through the in-process `ControllerPrompt` type. The native renderer first
+verifies the capsule hash, route and actor; the transport then accepts the
+complete controller-built frame. Client JSON, markers and model declarations
+cannot reconstruct this type and remain bounded to 12,000 characters. The
+qualification disappears on JSON serialization. This changes no file/tool,
+test, review or release permission. Transport prompt-bound errors now receive
+the explicit `native_prompt_bounds` category rather than `broker_internal`.

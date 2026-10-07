@@ -213,6 +213,19 @@ class Transport:
         self.sock.close()
 
 
+class ControllerPrompt(dict):
+    """In-process qualification, never preserved by client JSON serialization.
+
+Only the broker's role-checked context renderer constructs this wrapper. Text
+markers, JSON keys or worker declarations cannot qualify a larger prompt.
+"""
+    def __init__(self,frame,capsule):
+        from execution_context import validate
+        validate(capsule)
+        if frame.get('method')!='session/prompt':raise ValueError('controller prompt frame required')
+        super().__init__(frame)
+
+
 def validate_frame(frame):
     if not isinstance(frame, dict) or set(frame) - {'jsonrpc', 'id', 'method', 'params'}:
         raise ValueError('invalid ACP frame')
@@ -234,5 +247,5 @@ def validate_frame(frame):
                 len(prompt) != 1 or not isinstance(prompt[0], dict) or
                 set(prompt[0]) != {'type', 'text'} or prompt[0]['type'] != 'text' or
                 not isinstance(prompt[0]['text'], str) or
-                not 0 < len(prompt[0]['text']) <= 12000):
+                not 0 < len(prompt[0]['text']) <= (32000 if type(frame) is ControllerPrompt else 12000)):
             raise ValueError('only bounded text prompts are qualified')
