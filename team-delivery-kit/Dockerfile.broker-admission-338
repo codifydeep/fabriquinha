@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261007.337
+USER root
+COPY broker/remediation_admission.py /remediation_admission.py

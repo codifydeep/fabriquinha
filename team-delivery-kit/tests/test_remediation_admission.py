@@ -69,3 +69,33 @@ class RemediationAdmissionTests(unittest.TestCase):
         self.assertIsNone(self.reconcile());self.fx.wake.assert_not_called()
         self.request();self.bound['enabled']=True
         self.assertEqual(self.reconcile()['category'],'unrecorded_phase_activation');self.fx.wake.assert_not_called()
+
+    def test_resolved_dependency_hold_resumes_existing_chain_with_live_checks(self):
+        self.request();self.reconcile()
+        self.parent.update(r1_gate={'actual':'approved'},r2_issue_hold={'technical':'pending'})
+        self.con.execute('UPDATE remediation_executions SET state=?',(json.dumps(self.parent),))
+        blocked=self.reconcile();self.assertEqual(blocked['category'],'admission_dependency_hold')
+        self.assertEqual(self.reconcile(),blocked)
+        self.parent.pop('r2_issue_hold');self.parent['r2_runtime']={'actual':'registered'}
+        self.con.execute('UPDATE remediation_executions SET state=?',(json.dumps(self.parent),))
+        self.bound=dict(issue_id='r2',author='author',enabled=False,minimum_calls=8,description='exact')
+        self.con.execute('INSERT INTO delivery_routes VALUES(?,?)',('r2',json.dumps({'enabled':False})))
+        self.fx.available.return_value=False
+        resumed=self.reconcile();self.assertEqual(resumed['stage'],'awaiting_capacity')
+        self.assertEqual(resumed['dependency_hold_history'][0]['previous_state'],blocked)
+        self.assertFalse(self.enabled('r2'));self.fx.wake.assert_not_called()
+        self.fx.available.return_value=True
+        self.assertTrue(self.reconcile()['steps'].get('R2'));self.assertTrue(self.enabled('r2'))
+        self.assertEqual(len(self.reconcile()['dependency_hold_history']),1)
+
+    def test_dependency_resolution_does_not_waive_current_approval(self):
+        self.request();self.reconcile()
+        self.parent.update(r1_gate={'actual':'approved'},r2_issue_hold={'technical':'pending'})
+        self.con.execute('UPDATE remediation_executions SET state=?',(json.dumps(self.parent),))
+        self.reconcile();self.parent.pop('r2_issue_hold');self.parent['r2_runtime']={'actual':'registered'}
+        self.con.execute('UPDATE remediation_executions SET state=?',(json.dumps(self.parent),))
+        self.bound=dict(issue_id='r2',author='author',enabled=False,minimum_calls=8,description='exact')
+        self.con.execute('INSERT INTO delivery_routes VALUES(?,?)',('r2',json.dumps({'enabled':False})))
+        self.fx.plan.side_effect=ValueError('approval changed')
+        with self.assertRaises(ValueError):self.reconcile()
+        self.assertFalse(self.enabled('r2'));self.fx.wake.assert_not_called()

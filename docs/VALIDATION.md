@@ -21,6 +21,16 @@ despacho, merge ou homologação. As duas correções foram instaladas após bac
 SQLite verificado. A suíte offline executou **2.275 testes, com sete skips
 existentes**; a continuidade nativa do R2 ainda precisa ser comprovada.
 
+O R2 foi registrado com referência validada ao Red aprovado e seu contexto
+nativo foi publicado. A admissão mantinha um bloqueio antigo de dependência
+mesmo após a resolução dos impedimentos. A recuperação agora preserva esse
+incidente no ledger e só retoma a cadeia já autorizada quando R1 está aprovado,
+R2 está registrado e não existem impedimentos dependentes. Binding, aprovação
+nativa, orçamento, capacidade e contexto continuam revalidados antes da
+ativação; pausas de fases já admitidas e outros bloqueios não são removidos.
+A versão instalada passou por **2.277 testes, com sete skips existentes**.
+Isso ainda não prova Green, revisão do produto, PR/CI ou homologação do R2.
+
 ### Recuperação do artefato salvo sem repetir a edição
 
 O controlador agora mantém checkpoints de falha por **issue e execução**.

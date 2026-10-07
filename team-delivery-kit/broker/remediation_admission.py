@@ -77,7 +77,23 @@ def reconcile(b,source):
             value,parent=map(json.loads,con.execute('SELECT contract,state FROM remediation_executions WHERE source_task=?',(source,)).fetchone())
         if (intent['execution_contract_sha256']!=planning.digest(value) or value.get('original_depth')!=2
                 or intent.get('release_homologated') is not False):raise ValueError('admission contract drift')
-        if state['stage']=='blocked':return state
+        if state['stage']=='blocked':
+            # A dependency incident remains preserved, but its resolved hold
+            # must not permanently starve an already authorized full chain.
+            # Every live binding, approval, budget and native-context check
+            # below still runs before any route activation.
+            if (state.get('category')!='admission_dependency_hold'
+                    or not state.get('steps',{}).get('R1') or state.get('steps',{}).get('R2')
+                    or not parent.get('r1_gate') or not parent.get('r2_runtime')
+                    or parent.get('native_context_hold') or parent.get('r2_issue_hold')
+                    or parent.get('remediation_dispatch_holds')):
+                return state
+            prior=json.loads(json.dumps(state))
+            prior.pop('dependency_hold_history',None)  # History stays once, in the outer ledger.
+            state={k:v for k,v in state.items() if k not in ('owner','category')}
+            state.update(stage='awaiting_dependency',dependency_hold_history=[
+                *state.get('dependency_hold_history',[]),dict(previous_state=prior,
+                resolved_at=time.time(),phase_activated=False,release_homologated=False)])
         def save(**extra):
             nonlocal state
             state={**state,**extra,'release_homologated':False}
