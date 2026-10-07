@@ -2,6 +2,25 @@
 
 ## Inspeção do autor após edição cirúrgica
 
+### Contexto e permissões do card dependente R2
+
+A preparação do R2 encontrou dois impedimentos anteriores ao despacho: a
+cápsula repetia instruções históricas de fase e excedia seu limite; em seguida,
+a validação confundia os caminhos graváveis do R2 original com os caminhos
+de leitura do reparo R1. O controlador agora extrai integralmente os dados do
+brief e da revisão apenas de um wrapper autenticado de emenda, mantém a
+cápsula anterior imutável e registra seu hash. Dados arbitrários, incompletos
+ou com conteúdo residual não podem ser extraídos, e o limite não foi ampliado.
+
+No cenário de emenda, a rota original continua gravável somente nos arquivos
+do produto. Os testes congelados são entradas de leitura, não novas permissões
+de escrita. Recuperações específicas preservam cada impedimento, exigem R1
+aprovado, base qualificada, identidade e contrato atuais, ausência de execução
+ativa e nenhuma rota R2 já registrada. Reabrir a preparação não concede
+despacho, merge ou homologação. As duas correções foram instaladas após backup
+SQLite verificado. A suíte offline executou **2.275 testes, com sete skips
+existentes**; a continuidade nativa do R2 ainda precisa ser comprovada.
+
 ### Recuperação do artefato salvo sem repetir a edição
 
 O controlador agora mantém checkpoints de falha por **issue e execução**.

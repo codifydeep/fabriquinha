@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261007.336
+USER root
+COPY broker/remediation_product_context.py /remediation_product_context.py

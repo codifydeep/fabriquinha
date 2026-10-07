@@ -87,6 +87,105 @@ class RemediationProductContextTests(unittest.TestCase):
         state=copy.deepcopy(self.state);state['r1_gate']['execution_contract_sha256']=digest(value)
         with self.assertRaises(ValueError):context.route(value,state,source,self.f.f.ITEM_ID)
 
+    def amended(self, description=None, review=None):
+        original=freeze(description or ('CURRENT TASK: R2 PRODUCT ONLY.\n'+'historical phase '*350+
+            '\nORIGINAL BRIEF DATA: '+json.dumps('Complete user brief.\nBusiness detail preserved.')),
+            review or ('CURRENT REVIEW: independent immutable product delivery for R2.\n'+
+            'old review controls '*200+'\nORIGINAL REVIEW DATA: '+json.dumps('Complete original review.')))
+        value={**self.value,'context_sha256':original['sha256'],
+               'amendment':dict(operation='inherited_harness_contract_amendment_v1')}
+        state=copy.deepcopy(self.state);state['r1_gate']['execution_contract_sha256']=digest(value)
+        source={**self.source,'execution_context':original,'review_instruction':reference(original,'review')}
+        return value,state,source
+
+    def test_amended_r2_preserves_business_data_not_duplicate_phase_instructions(self):
+        value,state,source=self.amended()
+        before=copy.deepcopy((value,state,source))
+        capsule=context.route(value,state,source,self.f.f.ITEM_ID)['execution_context']
+        self.assertIn('Complete user brief.',capsule['description'])
+        self.assertIn('Business detail preserved.',capsule['description'])
+        self.assertIn('Complete original review.',capsule['review_instruction'])
+        self.assertNotIn('historical phase ',capsule['description'])
+        self.assertNotIn('old review controls ',capsule['review_instruction'])
+        self.assertIn(source['execution_context']['sha256'],capsule['description'])
+        self.assertEqual((value,state,source),before)
+        brief,review,_=context.historical_data(value,capsule)
+        self.assertEqual(brief,'Complete user brief.\nBusiness detail preserved.')
+        self.assertEqual(review,'Complete original review.')
+
+    def test_amendment_cannot_unwrap_arbitrary_or_incomplete_data(self):
+        for description,review in [
+            ('arbitrary ORIGINAL BRIEF DATA: "brief"',None),
+            ('CURRENT TASK: R2 PRODUCT ONLY.\nORIGINAL BRIEF DATA: "brief" garbage',None),
+            ('CURRENT TASK: R2 PRODUCT ONLY.\nORIGINAL BRIEF DATA: {}',None),
+            (None,'CURRENT REVIEW: independent immutable product delivery for R2.\nORIGINAL REVIEW DATA: "review" garbage'),
+        ]:
+            with self.subTest(description=description,review=review):
+                value,state,source=self.amended(description,review)
+                with self.assertRaises(ValueError):context.route(value,state,source,self.f.f.ITEM_ID)
+
+    def test_changed_context_recovery_preserves_hold_without_grant_or_repeat(self):
+        value,state,source=self.amended(description=('CURRENT TASK: R2 PRODUCT ONLY.\n'+
+            'historical phase '*650+'\nORIGINAL BRIEF DATA: '+json.dumps('Full brief.')))
+        state['steps']['R1']['stage']='approved'
+        state['r2_issue_hold']=dict(category='r2_context_precondition_failed')
+        before=copy.deepcopy(state)
+        new=context.context_recovery(value,state,source,self.f.f.ITEM_ID)
+        self.assertEqual(state,before)
+        self.assertNotIn('r2_issue_hold',new)
+        receipt=new['r2_context_recovery']
+        self.assertEqual(receipt['previous_hold'],before['r2_issue_hold'])
+        self.assertFalse(receipt['execution_authorized']);self.assertFalse(receipt['dispatch_ready'])
+        self.assertFalse(receipt['release_homologated'])
+        self.assertNotIn('r2_runtime',new)
+        with self.assertRaises(ValueError):context.context_recovery(value,new,source,self.f.f.ITEM_ID)
+        for change in (dict(r2_runtime={'already':'registered'}),
+                       dict(r2_issue_hold={'category':'different'})):
+            with self.assertRaises(ValueError):context.context_recovery(value,{**state,**change},source,self.f.f.ITEM_ID)
+
+    def test_maintenance_recovery_archives_hold_and_does_not_create_route(self):
+        value,state,source=self.amended(description=('CURRENT TASK: R2 PRODUCT ONLY.\n'+
+            'historical phase '*650+'\nORIGINAL BRIEF DATA: '+json.dumps('Full brief.')))
+        state['steps']['R1']['stage']='approved'
+        state['r2_issue_hold']=dict(category='r2_context_precondition_failed')
+        with self.b.db() as con:
+            con.execute('UPDATE remediation_executions SET contract=?,state=?',
+                (json.dumps(value),json.dumps(state)))
+            con.execute('UPDATE delivery_routes SET config=? WHERE issue_id=?',
+                (json.dumps(source),value['source_issue']))
+            con.execute('UPDATE remediation_r2_preparations SET input_sha256=?',
+                (digest(dict(contract=value,gate=state['r1_gate'],issue_id=self.f.f.ITEM_ID)),))
+        from types import SimpleNamespace
+        fx=SimpleNamespace(native=SimpleNamespace(settings={}))
+        with patch.object(context.planning,'Effects',return_value=fx),\
+             patch.object(context.preparation.review,'verify'),\
+             patch('broker.native.issue_task_runs',return_value=[]):
+            new=context.arm_context_recovery(self.b,'source')
+            self.assertEqual(context.arm_context_recovery(self.b,'source'),new)
+        self.assertNotIn('r2_issue_hold',new)
+        self.assertFalse(new['r2_context_recovery']['execution_authorized'])
+        self.assertEqual(self.calls,[])
+        with self.b.db() as con:
+            self.assertFalse(con.execute('SELECT 1 FROM delivery_routes WHERE issue_id=?',
+                (self.f.f.ITEM_ID,)).fetchone())
+
+    def test_amended_source_permissions_do_not_grant_frozen_test_writes(self):
+        value,state,source=self.amended()
+        paths=context.source_permissions(value)
+        self.assertEqual(paths,['/workspace/app.js'])
+        self.assertNotIn('/workspace/tests/test_new.py',paths)
+        self.assertEqual(context.source_permissions(self.value),['/workspace/app.js','/workspace/tests/test_new.py'])
+        state['r2_context_recovery']=dict(operation='retained_context_recovery')
+        state['r2_issue_hold']=dict(category='r2_context_precondition_failed')
+        before=copy.deepcopy(state)
+        new=context.scope_recovery(value,state,paths)
+        self.assertEqual(state,before)
+        self.assertFalse(new['r2_scope_recovery']['execution_authorized'])
+        self.assertEqual(new['r2_scope_recovery']['readonly_test_paths'],['/workspace/tests/test_new.py'])
+        for data,permissions in ((new,paths),(state,paths+['/workspace/tests/test_new.py']),
+                                 (state,[])):
+            with self.assertRaises(ValueError):context.scope_recovery(value,data,permissions)
+
     def invoke(self):
         with patch.object(context.planning,'Effects',return_value=self.f.f.fx),patch.object(context.preparation.review,'verify'),\
              patch.object(context.handoff_runtime,'register',side_effect=self.route),\
