@@ -220,6 +220,14 @@ contêiner observado em execução, política íntegra, tarefa nativa atual e
 transporte vivo; o `initialize` continua sendo respondido pelo Hermes real.
 Esse protocolo também permanece não instalado; os testes determinísticos não
 substituem a qualificação das imagens e do startup real sem chamadas ao modelo.
+A imagem candidata `delivery-kit-execution-broker:20261007.327` passou pelo
+canário do registro V6 e pelo `initialize` do Hermes real, ambos em probes sem
+rede, credenciais ou socket. O digest qualificado nesses dois escopos é
+`sha256:c0e364d078f642f5996b687fb0c1178d1ab1faafa75b177747f9c28418040171`.
+Isso não valida ainda a abertura assíncrona ponta a ponta entre wrapper,
+controlador e Multica: essa integração permanece necessária antes da instalação
+e de outra execução do autor. A suíte offline passou com 2.240 testes e sete
+skips existentes; os probes não enviaram sessões ou prompts ao modelo.
 
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
