@@ -274,3 +274,21 @@ The watchdog performs this registration automatically, but `dispatch_ready`
 and execution authorization remain false. Exact native context presentation,
 durable dispatch/capacity control and R3 completion are separate required gates;
 the live trial remains paused until their executor is qualified.
+
+### Native context presentation without dispatch
+
+`remediation_native_context.py` projects only an exact registered execution
+context reference into the unassigned, todo Multica card. It revalidates the
+paused runtime, original brief, full-suite command, role separation and R1
+review policy or approved foreign Red. The original card description remains
+in the durable controller intent; the full execution/review capsule remains in
+the immutable route. No status, assignment or wakeup is created by projection.
+
+The fixed PUT uses `suppress_run=true` and is preceded by committed intent.
+Lost acknowledgments and restarts permit observation only, never a repeated
+PUT. A written reference without controller intent is not adopted. Native
+metadata or context drift, active issue leases and enabled issue wakeups block
+the write. Unrelated leases do not starve it. Observation is bounded even when
+transport fails before intent creation; permission/schema HTTP rejection is a
+technical hold, not an endless transient retry. Holds retain a Tech Lead owner
+and next action. Presentation receipts authorize neither execution nor release.
