@@ -27,6 +27,7 @@ def findings(path, content, *, mode='100644'):
         'team-delivery-kit/evaluation/sources.lock.json',
         'team-delivery-kit/evaluation/SURGICAL-DRIVER-V3-QUALIFICATION-2026-10-04.json',
         'team-delivery-kit/evaluation/TEMPLATE-LINES-V6-SOURCE-CANARY-2026-10-07.json',
+        'team-delivery-kit/evaluation/STARTUP-POLICY-OBSERVATIONS-2026-10-07.json',
     }
     if (path.startswith('team-delivery-kit/evaluation/') and p.suffix in {'.md', '.json'}
             and path not in public_evidence):
@@ -63,6 +64,12 @@ class PublicationTests(unittest.TestCase):
     def test_templates_and_public_code_are_allowed(self):
         self.assertFalse(findings('config/.env.example', b'OPENROUTER_API_KEY=\n'))
         self.assertFalse(findings('README.md', b'Use ${GH_TOKEN}; no actual credential.'))
+
+    def test_explicit_zero_model_qualification_still_checks_credentials(self):
+        path='team-delivery-kit/evaluation/STARTUP-POLICY-OBSERVATIONS-2026-10-07.json'
+        self.assertFalse(findings(path,b'{"model_calls":0,"delivery_approval":false}'))
+        self.assertTrue(findings(path,b'OPENROUTER_API_KEY=' + b'sk-or-v1-' + b'a'*64))
+        self.assertTrue(findings('team-delivery-kit/evaluation/private-startup.json',b'{}'))
 
 
 def check():
