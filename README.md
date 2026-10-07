@@ -99,6 +99,11 @@ instrução real após leituras completas contra schema e adaptador do proxy. Um
 rejeição de preflight permanece bloqueada até qualificar a condição corrigida;
 a instalação da política, por si só, não rearma o card nem reinicia tentativas.
 
+Uma qualificação administrativa de preflight vincula o recibo sanitizado do
+proxy à execução fechada do CTO, exige suas leituras completas e verifica o schema
+simples corrigido. Ela preserva o hold anterior e registra uma única retomada de
+decisão; não reaproveita respostas, reinicia o autor ou dispensa nenhum gate.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe
