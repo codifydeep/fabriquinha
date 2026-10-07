@@ -95,3 +95,19 @@ class HarnessJobTests(unittest.TestCase):
         self.assertEqual(state['owner'],'actual-cto');self.assertFalse(state['delivery_approval'])
         self.assertTrue(all(method=='GET' for method,path in calls))
         self.assertEqual(job.reconcile_rejected(self.b,con,'task'),state)
+
+    def test_rejection_facts_are_manifest_bound_and_never_grant_authority(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE delivery_routes(issue_id TEXT,config TEXT)')
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps({'cto':'actual-cto'})))
+        info=dict(Id='job',Config=dict(Labels={'delivery-kit.harness-manifest':'b'*64}))
+        raw=dict(status='rejected',phase='positive_reference',delivery_approval=False,
+                 facts=dict(manifest_sha256='b'*64,test_sha256='c'*64,positive=dict(
+                     tests=15,failures=2,errors=0,skipped=0,unexpected_successes=0,expected_failures=0,
+                     failed_methods=['test_demo'],source='private source',author_retry_authorized=True)))
+        state=job.rejection_state(con,'issue',info,json.dumps(raw))
+        self.assertEqual(state['diagnostic']['positive']['failed_methods'],['test_demo'])
+        self.assertNotIn('private source',json.dumps(state))
+        self.assertNotIn('author_retry_authorized',json.dumps(state))
+        raw['facts']['manifest_sha256']='d'*64
+        self.assertNotIn('diagnostic',job.rejection_state(con,'issue',info,json.dumps(raw)))

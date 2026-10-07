@@ -20,6 +20,14 @@ TEST = 'tests/test_service_mode_indicator.py'
 PRODUCT = 'app/static/app.js'
 TEMPLATE = 'NODE_HARNESS_TEMPLATE'
 CLASS = 'ServiceModeClientTests'
+
+
+class CalibrationRejected(ValueError):
+    """Bounded controller facts, never submitted source or an approval."""
+    def __init__(self,phase,facts):
+        super().__init__('harness calibration rejected: '+phase)
+        self.phase=phase
+        self.facts=facts
 CASES = {
     'extra_key_accepted': 'test_extra_key_yields_unavailable',
     'other_mode_accepted': 'test_other_mode_value_yields_unavailable',
@@ -69,7 +77,9 @@ def observed(cls, method=None):
     return dict(tests=result.testsRun,failures=len(result.failures),errors=len(result.errors),
                 skipped=len(result.skipped),unexpected_successes=len(result.unexpectedSuccesses),
                 expected_failures=len(result.expectedFailures),
-                output_sha256=hashlib.sha256(output.getvalue().encode()).hexdigest())
+                output_sha256=hashlib.sha256(output.getvalue().encode()).hexdigest(),
+                failed_methods=sorted({getattr(t,'_testMethodName','__fixture__') for t,_ in result.failures}),
+                errored_methods=sorted({getattr(t,'_testMethodName','__fixture__') for t,_ in result.errors}))
 
 
 def validate_controls(positive, negatives):
@@ -87,7 +97,8 @@ def run(root,manifest):
     root=Path(root)
     compiled=compile_snapshot(root,manifest,TEST,PRODUCT,TEMPLATE)
     if any(compiled[k]['exit_code']!=0 for k in ('control','harness','product')):
-        raise ValueError('embedded harness/product must compile before behavioral calibration')
+        raise CalibrationRejected('compile',dict(manifest_sha256=manifest,test_sha256=compiled['test_sha256'],
+            exit_codes={k:compiled[k]['exit_code'] for k in ('control','harness','product')}))
     spec=importlib.util.spec_from_file_location('submitted_service_mode_harness',root/TEST)
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     cls=getattr(module,CLASS)
@@ -101,11 +112,17 @@ def run(root,manifest):
             path=Path(directory)/'control.js';module.APP_JS_PATH=path
             path.write_text(fixture('positive'));positive=observed(cls)
             if positive['failures'] or positive['errors']:
-                raise ValueError('candidate harness rejects correct reference')
+                verify_snapshot(root,manifest)
+                raise CalibrationRejected('positive_reference',dict(manifest_sha256=manifest,
+                    test_sha256=compiled['test_sha256'],positive=positive))
             for case,method in CASES.items():
                 path.write_text(fixture(case));negatives[case]=observed(cls,method)
     finally:module.APP_JS_PATH=original
-    validate_controls(positive,negatives)
+    try:validate_controls(positive,negatives)
+    except ValueError:
+        verify_snapshot(root,manifest)
+        raise CalibrationRejected('behavioral_controls',dict(manifest_sha256=manifest,
+            test_sha256=compiled['test_sha256'],positive=positive,negative_controls=negatives)) from None
     verify_snapshot(root,manifest)
     return dict(operation='service_mode_harness_calibration_v1',manifest_sha256=manifest,
         test_sha256=compiled['test_sha256'],compile=compiled,positive=positive,negative_controls=negatives,
@@ -117,5 +134,7 @@ if __name__=='__main__':
     import sys
     try:print(json.dumps(run(*sys.argv[1:]),sort_keys=True))
     except Exception as error:
-        print(json.dumps(dict(status='rejected',category=type(error).__name__,delivery_approval=False)))
+        result=dict(status='rejected',category=type(error).__name__,delivery_approval=False)
+        if isinstance(error,CalibrationRejected):result.update(phase=error.phase,facts=error.facts)
+        print(json.dumps(result,sort_keys=True))
         sys.exit(1)

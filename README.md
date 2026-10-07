@@ -75,6 +75,12 @@ objeto de qualificação do harness. A reconciliação de um job rejeitado obser
 somente o contêiner e a imagem originais, mesmo após atualizar o controlador;
 não recria jobs, reexecuta o autor ou transforma rejeição em aprovação.
 
+O diagnóstico de calibração distingue compilação, referência positiva e controles
+comportamentais. Rejeições retêm contagens, nomes dos métodos que falharam e hashes,
+sem tracebacks ou código submetido. Esses fatos são vinculados ao manifesto do job
+e não concedem retry, edição, Red, revisão aprovada ou homologação. O tratamento
+autônomo completo de replanejamento após esgotar a correção ainda está pendente.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe

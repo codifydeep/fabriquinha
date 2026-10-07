@@ -69,8 +69,32 @@ def rejection_state(con,issue,info,raw):
     row=con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
     owner=json.loads(row[0]).get('cto') if row else None
     if not isinstance(owner,str) or not owner:raise ValueError('persistent CTO route required')
-    return dict(stage='blocked',container_id=info['Id'],output_sha256=hashlib.sha256(raw.encode()).hexdigest(),
-                category='harness_calibration_rejected',owner=owner,delivery_approval=False)
+    state=dict(stage='blocked',container_id=info['Id'],output_sha256=hashlib.sha256(raw.encode()).hexdigest(),
+               category='harness_calibration_rejected',owner=owner,delivery_approval=False)
+    # Retain only diagnostic facts tied to the actual job manifest. Submitted
+    # prose, tool requests and success claims cannot expand this receipt.
+    try:
+        value=json.loads(raw);facts=value['facts'];phase=value['phase']
+        expected=info['Config']['Labels']['delivery-kit.harness-manifest']
+        if (value.get('status')!='rejected' or value.get('delivery_approval') is not False
+                or phase not in ('compile','positive_reference','behavioral_controls')
+                or facts.get('manifest_sha256')!=expected
+                or not re.fullmatch(r'[a-f0-9]{64}',facts.get('test_sha256',''))):return state
+        diagnostic=dict(phase=phase,manifest_sha256=expected,test_sha256=facts['test_sha256'])
+        positive=facts.get('positive')
+        counts=('tests','failures','errors','skipped','unexpected_successes','expected_failures')
+        if isinstance(positive,dict) and all(type(positive.get(k)) is int and 0<=positive[k]<=10000 for k in counts):
+            summary={k:positive[k] for k in counts}
+            for key in ('failed_methods','errored_methods'):
+                names=positive.get(key,[])
+                if (isinstance(names,list) and len(names)<=1000 and all(isinstance(n,str)
+                        and re.fullmatch(r'(?:test_[A-Za-z0-9_]{1,120}|__fixture__)',n) for n in names)):
+                    summary[key]=names
+            if re.fullmatch(r'[a-f0-9]{64}',positive.get('output_sha256','')):summary['output_sha256']=positive['output_sha256']
+            diagnostic['positive']=summary
+        state['diagnostic']=diagnostic
+    except (ValueError,TypeError,KeyError):pass
+    return state
 
 
 def reconcile_rejected(b,con,task):

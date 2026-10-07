@@ -1,10 +1,33 @@
 import unittest
 import json,subprocess
-from service_mode_harness_qualification import CASES,fixture,validate_controls
+from service_mode_harness_qualification import CASES,fixture,validate_controls,observed,CalibrationRejected
 from inherited_harness_probe import syntax
 
 
 class HarnessQualificationTests(unittest.TestCase):
+    def test_failure_facts_identify_methods_without_leaking_tracebacks_or_source(self):
+        class Candidate(unittest.TestCase):
+            def test_bad(self):self.fail('private submitted source must not escape')
+            def test_error(self):raise RuntimeError('private submitted source must not escape')
+        facts=observed(Candidate)
+        self.assertEqual(facts['failed_methods'],['test_bad'])
+        self.assertEqual(facts['errored_methods'],['test_error'])
+        self.assertNotIn('private submitted source',json.dumps(facts))
+        error=CalibrationRejected('positive_reference',{'positive':facts})
+        self.assertIsInstance(error,ValueError)
+        self.assertEqual(error.phase,'positive_reference')
+        self.assertNotIn('private submitted source',str(error))
+
+    def test_fixture_error_is_retained_instead_of_losing_the_diagnostic(self):
+        class Candidate(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):raise RuntimeError('private fixture failure')
+            def test_example(self):pass
+        facts=observed(Candidate)
+        self.assertEqual(facts['errors'],1)
+        self.assertEqual(facts['errored_methods'],['__fixture__'])
+        self.assertNotIn('private fixture failure',json.dumps(facts))
+
     def facts(self,**changes):
         return dict(tests=1,failures=1,errors=0,skipped=0,unexpected_successes=0,expected_failures=0,**changes)
 
