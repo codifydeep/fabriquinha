@@ -11,8 +11,12 @@ MAX_BYTES = 32768
 def write_fenced(path, content, root=Path('/workspace')):
     target = Path(path)
     if (not target.is_absolute() or '..' in target.parts or target.resolve() != target
-            or root not in target.parents or len(content) > MAX_BYTES):
-        raise ValueError('invalid fenced write target or size')
+            or root not in target.parents):
+        raise ValueError('invalid fenced write target')
+    if len(content)>MAX_BYTES:
+        raise ValueError('fenced write size exceeds '+str(MAX_BYTES)+' bytes; received at least '+str(len(content))+
+            ' bytes. Reduce duplicate comments/scaffolding in the declared NEW test before adding code; '
+            'preserve all test methods, assertions and acceptance. No bytes were changed.')
     descriptor = os.open(target, os.O_WRONLY | os.O_NOFOLLOW)
     try:
         info = os.fstat(descriptor)

@@ -7,6 +7,19 @@ from artifact_response_contract import validate, ArtifactResponseRejected
 
 
 class SeededEditProtocolTests(unittest.TestCase):
+    def test_byte_guidance_comes_from_complete_read_without_increasing_write_authority(self):
+        body=self.body()
+        text='# '+('é'*16000)
+        body['messages'][-1]['content']=json.dumps(dict(content='1|'+text,total_lines=1))
+        result=apply(body)
+        note=result['messages'][-1]['content']
+        self.assertIn('byte ceiling='+str(len(text.encode('utf-8'))+1),note)
+        self.assertIn('write limit32768',note)
+        self.assertIn('preserving every method/assertion',note)
+        chosen=next(t for t in result['tools'] if t['function']['name']=='patch')
+        self.assertEqual(chosen['function']['parameters']['properties']['path']['enum'],['/workspace/tests/test_new.py'])
+        self.assertEqual(chosen['function']['parameters']['properties']['new_string']['maxLength'],4096)
+
     def test_real_edit_does_not_rearm_pre_edit_read_gate_after_changed_file_read(self):
         body=self.body()
         body['messages'] += [{'role':'assistant','tool_calls':[{'id':'edit','function':{

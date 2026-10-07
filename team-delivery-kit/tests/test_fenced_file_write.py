@@ -18,6 +18,15 @@ class FencedFileWriteTests(unittest.TestCase):
                 write_fenced(target, b'x' * 32769, root)
             self.assertEqual(target.read_bytes(), b'preserved')
 
+    def test_size_error_identifies_limit_without_payload_and_path_error_is_distinct(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'test_new.py';target.write_bytes(b'unchanged')
+            with self.assertRaisesRegex(ValueError,'size exceeds 32768 bytes; received at least 32769'):
+                write_fenced(target,b'x'*32769,root)
+            with self.assertRaisesRegex(ValueError,'invalid fenced write target'):
+                write_fenced(root/'..'/'forbidden.py',b'x',root)
+            self.assertEqual(target.read_bytes(),b'unchanged')
+
     def test_writes_existing_target_and_rejects_symlink_and_unowned_file(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()

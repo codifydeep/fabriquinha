@@ -329,16 +329,21 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import read_capacity_diagnosis
         with broker.db() as con:
             qualified_capacity=read_capacity_diagnosis.qualified(con,issue,key,data)
+        try:import seeded_byte_budget_replan
+        except ImportError:from broker import seeded_byte_budget_replan
+        with broker.db() as con:
+            qualified_byte_budget=seeded_byte_budget_replan.qualified(con,issue,key,data)
         qualified_framework=(framework.get('kind')=='unpinned_pytest_cto_replan_v1'
             and framework.get('request',{}).get('issue_id')==issue
             and framework.get('request',{}).get('source_task')==key
             and framework.get('proof',{}).get('verified') is True
             and framework.get('proof',{}).get('framework_mismatch') is True
             and framework.get('diagnostic_sha256')==hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest())
-        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity):
+        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget):
             block('test_first_correction_failed_after_cto_diagnosis')
             return
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
+        if qualified_byte_budget:suffix+=':preserved-seed-byte-budget-v1'
         if data.get('artifact_diagnosis_replay'):
             suffix+=':proxy-artifact-evidence-v1'
         if qualified_structure:

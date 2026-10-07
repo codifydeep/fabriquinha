@@ -8,7 +8,7 @@ import ast
 import json
 import re
 
-from artifact_read_evidence import observations, next_read
+from artifact_read_evidence import observations, next_read, coverage
 from surgical_test_edit import marker_config,typed_schema
 from author_read_policy import page_size
 
@@ -275,8 +275,17 @@ def apply(body):
                     'old_string':{'type':'string','minLength':1,'maxLength':4096},
                     'new_string':{'type':'string','minLength':1,'maxLength':4096}},
                     'required':['path','old_string','new_string'],'additionalProperties':False}
+                observed=coverage(read_history,wire=True,include_content=True).get(target,{})
+                lines=observed.get('line_content',{})
+                # Full numbered reads prove content, not the exact final-newline
+                # bit. Report a conservative byte ceiling, never invented stat.
+                byte_ceiling=sum(len(text.encode('utf-8'))+1 for text in lines.values())
+                budget=('Observed complete source byte ceiling='+str(byte_ceiling)+
+                    '; write limit32768. If headroom is small, first shorten duplicate COMMENTS with a narrow patch, '
+                    'preserving every method/assertion, then repair the harness. Do not increase limits or weaken tests. '
+                    if observed.get('lines')==observed.get('total_lines') and lines else '')
                 return _selected(result,'patch',
-                    'SEEDED HARNESS REPAIR: fresh reads observed. Perform ONE actual narrow patch '
+                    budget+'SEEDED HARNESS REPAIR: fresh reads observed. Perform ONE actual narrow patch '
                     'to the diagnosed NEW harness now: unique old_string and changed new_string. '
                     'No promise, terminal, full-file replacement or assertion deletion. Preserve '
                     'existing methods/assertions. Then complete remaining fixes and executable '

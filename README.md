@@ -61,6 +61,15 @@ revisão. A rejeição do harness antigo inválido foi verificada; a aprovação
 nova entrega e o ciclo integral continuam pendentes. Este gate especializado do
 ensaio não constitui calibração genérica para qualquer projeto.
 
+O writer mantém o limite de 32.768 bytes e distingue rejeições de caminho e de
+tamanho sem alterar o arquivo. Para testes novos herdados próximos desse teto,
+o contexto de patch usa as leituras completas para orientar uma redução estreita
+de comentários redundantes, preservando métodos, assertions e critérios. Uma
+requalificação administrativa única exige arquivo preservado, identidade do
+workspace, duas rejeições reais e política corrigida; apenas reabre o diagnóstico
+independente do CTO. Não reinicia diretamente o autor, aumenta limites, reinicia
+profundidade ou aprova Red e entrega.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe
