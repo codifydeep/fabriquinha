@@ -35,6 +35,7 @@ def instruction(config,state):
             'escalate_cto, reason<=1200 characters, optional_files=[].\n'
             'Authenticated bootstrap: '+json.dumps(config['bootstrap_failure'],sort_keys=True)+'\n'
             'Bounded recipe: '+json.dumps(config['line_recipe']['recipe'],sort_keys=True)+'\n'+
+            (config['bootstrap_infrastructure_note']+'\n' if config.get('bootstrap_infrastructure_note') else '')+
             ('CTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True)+'\n' if peer else '')+
             'Unchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
             ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))

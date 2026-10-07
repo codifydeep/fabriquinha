@@ -39,6 +39,17 @@ desse teste é uma fixture descartável, não um handoff real do Multica. O inci
 legado do CTO continua sem a inspeção original; esse probe não a reconstitui nem
 aprova uma entrega.
 
+Para um incidente legado cujo worker já foi retirado sem inspeção arquivada, uma
+manutenção pode abrir **um novo diagnóstico somente leitura**, não confirmar a
+causa antiga. Ela exige execução nativa do CTO falha, capability de planejamento
+consumida, zero ACP e ferramentas, retirada comprovada, entrega imutável conferida
+e o arquivo privado do probe instalado validado contra os hashes atuais. O novo
+contexto declara a inspeção ausente e a causa não comprovada. Há identidade nova,
+intenção persistida antes do despacho e nenhuma aprovação herdada. CTO e Tech Lead
+ainda precisam ler a entrega e tomar decisões independentes; autor, Red, revisão,
+PR/CI e homologação continuam protegidos pelos gates originais. Essa admissão de
+diagnóstico não é uma recuperação genérica nem uma entrega autônoma qualificada.
+
 ## O que queremos construir
 
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.

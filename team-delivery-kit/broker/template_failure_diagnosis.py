@@ -3,7 +3,8 @@
 Each failed native execution owns one persistent diagnostic intent. Historical
 executors and plans remain intact; a new image alone cannot sponsor execution.
 """
-import hashlib,json,time
+import hashlib,json,os,re,sqlite3,time
+from pathlib import Path
 
 
 def modules():
@@ -84,10 +85,7 @@ def installed_line_qualification(b,con):
     return proof
 
 
-def recover_network_default(config,state,task,payload,intent,startup,info,tool_calls,acp_events):
-    """One changed-policy CTO planning round, never replay the failed transport."""
-    try:import worker_creation_intent as workers
-    except ImportError:from broker import worker_creation_intent as workers
+def validate_failed_planner(config,state,task,payload,intent,startup,tool_calls,acp_events):
     if (not config.get('bootstrap_failure') or config.get('bootstrap_policy_revision')
             or state.get('bootstrap_policy_recovery') or state.get('stage')!='blocked'
             or state.get('category')!='surgical_failure_diagnosis_rejected'
@@ -98,9 +96,17 @@ def recover_network_default(config,state,task,payload,intent,startup,info,tool_c
             or tool_calls!=0 or acp_events!=0
             or intent.get('stage')!='ownership_or_policy_conflict'
             or startup.get('stage')!='failed' or startup.get('category')!='startup_broker_internal'
-            or payload.get('NetworkDisabled') is not False or not info
-            or 'NetworkDisabled' in info.get('Config',{})):
-        raise ValueError('one authenticated omitted-false pre-ACP CTO incident required')
+            or payload.get('NetworkDisabled') is not False):
+        raise ValueError('one authenticated pre-ACP CTO planning incident required')
+
+
+def recover_network_default(config,state,task,payload,intent,startup,info,tool_calls,acp_events):
+    """One changed-policy CTO planning round, never replay the failed transport."""
+    try:import worker_creation_intent as workers
+    except ImportError:from broker import worker_creation_intent as workers
+    validate_failed_planner(config,state,task,payload,intent,startup,tool_calls,acp_events)
+    if not info or 'NetworkDisabled' in info.get('Config',{}):
+        raise ValueError('original omitted-false inspection required')
     observed,_=workers.observe(payload,{'stage':'start_acknowledged'},info,'failed',0,time.time())
     if observed['stage']!='late_start_observed':raise ValueError('complete original worker policy must match')
     receipt=dict(operation='docker_omitted_false_CTO_recovery_v1',previous_state=state,
@@ -116,7 +122,87 @@ def recover_network_default(config,state,task,payload,intent,startup,info,tool_c
     return changed,new
 
 
-def arm_network_default_recovery(b,source):
+def validate_infrastructure_probe(proof,worker,controller_sha,policy_sha):
+    true_flags=('installed_controller_code','actual_broker_http','actual_wrapper','actual_docker',
+        'actual_acp_transport','actual_hermes_initialize','lost_create_ack_observed','retirement_observed',
+        'network_default_policy','durable_policy_observations','observed_omitted_false','worker_socket_absent')
+    if (proof.get('schema')!='async-startup-integration-probe-v1' or proof.get('status')!='passed'
+            or not re.fullmatch(r'sha256:[a-f0-9]{64}',str(worker))
+            or any(not re.fullmatch(r'[a-f0-9]{64}',str(v)) for v in (controller_sha,policy_sha))
+            or proof.get('native_identity')!='disposable_fixture_not_real_multica'
+            or proof.get('worker_image')!=worker or proof.get('controller_sha256')!=controller_sha
+            or proof.get('policy_source_sha256')!=policy_sha or proof.get('lease_status')!='closed'
+            or proof.get('worker_network')!='none' or proof.get('delivery_approval') is not False
+            or any(proof.get(k) is not True for k in true_flags)
+            or any(type(proof.get(k)) is not int or proof[k]!=0 for k in ('model_calls','prompts_sent','sessions_created'))
+            or type(proof.get('capability_consumptions')) is not int or proof['capability_consumptions']!=1
+            or proof.get('operations')!={'create':1,'start':1,'exec':1}
+            or any(type(v) is not int for v in proof.get('operations',{}).values())):
+        raise ValueError('exact installed zero-model infrastructure qualification required')
+
+
+def infrastructure_archive(b,name):
+    """Controller-owned fixture proof, never an agent-supplied verdict."""
+    if not re.fullmatch(r'startup[0-9]+-network-default-qualified',str(name)):
+        raise ValueError('one owned qualification archive name required')
+    directory=b.STATE/name
+    paths=(directory,directory/'probe-receipt.json',directory/'leases.sqlite')
+    if any(p.is_symlink() or not p.exists() or p.stat().st_uid!=os.geteuid() or p.stat().st_mode&0o077 for p in paths):
+        raise ValueError('private controller-owned qualification required')
+    if (not directory.is_dir() or not paths[1].is_file() or not paths[2].is_file()
+            or paths[1].stat().st_size>8192):raise ValueError('bounded archive files required')
+    proof=json.loads(paths[1].read_text())
+    validate_infrastructure_probe(proof,b.IMAGE,hashlib.sha256(Path('/broker.py').read_bytes()).hexdigest(),
+        hashlib.sha256(Path('/worker_creation_intent.py').read_bytes()).hexdigest())
+    con=sqlite3.connect('file:'+str(paths[2])+'?mode=ro',uri=True)
+    try:
+        if (con.execute('PRAGMA integrity_check').fetchone()[0]!='ok'
+                or con.execute('SELECT used,mode FROM grants').fetchall()!=[(1,'planning')]
+                or con.execute('SELECT status FROM leases').fetchall()!=[('closed',)]
+                or con.execute('SELECT method,success FROM acp_events').fetchall()!=[('initialize',1)]
+                or con.execute('SELECT count(*) FROM acp_sessions').fetchone()[0]!=0):
+            raise ValueError('actual closed fixture ACP execution required')
+        rows=con.execute('SELECT request_id,receipt_sha256,receipt FROM worker_policy_observations').fetchall()
+        request=con.execute('SELECT request_id FROM grants').fetchone()[0]
+        facts=[]
+        for req,digest,raw in rows:
+            fact=json.loads(raw)
+            if (req!=request or hashlib.sha256(raw.encode()).hexdigest()!=digest
+                    or fact['request_id']!=request or fact['worker_image']!=b.IMAGE
+                    or fact['normalized_differences'] or fact['delivery_approval'] is not False
+                    or fact['author_retry_authorized'] is not False):raise ValueError('durable policy receipt drift')
+            facts.append(fact)
+        if (not facts or not any(f['docker_status']=='running' and f['omitted_false_network_flag'] for f in facts)
+                or con.execute('SELECT state FROM worker_retirement_intents').fetchall()!=[('gone',)]):
+            raise ValueError('actual default policy and retirement evidence required')
+    finally:con.close()
+    return proof
+
+
+def recover_retired_planner(config,state,task,payload,intent,startup,retired,proof,tools,acp):
+    """New read-only diagnosis with qualified infrastructure; old cause unproved."""
+    validate_failed_planner(config,state,task,payload,intent,startup,tools,acp)
+    if retired.get('state')!='gone' or not re.fullmatch(r'[a-f0-9]{64}',str(retired.get('container_id',''))):
+        raise ValueError('owned terminal worker retirement required')
+    validate_infrastructure_probe(proof,payload['Image'],proof.get('controller_sha256'),proof.get('policy_source_sha256'))
+    receipt=dict(operation='retired_CTO_new_infrastructure_diagnosis_v1',previous_state=state,
+        failed_task=task['id'],failed_wakeup=task['wakeup_id'],previous_startup=startup,
+        previous_creation_intent=intent,retirement=retired,infrastructure_probe=proof,
+        original_inspection_missing=True,original_cause_confirmed=False,tool_calls=0,acp_events=0,
+        transport_replayed=False,author_retry_authorized=False,delivery_approval=False)
+    changed={**config,'bootstrap_policy_revision':1,'bootstrap_infrastructure_note':
+        'Original CTO inspection missing; old cause remains unproved. Installed zero-model Docker/ACP probe passed. '
+        'Perform new read-only diagnosis, not a replay or delivery approval. Infrastructure proof SHA256='+
+        hashlib.sha256(json.dumps(proof,sort_keys=True).encode()).hexdigest()}
+    new={k:v for k,v in state.items() if not k.startswith(('cto_','peer_'))
+         and k not in ('at','intent_at','category','error_type','required_action')}
+    new.update(stage='cto_pending',bootstrap_policy_recovery=receipt,
+        required_action='new_CTO_diagnosis_with_qualified_infrastructure_and_missing_old_inspection',
+        author_retry_authorized=False,delivery_approval=False)
+    return changed,new
+
+
+def arm_network_default_recovery(b,source,*,probe_archive=None):
     """Maintenance-only bootstrap: no worker endpoint and no native wakeup here."""
     _,admission,_,jobs,_,native=modules()
     with b.LOCK:
@@ -137,7 +223,7 @@ def arm_network_default_recovery(b,source):
         tasks=[t for t in runs if t.get('wakeup_id')==state.get('cto_wakeup')]
         if len(tasks)!=1 or any(t['status'] in ('queued','dispatched','running') for t in runs):
             raise ValueError('one terminal CTO task and idle native issue required')
-        task=tasks[0]
+        task=native.task_record(settings,tasks[0]['id'],config['cto'])
         current_cto=[t for t in runs if t.get('agent_id')==config['cto']]
         authors=[t for t in runs if t.get('agent_id')==config['author']]
         if (not current_cto or max(current_cto,key=lambda t:(t.get('created_at') or '',t['id']))['id']!=task['id']
@@ -170,7 +256,15 @@ def arm_network_default_recovery(b,source):
             raise ValueError('immutable preservation receipt drift')
         admission.validate_preservation(rec['proof'],config)
         info=b.docker('GET','/containers/'+name+'/json')
-        changed,new=recover_network_default(config,state,task,payload,intent,startup,info,tools,acp)
+        if info is None and probe_archive:
+            with b.db() as con:
+                row_retired=con.execute('SELECT container_id,name,state FROM worker_retirement_intents WHERE request_id=?',(request,)).fetchone()
+            if not row_retired or row_retired[1]!=name or records[0][2] not in ('closed','failed','expired','interrupted'):
+                raise ValueError('exact terminal retired planner required')
+            retired=dict(container_id=row_retired[0],name=row_retired[1],state=row_retired[2])
+            changed,new=recover_retired_planner(config,state,task,payload,intent,startup,retired,
+                infrastructure_archive(b,probe_archive),tools,acp)
+        else:changed,new=recover_network_default(config,state,task,payload,intent,startup,info,tools,acp)
         labels=payload['Labels']
         if (payload['Image']!=b.IMAGE or labels.get('delivery-kit.owner')!=b.OWNER
                 or labels.get('delivery-kit.request')!=request):raise ValueError('exact qualified owned worker required')
@@ -180,7 +274,8 @@ def arm_network_default_recovery(b,source):
                 raise ValueError('incident changed during recovery')
             con.execute('UPDATE calibration_failure_plans SET config=?,state=? WHERE source_task=?',
                 (json.dumps(changed,sort_keys=True),json.dumps(new,sort_keys=True),source))
-            con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(request,))
+            if new['stage']=='bootstrap_retirement_pending':
+                con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(request,))
         return new
 
 

@@ -1,4 +1,5 @@
-import copy,json,sqlite3,unittest
+import copy,hashlib,json,sqlite3,tempfile,unittest
+from pathlib import Path
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -6,6 +7,79 @@ from broker import template_failure_diagnosis as diagnosis,calibration_rework as
 
 
 class TemplateFailureDiagnosisTests(unittest.TestCase):
+    def test_archive_checks_private_files_actual_ledger_and_observation_hashes(self):
+        with tempfile.TemporaryDirectory() as root:
+            b=SimpleNamespace(STATE=Path(root),IMAGE='sha256:'+'a'*64)
+            directory=b.STATE/'startup333-network-default-qualified';directory.mkdir(mode=0o700)
+            receipt=directory/'probe-receipt.json';database=directory/'leases.sqlite'
+            proof=self.infrastructure_proof()
+            proof.update(controller_sha256=hashlib.sha256(b'controller').hexdigest(),
+                         policy_source_sha256=hashlib.sha256(b'policy').hexdigest())
+            receipt.write_text(json.dumps(proof));receipt.chmod(0o600)
+            fact=dict(request_id='fixture',worker_image=b.IMAGE,normalized_differences=[],
+                delivery_approval=False,author_retry_authorized=False,docker_status='running',omitted_false_network_flag=True)
+            raw=json.dumps(fact,sort_keys=True)
+            with sqlite3.connect(database) as con:
+                con.executescript("CREATE TABLE grants(request_id TEXT,used INTEGER,mode TEXT); INSERT INTO grants VALUES('fixture',1,'planning');"
+                    "CREATE TABLE leases(status TEXT); INSERT INTO leases VALUES('closed');"
+                    "CREATE TABLE acp_events(method TEXT,success INTEGER); INSERT INTO acp_events VALUES('initialize',1);"
+                    "CREATE TABLE acp_sessions(session_id TEXT); CREATE TABLE worker_retirement_intents(state TEXT); INSERT INTO worker_retirement_intents VALUES('gone');"
+                    "CREATE TABLE worker_policy_observations(request_id TEXT,receipt_sha256 TEXT,receipt TEXT);")
+                con.execute('INSERT INTO worker_policy_observations VALUES(?,?,?)',('fixture',hashlib.sha256(raw.encode()).hexdigest(),raw))
+            database.chmod(0o600)
+            with patch.object(Path,'read_bytes',autospec=True,side_effect=lambda path:b'controller' if str(path)=='/broker.py' else b'policy'):
+                self.assertEqual(diagnosis.infrastructure_archive(b,directory.name),proof)
+                for name in ('../escape','startup-qualified','/tmp/fixture'):
+                    with self.assertRaises(ValueError):diagnosis.infrastructure_archive(b,name)
+                receipt.chmod(0o644)
+                with self.assertRaises(ValueError):diagnosis.infrastructure_archive(b,directory.name)
+                receipt.chmod(0o600)
+                with sqlite3.connect(database) as con:con.execute("UPDATE worker_policy_observations SET receipt_sha256='bad'")
+                with self.assertRaises(ValueError):diagnosis.infrastructure_archive(b,directory.name)
+
+    def infrastructure_proof(self):
+        return dict(schema='async-startup-integration-probe-v1',status='passed',
+            worker_image='sha256:'+'a'*64,controller_sha256='b'*64,policy_source_sha256='c'*64,
+            native_identity='disposable_fixture_not_real_multica',lease_status='closed',worker_network='none',
+            delivery_approval=False,capability_consumptions=1,model_calls=0,prompts_sent=0,sessions_created=0,
+            operations={'create':1,'start':1,'exec':1},**{k:True for k in
+                ('installed_controller_code','actual_broker_http','actual_wrapper','actual_docker','actual_acp_transport',
+                 'actual_hermes_initialize','lost_create_ack_observed','retirement_observed','network_default_policy',
+                 'durable_policy_observations','observed_omitted_false','worker_socket_absent')})
+
+    def test_qualified_new_diagnosis_never_reconstructs_missing_old_inspection(self):
+        config=dict(bootstrap_failure={'operation':'worker_bootstrap_failure_v1'},source_task='source',
+            manifest_sha256='a'*64,cto='cto',issue_id='issue')
+        state=dict(stage='blocked',category='surgical_failure_diagnosis_rejected',cto_wakeup='wake',probe={'preserved':True})
+        task=dict(id='failed',status='failed',agent_id='cto',issue_id='issue',wakeup_id='wake')
+        payload=dict(Image='sha256:'+'a'*64,NetworkDisabled=False)
+        intent=dict(stage='ownership_or_policy_conflict');startup=dict(stage='failed',category='startup_broker_internal')
+        retired=dict(container_id='d'*64,name='original-worker',state='gone')
+        proof=self.infrastructure_proof();before=copy.deepcopy((config,state))
+        changed,new=diagnosis.recover_retired_planner(config,state,task,payload,intent,startup,retired,proof,0,0)
+        self.assertEqual((config,state),before)
+        self.assertEqual(new['stage'],'cto_pending');self.assertNotIn('executor',new)
+        self.assertNotEqual(lane.marker(config,'cto'),lane.marker(changed,'cto'))
+        receipt=new['bootstrap_policy_recovery']
+        self.assertTrue(receipt['original_inspection_missing']);self.assertFalse(receipt['original_cause_confirmed'])
+        self.assertFalse(receipt['transport_replayed']);self.assertFalse(receipt['author_retry_authorized'])
+        self.assertFalse(receipt['delivery_approval']);self.assertIn('old cause remains unproved',changed['bootstrap_infrastructure_note'])
+        for updates in ({'model_calls':1},{'retirement_observed':False},{'durable_policy_observations':False},
+                        {'operations':{'create':2,'start':1,'exec':1}},{'delivery_approval':True},
+                        {'controller_sha256':None}):
+            with self.assertRaises(ValueError):diagnosis.recover_retired_planner(config,state,task,payload,intent,startup,retired,{**proof,**updates},0,0)
+        for c,s,t,r,tools,acp in ((changed,new,task,retired,0,0),
+                (config,state,{**task,'agent_id':'author'},retired,0,0),
+                (config,state,task,{**retired,'state':'delete_intent'},0,0),
+                (config,state,task,retired,1,0),(config,state,task,retired,0,1)):
+            with self.assertRaises(ValueError):diagnosis.recover_retired_planner(c,s,t,payload,intent,startup,r,proof,tools,acp)
+
+    def test_infrastructure_proof_requires_exact_installed_source_and_worker(self):
+        proof=self.infrastructure_proof()
+        diagnosis.validate_infrastructure_probe(proof,'sha256:'+'a'*64,'b'*64,'c'*64)
+        for worker,controller,policy in (('sha256:'+'f'*64,'b'*64,'c'*64),
+                ('sha256:'+'a'*64,'f'*64,'c'*64),('sha256:'+'a'*64,'b'*64,'f'*64)):
+            with self.assertRaises(ValueError):diagnosis.validate_infrastructure_probe(proof,worker,controller,policy)
     def test_omitted_false_CTO_recovery_is_once_only_not_transport_or_author_replay(self):
         from tests.test_worker_creation_intent import WorkerCreationIntentTests
         payload,_,info=WorkerCreationIntentTests().inputs()
@@ -100,6 +174,9 @@ class TemplateFailureDiagnosisTests(unittest.TestCase):
             for text in ('never replayed','Historical surgical denials remain historical','No author admission yet',
                          'full pinned Red','independent review','same-commit deploy/QA','DELIVERY_REVIEW_READ_PATH:'):
                 self.assertIn(text,note)
+            config['bootstrap_infrastructure_note']='Original CTO inspection missing; old cause remains unproved. Installed zero-model Docker/ACP probe passed. Perform new read-only diagnosis, not a replay or delivery approval. Infrastructure proof SHA256='+'a'*64
+            fresh=lane.instruction(config,state)
+            self.assertLessEqual(len(fresh)+100,4000);self.assertIn('old cause remains unproved',fresh)
 
     def test_bootstrap_qualification_requires_registered_exact_worker_and_live_proxy(self):
         con=sqlite3.connect(':memory:');self.addCleanup(con.close)
