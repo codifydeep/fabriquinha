@@ -97,4 +97,3 @@ class ForcedFeedbackTests(unittest.TestCase):
         bad=response().replace(b'/workspace/tests/test_new.py',b'/workspace/app.py')
         h,forward=self.run_handler([(200,response(2),'application/json'),(200,bad,'application/json')])
         self.assertEqual(h.status,502);self.assertEqual(forward.call_count,2)
-
