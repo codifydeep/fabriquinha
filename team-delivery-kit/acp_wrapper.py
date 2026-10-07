@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+import time
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -38,6 +39,18 @@ def stream_prompt(call_url, capability, frame, output):
                 raise ValueError('invalid prompt stream event')
 
 
+def await_startup(call,*,clock=time.monotonic,sleep=time.sleep):
+    """Bounded observation using the same capability, no second acp-open."""
+    deadline=clock()+95
+    result=call('/v1/acp-startup',{})
+    while result.get('startup_status')=='pending':
+        if clock()>=deadline:raise TimeoutError('restricted worker startup deadline')
+        sleep(0.25)
+        result=call('/v1/acp-ready',{})
+    if result.get('startup_status')!='ready':raise RuntimeError('restricted worker startup failed')
+    return result
+
+
 def main():
     if '--version' in sys.argv:
         print('hermes-isolated 0.21.0')
@@ -61,7 +74,7 @@ def main():
             headers={'Authorization': 'Bearer ' + capability, 'Content-Type': 'application/json'})
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
-    opened = call('/v1/acp-open', {})
+    opened = await_startup(call)
     try:
         for line in sys.stdin:
             frame = {}

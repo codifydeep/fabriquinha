@@ -212,6 +212,14 @@ não repete `start`, não adota contêiner com política divergente e não trans
 uma tarefa terminal em sessão pronta. Mesmo a observação de Docker `running`
 exige validação da autorização atual e do transporte ACP; não é aprovação de
 entrega. Esse endurecimento permanece não instalado até qualificação conjunta.
+O wrapper agora usa abertura assíncrona: uma solicitação `/v1/acp-startup`
+seguida de consultas `/v1/acp-ready` com a mesma capability. A intenção de
+transporte é persistida antes do exec, e um resultado incerto após reinício
+exige diagnóstico, nunca uma segunda abertura silenciosa. A prontidão exige
+contêiner observado em execução, política íntegra, tarefa nativa atual e
+transporte vivo; o `initialize` continua sendo respondido pelo Hermes real.
+Esse protocolo também permanece não instalado; os testes determinísticos não
+substituem a qualificação das imagens e do startup real sem chamadas ao modelo.
 
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o

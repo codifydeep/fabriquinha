@@ -1598,7 +1598,7 @@ def change_request_reason(content):
     raise ValueError('change request lacks structured reason')
 
 
-def execute_grant(token, payload, streaming=False):
+def execute_grant(token, payload, streaming=False, defer_transport=False):
     if payload != {}:
         raise ValueError('execution parameters are controller-owned')
     with LOCK, db() as con:
@@ -1628,51 +1628,57 @@ def execute_grant(token, payload, streaming=False):
         result = submit({'request_id': row['request_id'], 'scenario': 'acp-session' if streaming else 'acp'}, trusted_acp=True)
         if result['status']!='running':
             raise ValueError('worker startup requires observation before transport')
-        if streaming:
-            from acp_transport import Transport
-            try:
-                with db() as lookup:
-                    binding = lookup.execute('SELECT scope,issue_id,task_id FROM native_bindings WHERE request_id=?', (row['request_id'],)).fetchone()
-                    editables = [r[0] for r in lookup.execute(
-                        'SELECT path FROM issue_editables WHERE issue_id=?',
-                        (binding['issue_id'],))] if binding else []
-                    test_commands = [r[0] for r in lookup.execute(
-                        'SELECT command FROM issue_test_commands WHERE issue_id=?',
-                        (binding['issue_id'],))] if binding else []
-                    phase = implementation_phase(binding['issue_id']) if binding else None
-                    route_row = lookup.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
-                                               (binding['issue_id'],)).fetchone() if binding else None
-                    editables = phase_editables(editables,
-                        json.loads(route_row[0]) if route_row else None, phase, row['mode'])
-                if row['mode'] == 'implementation' and route_row:
-                    lock_workspace(binding['issue_id'], binding['scope'],
-                                   PREFIX + '-work-' + hashlib.sha256(binding['scope'].encode()).hexdigest()[:32],
-                                   editables)
-                if row['mode'] == 'implementation' and not editables:
-                    editables = ['/workspace/calc.py', '/workspace/test_calc.py']
-                suite_capability = None
-                if row['mode'] == 'review' and binding:
-                    import review_suite_rpc
-                    suite_capability = review_suite_rpc.issue(handoff_context(), row['request_id'])
-                SESSIONS[row['request_id']] = Transport(
-                    docker, result['name'], persistent=bool(binding), mode=row['mode'],
-                    editable_paths=editables, test_commands=test_commands,
-                    review_suite_capability=suite_capability)
-            except Exception as error:
-                remove_owned(result['name'], row['request_id'])
-                with db() as failed:
-                    failed.execute("UPDATE leases SET status='failed' WHERE request_id=?", (row['request_id'],))
-                    failed.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
-                                   (row['request_id'], 'transport_start',
-                                    'bootstrap:' + failure_category(error), time.time()))
-                raise
-            if scope:
-                from session_resume import prior_session
-                with db() as lookup:
-                    prior = prior_session(lookup, scope, binding['task_id'])
-                if prior:
-                    result['resume_session_id'] = prior
+        if streaming and not defer_transport:
+            result = open_granted_transport(row,result,scope)
         return result
+
+
+def open_granted_transport(row,result,scope):
+    """Open only after startup authorization; callers own the single-use intent."""
+    from acp_transport import Transport
+    try:
+        with db() as lookup:
+            binding = lookup.execute('SELECT scope,issue_id,task_id FROM native_bindings WHERE request_id=?', (row['request_id'],)).fetchone()
+            editables = [r[0] for r in lookup.execute(
+                'SELECT path FROM issue_editables WHERE issue_id=?',
+                (binding['issue_id'],))] if binding else []
+            test_commands = [r[0] for r in lookup.execute(
+                'SELECT command FROM issue_test_commands WHERE issue_id=?',
+                (binding['issue_id'],))] if binding else []
+            phase = implementation_phase(binding['issue_id']) if binding else None
+            route_row = lookup.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
+                                       (binding['issue_id'],)).fetchone() if binding else None
+            editables = phase_editables(editables,
+                json.loads(route_row[0]) if route_row else None, phase, row['mode'])
+        if row['mode'] == 'implementation' and route_row:
+            lock_workspace(binding['issue_id'], binding['scope'],
+                           PREFIX + '-work-' + hashlib.sha256(binding['scope'].encode()).hexdigest()[:32],
+                           editables)
+        if row['mode'] == 'implementation' and not editables:
+            editables = ['/workspace/calc.py', '/workspace/test_calc.py']
+        suite_capability = None
+        if row['mode'] == 'review' and binding:
+            import review_suite_rpc
+            suite_capability = review_suite_rpc.issue(handoff_context(), row['request_id'])
+        SESSIONS[row['request_id']] = Transport(
+            docker, result['name'], persistent=bool(binding), mode=row['mode'],
+            editable_paths=editables, test_commands=test_commands,
+            review_suite_capability=suite_capability)
+    except Exception as error:
+        remove_owned(result['name'], row['request_id'])
+        with db() as failed:
+            failed.execute("UPDATE leases SET status='failed' WHERE request_id=?", (row['request_id'],))
+            failed.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
+                           (row['request_id'], 'transport_start',
+                            'bootstrap:' + failure_category(error), time.time()))
+        raise
+    if scope:
+        from session_resume import prior_session
+        with db() as lookup:
+            prior = prior_session(lookup, scope, binding['task_id'])
+        if prior:
+            result['resume_session_id'] = prior
+    return result
 
 
 def assert_review_task_running(row):
@@ -2213,8 +2219,9 @@ class Handler(BaseHTTPRequestHandler):
         status, response = 200, {}
         authorization = self.headers.get('Authorization', '')
         suite_call = self.path == '/v1/review-suite' and authorization.startswith('Bearer ')
+        startup_call = self.path in ('/v1/acp-startup','/v1/acp-ready') and authorization.startswith('Bearer ')
         grant_call = self.path in ('/v1/acp-probe', '/v1/acp-open', '/v1/acp-message', '/v1/acp-message-stream', '/v1/acp-close') and authorization.startswith('Bearer ')
-        if not grant_call and not suite_call and not hmac.compare_digest(authorization, 'Bearer ' + TOKEN):
+        if not grant_call and not suite_call and not startup_call and not hmac.compare_digest(authorization, 'Bearer ' + TOKEN):
             status, response = 401, {'error': 'unauthorized'}
         else:
             try:
@@ -2225,7 +2232,11 @@ class Handler(BaseHTTPRequestHandler):
                 if self.path == '/v1/acp-message-stream':
                     self.stream_message(authorization, payload)
                     return
-                if suite_call:
+                if startup_call:
+                    import acp_startup
+                    response = acp_startup.request(handoff_context(),authorization[7:],payload,
+                        begin=self.path=='/v1/acp-startup')
+                elif suite_call:
                     import review_suite_rpc
                     response = review_suite_rpc.execute(handoff_context(), authorization[7:], payload)
                 elif grant_call:
