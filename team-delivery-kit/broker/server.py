@@ -167,6 +167,14 @@ def implementation_phase(issue_id):
         db=db, PREFIX=PREFIX, OWNER=OWNER, issue_base=issue_base, docker=docker), issue_id)
     if remediation_phase:
         return remediation_phase
+    try:
+        import remediation_red_reference
+    except ImportError:
+        from broker import remediation_red_reference
+    dependent_phase = remediation_red_reference.phase(SimpleNamespace(
+        db=db, PREFIX=PREFIX, OWNER=OWNER, issue_base=issue_base, docker=docker), issue_id)
+    if dependent_phase:
+        return dependent_phase
     with db() as con:
         row = con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
                           (issue_id,)).fetchone()

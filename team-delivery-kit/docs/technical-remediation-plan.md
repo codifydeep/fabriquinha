@@ -188,3 +188,23 @@ or relabel that Red as a new R2 test execution. It exposes product-only writable
 paths, frozen tests and the full criteria, but confers no execution authority.
 Actual R2 seeding, handler restrictions, full Green, independent product review
 and R3 publication/deploy/QA must still be verified by their executor.
+
+### Cross-card Red reference
+
+`remediation_red_reference.py` registers an explicit controller-owned R2-to-R1
+association only after the exact R1 review has been independently verified.
+It never inserts a Red into the R2 card or changes the original Red issue, task,
+scope, volume or test hashes. The reference remains tied to the approved recovery
+contract, original Git base, independent actors, product-only edit allowlist and
+current R1 approval. Revocation or drift fails closed.
+
+Workspace seeding selects the R1 snapshot read-only. The runtime classifies R2
+as implementation-after-Red without running the same-card test-first workflow.
+Freeze and full Green resolve the referenced receipt only for the exact author
+and a closed implementation lease. Frozen-test verification compares against
+that original snapshot, and durable TDD records retain `red_origin_issue` and
+`red_origin_scope`. No local Red is fabricated to satisfy a lookup.
+
+These hooks do not create R2, prepare its Docker base, wake its author, approve
+its product delivery or publish it. Those dependent controller transitions and
+the live R1/R2/R3 chain remain required before the trial can be declared passed.

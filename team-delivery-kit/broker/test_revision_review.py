@@ -466,6 +466,13 @@ def seed_source(broker, issue_id):
     remediation_seed = remediation_runtime_guard.seed_source(broker, issue_id)
     if remediation_seed is not None:
         return remediation_seed
+    try:
+        import remediation_red_reference
+    except ImportError:
+        from broker import remediation_red_reference
+    dependent_seed = remediation_red_reference.seed_source(broker, issue_id)
+    if dependent_seed is not None:
+        return dependent_seed
     with broker.db() as con:
         initialize(con)
         row = con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',

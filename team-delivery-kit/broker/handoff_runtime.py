@@ -210,6 +210,9 @@ class Effects:
                        'green': {'manifest_sha256': result['manifest_sha256'],
                                  'tests': result['tests'], 'executed_by_controller': True},
                        'test_task': red['task_id'], 'implementation_task': task}
+            if red.get('issue_id'):
+                receipt['red_origin_issue'] = red['issue_id']
+                receipt['red_origin_scope'] = red['scope']
             with self.b.db() as con:
                 con.execute('INSERT OR IGNORE INTO delivery_tdd VALUES (?,?)',
                             (task, json.dumps(receipt, sort_keys=True)))
@@ -219,6 +222,13 @@ class Effects:
         return {**result, 'tdd': receipt}
 
     def test_first_red(self, task):
+        try:
+            import remediation_red_reference
+        except ImportError:
+            from broker import remediation_red_reference
+        dependent = remediation_red_reference.task_red(self.b, task)
+        if dependent is not None:
+            return dependent
         with self.b.db() as con:
             binding = con.execute('SELECT issue_id,scope FROM native_bindings WHERE task_id=? '
                                   'ORDER BY rowid DESC LIMIT 1', (task,)).fetchone()
