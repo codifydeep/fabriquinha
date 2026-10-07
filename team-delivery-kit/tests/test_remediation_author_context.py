@@ -55,6 +55,24 @@ class RemediationAuthorContextTests(unittest.TestCase):
         self.value['context_sha256']=original['sha256']
         with self.assertRaises(ValueError):context.capsule(self.value,{**self.route,'execution_context':original})
 
+    def test_amendment_unwraps_only_controller_phase_prose_preserving_full_original_brief(self):
+        import json
+        brief='Entire approved original brief. '+('detailed product scope '*300)
+        outer=freeze('CURRENT TASK: R2 PRODUCT ONLY.\nSuperseded phase instructions.\nORIGINAL BRIEF DATA: '+json.dumps(brief),
+                     'Entire previous independent review.')
+        value={**self.value,'context_sha256':outer['sha256'],
+               'amendment':dict(operation='inherited_harness_contract_amendment_v1')}
+        route={**self.route,'execution_context':outer}
+        capsule=context.capsule(value,route)
+        self.assertIn(json.dumps(brief),capsule['description'])
+        self.assertIn(outer['sha256'],capsule['description'])
+        self.assertIn('A01: criterion',capsule['description'])
+        self.assertNotIn('Superseded phase instructions.',capsule['description'])
+        for bad in ('unrecognized wrapper',outer['description']+' trailing content'):
+            altered=freeze(bad,outer['review_instruction'])
+            with self.assertRaises(ValueError):context.capsule({**value,'context_sha256':altered['sha256']},
+                {**route,'execution_context':altered})
+
     def test_r2_input_requires_exact_approved_r1_and_never_relabels_red(self):
         red=dict(issue_id='r1',task_id='new-tests',volume='new-snapshot',red=dict(manifest_sha256='d'*64,
             test_sha256={'tests/test_new.py':'e'*64}))

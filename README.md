@@ -51,6 +51,16 @@ preserva a linhagem e exige uma nova revisão independente; a nova execução ai
 precisa demonstrar compilação do harness, controles negativos comportamentais,
 Red no baseline original e todos os gates posteriores.
 
+A emenda do harness possui agora um gate de calibração antes da captura de Red:
+compilação, referência correta e 12 defeitos controlados (respostas indevidas,
+requisições duplicadas, estado pendente, timers e interferência). O job usa o
+snapshot somente leitura, sem rede, credenciais ou socket Docker. Erros de runtime,
+skips ou uma referência correta rejeitada não contam como controles negativos
+válidos. O recibo persistente fica vinculado ao mesmo manifesto e é revalidado na
+revisão. A rejeição do harness antigo inválido foi verificada; a aprovação de uma
+nova entrega e o ciclo integral continuam pendentes. Este gate especializado do
+ensaio não constitui calibração genérica para qualquer projeto.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe

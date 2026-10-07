@@ -3,6 +3,10 @@ USER root
 COPY broker/server.py /broker.py
 COPY broker/remediation_runtime_guard.py /remediation_runtime_guard.py
 COPY broker/remediation_test_review.py /remediation_test_review.py
+COPY broker/harness_qualification.py /harness_qualification.py
+COPY service_mode_harness_qualification.py /service_mode_harness_qualification.py
+COPY inherited_harness_probe.py /inherited_harness_probe.py
+COPY r3_snapshot_probe.py /r3_snapshot_probe.py
 COPY broker/remediation_author_context.py /remediation_author_context.py
 COPY broker/remediation_red_reference.py /remediation_red_reference.py
 COPY broker/remediation_r2_issue.py /remediation_r2_issue.py

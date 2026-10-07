@@ -72,6 +72,9 @@ def install(b, issue):
 def verify(b, issue, route, red, effects):
     """Qualify an actual new controller Red before the ordinary immutable review."""
     expected = config(b, issue)
+    try:import harness_qualification
+    except ImportError:from broker import harness_qualification
+    harness_qualification.require(b,issue,red)
     with b.db() as con:
         revision.initialize(con)
         installed = con.execute('SELECT parent_issue,config,state FROM test_revision_trials WHERE issue_id=?', (issue,)).fetchone()

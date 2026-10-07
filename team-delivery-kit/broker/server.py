@@ -958,6 +958,8 @@ def capture_test_first_red(payload, *, _failed_checkpoint=None):
                 not PINNED_IMAGE.fullmatch(prepared.get('test_image', ''))):
             raise ValueError('invalid test-first copy receipt')
         runner = PREFIX + '-test-first-red-' + task_id
+        import harness_qualification
+        harness_qualification.capture(handoff_context(),con,row['issue_id'],task_id,volume,prepared)
         command = prepared['command']
         validate_argv(command, prepared['test_roots'])
         old_runner = docker('GET', '/containers/' + runner + '/json')
