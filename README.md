@@ -206,6 +206,12 @@ e política do mesmo contêiner, sem iniciar uma tarefa já terminal, e registra
 ação necessária. Essa correção ainda não está instalada. Não resolve por si só
 a prontidão assíncrona do transporte nem autoriza outra execução: ainda faltam
 qualificar o startup completo e uma recuperação que preserve a tentativa atual.
+O `start` também tem intenção persistida antes da operação e tratamento de
+acknowledgement incerto, inclusive após reinício do controlador. Sua observação
+não repete `start`, não adota contêiner com política divergente e não transforma
+uma tarefa terminal em sessão pronta. Mesmo a observação de Docker `running`
+exige validação da autorização atual e do transporte ACP; não é aprovação de
+entrega. Esse endurecimento permanece não instalado até qualificação conjunta.
 
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o

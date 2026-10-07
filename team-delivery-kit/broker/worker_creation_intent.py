@@ -1,4 +1,4 @@
-"""Durable uncertain-create observation. Never POST create/start or approve work."""
+"""Durable worker bootstrap intents. Observation never starts or approves work."""
 import hashlib,json,time
 from pathlib import Path
 
@@ -21,12 +21,42 @@ def uncertain(con,request):
         (json.dumps(dict(stage='create_outcome_unknown',at=time.time(),required_action='observe_exact_container_no_repost',delivery_approval=False)),request))
 
 
+def start_intent(con,request):
+    """Commit before POST start. An interrupted intention must not be replayed."""
+    row=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
+    if not row or json.loads(row[0]).get('stage')!='create_intent':
+        raise ValueError('fresh acknowledged creation required before start')
+    con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',
+        (json.dumps(dict(stage='start_intent',at=time.time(),required_action='observe_start_no_repost',delivery_approval=False)),request))
+
+
+def start_uncertain(con,request):
+    row=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
+    if not row or json.loads(row[0]).get('stage')!='start_intent':
+        raise ValueError('durable start intent required')
+    state=json.loads(row[0])
+    con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',
+        (json.dumps({**state,'stage':'start_outcome_unknown'}),request))
+
+
+def started(con,request):
+    row=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
+    if not row or json.loads(row[0]).get('stage')!='start_intent':
+        raise ValueError('durable start intent required')
+    con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',
+        (json.dumps(dict(stage='start_acknowledged',at=time.time(),delivery_approval=False)),request))
+
+
 def observe(payload,state,info,native_status,deadline,now):
     """A late acknowledgement is not permission to start a terminal task."""
-    if state.get('stage')!='create_outcome_unknown':return state,None
+    stage=state.get('stage')
+    if stage not in ('create_intent','create_outcome_unknown','start_intent','start_outcome_unknown'):return state,None
+    starting=stage in ('start_intent','start_outcome_unknown')
     terminal=native_status in ('failed','completed','cancelled') or now>=deadline
     if info is None:
-        return {**state,'required_action':'observe_late_create_even_after_native_termination' if terminal else 'observe_exact_container_no_repost'},'failed' if terminal else None
+        action=('observe_late_start_even_after_native_termination' if terminal else 'observe_start_no_repost') if starting else (
+            'observe_late_create_even_after_native_termination' if terminal else 'observe_exact_container_no_repost')
+        return {**state,'required_action':action},'failed' if terminal else None
     cfg=info.get('Config',{});host=info.get('HostConfig',{})
     expected_env={v.split('=',1)[0]:v.split('=',1)[1] for v in payload.get('Env',[])}
     observed_env={v.split('=',1)[0]:v.split('=',1)[1] for v in cfg.get('Env',[]) if '=' in v}
@@ -38,6 +68,20 @@ def observe(payload,state,info,native_status,deadline,now):
     fact=dict(container_id=info['Id'],docker_status=info['State']['Status'],
         started_at=info['State'].get('StartedAt'),native_status=native_status,
         payload_sha256=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest())
+    if starting:
+        if terminal:
+            return {**state,'stage':'late_start_observed','fact':fact,'owner':'controller',
+                'required_action':'preserve_and_retire_terminal_bootstrap_container',
+                'author_retry_authorized':False,'delivery_approval':False},'failed'
+        if info['State']['Status']=='running':
+            return {**state,'stage':'start_running_observed','fact':fact,'owner':'controller',
+                'required_action':'qualify_current_capability_and_transport_before_ACP',
+                'author_retry_authorized':False,'delivery_approval':False},None
+        if info['State']['Status'] in ('exited','dead','removing'):
+            return {**state,'stage':'bootstrap_stopped','fact':fact,'owner':'controller',
+                'required_action':'diagnose_bootstrap_no_restart',
+                'author_retry_authorized':False,'delivery_approval':False},'failed'
+        return {**state,'fact':fact,'required_action':'observe_start_no_repost'},None
     return {**state,'stage':'late_container_observed','fact':fact,'owner':'controller',
         'required_action':'preserve_and_retire_terminal_bootstrap_container' if terminal else 'qualify_startup_readiness_before_ACP',
         'author_retry_authorized':False,'delivery_approval':False},'failed' if terminal else None
@@ -50,7 +94,7 @@ def reconcile(b):
         rows=con.execute("SELECT i.request_id,i.payload,i.state,l.name,l.deadline FROM worker_creation_intents i JOIN leases l USING(request_id)").fetchall()
     for request,raw_payload,raw_state,name,deadline in rows:
         state=json.loads(raw_state)
-        if state.get('stage')!='create_outcome_unknown':continue
+        if state.get('stage') not in ('create_intent','create_outcome_unknown','start_intent','start_outcome_unknown'):continue
         native_status=None
         with b.db() as con:
             present=con.execute("SELECT 1 FROM sqlite_master WHERE name='native_bindings'").fetchone()

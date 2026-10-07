@@ -590,6 +590,7 @@ def submit(payload, trusted_acp=False):
                      (420 if scenario == 'acp-session' else 45)))
         con.commit()  # durable intent before Docker side effect
         create_intent=False
+        starting=False
         try:
             expected=config(request_id, scenario)
             try:import worker_creation_intent
@@ -598,13 +599,20 @@ def submit(payload, trusted_acp=False):
             con.commit()  # immutable payload before the possibly delayed create
             create_intent=True
             docker('POST', '/containers/create?name=' + name, expected)
+            worker_creation_intent.start_intent(con,request_id)
+            con.commit()  # a lost start acknowledgement cannot authorize repost
+            starting=True
             docker('POST', '/containers/' + name + '/start')
+            worker_creation_intent.started(con,request_id)
             con.execute("UPDATE leases SET status='running' WHERE request_id=?", (request_id,))
         except Exception as error:
-            if create_intent and isinstance(error,DockerOperationTimeout) and error.operation=='containers_create':
-                worker_creation_intent.uncertain(con,request_id)
+            if isinstance(error,DockerOperationTimeout) and (
+                    create_intent and error.operation=='containers_create' or
+                    starting and error.operation=='containers_start'):
+                if starting:worker_creation_intent.start_uncertain(con,request_id)
+                else:worker_creation_intent.uncertain(con,request_id)
                 con.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
-                    (request_id,'worker_submit','bootstrap:docker_containers_create',time.time()))
+                    (request_id,'worker_submit','bootstrap:'+failure_category(error),time.time()))
                 con.commit()  # unknown outcome is observed, not blindly deleted/reposted
                 raise
             # Preserve primary failure and close intent before slow cleanup can fail.

@@ -56,6 +56,57 @@ class WorkerCreationIntentTests(unittest.TestCase):
         import json
         self.assertEqual(json.loads(con.execute('select state from worker_creation_intents').fetchone()[0])['stage'],'create_outcome_unknown')
 
+    def test_start_intent_is_single_use_and_survives_unknown_ack(self):
+        payload,_,_=self.inputs()
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        intent.record(con,'request',payload);intent.start_intent(con,'request');con.commit()
+        with self.assertRaises(ValueError):intent.start_intent(con,'request')
+        intent.start_uncertain(con,'request');con.commit()
+        self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])['stage'],'start_outcome_unknown')
+        with self.assertRaises(ValueError):intent.start_intent(con,'request')
+        with self.assertRaises(ValueError):intent.started(con,'request')
+
+    def test_interrupted_create_intent_is_observed_without_repost(self):
+        payload,_,info=self.inputs()
+        new,lease=intent.observe(payload,{'stage':'create_intent'},info,'running',1000,10)
+        self.assertEqual(new['stage'],'late_container_observed');self.assertIsNone(lease)
+        self.assertFalse(new['author_retry_authorized'])
+
+    def test_start_timeout_and_restart_require_observed_running_not_just_existence(self):
+        payload,_,info=self.inputs()
+        for stage in ('start_intent','start_outcome_unknown'):
+            for docker_status in ('created','paused','restarting'):
+                info['State']['Status']=docker_status
+                new,lease=intent.observe(payload,{'stage':stage},info,'running',1000,10)
+                self.assertEqual(new['stage'],stage);self.assertIsNone(lease)
+                self.assertEqual(new['required_action'],'observe_start_no_repost')
+            info['State']['Status']='running'
+            new,lease=intent.observe(payload,{'stage':stage},info,'running',1000,10)
+            self.assertEqual(new['stage'],'start_running_observed');self.assertIsNone(lease)
+            self.assertIn('current_capability',new['required_action'])
+            self.assertFalse(new['delivery_approval']);self.assertFalse(new['author_retry_authorized'])
+
+    def test_late_start_of_terminal_or_expired_task_never_becomes_ready(self):
+        payload,_,info=self.inputs();info['State']['Status']='running'
+        for native_status,deadline in [('failed',1000),('cancelled',1000),('completed',1000),('running',9)]:
+            new,lease=intent.observe(payload,{'stage':'start_outcome_unknown'},info,native_status,deadline,10)
+            self.assertEqual(new['stage'],'late_start_observed');self.assertEqual(lease,'failed')
+            self.assertEqual(new['required_action'],'preserve_and_retire_terminal_bootstrap_container')
+            self.assertFalse(new['author_retry_authorized']);self.assertFalse(new['delivery_approval'])
+
+    def test_bootstrap_exit_is_failure_without_restart(self):
+        payload,_,info=self.inputs()
+        for status in ('exited','dead','removing'):
+            info['State']['Status']=status
+            new,lease=intent.observe(payload,{'stage':'start_intent'},info,'running',1000,10)
+            self.assertEqual(new['stage'],'bootstrap_stopped');self.assertEqual(lease,'failed')
+            self.assertEqual(new['required_action'],'diagnose_bootstrap_no_restart')
+
+    def test_start_observation_revalidates_ownership(self):
+        payload,_,info=self.inputs();info['State']['Status']='running';info['Image']='other'
+        new,lease=intent.observe(payload,{'stage':'start_outcome_unknown'},info,'running',1000,10)
+        self.assertEqual(new['stage'],'ownership_or_policy_conflict');self.assertIsNone(lease)
+
     def test_watchdog_observes_a_late_container_after_releasing_terminal_capacity(self):
         payload,_,info=self.inputs()
         con=sqlite3.connect(':memory:');self.addCleanup(con.close)

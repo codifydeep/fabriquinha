@@ -16,6 +16,21 @@ with patch.dict(os.environ, {'BROKER_WORKER_IMAGE': 'sha256:' + 'a' * 64}):
 
 
 class BrokerDiagnosticTests(unittest.TestCase):
+    def test_worker_start_timeout_preserves_single_start_without_delete(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            with server.db() as con:
+                con.execute('CREATE TABLE leases(request_id TEXT PRIMARY KEY,scenario TEXT,name TEXT,status TEXT,deadline REAL)')
+                con.execute('CREATE TABLE broker_errors(request_id TEXT,operation TEXT,category TEXT,at REAL)')
+            error=server.DockerOperationTimeout('POST','/containers/owned/start')
+            with patch.object(server,'config',return_value={'Image':'fixture'}),patch.object(server,'docker',side_effect=[{'Id':'owned'},error]) as docker,patch.object(server,'remove_owned') as remove:
+                with self.assertRaises(server.DockerOperationTimeout):server.submit({'request_id':'request','scenario':'acp-session'},trusted_acp=True)
+                self.assertEqual(docker.call_count,2);remove.assert_not_called()
+                self.assertEqual(server.submit({'request_id':'request','scenario':'acp-session'},trusted_acp=True)['status'],'creating')
+                self.assertEqual(docker.call_count,2)
+            with server.db() as con:
+                self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])['stage'],'start_outcome_unknown')
+                self.assertEqual(con.execute('SELECT category FROM broker_errors').fetchone()[0],'bootstrap:docker_containers_start')
+
     def test_worker_create_timeout_is_observed_without_delete_or_duplicate_post(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
             with server.db() as con:
