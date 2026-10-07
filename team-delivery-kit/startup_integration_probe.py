@@ -25,11 +25,12 @@ import uuid
 ROOT=Path(__file__).resolve().parent
 
 
-def run(image):
+def run(image,installed_controller=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}',image):raise ValueError('immutable probe image required')
     sys.path.insert(0,str(ROOT/'broker'))
     os.environ['BROKER_WORKER_IMAGE']=image
-    spec=importlib.util.spec_from_file_location('startup_probe_broker',ROOT/'broker/server.py')
+    controller_source=Path('/broker.py') if installed_controller else ROOT/'broker/server.py'
+    spec=importlib.util.spec_from_file_location('startup_probe_broker',controller_source)
     b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
     import native
     import acp_startup
@@ -115,6 +116,8 @@ def run(image):
                 first=[duration for path,duration in observed if path=='/v1/acp-startup']
                 if len(first)!=1 or first[0]>=1:raise ValueError('startup HTTP did not return promptly')
                 result=dict(schema='async-startup-integration-probe-v1',status='passed',
+                    installed_controller_code=installed_controller,
+                    controller_sha256=hashlib.sha256(controller_source.read_bytes()).hexdigest(),
                     worker_image=image,native_identity='disposable_fixture_not_real_multica',
                     actual_broker_http=True,actual_wrapper=True,actual_docker=True,actual_acp_transport=True,
                     actual_hermes_initialize=True,lost_create_ack_observed=True,
@@ -160,4 +163,6 @@ def run(image):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--image',required=True)
-    print(json.dumps(run(parser.parse_args().image),sort_keys=True))
+    parser.add_argument('--installed-controller',action='store_true')
+    arguments=parser.parse_args()
+    print(json.dumps(run(arguments.image,arguments.installed_controller),sort_keys=True))

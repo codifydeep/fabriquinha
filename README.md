@@ -203,30 +203,29 @@ o Docker excedeu o prazo de criação e materializou o worker depois da falha.
 O código agora conserva o payload e a intenção antes do `create`; uma resposta
 incerta não provoca repost ou exclusão às cegas. O watchdog observa a identidade
 e política do mesmo contêiner, sem iniciar uma tarefa já terminal, e registra a
-ação necessária. Essa correção ainda não está instalada. Não resolve por si só
-a prontidão assíncrona do transporte nem autoriza outra execução: ainda faltam
-qualificar o startup completo e uma recuperação que preserve a tentativa atual.
+ação necessária. A correção instalada não autoriza outra execução por si só:
+a recuperação ainda deve preservar a tentativa atual e ter patrocínio técnico.
 O `start` também tem intenção persistida antes da operação e tratamento de
 acknowledgement incerto, inclusive após reinício do controlador. Sua observação
 não repete `start`, não adota contêiner com política divergente e não transforma
 uma tarefa terminal em sessão pronta. Mesmo a observação de Docker `running`
 exige validação da autorização atual e do transporte ACP; não é aprovação de
-entrega. Esse endurecimento permanece não instalado até qualificação conjunta.
+entrega.
 O wrapper agora usa abertura assíncrona: uma solicitação `/v1/acp-startup`
 seguida de consultas `/v1/acp-ready` com a mesma capability. A intenção de
 transporte é persistida antes do exec, e um resultado incerto após reinício
 exige diagnóstico, nunca uma segunda abertura silenciosa. A prontidão exige
 contêiner observado em execução, política íntegra, tarefa nativa atual e
 transporte vivo; o `initialize` continua sendo respondido pelo Hermes real.
-Esse protocolo também permanece não instalado; os testes determinísticos não
-substituem a qualificação das imagens e do startup real sem chamadas ao modelo.
-A imagem candidata `delivery-kit-execution-broker:20261007.327` passou pelo
+Os testes determinísticos não substituem a qualificação das imagens e do
+startup real sem chamadas ao modelo. A imagem candidata inicial
+`delivery-kit-execution-broker:20261007.327` passou pelo
 canário do registro V6 e pelo `initialize` do Hermes real, ambos em probes sem
 rede, credenciais ou socket. O digest qualificado nesses dois escopos é
 `sha256:c0e364d078f642f5996b687fb0c1178d1ab1faafa75b177747f9c28418040171`.
 Isso não valida ainda a abertura assíncrona ponta a ponta entre wrapper,
-controlador e Multica: essa integração permanece necessária antes da instalação
-e de outra execução do autor. A suíte offline passou com 2.240 testes e sete
+controlador e Multica: essa integração permanece necessária antes de outra
+execução do autor. A suíte inicial passou com 2.240 testes e sete
 skips existentes; os probes não enviaram sessões ou prompts ao modelo.
 
 A integração de fontes do controlador e wrapper foi exercitada no Linux do
@@ -239,8 +238,17 @@ O contrato agora preserva bootstrap incerto durante reinício, registra o payloa
 Compose já normalizado e persiste a intenção de retirada antes de `DELETE`.
 Uma retirada pendente não repete a exclusão nem impede o watchdog de atender
 outras leases. A suíte correspondente passou com 2.248 testes e sete skips.
-Essas correções ainda não estão instaladas; qualificação das imagens finais,
-integração nativa real e recuperação do autor continuam sendo gates abertos.
+Essas correções estão instaladas no controlador `20261007.330`, digest
+`sha256:8f7ffa82da370e8c8f5feffafbc70b4f28e411af717b324afd587956c0bcc9db`,
+com wrapper `20261007.1`, digest
+`sha256:2bca79425cfe904932e8ec00eb641c28dc91db95ea3b88d7ef7ec0d6d4dd6f56`.
+O canário V6 e o initialize real passaram na imagem final. O probe integrado
+também passou usando `/broker.py` instalado (sem overlay do controlador), com
+uma criação, início, exec e consumo da capability, além de retirada observada.
+Sua identidade nativa continuou sendo uma fixture: integração nativa real e
+recuperação do autor continuam sendo gates abertos. O caminho pós-falha ainda
+precisa tratar startup sem ferramentas, não apenas rejeições de ferramentas;
+uma anotação de responsabilidade ao CTO não substitui o handoff executado.
 
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
