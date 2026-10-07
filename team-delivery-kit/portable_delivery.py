@@ -897,7 +897,7 @@ def reconcile(context, contract):
         raise QualityBlocked(incident)
     delivery = candidate_delivery or approved(context)
     recovery_proof = qualify_remediation_delivery(command, INSTANCE, context, delivery,
-        previous=receipt.get('remediation_delivery'))
+        previous=receipt.get('remediation_delivery', context.get('remediation_expected')))
     if context.get('durable_handoffs'):
         query = ('import sqlite3,json,sys; c=sqlite3.connect("file:/broker-state/leases.sqlite?mode=ro",uri=True); '
                  'r=c.execute("SELECT r.body FROM task_contracts t JOIN contract_revisions r USING(decision_task) WHERE t.task_id=?",(sys.argv[1],)).fetchone(); print(r[0] if r else "null")')

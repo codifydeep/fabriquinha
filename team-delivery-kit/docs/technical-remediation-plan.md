@@ -338,3 +338,23 @@ SHA CI, frozen-file preflight, candidate QA or post-deploy QA. It does not mark
 the parent release delivered. The parent/sequence recovery mapping, automatic
 R3 controller scheduling and full-chain activation still need implementation
 and real validation; keep the live R1 route paused until those gates are ready.
+
+### Durable R3 intake without another test-revision child
+
+`portable_remediation_intake.py` finds only enabled R2 routes whose latest real
+handoff is approved, and exports the live qualified delivery plus its immutable
+execution contract and full context through fixed broker queries. It prepares a
+distinct `REMEDIATION…-1` publication identity on the original Git base, retaining
+the original root context, approved R2 receipt, actors, QA configuration, all six
+R3 gates and recovery depth. It creates no card or worker and grants no authority.
+
+Private intent is saved before the run specification/context. Re-entry can only
+finish identical artifacts; conflicting files, symlinks and changed originals
+are rejected. Portable contract/run hashes keep their original ASCII-escaped
+encoding; broker recovery contracts keep their UTF-8 encoding, including Unicode
+criteria. The publication driver requires the intake's exact expected delivery
+proof from its first reconciliation, not only after a receipt already exists.
+
+This preparation is not yet automatic R3 execution or parent release completion.
+The sequence scheduling hook and independently verified parent projection remain
+required before activating the live R1/R2/R3 trial.
