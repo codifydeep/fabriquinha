@@ -469,6 +469,12 @@ def config(request_id, scenario):
             try:import driver_checkpoint_policy
             except ImportError:from broker import driver_checkpoint_policy
             driver=driver_checkpoint_policy.worker_config(handoff_context(),request_id,bound['issue_id'])
+            try:import template_author_executor
+            except ImportError:from broker import template_author_executor
+            template=template_author_executor.worker_config(handoff_context(),request_id,bound['issue_id'])
+            if template:
+                if driver:raise ValueError('conflicting template/driver capabilities')
+                driver=template
             if driver:
                 if surgical:raise ValueError('conflicting surgical capabilities')
                 image=docker('GET','/images/'+driver['worker_image']+'/json')
@@ -2040,11 +2046,17 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
             try:import driver_checkpoint_policy
             except ImportError:from broker import driver_checkpoint_policy
             driver=driver_checkpoint_policy.for_task(handoff_context(),issue['id'],task)
+            try:import template_author_executor
+            except ImportError:from broker import template_author_executor
+            template=template_author_executor.for_task(handoff_context(),issue['id'],task)
+            if template:
+                if driver:raise ValueError('conflicting template/driver capabilities')
+                driver=template
             if driver:
                 if surgical:raise ValueError('conflicting surgical capabilities')
                 surgical=driver['surgical']
             if surgical:
-                version={'typed_v2':'V2','typed_driver_v3':'V3','typed_driver_lines_v4':'V4'}.get(surgical.get('protocol'),'V1')
+                version={'typed_v2':'V2','typed_driver_v3':'V3','typed_driver_lines_v4':'V4','typed_template_v5':'V5'}.get(surgical.get('protocol'),'V1')
                 instruction+='\nDELIVERY_SURGICAL_TEST_'+version+':'+surgical['path']+':'+surgical['expected_sha256']+'\n'
                 if surgical.get('drain_resolver'):
                     instruction+='DELIVERY_STATUS_DRAIN_V1:'+surgical['drain_resolver']+'\n'

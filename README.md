@@ -103,8 +103,8 @@ Na instalação de referência, essa hipótese passou nos 15 testes da referênc
 positiva e nos 12 controles negativos. Isso é evidência diagnóstica, não entrega
 do autor nem Red. O supervisor aceita somente o recibo vinculado ao job offline,
 imagem, manifesto e execução falha; encaminha-o ao CTO e depois ao Tech Lead para
-uma proposta independente. O resultado dessa trilha não despacha implementação:
-um executor limitado ainda precisa ser qualificado para o contrato exato. Esse
+uma proposta independente. O resultado dessa trilha não despacha implementação
+por si só: um executor limitado exige admissão separada para o contrato exato. Esse
 experimento é específico ao ensaio de service-mode, não uma calibração universal.
 
 A capacidade V5 de manutenção de harness foi qualificada separadamente no
@@ -112,9 +112,16 @@ registro real Hermes/ACP, sem chamadas de modelo. Ela permite somente edição
 hash-bound do literal `NODE_HARNESS_TEMPLATE`, preserva todo o restante da AST
 Python e verifica sintaxe Node antes de gravar. Escrita genérica, patch, terminal,
 Python, enfraquecimento de testes e chamadas diretas sem permissão são bloqueados.
-Essa qualificação isolada ainda não vincula uma execução do autor à proposta
-independente: o adaptador de admissão e os gates de calibração, Red e revisão
-continuam necessários. Os protocolos anteriores permanecem disponíveis apenas
+O adaptador de admissão vincula uma tentativa ao autor, wakeup, hash da entrega,
+propostas independentes e imagens qualificadas; persiste a intenção antes do
+despacho e não repete uma criação de resultado incerto após reinício. Uma falha
+terminal permanece bloqueada para diagnóstico, sem aprovação fictícia. O primeiro
+ensaio instalado expôs uma incompatibilidade entre `task_binding` e o registro
+completo da tarefa: a instrução V5 não chegou ao prompt e dois patches foram
+corretamente rejeitados. A correção resolve a identidade/status na fonte nativa e
+possui teste de regressão no montador real do prompt; isso ainda não comprova
+entrega do autor. Calibração, Red e revisão continuam necessários antes de
+implementação do produto. Os protocolos anteriores permanecem disponíveis apenas
 sob suas próprias permissões; V5 não é uma autorização global para editar testes.
 
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma

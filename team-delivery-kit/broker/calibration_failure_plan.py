@@ -120,7 +120,12 @@ def _handle(b,route,runs,source,prior,effects):
             data['required_action']=new.get('required_action','calibration_failure_plan:'+new['stage'])
             owner=config['peer'] if new['stage'].startswith('peer') else config['cto']
             handoffs.save(con,key,issue,'calibration_failure_plan',owner,data,time.time())
-    try:lane.advance(config,state,runs,effects,persist)
+    try:
+        if state.get('executor'):
+            try:import template_author_executor
+            except ImportError:from broker import template_author_executor
+            template_author_executor.advance(config,state,effects,persist)
+        else:lane.advance(config,state,runs,effects,persist)
     except (ValueError,TypeError,KeyError) as error:
         persist({**state,'stage':'blocked','category':'calibration_failure_plan_rejected',
                  'error_type':type(error).__name__,'owner':config['cto'],'author_retry_authorized':False})

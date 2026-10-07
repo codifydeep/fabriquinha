@@ -533,6 +533,9 @@ def reconcile(broker, route, runs, effects):
         if not authors:
             return None
         source = authors[-1]
+        try:import template_author_executor
+        except ImportError:from broker import template_author_executor
+        template_author_executor.observe(broker,route,source)
         if source['status'] == 'failed' and hasattr(effects, 'capture_failed_test_checkpoint'):
             checkpoint = effects.capture_failed_test_checkpoint(issue, source['id'])
             if checkpoint and checkpoint.get('status') == 'red_captured':

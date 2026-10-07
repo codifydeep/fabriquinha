@@ -257,6 +257,31 @@ class BrokerTests(unittest.TestCase):
         self.assertNotIn('Run multica issue get', prompt)
         self.assertIn('Red-Green-Refactor', prompt)
 
+    def test_template_prompt_selects_same_grant_for_native_binding_and_task_record(self):
+        from broker import template_author_executor as executor
+        cfg=dict(issue_id='issue',source_task='failed',author='author')
+        surgical=dict(path='/workspace/tests/test_service_mode_indicator.py',
+                      expected_sha256='c'*64,protocol='typed_template_v5')
+        state=dict(executor=dict(status='waiting',wakeup_id='wake',
+                                worker_image='sha256:'+'b'*64,surgical=surgical))
+        with broker.db() as con:
+            con.execute('CREATE TABLE calibration_failure_plans(source_task TEXT,config TEXT,state TEXT)')
+            con.execute('INSERT INTO calibration_failure_plans VALUES(?,?,?)',
+                        ('failed',json.dumps(cfg),json.dumps(state)))
+        (broker.STATE/'native.json').write_text('{}')
+        actual=dict(id='new-author',agent_id='author',issue_id='issue',wakeup_id='wake',status='running',handoff_note='bounded correction')
+        binding=dict(task_id='new-author',agent_id='author',issue_id='issue',wakeup_id='wake',handoff_note='bounded correction')
+        frame=dict(method='session/prompt',params=dict(prompt=[]))
+        issue=dict(id='issue',title='Harness maintenance',description='Preserve tests.')
+        with patch('broker.native.task_record',return_value=actual), \
+                patch.object(broker,'implementation_phase',return_value='tests_only'), \
+                patch.object(broker,'test_artifact_phase_context',return_value=''):
+            bound_prompt=broker.native_task_prompt(frame,'implementation',issue,binding)['params']['prompt'][0]['text']
+            record_prompt=broker.native_task_prompt(frame,'implementation',issue,actual)['params']['prompt'][0]['text']
+        self.assertEqual(bound_prompt,record_prompt)
+        self.assertIn('DELIVERY_SURGICAL_TEST_V5:'+surgical['path']+':'+surgical['expected_sha256'],bound_prompt)
+        self.assertEqual(executor.for_task(broker,'issue',actual)['surgical'],surgical)
+
     def test_native_prompt_resolves_only_registered_immutable_context(self):
         from execution_context import freeze, reference
         capsule = freeze('Complete requirement. ' * 240, 'Exact independent review criteria.')

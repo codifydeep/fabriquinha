@@ -11,7 +11,8 @@ import sqlite3
 import time
 import uuid
 
-FIXED_SERVER_SHA = '4a8a4931ef7de58beea6f0fc353c17e5c1bc3fad33fdc77fd540af36861df819'
+FIXED_SERVER_SHA = '938c58f8734bd4b9089c276278f9e21b273795939bc9c151697986890cfacb78'
+PRE_TEMPLATE_SERVER_SHA = '4a8a4931ef7de58beea6f0fc353c17e5c1bc3fad33fdc77fd540af36861df819'
 R1_GUARDED_SERVER_SHA = 'b9e307bddb51ea281535ae26b8dafb53fccdd3fb16bdc3a00040bd5bb5fe1fbc'
 PRE_REMEDIATION_SERVER_SHA = '72bf87e256faad1f7ac04ff373fd10b5aff1c016de2d5be505064a45e6da6ace'
 PREVIOUS_FIXED_SERVER_SHA = '9bd24852b561a3f11bb7d1c15baa7e5e572eda530b41a1e82e8f33a9369dae27'
@@ -89,7 +90,7 @@ def register(b, payload):
             raise ValueError('canonical review recovery identity required')
     actual_server_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
     if actual_server_sha not in {
-            FIXED_SERVER_SHA,R1_GUARDED_SERVER_SHA,PRE_REMEDIATION_SERVER_SHA,PREVIOUS_FIXED_SERVER_SHA,LEGACY_FIXED_SERVER_SHA}:
+            FIXED_SERVER_SHA,PRE_TEMPLATE_SERVER_SHA,R1_GUARDED_SERVER_SHA,PRE_REMEDIATION_SERVER_SHA,PREVIOUS_FIXED_SERVER_SHA,LEGACY_FIXED_SERVER_SHA}:
         raise ValueError('fixed native task_id receipt implementation required')
     issue, source = payload['issue_id'], payload['source_task']
     with b.LOCK, b.db() as con:
