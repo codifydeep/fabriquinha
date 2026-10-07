@@ -72,6 +72,19 @@ class WorkerCreationIntentTests(unittest.TestCase):
         self.assertEqual(new['stage'],'late_container_observed');self.assertIsNone(lease)
         self.assertFalse(new['author_retry_authorized'])
 
+    def test_docker_omitted_false_network_flag_is_not_policy_drift(self):
+        payload,state,info=self.inputs()
+        info['Config'].pop('NetworkDisabled')
+        new,_=intent.observe(payload,state,info,'running',1000,10)
+        self.assertNotEqual(new['stage'],'ownership_or_policy_conflict')
+        for value in (True,None,0,'false'):
+            info['Config']['NetworkDisabled']=value
+            new,_=intent.observe(payload,state,info,'running',1000,10)
+            self.assertEqual(new['stage'],'ownership_or_policy_conflict')
+        info['Config'].pop('NetworkDisabled');payload['NetworkDisabled']=True
+        new,_=intent.observe(payload,state,info,'running',1000,10)
+        self.assertEqual(new['stage'],'ownership_or_policy_conflict')
+
     def test_start_timeout_and_restart_require_observed_running_not_just_existence(self):
         payload,_,info=self.inputs()
         for stage in ('start_intent','start_outcome_unknown'):

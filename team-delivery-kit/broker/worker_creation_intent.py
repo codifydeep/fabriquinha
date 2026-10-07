@@ -60,7 +60,12 @@ def observe(payload,state,info,native_status,deadline,now):
     cfg=info.get('Config',{});host=info.get('HostConfig',{})
     expected_env={v.split('=',1)[0]:v.split('=',1)[1] for v in payload.get('Env',[])}
     observed_env={v.split('=',1)[0]:v.split('=',1)[1] for v in cfg.get('Env',[]) if '=' in v}
-    if (info.get('Image')!=payload['Image'] or any(cfg.get(k)!=payload.get(k) for k in ('User','Entrypoint','Cmd','NetworkDisabled'))
+    # Docker inspect can omit the false default. Normalize only this boolean;
+    # network mode, mounts and all other recorded policy remain exact checks.
+    if (info.get('Image')!=payload['Image'] or any(cfg.get(k)!=payload.get(k) for k in ('User','Entrypoint','Cmd'))
+            or type(cfg.get('NetworkDisabled',False)) is not bool
+            or type(payload.get('NetworkDisabled',False)) is not bool
+            or cfg.get('NetworkDisabled',False)!=payload.get('NetworkDisabled',False)
             or any(cfg.get('Labels',{}).get(k)!=v for k,v in payload['Labels'].items())
             or any(observed_env.get(k)!=v for k,v in expected_env.items())
             or any(host.get(k)!=v for k,v in payload['HostConfig'].items())):
