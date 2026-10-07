@@ -159,6 +159,14 @@ erro de protocolo podem ser reconciliados uma vez por observação, sem desperta
 novamente o agente. O teto de 40 iterações não elimina o limite separado de duas
 propostas de edição: duas rejeições exigem diagnóstico, não uma terceira escrita.
 
+A preparação de edição por linhas do `NODE_HARNESS_TEMPLATE` já possui testes de
+hash, intervalos originais disjuntos, limite UTF-8, AST externa e sintaxe Node.
+Um probe somente leitura produziu, no snapshot real, exatamente o hash da variante
+diagnóstica validada anteriormente e reduziu o arquivo em três bytes. Essa operação
+continua **não exposta aos workers**: falta qualificar seus handlers, esquema,
+registro, proxy e admissão independente. O resultado não modifica a entrega nem
+substitui calibração, Red ou revisão; nenhum grant existente foi ampliado.
+
 O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
 proposta técnica; a correção da integração não é conclusão da entrega.

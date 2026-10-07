@@ -284,12 +284,28 @@ def validate_line_envelope(args,expected):
 
 
 def prepare_driver_lines(source,args):
+    return _prepare_literal_lines(source,args,'DRIVER_BODY')
+
+
+def prepare_template_lines(source,args):
+    """Unexposed preparator for bounded template-line edits, never a permission.
+
+    All ranges address the same ORIGINAL hash, not successive intermediate
+    results. The caller does not choose a literal name. Existing worker grants
+    and marker protocols cannot invoke this preparator yet.
+    """
+    return _prepare_literal_lines(source,args,'NODE_HARNESS_TEMPLATE')
+
+
+def _prepare_literal_lines(source,args,name):
+    if name not in ('DRIVER_BODY','NODE_HARNESS_TEMPLATE'):
+        raise ValueError('operation forbidden in surgical mode')
     validate_line_envelope(args,args.get('expected_sha256') if isinstance(args,dict) else None)
     if not 0<len(source)<=32768 or hashlib.sha256(source).hexdigest()!=args['expected_sha256']:
         raise ValueError('stale surgical input hash')
     text=source.decode('utf-8');lines=text.splitlines(keepends=True);tree=ast.parse(text)
     drivers=[n for n in tree.body if isinstance(n,ast.Assign) and len(n.targets)==1
-        and isinstance(n.targets[0],ast.Name) and n.targets[0].id=='DRIVER_BODY']
+        and isinstance(n.targets[0],ast.Name) and n.targets[0].id==name]
     if len(drivers)!=1 or not isinstance(drivers[0].value,ast.Constant) or not isinstance(drivers[0].value.value,str):
         raise ValueError('single literal driver required')
     node=drivers[0].value
@@ -307,7 +323,7 @@ def prepare_driver_lines(source,args):
     if result==source:raise ValueError('surgical edit made no bounded change')
     if _tests(tree)!=_tests(ast.parse(result)):raise ValueError('test bodies or methods changed')
     _discoverable(ast.parse(result))
-    return _validate_driver_result(source,result)
+    return _validate_driver_result(source,result) if name=='DRIVER_BODY' else _validate_literal_result(source,result,name)
 
 
 def prepare_driver(source,args):
