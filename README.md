@@ -176,6 +176,17 @@ nem a admissão independente, que continuam pendentes. O resultado não modifica
 Red ou revisão; nenhum grant existente foi ampliado. O recibo reproduzível está em
 [TEMPLATE-LINES-V6-SOURCE-CANARY](team-delivery-kit/evaluation/TEMPLATE-LINES-V6-SOURCE-CANARY-2026-10-07.json).
 
+O contrato de recuperação V6 agora separa a retenção técnica da nova proposta:
+um experimento fixo somente leitura deve ser autenticado por imagem, comando,
+snapshot, hash e recibo antes de reabrir o planejamento. A decisão anterior fica
+arquivada; CTO e Tech Lead precisam ler novamente e produzir decisões distintas.
+O supervisor só admite o autor após essas decisões e revalidação da instalação,
+contrato e ausência de execução concorrente. Essa integração possui testes de
+contrato e preflight somente leitura com o bloqueio real, mas **ainda não foi
+instalada nem validada com agentes reais**. O preflight também encontrou e
+corrigiu um contexto excessivo: o contexto específico cabe no limite original,
+inclusive com a justificativa máxima do revisor, sem ampliar capacidades.
+
 O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
 proposta técnica; a correção da integração não é conclusão da entrega.

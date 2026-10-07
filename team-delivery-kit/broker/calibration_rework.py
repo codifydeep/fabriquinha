@@ -17,6 +17,34 @@ def initialize(con):
 
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
+    if config.get('line_recipe_revision'):
+        proof=config['line_recipe']
+        note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
+            'DELIVERY_TEMPLATE_LINES_V6_REPLAN\nDELIVERY_EXECUTED_FAILURES_V1\n'
+            'CHANGED-EVIDENCE PLAN ONLY: '+('Independent Tech Lead review. ' if peer else 'CTO diagnosis. ')+
+            'Read all frozen original files completely. No shell, edits, Red replay or delivery approval. '
+            'The previous two surgical proposals were denied atomically; all original bytes remain unchanged. '
+            'The fixed read-only line experiment reproduced the previously validated diagnostic variant without '
+            'increasing the file limit. This is a disposable diagnostic copy, never an author submission or Red. '
+            'Preserve all test methods/assertions, product/baseline bytes and acceptance. Pending observations '
+            'precede settlement; terminal observations must be read afresh AFTER settlement. The original product '
+            'lacks the feature: expected Red, not a harness fault. Prior timer claims are not proved by this experiment. '
+            'Prior decisions are archived, not replayed. Sponsor only one changed-evidence original-author '
+            'NODE_HARNESS_TEMPLATE correction using original inclusive line ranges, not old/new fragments. '
+            'Neither decision grants execution, limit/depth reset or recursive revision. Require controller '
+            'calibration, full pinned Red, independent test review and all later delivery gates. '
+            'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[]. '
+            'Check the exact recipe and measured growth; if unsupported retain the hold. No author admission yet.\n'
+            'Executed line recipe: '+json.dumps(proof['recipe'],sort_keys=True)+'\nMeasured growth_bytes='+str(proof['growth_bytes'])+
+            '; file_bytes='+str(proof['file_bytes'])+'; limit_bytes='+str(proof['file_limit_bytes'])+'\n'
+            'Executed original failure: '+json.dumps(config.get('empirical_failure',{'phase':config['diagnostic'].get('phase')}),sort_keys=True)+
+            '\nValidated experiment: '+json.dumps(config['experiment_summary'],sort_keys=True)+
+            ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
+            '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
+            ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
+        if len(note)+100>4000:raise ValueError('bounded line replan context too large')
+        return note
     if config.get('diagnosis_only'):
         execution=config.get('execution_failure')
         incident=''
@@ -100,6 +128,7 @@ def marker(config,role):
     return digest({'source':config['source_task'],'manifest':config['manifest_sha256'],'role':role,
         'operation':'calibration_failure_plan_v1' if config.get('diagnosis_only') else 'calibration_rework_v1',
         'format_revision':config.get('format_revision',0),
+        **({'line_recipe_revision':config['line_recipe_revision']} if config.get('line_recipe_revision') else {}),
         **({'evidence_revision':config['evidence_revision']} if config.get('evidence_revision') else {})})
 
 

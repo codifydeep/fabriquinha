@@ -1,4 +1,4 @@
-"""One independently sponsored, hash-bound V5 execution; never a gate waiver."""
+"""One independently sponsored, hash-bound V5/V6 execution; never a gate waiver."""
 import hashlib,json,re,time
 
 FLAGS=('actual_registry','actual_default_selection','actual_acp_selection','full_proxy_request_validation','native_binding_prompt',
@@ -15,10 +15,30 @@ def validate_qualification(proof):
             or any(not re.fullmatch(r'sha256:[a-f0-9]{64}',str(proof.get(k,''))) for k in ('worker_image','proxy_image'))):
         raise ValueError('qualified installed V5 registry required')
 
+
+def validate_line_qualification(proof):
+    """Candidate evidence is not admission; installation is checked by arm()."""
+    registry=proof.get('registry',{});proxy=proof.get('proxy',{})
+    if (proof.get('schema')!='template-lines-v6-image-qualification-v1'
+            or proof.get('status')!='passed' or proof.get('delivery_approval') is not False
+            or any(not re.fullmatch(r'sha256:[a-f0-9]{64}',str(proof.get(k,''))) for k in ('worker_image','proxy_image'))
+            or registry.get('schema')!='surgical-template-line-registry-probe-v6'
+            or registry.get('status')!='passed' or registry.get('uid')!=10000
+            or registry.get('network')!='none' or registry.get('model_calls')!=0
+            or registry.get('delivery_approval') is not False
+            or any(registry.get(k) is not True for k in FLAGS+('line_range_atomic_rejection','legacy_payload_denied'))
+            or proxy.get('schema')!='template-line-proxy-image-probe-v6' or proxy.get('status')!='passed'
+            or proxy.get('model_calls')!=0 or proxy.get('delivery_approval') is not False
+            or any(proxy.get(k) is not True for k in ('actual_proxy_request_validation','actual_response_validation',
+                'legacy_payload_denied','mixed_protocol_denied','path_and_hash_mismatch_denied'))
+            or set(proxy.get('source_sha256',{}))!={'surgical_test_edit.py','test_artifact_schema.py'}
+            or any(not re.fullmatch(r'[a-f0-9]{64}',str(v)) for v in proxy.get('source_sha256',{}).values())):
+        raise ValueError('exact V6 registry and proxy qualification required')
+
 def note(config,state):
     prefix=('BINDING ADMISSION RECOVERY: prior patches were denied; the entire frozen submission is unchanged. '
             if state.get('binding_recovery') else 'CURRENT R1 BOUNDED TEMPLATE CORRECTION. ')
-    return (prefix+'This is the independently sponsored changed-evidence '
+    text=(prefix+'This is the independently sponsored changed-evidence '
         'execution, not an identical retry or limit reset. Edit ONLY NODE_HARNESS_TEMPLATE in the declared NEW '
         'test using surgical_test_edit; no terminal, Python, generic writes, patches, assertions or product edits. '
         'Read the whole assigned test and product first. Repair terminal observation AFTER async settlement; '
@@ -27,9 +47,12 @@ def note(config,state):
         'Do not claim those gates ran. No Red reconstruction, test skipping, depth/size/iteration change or delivery approval. '
         'CTO proposal: '+state['cto_decision']['reason']+'. Independent Tech Lead: '+state['peer_decision']['reason']+
         '\nDELIVERY_CONTROLLER_CALIBRATION_V1\n')
+    if config.get('line_recipe_revision'):
+        text+='\nV6: original inclusive line ranges, not old/new fragments. Controller-proven bounded recipe: '+json.dumps(config['line_recipe']['recipe'],sort_keys=True)+'\n'
+    return text
 
 def marker(config,state):
-    return digest(dict(operation='bounded_template_author_v5',source=config['source_task'],
+    return digest(dict(operation='bounded_template_author_v6' if config.get('line_recipe_revision') else 'bounded_template_author_v5',source=config['source_task'],
                        executor=selected_executor(state)['contract_sha256']))
 
 
@@ -37,7 +60,8 @@ def selected_executor(state):
     return state.get('binding_recovery',{}).get('executor') or state.get('executor')
 
 def arm(b,source,qualification):
-    validate_qualification(qualification)
+    line_mode=qualification.get('schema')=='template-lines-v6-image-qualification-v1'
+    (validate_line_qualification if line_mode else validate_qualification)(qualification)
     try:import native,handoff_runtime
     except ImportError:from broker import native,handoff_runtime
     with b.LOCK:
@@ -45,6 +69,10 @@ def arm(b,source,qualification):
             row=con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(source,)).fetchone()
             if not row:raise ValueError('independent proposal required')
             config,state=map(json.loads,row)
+            if bool(config.get('line_recipe_revision'))!=line_mode:
+                raise ValueError('qualified protocol must match the independently proposed repair')
+            if line_mode and config.get('line_qualification_sha256')!=digest(qualification):
+                raise ValueError('new planner evidence must bind the exact V6 qualification')
             if state.get('executor'):
                 if state['executor']['qualification']!=qualification:raise ValueError('one immutable executor qualification required')
                 return state['executor']
@@ -70,14 +98,16 @@ def arm(b,source,qualification):
             if (task['status']!='completed' or task.get('issue_id')!=config['issue_id'] or task.get('agent_id')!=config[role]
                     or task.get('wakeup_id')!=state[role+'_wakeup']
                     or fx.decision(task)!=state[role+'_decision']
+                    or state[role+'_decision'].get('action')!='request_test_revision'
                     or any(reads.get(p,{}).get('lines',0)<=0 or reads[p]['lines']!=reads[p].get('total_lines') for p in config['paths'])):
                 raise ValueError('exact actual independent full-read sponsorship required')
         contract=dict(source=source,manifest=config['manifest_sha256'],test_sha256=config['diagnostic']['test_sha256'],
             author=config['author'],cto_task=state['cto_task'],cto_decision=state['cto_decision'],
             peer_task=state['peer_task'],peer_decision=state['peer_decision'],criteria=config['criteria'],
             unchanged_delivery_contract=config['contract_sha256'],qualification_sha256=digest(qualification))
+        if line_mode:contract['line_recipe_sha256']=digest(config['line_recipe'])
         executor=dict(status='ready',qualification=qualification,contract=contract,contract_sha256=digest(contract),
-            surgical=dict(path='/workspace/tests/test_service_mode_indicator.py',expected_sha256=contract['test_sha256'],protocol='typed_template_v5'),
+            surgical=dict(path='/workspace/tests/test_service_mode_indicator.py',expected_sha256=contract['test_sha256'],protocol='typed_template_lines_v6' if line_mode else 'typed_template_v5'),
             worker_image=qualification['worker_image'],attempt_limit=1,delivery_approval=False)
         if len(note(config,state))+100>4000:raise ValueError('bounded exact executor handoff required')
         with b.db() as con:
@@ -109,6 +139,18 @@ def replace_executor(state,value):
     if state.get('binding_recovery'):
         return {**state,'binding_recovery':{**state['binding_recovery'],'executor':value}}
     return {**state,'executor':value}
+
+
+def admit_line_plan(b,config,state):
+    """Normal supervisor admission after NEW independent decisions, not a wake."""
+    if not config.get('line_recipe_revision') or state.get('stage')!='plan_qualified' or state.get('executor'):
+        return None
+    with b.db() as con:
+        row=con.execute('SELECT receipt FROM template_registry_qualifications WHERE worker_image=?',(b.IMAGE,)).fetchone()
+    if not row:return None
+    # arm revalidates exact native tasks, full reads, latest author, idle leases,
+    # installation and unchanged contract before writing a single executor.
+    return arm(b,config['source_task'],json.loads(row[0]))
 
 def for_task(b,issue,task):
     with b.db() as con:

@@ -212,7 +212,11 @@ def handle(b,route,runs,source,prior,effects):
             state=probe(b,config,state,persist)
         elif state.get('executor'):
             executor.advance(config,state,effects,persist)
-        else:lane.advance(config,state,runs,effects,persist)
+        else:
+            state=lane.advance(config,state,runs,effects,persist)
+            if config.get('line_recipe_revision') and state['stage']=='plan_qualified':
+                admitted=executor.admit_line_plan(b,config,state)
+                if admitted:persist({**state,'executor':admitted,'required_action':'dispatch_independently_sponsored_V6_author'})
     except (ValueError,TypeError,KeyError) as error:
         persist({**state,'stage':'blocked','category':'surgical_failure_diagnosis_rejected',
             'error_type':type(error).__name__,'required_action':'CTO_inspect_exact_diagnostic_failure',
