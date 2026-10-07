@@ -15,9 +15,13 @@ O broker instalado foi atualizado mantendo worker e proxy qualificados. Após
 backup SQLite com integridade verificada, o supervisor avaliou o snapshot já
 salvo sem uma nova execução de edição. A calibração real passou em 15 casos
 positivos e 12 controles negativos. A suíte completa produziu Red com código
-de saída 1, vinculado ao mesmo snapshot. O checkpoint registra explicitamente
+de saída 1 e 323 testes executados, vinculado ao mesmo snapshot. O checkpoint registra explicitamente
 que a tarefa nativa **não** terminou com sucesso e que a entrega **não** foi
-aprovada. A revisão independente foi despachada e ainda precisa ser validada.
+aprovada. A revisão independente do Tech Lead terminou e foi aceita pelo
+controlador com `approve_test_revision` no mesmo manifesto. O gate R1 foi
+registrado e sua rota de edição foi pausada. Essa aprovação é dos testes
+recuperados, não da implementação do produto ou da release. O próximo passo
+é a preparação e execução do card dependente R2 sobre esses testes congelados.
 
 A suíte offline dessa mudança executou **2.270 testes, com sete skips
 existentes**. Red e calibração não substituem revisão, Green, PR/CI,
