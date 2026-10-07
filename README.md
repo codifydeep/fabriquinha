@@ -124,6 +124,15 @@ entrega do autor. Calibração, Red e revisão continuam necessários antes de
 implementação do produto. Os protocolos anteriores permanecem disponíveis apenas
 sob suas próprias permissões; V5 não é uma autorização global para editar testes.
 
+Uma recuperação específica de admissão exige duas rejeições reais de patch,
+ausência de outras operações de escrita, execução/lease encerradas, patrocínio
+independente preservado e nova qualificação do registro, prompt nativo e proxy.
+Um job fixo sem rede compara o inventário e todos os bytes dos dois snapshots,
+antes de admitir uma única execução separada. O executor anterior continua
+bloqueado e intacto; criar o job ou o wakeup tem intenção persistida e retomada
+por observação, sem repostar após resultado incerto. Nem essa admissão nem a
+preservação dos arquivos comprovam Red, revisão ou entrega autônoma ponta a ponta.
+
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
 handoff antigo sem esse marcador, admite uma única recuperação com a política

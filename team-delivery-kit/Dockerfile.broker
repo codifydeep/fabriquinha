@@ -7,6 +7,8 @@ COPY broker/seeded_byte_budget_replan.py /seeded_byte_budget_replan.py
 COPY broker/calibration_rework.py /calibration_rework.py
 COPY broker/calibration_failure_plan.py /calibration_failure_plan.py
 COPY broker/template_author_executor.py /template_author_executor.py
+COPY broker/template_admission_recovery.py /template_admission_recovery.py
+COPY broker/template_preservation_probe.py /template_preservation_probe.py
 COPY broker/calibration_preflight_recovery.py /calibration_preflight_recovery.py
 COPY broker/harness_qualification.py /harness_qualification.py
 COPY service_mode_harness_qualification.py /service_mode_harness_qualification.py

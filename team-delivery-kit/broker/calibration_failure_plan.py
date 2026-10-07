@@ -57,6 +57,16 @@ def handle(b,route,runs,source,prior,effects):
 
 def _handle(b,route,runs,source,prior,effects):
     lane,jobs,handoffs,_=modules();key=source['id'];issue=route['issue_id']
+    parent=json.loads(prior['data']).get('calibration_failure_plan_source')
+    if parent:
+        with b.db() as con:
+            row=con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(parent,)).fetchone()
+        if not row:raise ValueError('preserved binding recovery plan required')
+        cfg,held=map(json.loads,row)
+        if (cfg['issue_id']!=issue or held.get('binding_recovery',{}).get('source_task')!=source['id']
+                or source.get('agent_id')!=cfg['author'] or source['status']!='failed'):
+            raise ValueError('exact failed binding recovery predecessor required')
+        key=parent
     with b.LOCK,b.db() as con:
         initialize(con)
         existing=con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(key,)).fetchone()
@@ -119,7 +129,17 @@ def _handle(b,route,runs,source,prior,effects):
             data['calibration_failure_plan']=dict(source_task=key,manifest_sha256=config['manifest_sha256'],state=new)
             data['required_action']=new.get('required_action','calibration_failure_plan:'+new['stage'])
             owner=config['peer'] if new['stage'].startswith('peer') else config['cto']
+            rec=new.get('binding_recovery',{})
+            if rec:
+                active=rec.get('executor',{})
+                data['required_action']=active.get('required_action') or rec.get('required_action') or 'binding_recovery:'+active.get('status',rec['stage'])
+                if active.get('status') in ('ready','intent','waiting','author_completed_awaiting_gates'):owner=config['author']
             handoffs.save(con,key,issue,'calibration_failure_plan',owner,data,time.time())
+            if parent:
+                latest=handoffs.load(con,source['id']);mirror=json.loads(latest['data'])
+                mirror.update(calibration_failure_plan_source=key,
+                    calibration_failure_plan=data['calibration_failure_plan'],required_action=data['required_action'])
+                handoffs.save(con,source['id'],issue,'calibration_failure_plan',owner,mirror,time.time())
     try:
         if state.get('executor'):
             try:import template_author_executor

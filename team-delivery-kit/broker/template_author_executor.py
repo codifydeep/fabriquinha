@@ -1,7 +1,7 @@
 """One independently sponsored, hash-bound V5 execution; never a gate waiver."""
 import hashlib,json,re,time
 
-FLAGS=('actual_registry','actual_default_selection','actual_acp_selection','full_proxy_request_validation',
+FLAGS=('actual_registry','actual_default_selection','actual_acp_selection','full_proxy_request_validation','native_binding_prompt',
        'readless_edit_denied','generic_write_and_terminal_denied','python_denied','direct_handler_fenced',
        'outside_template_change_preserves_bytes','test_weakening_preserves_bytes',
        'invalid_syntax_preserves_bytes','stale_edit_denied','template_selector_denied','fixed_node_check','credentials_absent')
@@ -16,7 +16,9 @@ def validate_qualification(proof):
         raise ValueError('qualified installed V5 registry required')
 
 def note(config,state):
-    return ('CURRENT R1 BOUNDED TEMPLATE CORRECTION. This is the independently sponsored changed-evidence '
+    prefix=('BINDING ADMISSION RECOVERY: prior patches were denied; the entire frozen submission is unchanged. '
+            if state.get('binding_recovery') else 'CURRENT R1 BOUNDED TEMPLATE CORRECTION. ')
+    return (prefix+'This is the independently sponsored changed-evidence '
         'execution, not an identical retry or limit reset. Edit ONLY NODE_HARNESS_TEMPLATE in the declared NEW '
         'test using surgical_test_edit; no terminal, Python, generic writes, patches, assertions or product edits. '
         'Read the whole assigned test and product first. Repair terminal observation AFTER async settlement; '
@@ -28,7 +30,11 @@ def note(config,state):
 
 def marker(config,state):
     return digest(dict(operation='bounded_template_author_v5',source=config['source_task'],
-                       executor=state['executor']['contract_sha256']))
+                       executor=selected_executor(state)['contract_sha256']))
+
+
+def selected_executor(state):
+    return state.get('binding_recovery',{}).get('executor') or state.get('executor')
 
 def arm(b,source,qualification):
     validate_qualification(qualification)
@@ -82,17 +88,27 @@ def arm(b,source,qualification):
         return executor
 
 def advance(config,state,effects,persist):
-    executor=state.get('executor')
+    if state.get('binding_recovery',{}).get('stage') in ('probe_pending','probe_intent','probe_running'):
+        try:import template_admission_recovery
+        except ImportError:from broker import template_admission_recovery
+        return template_admission_recovery.advance(effects.b,config,state,persist)
+    executor=selected_executor(state)
     if not executor or executor['status'] not in ('ready','intent'):return state
     if effects.remaining_calls()<config['minimum_calls'] or not effects.implementation_available(config['issue_id'],config['author']):return state
     first=executor['status']=='ready'
     if first:
-        state={**state,'executor':{**executor,'status':'intent','intent_at':time.time()}};persist(state)
+        state=replace_executor(state,{**executor,'status':'intent','intent_at':time.time()});persist(state)
     wake=effects.ensure_wakeup(config['issue_id'],config['author'],state['peer_task'],marker(config,state),note(config,state),allow_create=first)
-    if wake:state={**state,'executor':{**state['executor'],'status':'waiting','wakeup_id':wake['id']}};persist(state)
-    elif time.time()-state['executor']['intent_at']>=1800:
-        state={**state,'executor':{**state['executor'],'status':'blocked','required_action':'observe_unknown_template_dispatch_no_repost'}};persist(state)
+    if wake:state=replace_executor(state,{**selected_executor(state),'status':'waiting','wakeup_id':wake['id']});persist(state)
+    elif time.time()-selected_executor(state)['intent_at']>=1800:
+        state=replace_executor(state,{**selected_executor(state),'status':'blocked','required_action':'observe_unknown_template_dispatch_no_repost'});persist(state)
     return state
+
+
+def replace_executor(state,value):
+    if state.get('binding_recovery'):
+        return {**state,'binding_recovery':{**state['binding_recovery'],'executor':value}}
+    return {**state,'executor':value}
 
 def for_task(b,issue,task):
     with b.db() as con:
@@ -101,7 +117,7 @@ def for_task(b,issue,task):
     matches=[(json.loads(c),json.loads(s)) for c,s in rows if json.loads(c)['issue_id']==issue and json.loads(s).get('executor')]
     if not matches:return None
     if len(matches)!=1:raise ValueError('one template executor per issue required')
-    config,state=matches[0];executor=state['executor']
+    config,state=matches[0];executor=selected_executor(state)
     identity=task.get('id') or task.get('task_id')
     if task.get('id') and task.get('task_id') and task['id']!=task['task_id']:
         raise ValueError('conflicting template execution identity')
@@ -148,15 +164,17 @@ def observe(b,route,source):
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='calibration_failure_plans'").fetchone():return
         rows=con.execute('SELECT source_task,config,state FROM calibration_failure_plans').fetchall()
     selected=[r for r in rows if json.loads(r[1])['issue_id']==route['issue_id'] and
-        json.loads(r[2]).get('executor',{}).get('status')=='waiting' and
-        json.loads(r[2])['executor'].get('wakeup_id')==source.get('wakeup_id')]
+        (selected_executor(json.loads(r[2])) or {}).get('status')=='waiting' and
+        selected_executor(json.loads(r[2])).get('wakeup_id')==source.get('wakeup_id')]
     if not selected:return
     if len(selected)!=1 or source.get('agent_id')!=route['author']:raise ValueError('exact terminal template author required')
     try:import handoffs
     except ImportError:from broker import handoffs
     key,_,raw=selected[0];state=json.loads(raw)
-    state['executor'].update(status='author_completed_awaiting_gates' if source['status']=='completed' else 'blocked',
+    value={**selected_executor(state)}
+    value.update(status='author_completed_awaiting_gates' if source['status']=='completed' else 'blocked',
         task_id=source['id'],delivery_approval=False,required_action='controller_calibration_and_red' if source['status']=='completed' else 'CTO_diagnose_new_failed_execution_no_identical_retry')
+    state=replace_executor(state,value)
     with b.LOCK,b.db() as con:
         current=con.execute('SELECT state FROM calibration_failure_plans WHERE source_task=?',(key,)).fetchone()
         if current[0]!=raw:return
@@ -164,5 +182,5 @@ def observe(b,route,source):
         row=handoffs.load(con,key)
         if row:
             data=json.loads(row['data']);data['calibration_failure_plan']['state']=state
-            data['required_action']=state['executor']['required_action']
+            data['required_action']=value['required_action']
             handoffs.save(con,key,route['issue_id'],'calibration_failure_plan',route['cto'] if source['status']=='failed' else route['author'],data,time.time())
