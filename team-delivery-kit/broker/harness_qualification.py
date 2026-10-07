@@ -2,6 +2,8 @@
 import hashlib
 import json
 import time
+import re
+from types import SimpleNamespace
 
 IMAGE_ENV_KEYS={'PATH','PYTHONUNBUFFERED','PYTHONDONTWRITEBYTECODE','PLAYWRIGHT_BROWSERS_PATH',
     'npm_config_install_links','HERMES_WEB_DIST','HERMES_TUI_DIR','HERMES_HOME','HERMES_WRITE_SAFE_ROOT',
@@ -63,6 +65,37 @@ def validate_result(result,prepared):
     validate_controls(result.get('positive',{}),result.get('negative_controls',{}))
 
 
+def rejection_state(con,issue,info,raw):
+    row=con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
+    owner=json.loads(row[0]).get('cto') if row else None
+    if not isinstance(owner,str) or not owner:raise ValueError('persistent CTO route required')
+    return dict(stage='blocked',container_id=info['Id'],output_sha256=hashlib.sha256(raw.encode()).hexdigest(),
+                category='harness_calibration_rejected',owner=owner,delivery_approval=False)
+
+
+def reconcile_rejected(b,con,task):
+    """Observe an existing failed job only; no create/start/retry or approval."""
+    row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(task,)).fetchone()
+    if not row:raise ValueError('existing harness intent required')
+    identity,state=map(json.loads,row)
+    if state['stage']=='blocked':return state
+    if state['stage']!='observing' or identity['task_id']!=task:raise ValueError('observing exact harness task required')
+    pinned=identity['payload'].get('Image','')
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}',pinned):raise ValueError('recorded pinned harness image required')
+    # An upgrade must observe the original immutable job, not reinterpret its
+    # isolation contract using the new worker image or create a replacement.
+    original=SimpleNamespace(IMAGE=pinned,docker=b.docker,OWNER=b.OWNER)
+    expected=payload(original,task,identity['volume'],identity['manifest_sha256'])
+    if identity['payload']!=expected:raise ValueError('recorded harness policy drift')
+    info=b.docker('GET','/containers/'+state['container_id']+'/json');verify_job(info,expected)
+    if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']==0:
+        raise ValueError('existing terminal failed harness job required')
+    raw=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
+    retained=rejection_state(con,identity['issue_id'],info,raw)
+    con.execute('UPDATE harness_qualifications SET state=? WHERE task_id=?',(json.dumps(retained,sort_keys=True),task))
+    con.commit();return retained
+
+
 def capture(b,con,issue,task,volume,prepared):
     try:import remediation_runtime_guard as guard
     except ImportError:from broker import remediation_runtime_guard as guard
@@ -104,8 +137,7 @@ def capture(b,con,issue,task,volume,prepared):
                 if info['State']['ExitCode']!=0:raise ValueError('offline harness calibration rejected')
                 result=json.loads(raw);validate_result(result,prepared)
             except (ValueError,KeyError,TypeError):
-                save(dict(stage='blocked',container_id=info['Id'],output_sha256=hashlib.sha256(raw.encode()).hexdigest(),
-                    category='harness_calibration_rejected',owner=value['cto'],delivery_approval=False))
+                save(rejection_state(con,issue,info,raw))
                 raise ValueError('harness calibration rejected; CTO diagnose immutable candidate')
             save(dict(stage='passed',container_id=info['Id'],result=result,delivery_approval=False))
             return result

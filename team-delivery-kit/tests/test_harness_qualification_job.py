@@ -64,3 +64,34 @@ class HarnessJobTests(unittest.TestCase):
         for values in [['OPENROUTER_API_KEY=forbidden'],['PATH=/bin','PATH=/other']]:
             self.b.docker=lambda *a:dict(Id=self.b.IMAGE,Config=dict(Env=values))
             with self.assertRaises(ValueError):job.image_environment(self.b)
+
+    def test_rejection_owner_comes_from_persistent_route_not_guard_projection(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE delivery_routes(issue_id TEXT,config TEXT)')
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps({'cto':'actual-cto'})))
+        state=job.rejection_state(con,'issue',{'Id':'job'},'rejected')
+        self.assertEqual(state['owner'],'actual-cto')
+        self.assertEqual(state['stage'],'blocked');self.assertFalse(state['delivery_approval'])
+        with self.assertRaises(ValueError):job.rejection_state(con,'other',{'Id':'job'},'rejected')
+
+    def test_reconcile_observes_same_failed_job_without_create_start_or_approval(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE delivery_routes(issue_id TEXT,config TEXT)')
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps({'cto':'actual-cto'})))
+        con.execute('CREATE TABLE harness_qualifications(task_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+        expected=job.payload(self.b,'task','volume','b'*64)
+        identity=dict(issue_id='issue',task_id='task',volume='volume',manifest_sha256='b'*64,payload=expected)
+        con.execute('INSERT INTO harness_qualifications VALUES(?,?,?)',('task',json.dumps(identity),json.dumps(dict(stage='observing',container_id='job'))))
+        info=dict(Id='job',Config={k:v for k,v in expected.items() if k!='HostConfig'},
+                  HostConfig=expected['HostConfig'],State=dict(Status='exited',Running=False,ExitCode=1))
+        calls=[]
+        original_image=self.b.IMAGE
+        self.b.IMAGE='sha256:'+'d'*64  # Controller upgraded; existing job stays pinned.
+        def docker(method,path,body=None):
+            calls.append((method,path))
+            return dict(Id=original_image,Config=dict(Env=['PATH=/usr/bin'])) if path.startswith('/images/') else info
+        self.b.docker=docker;self.b.docker_stdout=lambda *args,**kwargs:'rejected'
+        state=job.reconcile_rejected(self.b,con,'task')
+        self.assertEqual(state['owner'],'actual-cto');self.assertFalse(state['delivery_approval'])
+        self.assertTrue(all(method=='GET' for method,path in calls))
+        self.assertEqual(job.reconcile_rejected(self.b,con,'task'),state)

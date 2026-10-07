@@ -70,6 +70,11 @@ workspace, duas rejeições reais e política corrigida; apenas reabre o diagnó
 independente do CTO. Não reinicia diretamente o autor, aumenta limites, reinicia
 profundidade ou aprova Red e entrega.
 
+Rejeições de calibração registram o CTO a partir da rota persistente, não do
+objeto de qualificação do harness. A reconciliação de um job rejeitado observa
+somente o contêiner e a imagem originais, mesmo após atualizar o controlador;
+não recria jobs, reexecuta o autor ou transforma rejeição em aprovação.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe
