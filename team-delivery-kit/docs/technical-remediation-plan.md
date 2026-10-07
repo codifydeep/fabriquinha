@@ -551,3 +551,11 @@ drift, cancellation or dependency holds retain a visible technical impediment.
 The existing durable dispatcher owns the actual one-shot wakeup and acceptance.
 R3 publication remains governed by its separate immutable delivery and resume
 checks. Full-chain admission is not homologation; live acceptance is pending.
+
+The host supervisor projects bounded admission status to the original root
+card's `remediation_admission_status` metadata: stage, next phase, owner and
+remaining/required call counts. This is a display-only field, not a Kanban
+status transition or permission to dispatch. A restricted private pending
+receipt survives failed sends. Subsequent reconciliation reads current native
+metadata before another identical write; visibility failures cannot stop the
+delivery controller. No prompts, credentials or raw API errors are published.

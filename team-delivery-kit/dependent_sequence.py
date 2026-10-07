@@ -866,6 +866,9 @@ def supervise_recovery_publication(ledger,plan,private,cli,instance):
     context=read_json(Path(private)/('portable-context-'+ledger['active']+'.json'))
     if (not context or context.get('issue_id')!=ledger.get('issues',{}).get(ledger['active'])
             or ledger.get('completed')!=labels[:index]):return None
+    from remediation_admission_status import project as project_admission
+    try:project_admission(private,context['issue_id'],cli,instance=instance)
+    except Exception:pass  # Status visibility cannot change delivery/admission authority.
     publication=supervise_publication(private,current_stage,context,plan['project_config'],instance=instance)
     if publication:
         projection={k:publication[k] for k in ('stage','owner','category','attention_required') if k in publication}
