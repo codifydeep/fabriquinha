@@ -165,3 +165,26 @@ is rejected rather than resetting the original exhausted revision depth.
 
 Deterministic validation is not a live model review, product Green, CI, deploy or
 homologation. Those gates remain unproven until their actual operations complete.
+
+### Lossless author context and dependent input
+
+`remediation_author_context.py` prepares a new immutable R1 context capsule from
+the exact approved original capsule, recovery objective and every acceptance
+criterion. Original brief and review prose are retained as quoted historical
+data, with old control markers escaped rather than reactivated. Oversized
+contexts fail; there is no truncation or criterion removal.
+
+The registered read scope includes product sources and the preserved NEW test.
+The runtime phase fence exposes only NEW-test write paths. The seeded-edit
+protocol requires actual inspection and edits, not a completion claim. Runtime
+registration remains paused, refuses active leases, is safe to repeat after a
+partial local registration and does not assign, wake or grant an agent. Its
+receipt explicitly leaves `dispatch_ready=false` until the native context and
+complete dependent executor are qualified.
+
+The R2 input projection consumes the exact independently approved R1 gate,
+retaining the real Red's original issue/task/volume and hashes. It does not copy
+or relabel that Red as a new R2 test execution. It exposes product-only writable
+paths, frozen tests and the full criteria, but confers no execution authority.
+Actual R2 seeding, handler restrictions, full Green, independent product review
+and R3 publication/deploy/QA must still be verified by their executor.

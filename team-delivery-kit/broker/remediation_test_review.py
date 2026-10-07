@@ -36,7 +36,7 @@ def config(b, issue):
             or not route.get('techlead') or not route.get('cto')):
         raise ValueError('same-author independent historical review lineage required')
     return dict(reviewer=route['techlead'], base_sha=value['base']['base_sha'], old_red=old,
-        seed_previous_tests=True, remediation_run_id=value['run_id'],
+        seed_previous_tests=True, seeded_edit_required=True, remediation_run_id=value['run_id'],
         remediation_execution_sha256=digest(value), remediation_plan_sha256=value['plan_sha256'],
         reason='R1 of independently approved recovery plan ' + value['plan_sha256'] +
                ': repair the existing NEW-test harness without removing methods, assertions or behavioral coverage. '
