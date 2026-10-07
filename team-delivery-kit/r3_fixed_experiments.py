@@ -18,6 +18,11 @@ OBSERVATIONS={'controller_absent','controller_present','controller_ambiguous','s
 ROOT=Path(__file__).resolve().parent
 
 
+def experiment_identity(evidence,state,bundle):
+    return digest(dict(incident=digest(evidence),proposal=digest(state['proposal']),review=digest(state['review']),
+                       review_task=state['review_task'],bundle=digest(bundle),experiment=state['proposal']['experiment']))
+
+
 class Effects:
     def __init__(self,private,instance):self.private=Path(private);self.instance=instance
     def now(self):return time.time()
@@ -162,8 +167,7 @@ def execute(private,evidence,state,bundle,*,instance='delivery-kit-port2',effect
     directory=private/'r3-experiments'
     if directory.is_symlink():raise ValueError('unsafe experiment directory')
     directory.mkdir(mode=0o700,exist_ok=True)
-    identity=digest(dict(incident=digest(evidence),proposal=digest(proposal),review=digest(state['review']),
-                         review_task=state['review_task'],bundle=digest(bundle),experiment=experiment))
+    identity=experiment_identity(evidence,state,bundle)
     path=directory/(identity+'.json')
     descriptor=os.open(directory/(identity+'.lock'),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     with os.fdopen(descriptor,'w') as lock:

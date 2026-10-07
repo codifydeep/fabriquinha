@@ -11,7 +11,10 @@ from r3_incident_contract import schema, planning_instruction as instruction
 FACTS = {'controller_handle_missing','controller_identity_changed','controller_ambiguous',
     'controller_unrecorded','launch_acknowledgment_unknown','progress_deadline_exceeded',
     'r2_dependency_not_qualified','delivery_receipt_missing','status_identity_changed',
-    'invalid_launch_handle','delivery_not_verified'}
+    'invalid_launch_handle','delivery_not_verified','experiment_controller_absent','experiment_controller_present',
+    'experiment_controller_ambiguous','experiment_snapshot_intact','experiment_github_ci_exact_sha',
+    'experiment_local_deployment_exact_sha','experiment_delivery_unavailable','experiment_verification_failed',
+    'experiment_review_obsolete','experiment_review_unobservable','experiment_result_unobservable'}
 
 CATEGORIES = dict(r3_controller_handle_missing='controller_handle_missing',
     r3_controller_identity_changed='controller_identity_changed',ambiguous_r3_controller='controller_ambiguous',
@@ -43,16 +46,25 @@ class Effects:
 def validate_evidence(evidence):
     expected={'operation','root_issue','source_task','controller_identity','bundle_sha256','r2_proof_sha256',
               'category','facts','execution_authorized','release_homologated'}
+    continuation={'previous_incident_sha256','experiment_receipt_sha256','experiment_result_sha256','experiment_history'}
     import re
-    if (set(evidence)!=expected or evidence['operation']!='r3_incident_evidence_v1'
+    if (set(evidence) not in (expected,expected|continuation) or evidence['operation']!='r3_incident_evidence_v1'
             or any(not re.fullmatch('[a-f0-9]{64}',str(evidence[k])) for k in
                    ('controller_identity','bundle_sha256','r2_proof_sha256'))
             or not isinstance(evidence['category'],str) or not re.fullmatch('[a-z0-9_]{1,80}',evidence['category'])
             or not all(isinstance(evidence[k],str) and 1<=len(evidence[k])<=64 for k in ('root_issue','source_task'))
             or evidence['execution_authorized'] is not False or evidence['release_homologated'] is not False
             or not isinstance(evidence['facts'],dict) or not 1<=len(evidence['facts'])<=10
+            or set(evidence['facts'])!={'F'+str(i).zfill(2) for i in range(1,len(evidence['facts'])+1)}
             or any(not re.fullmatch('F[0-9]{2}',key) or value not in FACTS for key,value in evidence['facts'].items())):
         raise ValueError('bounded controller-produced R3 evidence required')
+    if continuation<=set(evidence):
+        operations={'observe_existing_controller','verify_frozen_delivery','verify_github_ci','verify_local_deployment'}
+        history=evidence['experiment_history']
+        if (any(not re.fullmatch('[a-f0-9]{64}',str(evidence[k])) for k in continuation-{'experiment_history'})
+                or not isinstance(history,list) or not 1<=len(history)<=4
+                or any(not isinstance(v,str) or v not in operations for v in history) or len(set(history))!=len(history)):
+            raise ValueError('exact bounded post-experiment lineage required')
     return evidence
 
 
@@ -102,6 +114,8 @@ def reconcile(private,evidence,*,instance='delivery-kit-port2',effects=None):
             config=dict(evidence=evidence,evidence_sha256=identity,**actors)
             state=dict(stage='issue_intent',owner='techlead',incident_sha256=identity,
                        execution_authorized=False,release_homologated=False,started_at=fx.now())
+            if 'experiment_history' in evidence:
+                state.update(owner='cto',escalated=True,post_experiment=True)
         def save(value):
             save_receipt(path,dict(config=config,state=value));return value
         def hold(category):
@@ -152,6 +166,11 @@ def reconcile(private,evidence,*,instance='delivery-kit-port2',effects=None):
         try:decision=validate_decision(config,state,fx.task(config,state,state['task_id']))
         except (ValueError,TypeError,KeyError):return hold('invalid_incident_submission')
         if state['stage']=='awaiting_diagnose':
+            if ((decision['action']=='request_experiment' and decision['experiment']=='none')
+                    or (decision['action']!='request_experiment' and decision['experiment']!='none')):
+                return hold('inconsistent_incident_operation')
+            if decision['action']=='request_experiment' and decision['experiment'] in evidence.get('experiment_history',[]):
+                return hold('experiment_repeated_without_new_inputs')
             return save({**state,'stage':'review_dispatch','owner':'techlead' if state.get('escalated') else 'cto','proposal':decision,
                 'proposal_sha256':digest(decision),'diagnosis_task':state['task_id'],'diagnosis_wakeup':state['wakeup_id']})
         proposal=state['proposal']
@@ -188,8 +207,6 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
         facts={'F01':CATEGORIES[category],'F02':'delivery_not_verified'},execution_authorized=False,release_homologated=False)
     incident=reconcile(private,evidence,instance=instance,effects=effects)
     if incident.get('stage')=='experiment_pending':
-        from r3_fixed_experiments import execute
-        result=execute(private,evidence,incident,value,instance=instance,contract=contract)
-        incident={**incident,'experiment':{k:result[k] for k in
-            ('stage','owner','category','identity','result_sha256') if k in result}}
+        from r3_post_experiment import drive
+        incident=drive(private,evidence,incident,value,instance=instance,effects=effects,contract=contract)
     return incident

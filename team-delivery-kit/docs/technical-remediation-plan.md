@@ -476,3 +476,30 @@ Results remain diagnostic evidence with `execution_authorized=false` and
 `release_homologated=false`. A process found alive, matching snapshot or green
 CI alone does not authorize resume or complete the release. Post-experiment
 technical decisions and separately verified resume are still required.
+
+### Evidence-driven post-experiment decisions
+
+`r3_post_experiment.py` requires the exact terminal experiment journal already
+persisted on disk. It verifies its incident, bundle, proposal/review and result
+hashes before constructing a distinct evidence occurrence. Original source,
+root, controller identity, R2 proof and recovery depth remain unchanged. Raw
+output is not forwarded; only bounded verified facts and receipt hashes enter
+the planning context. A failed experiment is a failed fact, not a passing test.
+
+The new occurrence starts with a real CTO planning wakeup and independent Tech
+Lead review. Its intent and wakeup handling reuse the durable lookup-only
+protocol. A conditional resume recommendation has `experiment=none` and still
+grants no execution authority. Combining resume with another operation is
+rejected before review. Revisiting the same fixed experiment with unchanged
+inputs remains a visible technical impediment instead of another automatic run.
+
+The supervisor traverses preserved receipts and can dispatch another distinct
+operation when technically justified. This is not a four-handoff limit: four
+is the size of the current fixed operation whitelist, not a release termination
+condition. Decisions, blocked work and the full release remain active until
+their real delivery gates are satisfied or the CEO explicitly cancels them.
+
+Metadata contains only safe stage/owner/category/identity projections. Display
+metadata never enters the state used to verify an independent approval. Current
+process checks, proof revalidation and one-shot verified controller resume still
+need implementation and live acceptance before the paused R1 trial is enabled.

@@ -108,9 +108,9 @@ class R3FixedExperimentsTests(unittest.TestCase):
         publication=dict(stage='blocked',identity='a'*64,category='r3_controller_handle_missing',release_homologated=False)
         save_receipt(paths['intent'].with_name(fixture.bundle['context']['label']+'.controller.json'),publication)
         with patch('r3_incident_runtime.reconcile',return_value=self.state),\
-             patch('r3_fixed_experiments.execute',return_value={'stage':'experiment_recorded','result_sha256':'d'*64,'stdout':'not public'}) as execute:
+             patch('r3_fixed_experiments.execute',return_value={'stage':'observation_pending','result_sha256':'d'*64,'stdout':'not public'}) as execute:
             result=supervise(self.root,parent,publication,contract=fixture.stage['contract'])
-        self.assertEqual(result['experiment'],{'stage':'experiment_recorded','result_sha256':'d'*64})
+        self.assertEqual(result['experiment'],{'stage':'observation_pending','result_sha256':'d'*64})
         self.assertEqual(execute.call_args.kwargs['contract'],fixture.stage['contract'])
         self.assertFalse(result['release_homologated'])
 
