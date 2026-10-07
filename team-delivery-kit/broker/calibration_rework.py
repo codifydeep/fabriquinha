@@ -17,6 +17,27 @@ def initialize(con):
 
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
+    if config.get('diagnosis_only'):
+        note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
+            'POST-FAILURE PLAN ONLY: '+('Independent Tech Lead review of CTO proposal. ' if peer else 'CTO diagnosis. ')+
+            'Read every ORIGINAL failed candidate file completely. No shell, edits, Red replay or delivery approval. '
+            'The diagnostic experiment used a disposable COPY, not an author submission; it cannot be merged or used as Red. '
+            'Propose a distinct bounded original-author correction of the NEW harness; preserve every test method/assertion, '
+            'baseline/product bytes and all acceptance. Pending observations precede settlement; terminal observations '
+            'must be freshly read after settlement, not copied from pending values. '
+            'The original product lacks the new feature, so its behavioral failure is EXPECTED Red. '
+            'Require fresh controller calibration, full pinned Red, independent test review and all later delivery gates. '
+            'This lane retains a proposal only. Neither decision grants execution, reset of limits/depth or recursive revision. '
+            'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[]. '
+            'Explain the changed evidence and minimal correction; if uncertain retain the hold with escalate_cto.\n'
+            'Executed experiment: '+json.dumps(config['experiment_summary'],sort_keys=True)+
+            '\nOriginal failure: '+json.dumps(config['diagnostic'],sort_keys=True)+
+            ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
+            '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
+            ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
+        if len(note)+100>4000:raise ValueError('failure plan context too large')
+        return note
     note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_REWORK_V1\n'
         'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
         'CALIBRATION GATE REWORK: '+('independent Tech Lead inspection of CTO proposal. ' if peer else 'CTO diagnosis. ')+
@@ -37,7 +58,8 @@ def instruction(config,state):
 
 def marker(config,role):
     return digest({'source':config['source_task'],'manifest':config['manifest_sha256'],'role':role,
-        'operation':'calibration_rework_v1','format_revision':config.get('format_revision',0)})
+        'operation':'calibration_failure_plan_v1' if config.get('diagnosis_only') else 'calibration_rework_v1',
+        'format_revision':config.get('format_revision',0)})
 
 
 def recover_format(config,state,task,reads):
@@ -79,7 +101,13 @@ def decide(config,state,runs,effects,role):
 
 def advance(config,state,runs,effects,persist,now=None):
     now=time.time() if now is None else now
-    if state['stage']=='blocked':return state
+    if state['stage'] in ('blocked','plan_qualified'):return state
+    if state['stage']=='author_pending' and config.get('diagnosis_only'):
+        state={**state,'stage':'plan_qualified','owner':config['cto'],
+            'author_retry_authorized':False,'delivery_approval':False,
+            'required_action':'qualify_bounded_original_author_executor_for_exact_proposal'}
+        persist(state)
+        return state
     if state['stage']=='author_dispatched':
         # Dispatch acknowledgement is not progress or completion. Observe the
         # exact sponsored execution without creating a replacement wakeup.

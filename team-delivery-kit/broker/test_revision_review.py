@@ -1187,6 +1187,10 @@ def planning_mounts(broker, request_id):
                               (request_id,)).fetchone()
         if not binding:
             return []
+        try:import calibration_failure_plan
+        except ImportError:from broker import calibration_failure_plan
+        diagnosis=calibration_failure_plan.mounts(broker,{**dict(binding),'request_id':request_id})
+        if diagnosis:return diagnosis
         try:import calibration_rework
         except ImportError:from broker import calibration_rework
         rework=calibration_rework.mounts(broker,{**dict(binding),'request_id':request_id})

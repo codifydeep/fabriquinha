@@ -97,6 +97,16 @@ harness ou perseguir Green. Orientação no proxy não substitui controles de ac
 nem comprova correção; o snapshot, as validações e a revisão independente continuam
 sendo as evidências obrigatórias.
 
+Para uma falha posterior do autor, um SPIKE fixo pode testar uma hipótese de
+observação assíncrona numa cópia descartável, sem modificar a entrega original.
+Na instalação de referência, essa hipótese passou nos 15 testes da referência
+positiva e nos 12 controles negativos. Isso é evidência diagnóstica, não entrega
+do autor nem Red. O supervisor aceita somente o recibo vinculado ao job offline,
+imagem, manifesto e execução falha; encaminha-o ao CTO e depois ao Tech Lead para
+uma proposta independente. O resultado dessa trilha não despacha implementação:
+um executor limitado ainda precisa ser qualificado para o contrato exato. Esse
+experimento é específico ao ensaio de service-mode, não uma calibração universal.
+
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
 handoff antigo sem esse marcador, admite uma única recuperação com a política
@@ -131,6 +141,9 @@ flowchart TD
     CG -->|Não| CD[CTO: diagnosticar snapshot imutável]
     CD --> CP[Tech Lead: inspeção independente do retrabalho]
     CP -->|Patrocínio válido| F
+    F -->|Retrabalho falhou| CF[SPIKE offline: hipótese sobre cópia descartável]
+    CF --> DP[CTO + Tech Lead: proposta baseada no recibo verificado]
+    DP --> QE[Qualificar executor limitado; sem retry ou aprovação implícitos]
     G --> H[Snapshot durável da entrega]
     H --> I[Revisor independente: leitura e validações permitidas]
     I -->|Solicita mudanças| F

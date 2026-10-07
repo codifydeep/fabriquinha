@@ -98,6 +98,9 @@ def resume_diagnosis(broker, payload):
 def technical_recovery(broker, route, runs, source, prior, effects):
     """One actual CTO diagnosis and one author correction; never a passive wait."""
     data = json.loads(prior['data'])
+    try:import calibration_failure_plan
+    except ImportError:from broker import calibration_failure_plan
+    if calibration_failure_plan.handle(broker,route,runs,source,prior,effects):return
     try:import calibration_rework
     except ImportError:from broker import calibration_rework
     if calibration_rework.handle(broker,route,runs,source,prior,effects):return
@@ -562,7 +565,7 @@ def reconcile(broker, route, runs, effects):
         if prior and prior['stage'] in ('test_first_cto_diagnosis', 'test_first_cto_correction',
                                        'test_first_selected_read_recovery_pending','test_first_selected_read_recovery_wait',
                                        'test_first_surgical_recovery_pending','test_first_surgical_recovery_wait',
-                                       'test_first_cto_correction_wait', 'test_first_blocked','calibration_rework',
+                                       'test_first_cto_correction_wait', 'test_first_blocked','calibration_rework','calibration_failure_plan',
                                        'test_first_bootstrap_recovery_pending','test_first_bootstrap_recovery_wait',
                                        'test_first_artifact_recovery_pending','test_first_artifact_recovery_wait',
                                        'test_first_provider_recovery_pending','test_first_provider_recovery_wait',
