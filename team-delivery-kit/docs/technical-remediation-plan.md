@@ -424,3 +424,28 @@ This contract is only the data boundary. Persistent incident registration,
 actual Tech Lead/CTO handoffs, controlled experiment execution and verified
 resume authorization remain necessary before activating the live trial. Do not
 treat a schema-valid recommendation as permission to relaunch a controller.
+
+### Persistent technical incident handoffs
+
+The dependent supervisor admits an incident only from its matching persisted
+R3 controller hold and exact prepared intake. It records bounded fact enums,
+the controller/bundle/R2-proof hashes and the original source/root identities;
+private raw logs or tool instructions are not injected into the incident brief.
+
+`r3_incident_runtime.py` persists the occurrence before native issue creation
+and persists dispatch intent before each wakeup. Lost acknowledgments permit
+only exact lookup. The broker adapter verifies registered, distinct planning
+roles, the native child identity and a canonical typed instruction. It exposes
+no shell, test edit, restart, merge or deployment operation.
+
+The Tech Lead diagnoses; CTO reviews the exact proposal independently. Ten
+minutes raises attention, and thirty without attendance escalates diagnosis
+once to the CTO. That CTO proposal is reviewed by the Tech Lead. Repeated
+absence, invalid review or rejected diagnosis stays visibly blocked, without
+identical redispatch. Completed task, actor, wakeup, evidence and proposal
+identities are checked before accepting either submission.
+
+Approved recommendations stop at `experiment_pending` or
+`resume_verification_pending`: they are not authority to restart, alter tests
+or declare homologation. Fixed experiment execution, verified resume and
+full-chain admission remain the next implementation/acceptance gates.
