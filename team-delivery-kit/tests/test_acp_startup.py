@@ -74,6 +74,18 @@ class StartupTests(unittest.TestCase):
         self.b.open_granted_transport.assert_called_once()
         self.assertFalse(self.state_saved()['delivery_approval'])
 
+    def test_actual_observation_is_durable_before_single_transport_open(self):
+        self.info['Config'].pop('NetworkDisabled')
+        original=self.b.open_granted_transport.side_effect
+        def checked(row,result,scope):
+            with self.b.db() as con:
+                receipts=[json.loads(r[0]) for r in con.execute('SELECT receipt FROM worker_policy_observations')]
+                self.assertTrue(any(r['docker_status']=='running' and r['omitted_false_network_flag'] for r in receipts))
+            return original(row,result,scope)
+        self.b.open_granted_transport.side_effect=checked
+        with patch.object(startup.time,'sleep'):startup.run(self.b,self.token,'request',self.state)
+        self.assertEqual(self.state_saved()['stage'],'ready')
+
     def state_saved(self):
         with self.b.db() as con:return json.loads(con.execute('SELECT state FROM acp_startups').fetchone()[0])
 

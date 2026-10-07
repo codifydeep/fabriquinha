@@ -129,6 +129,7 @@ def advance_worker(b,row,binding):
     try:info=b.docker('GET','/containers/'+lease['name']+'/json')
     except (b.DockerOperationTimeout,OSError):return None
     if not info:return None
+    with b.db() as con:intents.record_observation(con,request_id,payload,info)
     # Revalidate the complete recorded worker policy even when start was
     # acknowledged. A name or Docker running state alone is insufficient.
     proof,_=intents.observe(payload,{'stage':'create_outcome_unknown'},info,'running',lease['deadline'],time.time())

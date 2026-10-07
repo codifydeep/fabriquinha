@@ -24,6 +24,15 @@ startup e identidade da execução ficam preservados; a nova identidade de hando
 não aprova entrega, reinicia o autor nem amplia limites. Esta recuperação ainda
 exige validação instalada e não qualifica a autonomia ponta a ponta.
 
+Inspeções de workers registrados agora têm recibos persistentes, deduplicados,
+gravados antes do transporte ACP e antes da retirada Docker. Os recibos guardam
+identidade, hash da política e categorias de divergência, sem configuração Docker
+completa, variáveis ou credenciais. Uma política divergente continua impedindo a
+continuação; registrar a observação não concede retry ou aprovação. Execuções
+antigas sem recibo não são convertidas retroativamente em evidência válida. O
+probe integrado pode exercitar o booleano de rede padrão e conferir a sobrevivência
+dos recibos após a retirada, sem sessões, prompts ou chamadas de modelo.
+
 ## O que queremos construir
 
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.

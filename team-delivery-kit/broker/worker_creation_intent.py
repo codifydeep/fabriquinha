@@ -1,10 +1,47 @@
 """Durable worker bootstrap intents. Observation never starts or approves work."""
-import hashlib,json,time
+import hashlib,json,re,time
 from pathlib import Path
 
 
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS worker_creation_intents(request_id TEXT PRIMARY KEY,payload TEXT,state TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS worker_policy_observations(request_id TEXT,receipt_sha256 TEXT,receipt TEXT,PRIMARY KEY(request_id,receipt_sha256))')
+
+
+def policy_differences(payload,info,*,normalize_default=True):
+    """Fixed field categories only; never return environment or label values."""
+    cfg=info.get('Config',{});host=info.get('HostConfig',{})
+    differences=[]
+    if info.get('Image')!=payload['Image']:differences.append('Image')
+    differences.extend(k for k in ('User','Entrypoint','Cmd') if cfg.get(k)!=payload.get(k))
+    default=False if normalize_default else None
+    observed=cfg.get('NetworkDisabled',default);expected=payload.get('NetworkDisabled',default)
+    if type(observed) is not bool or type(expected) is not bool or observed!=expected:
+        differences.append('NetworkDisabled')
+    if any(cfg.get('Labels',{}).get(k)!=v for k,v in payload['Labels'].items()):differences.append('Labels')
+    expected_env={v.split('=',1)[0]:v.split('=',1)[1] for v in payload.get('Env',[])}
+    observed_env={v.split('=',1)[0]:v.split('=',1)[1] for v in cfg.get('Env',[]) if '=' in v}
+    if any(observed_env.get(k)!=v for k,v in expected_env.items()):differences.append('Env')
+    if any(host.get(k)!=v for k,v in payload['HostConfig'].items()):differences.append('HostConfig')
+    return differences
+
+
+def record_observation(con,request,payload,info):
+    """Durable sanitized inspection before transport or retirement; no authority."""
+    initialize(con)
+    receipt=dict(operation='worker_policy_observation_v1',request_id=request,
+        payload_sha256=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest(),
+        container_id=info['Id'] if re.fullmatch(r'[a-f0-9]{64}',str(info.get('Id',''))) else 'invalid',
+        worker_image=info['Image'] if re.fullmatch(r'sha256:[a-f0-9]{64}',str(info.get('Image',''))) else 'invalid',
+        docker_status=info.get('State',{}).get('Status') if info.get('State',{}).get('Status') in
+            ('created','running','paused','restarting','exited','removing','dead') else 'unknown',
+        normalized_differences=policy_differences(payload,info),
+        strict_differences=policy_differences(payload,info,normalize_default=False),
+        omitted_false_network_flag=payload.get('NetworkDisabled') is False and 'NetworkDisabled' not in info.get('Config',{}),
+        author_retry_authorized=False,delivery_approval=False)
+    encoded=json.dumps(receipt,sort_keys=True);digest=hashlib.sha256(encoded.encode()).hexdigest()
+    con.execute('INSERT OR IGNORE INTO worker_policy_observations VALUES (?,?,?)',(request,digest,encoded))
+    return receipt
 
 
 def record(con,request,payload):
@@ -57,18 +94,7 @@ def observe(payload,state,info,native_status,deadline,now):
         action=('observe_late_start_even_after_native_termination' if terminal else 'observe_start_no_repost') if starting else (
             'observe_late_create_even_after_native_termination' if terminal else 'observe_exact_container_no_repost')
         return {**state,'required_action':action},'failed' if terminal else None
-    cfg=info.get('Config',{});host=info.get('HostConfig',{})
-    expected_env={v.split('=',1)[0]:v.split('=',1)[1] for v in payload.get('Env',[])}
-    observed_env={v.split('=',1)[0]:v.split('=',1)[1] for v in cfg.get('Env',[]) if '=' in v}
-    # Docker inspect can omit the false default. Normalize only this boolean;
-    # network mode, mounts and all other recorded policy remain exact checks.
-    if (info.get('Image')!=payload['Image'] or any(cfg.get(k)!=payload.get(k) for k in ('User','Entrypoint','Cmd'))
-            or type(cfg.get('NetworkDisabled',False)) is not bool
-            or type(payload.get('NetworkDisabled',False)) is not bool
-            or cfg.get('NetworkDisabled',False)!=payload.get('NetworkDisabled',False)
-            or any(cfg.get('Labels',{}).get(k)!=v for k,v in payload['Labels'].items())
-            or any(observed_env.get(k)!=v for k,v in expected_env.items())
-            or any(host.get(k)!=v for k,v in payload['HostConfig'].items())):
+    if policy_differences(payload,info):
         return {**state,'stage':'ownership_or_policy_conflict','required_action':'controller_audit_no_start_or_delete','delivery_approval':False},None
     fact=dict(container_id=info['Id'],docker_status=info['State']['Status'],
         started_at=info['State'].get('StartedAt'),native_status=native_status,
@@ -116,5 +142,6 @@ def reconcile(b):
         with b.LOCK,b.db() as con:
             current=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
             if not current or current[0]!=raw_state:continue
+            if info is not None:record_observation(con,request,json.loads(raw_payload),info)
             con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',(json.dumps(changed,sort_keys=True),request))
             if lease:con.execute("UPDATE leases SET status=? WHERE request_id=? AND status='creating'",(lease,request))

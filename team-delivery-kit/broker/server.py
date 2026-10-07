@@ -534,6 +534,13 @@ def remove_owned(name, request_id):
     if labels.get('delivery-kit.owner') != OWNER or labels.get('delivery-kit.request') != request_id:
         raise RuntimeError('container identity mismatch')
     with db() as con:
+        # Inspection evidence survives retirement; do not archive credentials or
+        # full Docker configuration. A recorded worker policy is immutable.
+        if con.execute("SELECT 1 FROM sqlite_master WHERE name='worker_creation_intents'").fetchone():
+            row=con.execute('SELECT payload FROM worker_creation_intents WHERE request_id=?',(request_id,)).fetchone()
+            if row:
+                import worker_creation_intent
+                worker_creation_intent.record_observation(con,request_id,json.loads(row[0]),info)
         con.execute('CREATE TABLE IF NOT EXISTS worker_retirement_intents(request_id TEXT PRIMARY KEY,container_id TEXT,name TEXT,state TEXT)')
         previous=con.execute('SELECT container_id,name,state FROM worker_retirement_intents WHERE request_id=?',(request_id,)).fetchone()
         if previous:

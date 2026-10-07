@@ -18,6 +18,35 @@ with patch.dict(os.environ, {'BROKER_WORKER_IMAGE': 'sha256:' + 'a' * 64}):
 
 
 class BrokerDiagnosticTests(unittest.TestCase):
+    def test_retirement_archives_sanitized_policy_before_delete(self):
+        from broker import worker_creation_intent as intents
+        from tests.test_worker_creation_intent import WorkerCreationIntentTests
+        payload,_,info=WorkerCreationIntentTests().inputs()
+        payload['Labels']={'delivery-kit.owner':server.OWNER,'delivery-kit.request':'request'}
+        info['Config']['Labels']=payload['Labels'];info['Id']='c'*64
+        info['Config'].pop('NetworkDisabled')
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)),\
+                patch.dict(sys.modules,{'worker_creation_intent':intents}):
+            with server.db() as con:intents.record(con,'request',payload)
+            def docker(method,path,body=None):
+                if method=='DELETE':
+                    with server.db() as con:
+                        receipt=json.loads(con.execute('SELECT receipt FROM worker_policy_observations').fetchone()[0])
+                        self.assertEqual(receipt['container_id'],'c'*64)
+                        self.assertEqual(receipt['normalized_differences'],[])
+                        self.assertTrue(receipt['omitted_false_network_flag'])
+                    return {}
+            with patch.object(server,'docker') as call:
+                # The second GET is the same name after the DELETE.
+                deleted=[False]
+                def sequence(method,path,*args):
+                    if method=='DELETE':deleted[0]=True;return docker(method,path,*args)
+                    return None if deleted[0] else info
+                call.side_effect=sequence
+                server.remove_owned('owned','request')
+                self.assertEqual(sum(c.args[0]=='DELETE' for c in call.call_args_list),1)
+            with server.db() as con:self.assertEqual(con.execute('SELECT count(*) FROM worker_policy_observations').fetchone()[0],1)
+
     def test_pending_retirement_does_not_starve_other_closing_leases(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
             with server.db() as con:

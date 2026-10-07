@@ -25,7 +25,7 @@ import uuid
 ROOT=Path(__file__).resolve().parent
 
 
-def run(image,installed_controller=False):
+def run(image,installed_controller=False,network_default=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}',image):raise ValueError('immutable probe image required')
     sys.path.insert(0,str(ROOT/'broker'))
     os.environ['BROKER_WORKER_IMAGE']=image
@@ -57,7 +57,7 @@ def run(image,installed_controller=False):
     def fixed_config(actual_request,scenario):
         if actual_request!=request_id or scenario!='acp-session':raise ValueError('fixed startup probe only')
         return dict(Image=image,User='10000:10000',Entrypoint=['python'],
-            Cmd=['-c','import time; time.sleep(480)'],WorkingDir='/tmp',NetworkDisabled=True,
+            Cmd=['-c','import time; time.sleep(480)'],WorkingDir='/tmp',NetworkDisabled=not network_default,
             Env=['HOME=/tmp','HERMES_HOME=/tmp/hermes'],
             Labels={'delivery-kit.owner':b.OWNER,'delivery-kit.request':request_id,'com.docker.compose.project':b.PREFIX},
             HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],
@@ -124,6 +124,7 @@ def run(image,installed_controller=False):
                     capability_consumptions=used,operations=operations,lease_status=status,
                     prompts_sent=0,sessions_created=0,model_calls=0,worker_network='none',
                     worker_socket_absent=True,delivery_approval=False)
+                result['network_default_policy']=network_default
                 receipt=b.STATE/'probe-receipt.json'
                 receipt.write_text(json.dumps(result,sort_keys=True));receipt.chmod(0o600)
             finally:
@@ -155,6 +156,16 @@ def run(image,installed_controller=False):
                     with b.db() as con:
                         final_status=con.execute('SELECT status FROM leases WHERE request_id=?',(request_id,)).fetchone()[0]
                     if final_status!='closed':raise ValueError('retirement not reconciled')
+                    if network_default:
+                        with b.db() as con:
+                            facts=[json.loads(row[0]) for row in con.execute('SELECT receipt FROM worker_policy_observations WHERE request_id=?',(request_id,))]
+                        if (not facts or any(f['normalized_differences'] for f in facts)
+                                or not any(f['docker_status']=='running' for f in facts)
+                                or any(f['worker_image']!=image or f['delivery_approval'] is not False for f in facts)):
+                            raise ValueError('durable original policy observations missing or divergent')
+                        result.update(durable_policy_observations=True,
+                            observed_omitted_false=any(f['omitted_false_network_flag'] for f in facts),
+                            policy_source_sha256=hashlib.sha256(Path(acp_startup.__file__).with_name('worker_creation_intent.py').read_bytes()).hexdigest())
                     result['lease_status']=final_status
                     result['retirement_observed']=True
                     receipt.write_text(json.dumps(result,sort_keys=True))
@@ -164,5 +175,6 @@ def run(image,installed_controller=False):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--image',required=True)
     parser.add_argument('--installed-controller',action='store_true')
+    parser.add_argument('--network-default',action='store_true')
     arguments=parser.parse_args()
-    print(json.dumps(run(arguments.image,arguments.installed_controller),sort_keys=True))
+    print(json.dumps(run(arguments.image,arguments.installed_controller,arguments.network_default),sort_keys=True))

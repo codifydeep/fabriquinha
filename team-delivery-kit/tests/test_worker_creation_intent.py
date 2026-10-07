@@ -6,6 +6,30 @@ from broker import worker_creation_intent as intent
 
 
 class WorkerCreationIntentTests(unittest.TestCase):
+    def test_policy_receipt_survives_reopen_deduplicates_and_excludes_secrets(self):
+        import tempfile,os
+        payload,_,info=self.inputs();info['Config'].pop('NetworkDisabled')
+        info['Id']='c'*64
+        payload['Env']=['SECRET=private-value'];info['Config']['Env']=['SECRET=private-value']
+        with tempfile.TemporaryDirectory() as directory:
+            path=os.path.join(directory,'receipts.sqlite')
+            with sqlite3.connect(path) as con:
+                receipt=intent.record_observation(con,'request',payload,info)
+                intent.record_observation(con,'request',payload,info)
+            with sqlite3.connect(path) as con:
+                rows=con.execute('SELECT receipt FROM worker_policy_observations').fetchall()
+                self.assertEqual(len(rows),1)
+                self.assertEqual(json.loads(rows[0][0]),receipt)
+                for forbidden in ('private-value','SECRET=','Config','HostConfig','Cmd'):
+                    self.assertNotIn(forbidden,rows[0][0])
+                self.assertTrue(receipt['omitted_false_network_flag'])
+                self.assertEqual(receipt['normalized_differences'],[])
+                self.assertEqual(receipt['strict_differences'],['NetworkDisabled'])
+                self.assertFalse(receipt['author_retry_authorized']);self.assertFalse(receipt['delivery_approval'])
+                info['HostConfig']['NetworkMode']='host'
+                drift=intent.record_observation(con,'request',payload,info)
+                self.assertEqual(drift['normalized_differences'],['HostConfig'])
+                self.assertEqual(con.execute('SELECT count(*) FROM worker_policy_observations').fetchone()[0],2)
     def inputs(self):
         payload=dict(Image='sha256:'+'a'*64,User='10000:10000',Entrypoint=['python'],Cmd=['-c','sleep'],NetworkDisabled=False,
             Env=['DELIVERY_EXECUTION_MODE=implementation'],Labels={'delivery-kit.owner':'owner','delivery-kit.request':'request'},
