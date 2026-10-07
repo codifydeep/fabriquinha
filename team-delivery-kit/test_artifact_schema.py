@@ -142,7 +142,7 @@ def apply(body):
     names = [t.get('function', {}).get('name') for t in tools]
     if names.count('read_file') != 1 or names.count('write_file') != 1:
         raise ValueError('test artifact requires existing read and write tools')
-    if surgical and surgical.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5') and names.count('surgical_test_edit')!=1:
+    if surgical and surgical.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5','typed_template_lines_v6') and names.count('surgical_test_edit')!=1:
         raise ValueError('typed surgical tool missing from actual registry')
     result = copy.deepcopy(body)
     if surgical:
@@ -162,7 +162,7 @@ def apply(body):
         # A resumed session's historical reads do not authorize this new worker.
         # Require fresh observations after the controller's current grant marker.
         start=max(i for i,m in enumerate(body['messages']) if m.get('role')=='user'
-                  and re.search(r'DELIVERY_SURGICAL_TEST_V[12345]:',str(m.get('content',''))))
+                  and re.search(r'DELIVERY_SURGICAL_TEST_V[123456]:',str(m.get('content',''))))
         read_history=body['messages'][start:]
     if revisions and not edit_required and not surgical:
         if revision_write_completed(read_history,target,sources):
@@ -213,13 +213,24 @@ def apply(body):
                         and receipt.get('before_sha256')==surgical['expected_sha256']
                         and receipt.get('path')==target and receipt.get('test_bodies_preserved') is True):
                     return body  # Local edit receipt only, never controller Red or approval.
-            typed=surgical.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5')
+            typed=surgical.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5','typed_template_lines_v6')
             writes=sum(1 for m in read_history if m.get('role')=='assistant'
                 for call in m.get('tool_calls',[]) if call.get('function',{}).get('name') in ('write_file','surgical_test_edit'))
             if writes>=2:raise ValueError('surgical edit failed twice; diagnosis required')
             if typed:
                 chosen=next(t for t in result['tools'] if t['function']['name']=='surgical_test_edit')
                 chosen['function']=typed_schema(surgical)
+                if surgical.get('protocol')=='typed_template_lines_v6':
+                    return _selected(result,'surgical_test_edit',
+                        'CURRENT HARNESS-ONLY LINE CORRECTION: use path, exact expected_sha256 and '
+                        'start_line,end_line,new from fresh complete FILE reads. All inclusive ranges refer '
+                        'to the ORIGINAL file, sorted and disjoint, strictly inside NODE_HARNESS_TEMPLATE. '
+                        'Preserve newline endings, all test bodies, assertions and non-template AST nodes. '
+                        'No old strings, literal selectors, delimiters, terminal, Python, generic writes or '
+                        'product changes. Limit4 ranges,4096 UTF-8bytes per range,32768 total file. '
+                        'Prefer the independently reviewed minimal terminal observation correction; '
+                        'keep pending observations separate. Two rejected proposals require diagnosis. '
+                        'Receipt is neither Red, approval nor delivery; end for controller calibration and review.')
                 if surgical.get('protocol')=='typed_template_v5':
                     return _selected(result,'surgical_test_edit',
                         'CURRENT R1 HARNESS-ONLY CORRECTION: use path, exact expected_sha256 and '

@@ -111,7 +111,7 @@ def marker_config(body):
         if message.get('role')!='user':continue
         content=message.get('content','')
         if isinstance(content,list):content='\n'.join(p.get('text','') for p in content if isinstance(p,dict))
-        if isinstance(content,str):markers.extend(re.findall(r'^DELIVERY_SURGICAL_TEST_(V[12345]):([^\n]+)$',content,re.M))
+        if isinstance(content,str):markers.extend(re.findall(r'^DELIVERY_SURGICAL_TEST_(V[123456]):([^\n]+)$',content,re.M))
     if not markers:return None
     markers=set(markers)
     if len(markers)!=1:raise ValueError('surgical marker drift')
@@ -123,6 +123,7 @@ def marker_config(body):
     if version=='V3':result['protocol']='typed_driver_v3'
     if version=='V4':result['protocol']='typed_driver_lines_v4'
     if version=='V5':result['protocol']='typed_template_v5'
+    if version=='V6':result['protocol']='typed_template_lines_v6'
     drains={value for message in body.get('messages',[]) if message.get('role')=='user'
         and isinstance(message.get('content'),str)
         for value in re.findall(r'^DELIVERY_STATUS_DRAIN_V1:([^\n]+)$',message['content'],re.M)}
@@ -135,7 +136,10 @@ def marker_config(body):
 
 def typed_schema(config):
     """One JSON object, not encoded JSON inside a file-content string."""
-    if config.get('protocol')=='typed_driver_lines_v4':
+    if config.get('protocol') in ('typed_driver_lines_v4','typed_template_lines_v6'):
+        template=config.get('protocol')=='typed_template_lines_v6'
+        if template and (config.get('atomic_contract') or config.get('drain_resolver')):
+            raise ValueError('invalid surgical worker configuration')
         schema={'name':'surgical_test_edit','description':'Hash-bound DRIVER_BODY-only line edits. Use absolute 1-based file lines from fresh read, inclusive start/end. All ranges refer to the ORIGINAL granted file, sorted and disjoint. Replace complete lines; include newline endings. Never copy old text. No terminal or product edits; not approval.',
             'strict':True,'parameters':{'type':'object','properties':{
                 'path':{'type':'string','enum':[config['path']]},
@@ -145,6 +149,8 @@ def typed_schema(config):
                     'end_line':{'type':'integer','minimum':1,'maximum':32768},
                     'new':{'type':'string','maxLength':4096}},'required':['start_line','end_line','new'],'additionalProperties':False}}},
                 'required':['path','expected_sha256','edits'],'additionalProperties':False}}
+        if template:
+            schema['description']=schema['description'].replace('DRIVER_BODY','NODE_HARNESS_TEMPLATE')
         if config.get('atomic_contract'):
             from c10_status_atomic import CONTRACT
             if config['atomic_contract']!=CONTRACT:raise ValueError('unknown atomic contract')
@@ -189,7 +195,7 @@ def validate_typed(args,config):
     if args['path']!=config['path']:raise ValueError('surgical path mismatch')
     if args['expected_sha256']!=config['expected_sha256']:raise ValueError('surgical hash mismatch')
     try:
-        validator=validate_line_envelope if config.get('protocol')=='typed_driver_lines_v4' else validate_envelope
+        validator=validate_line_envelope if config.get('protocol') in ('typed_driver_lines_v4','typed_template_lines_v6') else validate_envelope
         validator({k:args[k] for k in ('expected_sha256','edits')},config['expected_sha256'])
     except (ValueError,TypeError,UnicodeError):raise ValueError('surgical edits invalid') from None
     if config.get('atomic_contract'):
@@ -288,11 +294,11 @@ def prepare_driver_lines(source,args):
 
 
 def prepare_template_lines(source,args):
-    """Unexposed preparator for bounded template-line edits, never a permission.
+    """Preparator for bounded template-line edits, never itself a permission.
 
     All ranges address the same ORIGINAL hash, not successive intermediate
-    results. The caller does not choose a literal name. Existing worker grants
-    and marker protocols cannot invoke this preparator yet.
+    results. The caller does not choose a literal name. Only an independently
+    admitted V6 grant may select this through the controlled worker handler.
     """
     return _prepare_literal_lines(source,args,'NODE_HARNESS_TEMPLATE')
 
@@ -462,10 +468,10 @@ def edit_file(path,args,*,root=Path('/workspace'),observed_read=False,required_u
         info=os.fstat(fd)
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1
                 or required_uid is not None and info.st_uid!=required_uid):raise ValueError('unowned surgical target')
-        if line_ranges and not driver_only:raise ValueError('operation forbidden in surgical mode')
+        if line_ranges and not (driver_only or template_only):raise ValueError('operation forbidden in surgical mode')
         source=os.read(fd,32769)
-        if template_only and (driver_only or line_ranges or atomic_status or micro_resolver):raise ValueError('operation forbidden in surgical mode')
-        prepare_fn=prepare_template if template_only else prepare_driver_lines if line_ranges else prepare_driver if driver_only else prepare
+        if template_only and (driver_only or atomic_status or micro_resolver):raise ValueError('operation forbidden in surgical mode')
+        prepare_fn=(prepare_template_lines if line_ranges else prepare_template) if template_only else prepare_driver_lines if line_ranges else prepare_driver if driver_only else prepare
         if micro_resolver:
             from c10_micro_drain import validate
             if atomic_status or not driver_only or not line_ranges:raise ValueError('operation forbidden in surgical mode')

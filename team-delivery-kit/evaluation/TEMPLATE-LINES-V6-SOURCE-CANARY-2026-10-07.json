@@ -1,0 +1,37 @@
+{
+  "schema": "template-lines-v6-source-canary-v1",
+  "date": "2026-10-07",
+  "status": "passed",
+  "scope": "public_source_overlay_in_real_registry",
+  "base_image": "sha256:ef0fdbae8e022deaae6293fb010c8767d798cd4aa5d199ffa72c7e258c1eab3d",
+  "source_sha256": {
+    "surgical_test_edit.py": "44a7766e24ede3f0c4d34f1bf02d0fbd8036d699dba4474410241e9b041cecc8",
+    "test_artifact_schema.py": "7960ddbb694b458deece2e2c8edfa677875de84dcc23854c5338b742264cba8a",
+    "broker/server.py": "9c7721cf1fec6718f5fc249784aba0ca958ccc5c4d6aa8fedb20e1b2f533edb3",
+    "broker/review_tool_policy.py": "8ec5506bc1875f0cb6b07285207d7835bd669b959a09e97e405b9d4ce49a6c94",
+    "broker/surgical_tool.py": "a265ffa59c6ccd24e9a1ac83c71991b3f8f61c5d0a54fadbe69e842b6cd05626",
+    "tests/surgical_template_line_registry_probe.py": "4af5ecfde56897208affde2e68c0579bca50d7694da24f597136de52cd4c8336"
+  },
+  "unit_suite": {"tests": 2203, "existing_skips": 7, "status": "passed"},
+  "canary": "tests/surgical_template_line_registry_probe.py",
+  "registry": "actual_installed_Hermes_registry_with_public_source_overlays",
+  "native_io": "fixture_only_actual_task_binding_and_native_task_prompt",
+  "proxy_validation": "local_validate_request_and_artifact_response_contract_no_network",
+  "verified": [
+    "default_and_ACP_tool_selection", "fresh_complete_read_required",
+    "generic_write_patch_terminal_python_denied", "direct_handler_fenced",
+    "outside_template_edits_and_test_weakening_denied",
+    "syntax_failure_preserves_original", "overlapping_ranges_denied",
+    "legacy_payload_and_template_selector_denied", "stale_hash_replay_denied",
+    "valid_bounded_template_line_edit_verified"
+  ],
+  "model_calls": 0,
+  "network": "none",
+  "worker_uid": 10000,
+  "credentials_and_docker_socket": "absent",
+  "installed_image_qualification": false,
+  "author_execution_admitted": false,
+  "delivery_approval": false,
+  "red_evidence": false,
+  "autonomy_qualified": false
+}

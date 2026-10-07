@@ -26,6 +26,7 @@ def findings(path, content, *, mode='100644'):
     public_evidence = {
         'team-delivery-kit/evaluation/sources.lock.json',
         'team-delivery-kit/evaluation/SURGICAL-DRIVER-V3-QUALIFICATION-2026-10-04.json',
+        'team-delivery-kit/evaluation/TEMPLATE-LINES-V6-SOURCE-CANARY-2026-10-07.json',
     }
     if (path.startswith('team-delivery-kit/evaluation/') and p.suffix in {'.md', '.json'}
             and path not in public_evidence):

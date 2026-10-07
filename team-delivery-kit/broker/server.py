@@ -2056,7 +2056,7 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
                 if surgical:raise ValueError('conflicting surgical capabilities')
                 surgical=driver['surgical']
             if surgical:
-                version={'typed_v2':'V2','typed_driver_v3':'V3','typed_driver_lines_v4':'V4','typed_template_v5':'V5'}.get(surgical.get('protocol'),'V1')
+                version={'typed_v2':'V2','typed_driver_v3':'V3','typed_driver_lines_v4':'V4','typed_template_v5':'V5','typed_template_lines_v6':'V6'}.get(surgical.get('protocol'),'V1')
                 instruction+='\nDELIVERY_SURGICAL_TEST_'+version+':'+surgical['path']+':'+surgical['expected_sha256']+'\n'
                 if surgical.get('drain_resolver'):
                     instruction+='DELIVERY_STATUS_DRAIN_V1:'+surgical['drain_resolver']+'\n'

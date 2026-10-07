@@ -9,7 +9,7 @@ def available():
     try:
         config=json.loads(os.environ.get('DELIVERY_SURGICAL_TEST_JSON','{}'))
         return (os.environ.get('DELIVERY_EXECUTION_MODE')=='implementation'
-                and config.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5'))
+                and config.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5','typed_template_lines_v6'))
     except (ValueError,TypeError):return False
 
 

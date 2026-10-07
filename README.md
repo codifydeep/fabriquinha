@@ -163,9 +163,15 @@ A preparação de edição por linhas do `NODE_HARNESS_TEMPLATE` já possui test
 hash, intervalos originais disjuntos, limite UTF-8, AST externa e sintaxe Node.
 Um probe somente leitura produziu, no snapshot real, exatamente o hash da variante
 diagnóstica validada anteriormente e reduziu o arquivo em três bytes. Essa operação
-continua **não exposta aos workers**: falta qualificar seus handlers, esquema,
-registro, proxy e admissão independente. O resultado não modifica a entrega nem
-substitui calibração, Red ou revisão; nenhum grant existente foi ampliado.
+continua **não admitida para os workers reais**. O protocolo V6 passou pelos
+handlers, registro nativo/ACP, prompt com binding real e validação local do proxy
+em um contêiner descartável, com código público montado somente para leitura.
+O canary rejeitou escrita genérica, terminal, Python, alterações de assertions,
+intervalos sobrepostos, sintaxe inválida e hash obsoleto. Essa prova usa overlays
+de código: não qualifica as imagens instaladas nem a admissão independente, que
+continuam pendentes. O resultado não modifica a entrega nem substitui calibração,
+Red ou revisão; nenhum grant existente foi ampliado. O recibo reproduzível está em
+[TEMPLATE-LINES-V6-SOURCE-CANARY](team-delivery-kit/evaluation/TEMPLATE-LINES-V6-SOURCE-CANARY-2026-10-07.json).
 
 O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
