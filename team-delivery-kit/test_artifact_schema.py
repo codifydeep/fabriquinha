@@ -35,6 +35,31 @@ def _selected(result,name,instruction):
     return result
 
 
+def seeded_repair_progress(body):
+    """Keep the controller-owned calibration phase after the first real edit.
+
+    This is guidance, not a new tool permission or evidence of completion.
+    Snapshot calibration, full Red and independent review remain mandatory.
+    """
+    if not any(m.get('role')=='user' and re.search(
+            r'^DELIVERY_CONTROLLER_CALIBRATION_V1\s*$',str(m.get('content','')),re.M)
+            for m in body.get('messages',[])):
+        return body
+    result=copy.deepcopy(body)
+    result['messages'].append(dict(role='system',content=
+        'CURRENT R1 CALIBRATION PHASE: a saved patch is NOT a qualified harness. '
+        'Inspect the corrected observation against the diagnosis; preserve all tests/assertions. '
+        'Pending state is observed before settlement; terminal state must be freshly read after '
+        'settlement, never copied from an earlier pending value. Save and inspect remaining narrow '
+        'corrections, then finish this author turn for controller validation. The original product '
+        'intentionally lacks the new feature: its failure is expected Red, not a request to implement '
+        'the feature in the harness or pursue Green. The controller executes the fixed calibration '
+        'and full pinned suite; do not substitute a partial or piped command as evidence. '
+        'Near the 32768-byte ceiling, shorten only redundant comments before adding scaffolding. '
+        'No limit increase, approval, product edit or promise-only completion is authorized.'))
+    return result
+
+
 def revision_write_completed(history, target, sources):
     """Freeze pre-edit inspection; new bytes cannot invalidate old evidence."""
     calls={}
@@ -165,7 +190,7 @@ def apply(body):
             if (isinstance(receipt,dict) and receipt.get('success') is True and not receipt.get('error')
                     and not receipt.get('already_applied') and not receipt.get('no_change')
                     and isinstance(receipt.get('diff'),str) and receipt['diff'].strip()):
-                return body  # Only phase progression; never Red, review or delivery approval.
+                return seeded_repair_progress(body)  # Never Red, review or delivery approval.
     missing = sorted(sources - observations(read_history, wire=True).keys())
     if missing:
         path = missing[0]
@@ -265,7 +290,7 @@ def apply(body):
                     if (isinstance(receipt,dict) and receipt.get('success') is True and not receipt.get('error')
                             and not receipt.get('already_applied') and not receipt.get('no_change')
                             and isinstance(receipt.get('diff'),str) and receipt['diff'].strip()):
-                        return body  # Tool receipt only; controller still verifies changed hash and Red.
+                        return seeded_repair_progress(body)  # Controller still verifies changed hash and Red.
                 if len(patch_calls)>=2: raise ValueError('seeded patch failed twice; diagnosis required')
                 if names.count('patch')!=1: raise ValueError('seeded repair requires existing patch tool')
                 chosen=next(t for t in result['tools'] if t['function']['name']=='patch')

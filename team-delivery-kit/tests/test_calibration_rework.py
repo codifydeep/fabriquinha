@@ -40,8 +40,25 @@ class CalibrationReworkTests(unittest.TestCase):
         self.assertEqual([args[1] for args,kw in self.calls],['cto','peer','author'])
         self.assertFalse(state['delivery_approval']);self.assertFalse(state['revision_depth_reset'])
         self.assertIn('calibration and genuine Red',self.calls[-1][0][-1])
+        self.assertIn('EXPECTED Red',self.calls[-1][0][-1])
+        self.assertIn('DELIVERY_CONTROLLER_CALIBRATION_V1',self.calls[-1][0][-1])
+        self.assertNotIn('Run the full pinned suite',self.calls[-1][0][-1])
         advance(self.config,state,runs,self.fx,self.save,now=6)
         self.assertEqual(len(self.calls),3)
+
+    def test_failed_sponsored_author_is_visible_to_cto_without_another_dispatch(self):
+        state=dict(stage='author_dispatched',author_wakeup='wake-author',
+                   cto_decision={'action':'request_test_revision'},peer_decision={'action':'request_test_revision'})
+        run=dict(id='failed-author',agent_id='author',wakeup_id='wake-author',status='failed')
+        for changed in [dict(agent_id='other'),dict(wakeup_id='other'),dict(status='running'),dict(status='completed')]:
+            self.assertEqual(advance(self.config,state,[{**run,**changed}],self.fx,self.save),state)
+        held=advance(self.config,state,[run],self.fx,self.save)
+        self.assertEqual(held['stage'],'blocked');self.assertEqual(held['owner'],'cto')
+        self.assertEqual(held['author_task'],'failed-author')
+        self.assertFalse(held['author_retry_authorized']);self.assertFalse(held['delivery_approval'])
+        self.assertEqual(held['cto_decision'],state['cto_decision'])
+        self.assertEqual(self.calls,[])
+        self.assertEqual(advance(self.config,held,[run],self.fx,self.save),held)
 
     def test_restart_after_ambiguous_intent_only_observes_never_reposts(self):
         state=dict(stage='cto_intent',intent_at=1)
@@ -145,3 +162,13 @@ class CalibrationReworkTests(unittest.TestCase):
             self.assertTrue(lane.handle(b,route,[source],source,row,self.fx))
             self.assertEqual(con.execute('SELECT count(*) FROM calibration_reworks').fetchone()[0],1)
             self.assertFalse(lane.handle(b,route,[source],{**source,'id':'later-author'},row,self.fx))
+            saved=dict(stage='author_dispatched',author_wakeup='wake-author',
+                       cto_decision={'action':'request_test_revision'},peer_decision={'action':'request_test_revision'})
+            con.execute('UPDATE calibration_reworks SET state=? WHERE issue_id=?',(json.dumps(saved),'issue'))
+            failed=dict(id='later-author',agent_id='author',wakeup_id='wake-author',status='failed')
+            handoffs.save(con,failed['id'],'issue','test_first_blocked','cto',old,1)
+            self.assertFalse(lane.handle(b,route,[source,failed],failed,handoffs.load(con,failed['id']),self.fx))
+            original=handoffs.load(con,'source');result=json.loads(original['data'])['calibration_rework']['state']
+            self.assertEqual(result['category'],'calibration_author_failed')
+            self.assertEqual(result['author_task'],failed['id']);self.assertEqual(original['owner'],'cto')
+            self.assertEqual(handoffs.load(con,failed['id'])['stage'],'test_first_blocked')

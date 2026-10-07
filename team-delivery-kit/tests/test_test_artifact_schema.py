@@ -2,10 +2,29 @@ import copy
 import json
 import unittest
 
-from test_artifact_schema import apply
+from test_artifact_schema import apply,seeded_repair_progress
 
 
 class TestArtifactSchemaTests(unittest.TestCase):
+    def test_calibration_progress_keeps_phase_without_changing_tools_or_approving(self):
+        body=self.body(read=True)
+        self.assertIs(seeded_repair_progress(body),body)
+        body['messages'][0]['content']+='DELIVERY_CONTROLLER_CALIBRATION_V1\n'
+        original=copy.deepcopy(body)
+        result=seeded_repair_progress(body)
+        self.assertEqual(body,original);self.assertEqual(result['tools'],body['tools'])
+        note=result['messages'][-1]['content']
+        self.assertIn('expected Red',note);self.assertIn('freshly read',note)
+        self.assertIn('full pinned suite',note);self.assertIn('No limit increase',note)
+        body=self.revision_history()
+        body['messages'][0]['content']+=('DELIVERY_SEEDED_EDIT_REQUIRED_V1:/workspace/tests/test_new.py\n'
+                                      'DELIVERY_CONTROLLER_CALIBRATION_V1\n')
+        body['tools'].append(dict(type='function',function=dict(name='patch',parameters={})))
+        body['messages'] += [dict(role='assistant',tool_calls=[dict(id='changed',function=dict(name='patch',
+            arguments=json.dumps(dict(path='/workspace/tests/test_new.py',old_string='assert False',new_string='assert 1 == 2'))))]),
+            dict(role='tool',tool_call_id='changed',content=json.dumps(dict(success=True,diff='-old\n+new')))]
+        self.assertIn('CURRENT R1 CALIBRATION PHASE',apply(body)['messages'][-1]['content'])
+
     def test_revision_patch_freezes_prior_inspection_but_not_red(self):
         for receipt,accepted in [({'success':True,'diff':'-old\n+new'},True),
                                  ({'success':True,'diff':'-old\n+new','already_applied':True},False),

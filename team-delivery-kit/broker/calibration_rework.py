@@ -79,7 +79,19 @@ def decide(config,state,runs,effects,role):
 
 def advance(config,state,runs,effects,persist,now=None):
     now=time.time() if now is None else now
-    if state['stage'] in ('blocked','author_dispatched'):return state
+    if state['stage']=='blocked':return state
+    if state['stage']=='author_dispatched':
+        # Dispatch acknowledgement is not progress or completion. Observe the
+        # exact sponsored execution without creating a replacement wakeup.
+        tasks=[t for t in runs if t.get('wakeup_id')==state.get('author_wakeup')]
+        if (len(tasks)==1 and tasks[0].get('agent_id')==config['author']
+                and tasks[0].get('status')=='failed'):
+            state={**state,'stage':'blocked','category':'calibration_author_failed',
+                'author_task':tasks[0]['id'],'owner':config['cto'],
+                'required_action':'diagnose_author_execution_and_frozen_harness',
+                'author_retry_authorized':False,'delivery_approval':False}
+            persist(state)
+        return state
     role='cto' if state['stage'].startswith('cto') else 'peer' if state['stage'].startswith('peer') else 'author'
     if state['stage'].endswith('_pending') or state['stage'].endswith('_intent'):
         if effects.remaining_calls()<config['minimum_calls']:return state
@@ -91,9 +103,13 @@ def advance(config,state,runs,effects,persist,now=None):
                 '. Independent Tech Lead: '+state['peer_decision']['reason']+
                 '. Resume the assigned workspace; edit ONLY the declared NEW test. Preserve all test '
                 'methods/assertions, baseline and product bytes and all acceptance. Repair the harness '
-                'observation, not the product. Run the full pinned suite; the controller must capture '
-                'calibration and genuine Red before independent test review and implementation. '
+                'observation, not the product. Read and patch the harness; finish after saving and '
+                'inspecting the correction. Do not chase Green on the original product: the missing '
+                'feature there is EXPECTED Red, not a harness fault. The controller alone runs fixed '
+                'positive/negative calibration and the full pinned suite on the immutable submission. '
+                'It must capture calibration and genuine Red before independent test review and implementation. '
                 'This is one gate rework; no iteration/size/depth change or recursive revision. No promise-only completion.')
+            note+='\nDELIVERY_CONTROLLER_CALIBRATION_V1\n'
         else:
             source=config['source_task'] if role=='cto' else state['cto_task'];note=instruction(config,state)
         intent_marker=marker(config,role)
@@ -132,7 +148,7 @@ def _handle(b,route,runs,source,prior,effects):
     with b.db() as con:
         initialize(con)
         existing=con.execute('SELECT source_task,config,state FROM calibration_reworks WHERE issue_id=?',(issue,)).fetchone()
-    if existing and existing[0]!=key:return False  # A new author still follows normal Red capture.
+    foreign_source=bool(existing and existing[0]!=key)
     if not existing:
         if prior['stage']!='test_first_blocked':return False
         with b.db() as con:
@@ -202,7 +218,14 @@ def _handle(b,route,runs,source,prior,effects):
             owner=config['peer'] if new['stage'].startswith('peer') else config['author'] if new['stage'].startswith('author') else config['cto']
             handoffs.save(con,key,issue,'calibration_rework',owner,data,time.time())
     if (not route.get('enabled') or route['contract_sha256']!=config['contract_sha256']
-            or any(route[k]!=config[v] for k,v in (('author','author'),('cto','cto'),('techlead','peer')))):return True
+            or any(route[k]!=config[v] for k,v in (('author','author'),('cto','cto'),('techlead','peer')))):return not foreign_source
+    if foreign_source:
+        # The normal author gates still process this task. Separately update the
+        # original coordination record, which otherwise remains dispatched forever.
+        if state.get('stage')=='author_dispatched' and source.get('wakeup_id')==state.get('author_wakeup'):
+            key=existing[0]
+            advance(config,state,runs,effects,persist)
+        return False
     try:advance(config,state,runs,effects,persist)
     except (ValueError,TypeError,KeyError) as error:
         persist({**state,'stage':'blocked','category':'calibration_rework_rejected','error_type':type(error).__name__,'owner':config['cto']})
