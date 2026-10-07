@@ -336,6 +336,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 stage = 'preflight'
                 typed_decision_contract.length_feedback_preflight(COUNTER_PATH,execution_id,body)
+                typed_decision_contract.format_feedback_preflight(COUNTER_PATH,execution_id,body)
                 scope=read_stream_recovery.identity(body,execution_id)
                 read_stream_recovery.preflight(COUNTER_PATH,scope)
             for attempt in range(0 if dispatch else 2):
@@ -366,8 +367,12 @@ class Handler(BaseHTTPRequestHandler):
                         if attempt==0 and getattr(error,'length_feedback',None):
                             typed_decision_contract.record(COUNTER_PATH,execution_id,error.receipt)
                             revised=typed_decision_contract.claim_length_feedback(COUNTER_PATH,execution_id,error,body,call_number)
+                        if attempt==0 and revised is None:
+                            revised=typed_decision_contract.claim_format_feedback(COUNTER_PATH,execution_id,error,body,call_number)
+                            if revised is not None:
+                                typed_decision_contract.record(COUNTER_PATH,execution_id,error.receipt)
                         if revised is None:raise
-                        print(json.dumps({'event':'model_proxy_technical_length_feedback','execution_id':execution_id,
+                        print(json.dumps({'event':'model_proxy_bounded_decision_feedback','execution_id':execution_id,
                             'first_call':call_number,'rejected_upstream_sha256':error.receipt['upstream_sha256'],
                             'attempt_limit':1,'worker_tool_executed':False,'response_forwarded':False}),flush=True)
                         body=revised

@@ -26,6 +26,54 @@ RECOVERY_MARKER='DELIVERY_TYPED_WORKER_RECOVERY_V1'
 REMEDIATION_NAME='submit_remediation_contract'
 from r3_incident_contract import NAME as R3_NAME
 REMEDIATION_LENGTH_MARKER='DELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
+FORMAT_MARKER='DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1'
+
+
+def format_feedback_enabled(body):
+    """One opt-in format correction, restricted to nonauthorizing proposals."""
+    if body.get('tool_choice') != {'type':'function','function':{'name':NAME}}:return False
+    tools=body.get('tools',[])
+    if len(tools)!=1:return False
+    props=tools[0].get('function',{}).get('parameters',{}).get('properties',{})
+    return (set(props)=={'action','reason','optional_files'}
+        and bool(props['action'].get('enum'))
+        and set(props['action']['enum'])<={'request_correction','request_test_revision','escalate_cto'}
+        and props['optional_files'].get('maxItems')==0
+        and any(m.get('role')=='user' and isinstance(m.get('content'),str)
+            and re.search(r'^'+FORMAT_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
+
+
+def format_feedback_preflight(counter_path,execution_id,body):
+    if not format_feedback_enabled(body):return
+    from deterministic_read_dispatch import ledger
+    with ledger(counter_path) as con:
+        con.execute('CREATE TABLE IF NOT EXISTS technical_format_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
+        if con.execute('SELECT 1 FROM technical_format_feedback WHERE execution_id=?',(execution_id,)).fetchone():
+            raise StructuredResponseRejected('typed_format_feedback_consumed')
+
+
+def claim_format_feedback(counter_path,execution_id,error,body,first_call):
+    """Reject prose; ask the model afresh. Never parse, echo or accept prose."""
+    if not format_feedback_enabled(body) or error.category not in ('typed_mixed_content','typed_nonterminal'):return None
+    shape=error.receipt['response_shape']
+    if (not shape['parsed'] or shape['submissions']!=0 or shape['legacy_function_call']
+            or shape['content_shape']!='nonempty' or not 1<=shape['content_chars']<=1200):return None
+    if not isinstance(execution_id,str) or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',execution_id):return None
+    from deterministic_read_dispatch import ledger
+    receipt=dict(operation='technical_format_feedback_v1',first_call=first_call,
+        rejected_upstream_sha256=error.receipt['upstream_sha256'],attempt_limit=1,
+        worker_tool_executed=False,delivery_approval=False)
+    with ledger(counter_path) as con:
+        con.execute('CREATE TABLE IF NOT EXISTS technical_format_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
+        if con.execute('SELECT 1 FROM technical_format_feedback WHERE execution_id=?',(execution_id,)).fetchone():return None
+        con.execute('INSERT INTO technical_format_feedback VALUES (?,?)',(execution_id,json.dumps(receipt,sort_keys=True)))
+    revised=copy.deepcopy(body)
+    revised['messages'].append(dict(role='user',content=
+        'The previous response was rejected: prose without the required structured submission. '
+        'Submit exactly one '+NAME+' tool call with all fields of the unchanged schema. '
+        'Do not add prose. No files, tests, permissions or delivery approval are authorized. '
+        'This is the only format correction attempt.'))
+    return revised
 
 
 def remediation_length_feedback_enabled(body):

@@ -10,6 +10,47 @@ from structured_response_contract import StructuredResponseRejected
 
 
 class TypedDecisionTests(unittest.TestCase):
+    def test_opt_in_prose_feedback_requires_fresh_valid_tool_submission(self):
+        import sqlite3
+        for valid in (True,False):
+            f=fixtures.ReadStreamRecoveryTests();f.setUp()
+            try:
+                body=fixtures.request_body();body['messages'][0]['content']='DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1\n'
+                prose=json.dumps({'choices':[{'message':{'content':'PRIVATE_PROSE'},'finish_reason':'stop'}]}).encode()
+                good=self.wire(self.decision)
+                with patch.object(proxy,'forward',side_effect=[(200,prose,'application/json'),(200,good if valid else prose,'application/json')]) as forward:
+                    reply=f.request(body)
+                self.assertEqual(reply.status,200 if valid else 502);self.assertEqual(forward.call_count,2)
+                revised=forward.call_args_list[1].args[0]
+                self.assertNotIn('PRIVATE_PROSE',json.dumps(revised))
+                self.assertEqual(revised['tools'],forward.call_args_list[0].args[0]['tools'])
+                with sqlite3.connect(f.counter.with_name('deterministic-reads.sqlite')) as con:
+                    receipt=json.loads(con.execute('SELECT receipt FROM technical_format_feedback').fetchone()[0])
+                    self.assertFalse(receipt['delivery_approval']);self.assertFalse(receipt['worker_tool_executed'])
+                with patch.object(proxy,'forward') as again:
+                    self.assertEqual(f.request(body).status,502);again.assert_not_called()
+            finally:f.doCleanups()
+
+    def test_format_feedback_does_not_repair_mixed_tool_prose(self):
+        from typed_decision_contract import claim_format_feedback,FORMAT_MARKER
+        body=copy.deepcopy(self.body);body['messages'].append(dict(role='user',content=FORMAT_MARKER))
+        wire=json.loads(self.wire());wire['choices'][0]['message']['content']='PRIVATE'
+        with self.assertRaises(StructuredResponseRejected) as caught:translate(body,json.dumps(wire).encode(),'application/json')
+        self.assertIsNone(claim_format_feedback(None,'a'*36,caught.exception,body,1))
+
+    def test_format_feedback_cannot_extend_budget_or_grant_approval(self):
+        from typed_decision_contract import format_feedback_enabled,FORMAT_MARKER
+        body=copy.deepcopy(self.body);body['messages'].append(dict(role='user',content=FORMAT_MARKER))
+        self.assertTrue(format_feedback_enabled(body))
+        body['tools'][0]['function']['parameters']['properties']['action']['enum'].append('approve')
+        self.assertFalse(format_feedback_enabled(body))
+        f=fixtures.ReadStreamRecoveryTests();f.setUp();self.addCleanup(f.doCleanups)
+        incoming=fixtures.request_body();incoming['messages'][0]['content']='DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'+FORMAT_MARKER+'\n'
+        prose=json.dumps({'choices':[{'message':{'content':'PRIVATE'},'finish_reason':'stop'}]}).encode()
+        with patch.object(proxy,'MAX_CALLS',1),patch.object(proxy,'forward',return_value=(200,prose,'application/json')) as forward:
+            reply=f.request(incoming)
+        self.assertNotEqual(reply.status,200);forward.assert_called_once()
+
     def review_decision(self):
         return dict(action='reject_test_revision',reason='Actual coverage missing',optional_files=[],
             manifest_sha256='a'*64,findings=[dict(kind='missing_coverage',tree='candidate',
