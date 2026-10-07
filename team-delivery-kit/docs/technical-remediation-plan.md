@@ -356,5 +356,30 @@ criteria. The publication driver requires the intake's exact expected delivery
 proof from its first reconciliation, not only after a receipt already exists.
 
 This preparation is not yet automatic R3 execution or parent release completion.
-The sequence scheduling hook and independently verified parent projection remain
-required before activating the live R1/R2/R3 trial.
+The sequence scheduling hook and live parent projection remain required before
+activating the R1/R2/R3 trial.
+
+### Independently verified parent projection
+
+`remediation_parent_delivery.py` validates the final R3 receipt without relabeling
+the delivered R2 issue, approved snapshot, original Red or recovery depth. It
+requires frozen tests, merged PR/CI references, deployed commit and automated
+browser QA/cleanup at that same commit. `verify_live` additionally re-reads the
+native approval and broker proof, GitHub PR/main CI, current main and local
+deployment before board changes. Fixture claims alone cannot authorize them.
+
+A private projection intent precedes native writes. The root records distinct
+`remediation_*` evidence, preserving its failed snapshot/rejection rather than
+pretending it passed review. Cancellation, unexpected assignment, conflicting
+metadata and obsolete native approval block completion. Lost completion
+acknowledgments resume by observing the existing status, not another status
+write. The original author is detached with no-start before closing the root.
+
+`dependent_sequence.py` resolves and verifies this distinct recovery kind from
+the projected intent, immutable intake and unchanged child receipt. It checks
+the parent metadata in addition to the real delivered issue, GitHub and QA.
+Closing this parent card is not itself release homologation: the whole dependent
+sequence must still pass its existing end-to-end completion verification.
+
+The supervisor scheduling hook and full-chain admission are still outstanding;
+the live R1 route remains paused until they are implemented and qualified.

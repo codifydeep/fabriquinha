@@ -127,6 +127,12 @@ def read_stage_delivery(private, stage, *, _ancestry=()):
     context = read_json(private / ('portable-context-' + label + '.json'))
     if not context:
         return receipt
+    from remediation_parent_delivery import resolve as resolve_remediation
+    remediation = resolve_remediation(private, context)
+    if remediation is not None:
+        if not receipt_identity(remediation, stage):
+            raise ValueError('remediation recovered delivery incomplete')
+        return remediation
     intent = read_json(private / 'test-revision-recovery' / (context['issue_id'] + '.json'))
     if not intent or intent.get('stage') != 'recovered_by_test_revision':
         qa = read_json(private / 'qa-recoveries' / (context['issue_id'] + '.json'))
@@ -245,6 +251,14 @@ def verify_predecessor(receipt, stage, *, allow_advanced_main=False,
                     or metadata.get('qa_failed_source_sha') != receipt['base_sha']
                     or metadata.get('qa_repair_merge_sha') != receipt['merge_sha']):
                 raise ValueError('QA recovery parent board evidence missing')
+        elif receipt.get('recovery_kind') == 'remediation':
+            from remediation_parent_delivery import board_fields
+            proof = receipt.get('recovery_origin', {})
+            if (proof.get('parent_issue') != parent or proof.get('delivery_issue') != receipt['issue_id']
+                    or proof.get('merge_sha') != receipt['merge_sha']
+                    or cli('get', parent).get('status') != 'done'
+                    or any(metadata.get(k) != v for k, v in board_fields(proof).items())):
+                raise ValueError('remediation parent board evidence missing')
         else:
             links = receipt.get('recovery_links', [{'parent_issue': parent,
                                                     'child_issue': receipt['issue_id']}])
