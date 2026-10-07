@@ -107,6 +107,16 @@ uma proposta independente. O resultado dessa trilha não despacha implementaçã
 um executor limitado ainda precisa ser qualificado para o contrato exato. Esse
 experimento é específico ao ensaio de service-mode, não uma calibração universal.
 
+A capacidade V5 de manutenção de harness foi qualificada separadamente no
+registro real Hermes/ACP, sem chamadas de modelo. Ela permite somente edição
+hash-bound do literal `NODE_HARNESS_TEMPLATE`, preserva todo o restante da AST
+Python e verifica sintaxe Node antes de gravar. Escrita genérica, patch, terminal,
+Python, enfraquecimento de testes e chamadas diretas sem permissão são bloqueados.
+Essa qualificação isolada ainda não vincula uma execução do autor à proposta
+independente: o adaptador de admissão e os gates de calibração, Red e revisão
+continuam necessários. Os protocolos anteriores permanecem disponíveis apenas
+sob suas próprias permissões; V5 não é uma autorização global para editar testes.
+
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
 handoff antigo sem esse marcador, admite uma única recuperação com a política

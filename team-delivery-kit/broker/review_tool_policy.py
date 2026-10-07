@@ -65,7 +65,7 @@ def controlled(name, args):
             from surgical_test_edit import edit_file,validate_typed
             from pathlib import Path
             config=json.loads(surgical)
-            typed=config.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4')
+            typed=config.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5')
             expected=({'path','expected_sha256','protocol'} if typed else {'path','expected_sha256'})
             if config.get('atomic_contract'):
                 from c10_status_atomic import CONTRACT
@@ -96,6 +96,7 @@ def controlled(name, args):
             return json.dumps(edit_file(args['path'],envelope,observed_read=read,required_uid=0,
                 driver_only=config.get('protocol') in ('typed_driver_v3','typed_driver_lines_v4'),
                 line_ranges=config.get('protocol')=='typed_driver_lines_v4',
+                template_only=config.get('protocol')=='typed_template_v5',
                 atomic_status=bool(config.get('atomic_contract')),
                 micro_resolver=config.get('drain_resolver'),
                 rejection_ledger='/tmp/delivery-surgical-rejections.json'))

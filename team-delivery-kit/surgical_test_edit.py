@@ -91,7 +91,7 @@ def marker_config(body):
         if message.get('role')!='user':continue
         content=message.get('content','')
         if isinstance(content,list):content='\n'.join(p.get('text','') for p in content if isinstance(p,dict))
-        if isinstance(content,str):markers.extend(re.findall(r'^DELIVERY_SURGICAL_TEST_(V[1234]):([^\n]+)$',content,re.M))
+        if isinstance(content,str):markers.extend(re.findall(r'^DELIVERY_SURGICAL_TEST_(V[12345]):([^\n]+)$',content,re.M))
     if not markers:return None
     markers=set(markers)
     if len(markers)!=1:raise ValueError('surgical marker drift')
@@ -102,6 +102,7 @@ def marker_config(body):
     if version=='V2':result['protocol']='typed_v2'
     if version=='V3':result['protocol']='typed_driver_v3'
     if version=='V4':result['protocol']='typed_driver_lines_v4'
+    if version=='V5':result['protocol']='typed_template_v5'
     drains={value for message in body.get('messages',[]) if message.get('role')=='user'
         and isinstance(message.get('content'),str)
         for value in re.findall(r'^DELIVERY_STATUS_DRAIN_V1:([^\n]+)$',message['content'],re.M)}
@@ -141,7 +142,9 @@ def typed_schema(config):
             schema['description']='Apply ONLY this controller-verified executable recipe at original line551, after fresh complete read. Do not generate code, comments or explanations. Invocation performs a real hash-checked edit; not tests, review or approval.'
         return schema
     return {'name':'surgical_test_edit','description':
-        ('Hash-bound DRIVER_BODY-only repair with Node syntax validation before writing. '
+        ('Hash-bound NODE_HARNESS_TEMPLATE-only repair with Node syntax validation; all other Python AST and test bodies stay unchanged. '
+        if config.get('protocol')=='typed_template_v5' else
+        'Hash-bound DRIVER_BODY-only repair with Node syntax validation before writing. '
         if config.get('protocol')=='typed_driver_v3' else
         'Hash-bound adaptation of the declared NEW test scaffolding only. ')+
         'Each old fragment must match exactly once and differ from new. Include '
@@ -298,12 +301,21 @@ def prepare_driver(source,args):
 
 
 def _validate_driver_result(source,result):
+    return _validate_literal_result(source,result,'DRIVER_BODY')
+
+
+def prepare_template(source,args):
+    """Scoped NEW-harness repair, not edits to assertions or product files."""
+    return _validate_literal_result(source,prepare(source,args),'NODE_HARNESS_TEMPLATE')
+
+
+def _validate_literal_result(source,result,name):
     trees=[ast.parse(value.decode('utf-8')) for value in (source,result)]
     bodies=[]
     for tree in trees:
         drivers=[node for node in tree.body if isinstance(node,ast.Assign)
             and len(node.targets)==1 and isinstance(node.targets[0],ast.Name)
-            and node.targets[0].id=='DRIVER_BODY']
+            and node.targets[0].id==name]
         if len(drivers)!=1:raise ValueError('single literal driver required')
         try:body=ast.literal_eval(drivers[0].value)
         except (ValueError,TypeError):raise ValueError('single literal driver required') from None
@@ -311,9 +323,12 @@ def _validate_driver_result(source,result):
         bodies.append(body);drivers[0].value=ast.Constant(value='DRIVER_ONLY')
     if ast.dump(trees[0],include_attributes=False)!=ast.dump(trees[1],include_attributes=False):
         raise ValueError('outside driver scope changed')
-    checked=subprocess.run(['node','--check'],input=bodies[1],text=True,
+    body=bodies[1]
+    if name=='NODE_HARNESS_TEMPLATE':
+        body=body % {'source_path':json.dumps('/delivery/product.js'),'source_filename':json.dumps('/delivery/product.js')}
+    checked=subprocess.run(['node','--check'],input=body,text=True,
         capture_output=True,timeout=10)
-    if checked.returncode:raise DriverSyntaxError(checked.stderr,bodies[1])
+    if checked.returncode:raise DriverSyntaxError(checked.stderr,body)
     return result
 
 
@@ -400,7 +415,7 @@ def _guarded_prepare(source,args,prepare_fn,ledger_path,target,required_uid):
     finally:os.close(fd)
 
 
-def edit_file(path,args,*,root=Path('/workspace'),observed_read=False,required_uid=None,driver_only=False,line_ranges=False,rejection_ledger=None,atomic_status=False,micro_resolver=None):
+def edit_file(path,args,*,root=Path('/workspace'),observed_read=False,required_uid=None,driver_only=False,line_ranges=False,rejection_ledger=None,atomic_status=False,micro_resolver=None,template_only=False):
     target=Path(path);root=Path(root)
     if (not observed_read or not target.is_absolute() or target.resolve()!=target
             or root not in target.parents or not target.name.startswith('test_') or target.suffix!='.py'):
@@ -413,7 +428,8 @@ def edit_file(path,args,*,root=Path('/workspace'),observed_read=False,required_u
                 or required_uid is not None and info.st_uid!=required_uid):raise ValueError('unowned surgical target')
         if line_ranges and not driver_only:raise ValueError('operation forbidden in surgical mode')
         source=os.read(fd,32769)
-        prepare_fn=prepare_driver_lines if line_ranges else prepare_driver if driver_only else prepare
+        if template_only and (driver_only or line_ranges or atomic_status or micro_resolver):raise ValueError('operation forbidden in surgical mode')
+        prepare_fn=prepare_template if template_only else prepare_driver_lines if line_ranges else prepare_driver if driver_only else prepare
         if micro_resolver:
             from c10_micro_drain import validate
             if atomic_status or not driver_only or not line_ranges:raise ValueError('operation forbidden in surgical mode')
