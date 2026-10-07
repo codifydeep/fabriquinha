@@ -198,7 +198,12 @@ def tick(b):
     settings=json.loads((b.STATE/'native.json').read_text());fx=handoff_runtime.Effects(b,settings)
     for row in rows:
         value=json.loads(row['proposal']);state=json.loads(row['state']);source=row['source_task'];issue=value['issue_id']
-        if state['stage'] in ('peer_reviewed','blocked'):continue
+        if state['stage']=='peer_reviewed':
+            try:import request_scope_replan
+            except ImportError:from broker import request_scope_replan
+            request_scope_replan.tick_one(b,value,state)
+            continue
+        if state['stage']=='blocked':continue
         with b.LOCK,b.db() as con:
             current=handoffs.load(con,source)
             if not current or current['stage']!='inherited_replan_required':continue

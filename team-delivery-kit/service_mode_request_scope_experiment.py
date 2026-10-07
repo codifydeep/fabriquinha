@@ -79,4 +79,6 @@ def run(root,manifest):
 
 if __name__=='__main__':
     import sys
-    print(json.dumps(run(*sys.argv[1:]),sort_keys=True))
+    root=Path(sys.argv[1])
+    manifest=sys.argv[2] if len(sys.argv)==3 else hashlib.sha256((root/'manifest.json').read_bytes()).hexdigest()
+    print(json.dumps(run(root,manifest),sort_keys=True))

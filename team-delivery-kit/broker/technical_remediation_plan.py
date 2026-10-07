@@ -196,7 +196,14 @@ def instruction(config,state):
             '\nDELIVERY_REMEDIATION_REVIEW_V1:'+state['plan_sha256'])
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:review:'+state['plan_sha256']
         note+='\nDELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
-    if config.get('amendment'):
+    if config.get('amendment',{}).get('kind')=='request_scope':
+        note+='\nCONTRACT AMENDMENT: the fixed immutable experiment reproduced three assertion failures because '
+        note+='the NEW-test helper counted all page requests instead of GET /service-mode. The in-memory scoped '
+        note+='helper passed the same tests, background traffic and all duplicate/negative controls. Propose a NEW '
+        note+='tests-only submission preserving every method/assertion. Require background-traffic calibration, '
+        note+='genuine Red on the original base and independent test review. This experiment is not Green. '
+        note+='No depth reset, historical approval, product workaround or CEO technical question. All R2/R3 gates remain.'
+    elif config.get('amendment'):
         note+='\nCONTRACT AMENDMENT: the immutable embedded NEW-test harness fails Node syntax compilation; '
         note+='do not rewrite product to accommodate invalid test code. Repair harness only in a NEW submission, '
         note+='preserving every method/assertion, original base and depth 2. Require harness compilation and '
@@ -333,8 +340,17 @@ def mounts(b,binding):
     if s['stage'] not in ('plan_dispatch','review_dispatch','observe_dispatch','awaiting_plan','awaiting_review') or s['owner']!=binding['agent_id']:
         raise ValueError('current readonly recovery role required')
     labels=(b.docker('GET','/volumes/'+c['volume']) or {}).get('Labels',{})
+    completed=c.get('diagnostic_snapshot_kind')=='completed_frozen_validation' and c.get('amendment',{}).get('kind')=='request_scope'
+    if completed:
+        with b.db() as con:
+            snapshot=con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',(c['source_task'],)).fetchone()
+            diagnosis=con.execute('SELECT receipt FROM completed_validation_diagnoses WHERE source_task=?',(c['source_task'],)).fetchone()
+        if (not snapshot or snapshot['volume']!=c['volume'] or snapshot['status']!='complete'
+                or not diagnosis or json.loads(diagnosis[0]).get('volume')!=c['volume']
+                or json.loads(diagnosis[0]).get('status')!='diagnostic_only_not_approved'):
+            raise ValueError('exact completed validation diagnostic evidence required')
     if (labels.get('delivery-kit.owner')!=b.OWNER or labels.get('delivery-kit.source-task')!=c['source_task']
-            or labels.get('delivery-kit.diagnostic-only')!='true'):
+            or not completed and labels.get('delivery-kit.diagnostic-only')!='true'):
         raise ValueError('immutable recovery snapshot ownership drift')
     return [dict(Type='volume',Source=c['volume'],Target='/evidence/candidate',ReadOnly=True)]
 

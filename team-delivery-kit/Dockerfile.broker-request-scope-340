@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261007.339
+USER root
+COPY broker/request_scope_replan.py /request_scope_replan.py
+COPY broker/inherited_test_replan.py /inherited_test_replan.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+COPY service_mode_request_scope_experiment.py /service_mode_request_scope_experiment.py

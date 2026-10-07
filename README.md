@@ -57,6 +57,11 @@ na suíte congelada. Esse caminho exige snapshot completo, escopo fechado,
 testes preservados e reprodução controlada da falha antes da proposta do CTO e
 inspeção independente do Tech Lead. Ele não concede edição de testes ou aprovação
 da entrega. A validação ponta a ponta desse caminho continua em andamento.
+Uma continuação específica agora executa um experimento fixo de contagem de
+requisições e encaminha a evidência ao planejamento do CTO e à revisão do Tech
+Lead. Intenções Docker persistem antes das ações, e uma resposta incerta é
+observada sem repetição. Isso autoriza planejamento, não implementação ou
+homologação; o novo plano e os gates posteriores ainda precisam ser validados.
 
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.
 

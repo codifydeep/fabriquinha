@@ -619,5 +619,26 @@ The result is `experiment_only_not_approved`, not an official full-suite Green,
 test-edit permission, product approval or another recursive revision allowance.
 The next contract decision must bind this evidence to independent agent review,
 require background-traffic calibration and preserve all previous delivery gates.
-That experiment-to-contract continuation is not yet autonomous; the older
-syntax-only amendment path must not silently accept this different failure.
+`broker/request_scope_replan.py` now handles that continuation through a separate
+fixed-image experiment, not the older syntax-only amendment adapter. A durable
+create/start intent precedes Docker writes; uncertain outcomes are observed by
+the same name and never retried blindly. The job is networkless, credential-free,
+grouped in the instance's tests project and mounts only the snapshot read-only.
+Its inspected identity, terminal exit and actual bounded stdout are validated
+before a new CTO planning issue is registered. The controller rechecks actual
+independent diagnostic decisions, complete reads and the unchanged origin.
+
+The proposed amendment preserves the previous amendment hash, original depth,
+criteria, seed Red and original base. It requires background-traffic calibration
+and permits one distinct request-scope experiment; another amendment for that
+same kind is rejected. Registration pauses implementation and grants planning
+only. Approval still requires a fresh CTO plan and independent Tech Lead review;
+the execution adapter and all R1/R2/R3 gates remain separate. Completed native
+snapshots may be mounted for planning only when their exact persisted failed
+validation diagnostic is present; no historical volume is relabeled.
+
+The full public suite covers 2,287 tests with seven existing skips, including
+uncertain-create restart observation and refusal of repeated same-kind amendments.
+The new live plan, background calibration enforcement on a future submission and
+the complete product delivery still require qualification. This does not prove
+a fresh brief can be delivered without operator repair.
