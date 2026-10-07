@@ -41,6 +41,102 @@ def denials(messages):
                 author_retry_authorized=False,delivery_approval=False)
 
 
+def reconcile(config,state,identity,experiment):
+    """One changed-evidence planning round; retain the original decisions verbatim."""
+    try:import calibration_failure_plan as plans
+    except ImportError:from broker import calibration_failure_plan as plans
+    if (config.get('evidence_revision') or state.get('evidence_reconciliation')
+            or state['stage']!='plan_qualified' or not config.get('execution_failure')
+            or state.get('executor') or state.get('binding_recovery')):
+        raise ValueError('one unconsumed diagnostic-only evidence reconciliation required')
+    proof=experiment['proof'];plans.validate_experiment(proof,identity)
+    held=state['probe']['proof']
+    if (experiment['stage']!='complete' or identity['source_task']!=config['predecessor_plan']
+            or identity['issue_id']!=config['issue_id']
+            or held.get('all_files_unchanged') is not True
+            or config['manifest_sha256']!=proof['original_manifest_sha256']
+            or held['manifest_sha256']!=proof['original_manifest_sha256']
+            or config['diagnostic']['test_sha256']!=proof['original_test_sha256']
+            or held['test_sha256']!=proof['original_test_sha256']):
+        raise ValueError('same immutable submission and executed experiment required')
+    changed={**config,'evidence_revision':1,'empirical_failure':dict(phase=proof['original']['phase'],
+        failed_methods=proof['original']['facts']['positive']['failed_methods'])}
+    receipt=dict(operation='executed_failure_context_reconciliation_v1',previous_config=config,previous_state=state,
+        experiment_receipt_sha256=experiment['receipt_sha256'],original_manifest_sha256=config['manifest_sha256'],
+        decisions_replayed=False,author_retry_authorized=False,delivery_approval=False)
+    new={k:v for k,v in state.items() if not k.startswith(('cto_','peer_')) and k not in ('at','intent_at','required_action')}
+    new.update(stage='cto_pending',evidence_reconciliation=receipt,author_retry_authorized=False,delivery_approval=False)
+    _,_,lane,_,_,_=modules()
+    lane.instruction(changed,new)
+    return changed,new
+
+
+def arm_evidence_reconciliation(b,source):
+    """Controller migration only; no worker endpoint, arbitrary evidence or retry."""
+    executor,_,lane,jobs,handoffs,native=modules()
+    try:import handoff_runtime
+    except ImportError:from broker import handoff_runtime
+    with b.LOCK:
+        with b.db() as con:
+            row=con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(source,)).fetchone()
+            if not row:raise ValueError('actual diagnostic plan required')
+            config,state=map(json.loads,row)
+            if config.get('evidence_revision'):return state
+            route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(config['issue_id'],)).fetchone()[0])
+            registered=con.execute('SELECT receipt FROM template_registry_qualifications WHERE worker_image=?',(b.IMAGE,)).fetchone()
+            if not registered:raise ValueError('qualified installed registry required')
+            qualification=json.loads(registered[0]);executor.validate_qualification(qualification)
+            if qualification['worker_image']!=b.IMAGE:raise ValueError('installed qualification drift')
+            identity,experiment=map(json.loads,con.execute('SELECT identity,state FROM observation_hypothesis_experiments WHERE source_task=?',
+                (config['predecessor_plan'],)).fetchone())
+            if (not route['enabled'] or route['contract_sha256']!=config['contract_sha256']
+                    or any(config[k]!=route[v] for k,v in (('author','author'),('cto','cto'),('peer','techlead')))
+                    or len({config[k] for k in ('author','cto','peer')})!=3
+                    or con.execute('SELECT 1 FROM test_first_red WHERE issue_id=?',(config['issue_id'],)).fetchone()
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
+                raise ValueError('idle unchanged pre-Red diagnostic route required')
+        proxy=b.docker('GET','/containers/'+b.PREFIX+'-model-proxy-1/json')
+        if not proxy or proxy['Image']!=qualification['proxy_image'] or not proxy['State']['Running']:
+            raise ValueError('qualified installed proxy required')
+        settings=json.loads((b.STATE/'native.json').read_text());fx=handoff_runtime.Effects(b,settings)
+        runs=native.issue_task_runs(settings,config['issue_id'])
+        authors=[r for r in runs if r.get('agent_id')==config['author']]
+        if (not authors or max(authors,key=lambda r:(r.get('created_at') or '',r['id']))['id']!=source
+                or next(r for r in authors if r['id']==source)['status']!='failed'
+                or any(r['status'] in ('queued','dispatched','running') for r in runs)):
+            raise ValueError('latest failed author and idle tasks required')
+        for role in ('cto','peer'):
+            task=native.task_record(settings,state[role+'_task'],config[role]);reads=fx.read_evidence(task)
+            if (task['status']!='completed' or task.get('issue_id')!=config['issue_id']
+                    or task.get('wakeup_id')!=state[role+'_wakeup'] or fx.decision(task)!=state[role+'_decision']
+                    or 'DELIVERY_EXECUTED_FAILURES_V1' in (task.get('handoff_note') or '')
+                    or any(reads.get(p,{}).get('lines',0)<=0 or reads[p]['lines']!=reads[p].get('total_lines') for p in config['paths'])):
+                raise ValueError('actual completed old-context independent reads required')
+        info=b.docker('GET','/containers/'+experiment['container_id']+'/json');jobs.verify_job(info,identity['payload'])
+        if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']!=0:
+            raise ValueError('actual completed immutable experiment required')
+        raw=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
+        if hashlib.sha256(raw.encode()).hexdigest()!=experiment['receipt_sha256'] or json.loads(raw)!=experiment['proof']:
+            raise ValueError('immutable experiment receipt drift')
+        rec=state['probe'];info=b.docker('GET','/containers/'+rec['container_id']+'/json');jobs.verify_job(info,rec['payload'])
+        if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']!=0:
+            raise ValueError('actual completed preservation required')
+        raw=b.docker_stdout(info['Id'],include_stderr=False,limit=4096)
+        if hashlib.sha256(raw.encode()).hexdigest()!=rec['receipt_sha256'] or json.loads(raw)!=rec['proof']:
+            raise ValueError('immutable preservation receipt drift')
+        changed,new=reconcile(config,state,identity,experiment)
+        with b.db() as con:
+            current=con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(source,)).fetchone()
+            if tuple(current)!=tuple(row):raise ValueError('diagnostic changed during reconciliation')
+            con.execute('UPDATE calibration_failure_plans SET config=?,state=? WHERE source_task=?',
+                (json.dumps(changed,sort_keys=True),json.dumps(new,sort_keys=True),source))
+            held=handoffs.load(con,source);data=json.loads(held['data'])
+            data.update(required_action='reconcile_executed_failure_evidence_not_replay_previous_decisions',
+                calibration_failure_plan=dict(source_task=source,manifest_sha256=changed['manifest_sha256'],state=new))
+            handoffs.save(con,source,changed['issue_id'],'calibration_failure_plan',changed['cto'],data,time.time())
+        return new
+
+
 def handle(b,route,runs,source,prior,effects):
     executor,admission,lane,jobs,handoffs,native=modules()
     key=source['id'];issue=route['issue_id']

@@ -144,6 +144,14 @@ limites nem substitui calibração, Red ou revisão. Executores históricos bloq
 não concorrem com uma permissão ativa, mas duas permissões ativas são rejeitadas.
 Essa recuperação ainda exige qualificação instalada e evidência ponta a ponta;
 seus testes offline não constituem prova de entrega autônoma.
+
+Se o handoff de diagnóstico omitiu os nomes das falhas executadas, uma migração
+controlada admite uma única reconciliação com o recibo empírico conferido contra
+o mesmo manifesto. Configuração, propostas e execuções anteriores ficam
+arquivadas; os novos wakeups têm identidade distinta e não reproduzem decisões.
+Concordância entre CTO e Tech Lead não prova a hipótese: calibração e revisão da
+entrega efetiva continuam obrigatórias, sem retry de implementação nessa migração.
+
 O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
 proposta técnica; a correção da integração não é conclusão da entrega.

@@ -26,12 +26,17 @@ def instruction(config,state):
                     or type(proof.get('available_growth_bytes')) is not int):
                 raise ValueError('executed immutable byte-budget proof required')
             incident=('NEW EXECUTION FAILURE: both surgical proposals were rejected; all original bytes remain unchanged. '
-                'Do not assume the first replacement was applied or reuse fragments from a rejected proposal. '
-                'Propose a minimal exact-original-fragment correction within the measured UTF-8 byte budget; '
-                'prefer replacing stale observation expressions, not adding a duplicate driver or removing assertions. '
-                'No larger file limit or repeated unchanged executor is authorized. '
-                'Native denials: '+json.dumps(execution,sort_keys=True)+'\nMeasured file budget: '+
+                'Use original fragments, not rejected replacements; prefer minimal observation expressions. '
+                'No larger file limit or unchanged executor retry is authorized. '
+                'Native denial categories: '+json.dumps([r['category'] for r in execution['results']])+'\nMeasured file budget: '+
                 json.dumps({k:proof[k] for k in ('test_bytes','file_limit_bytes','available_growth_bytes')},sort_keys=True)+'\n')
+            empirical=''
+            if config.get('evidence_revision'):
+                empirical=('DELIVERY_EXECUTED_FAILURES_V1\nExecuted original failure: '+
+                    json.dumps({k:config['empirical_failure'][k] for k in ('phase','failed_methods')},sort_keys=True)+
+                    '\nSame-snapshot copy: 15 positives and 12 negative controls passed after only refreshing '
+                    'terminal observation. Prior timer claims are not proven by this receipt. Reconcile these failed methods '
+                    'and experiment, not unsupported theory. Prior decisions are archived, not replayed.\n')
             note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
                 'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
                 'POST-FAILURE PLAN ONLY: '+('Independent Tech Lead review. ' if peer else 'CTO diagnosis. ')+
@@ -45,7 +50,7 @@ def instruction(config,state):
                 'Require controller calibration, full pinned Red, independent test review and all later delivery gates. '
                 'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[]. '
                 'Explain a minimal exact-fragment proposal and its byte growth; if unsupported retain the hold.\n'+
-                incident+'Prior experiment: '+json.dumps({k:config['experiment_summary'][k] for k in
+                incident+empirical+'Prior experiment: '+json.dumps({k:config['experiment_summary'][k] for k in
                     ('hypothesis','original_failures','variant_positive_tests','variant_negative_controls','diagnostic_copy_only')
                     if k in config['experiment_summary']},sort_keys=True)+
                 ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
@@ -94,7 +99,8 @@ def instruction(config,state):
 def marker(config,role):
     return digest({'source':config['source_task'],'manifest':config['manifest_sha256'],'role':role,
         'operation':'calibration_failure_plan_v1' if config.get('diagnosis_only') else 'calibration_rework_v1',
-        'format_revision':config.get('format_revision',0)})
+        'format_revision':config.get('format_revision',0),
+        **({'evidence_revision':config['evidence_revision']} if config.get('evidence_revision') else {})})
 
 
 def recover_format(config,state,task,reads):

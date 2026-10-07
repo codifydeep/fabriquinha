@@ -6,6 +6,37 @@ from broker import template_failure_diagnosis as diagnosis,calibration_rework as
 
 
 class TemplateFailureDiagnosisTests(unittest.TestCase):
+    def test_reconciliation_is_once_only_same_manifest_and_keeps_previous_decisions(self):
+        from tests.test_calibration_failure_plan import CalibrationFailurePlanTests
+        proof=CalibrationFailurePlanTests().proof()
+        identity=dict(source_task='parent',issue_id='issue',manifest_sha256='a'*64)
+        experiment=dict(stage='complete',proof=proof,receipt_sha256='e'*64)
+        config=dict(source_task='failed',predecessor_plan='parent',issue_id='issue',manifest_sha256='a'*64,
+            diagnostic={'test_sha256':'c'*64},diagnosis_only=True,execution_failure=diagnosis.denials(self.messages()),
+            experiment_summary=dict(hypothesis=proof['hypothesis'],original_failures=2,variant_positive_tests=15,
+                variant_negative_controls=12,diagnostic_copy_only=True),
+            criteria={f'A0{i}':'unchanged' for i in range(1,9)},
+            paths=['/evidence/candidate/app/static/app.js','/evidence/candidate/tests/test_service_mode_indicator.py'])
+        state=dict(stage='plan_qualified',cto_task='cto',peer_task='peer',cto_wakeup='c',peer_wakeup='p',
+            cto_decision={'reason':'unsupported old theory'},peer_decision={'reason':'unsupported old theory'},
+            probe={'proof':dict(all_files_unchanged=True,manifest_sha256='a'*64,test_sha256='c'*64,
+                test_bytes=32674,file_limit_bytes=32768,available_growth_bytes=94)})
+        original=copy.deepcopy((config,state))
+        changed,new=diagnosis.reconcile(config,state,identity,experiment)
+        self.assertEqual((config,state),original)
+        self.assertEqual(new['evidence_reconciliation']['previous_state'],state)
+        self.assertNotIn('cto_wakeup',new);self.assertNotIn('peer_decision',new)
+        self.assertEqual(new['stage'],'cto_pending');self.assertFalse(new['author_retry_authorized'])
+        self.assertNotEqual(lane.marker(config,'cto'),lane.marker(changed,'cto'))
+        note=lane.instruction(changed,new)
+        for name in proof['original']['facts']['positive']['failed_methods']:self.assertIn(name,note)
+        self.assertIn('DELIVERY_EXECUTED_FAILURES_V1',note)
+        peer={**new,'stage':'peer_pending','cto_decision':dict(action='request_test_revision',reason='a'*1200,optional_files=[])}
+        self.assertLessEqual(len(lane.instruction(changed,peer))+100,4000)
+        with self.assertRaises(ValueError):diagnosis.reconcile(changed,new,identity,experiment)
+        with self.assertRaises(ValueError):diagnosis.reconcile({**config,'manifest_sha256':'x'*64},state,identity,experiment)
+        with self.assertRaises(ValueError):diagnosis.reconcile(config,{**state,'executor':{'status':'ready'}},identity,experiment)
+
     def messages(self):
         rows=[dict(type='tool_use',tool='read_file',call_id='read')]
         for i,category in enumerate(('file_size_exceeded','replacement_not_unique_or_bounded')):
