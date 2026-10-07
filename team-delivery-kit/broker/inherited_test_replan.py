@@ -11,7 +11,8 @@ except ImportError:
 
 
 def proposal(route,reference,data,task,decision,reads):
-    failure=data.get('validation_failure') or {};diagnostic=data.get('failed_execution_diagnostic') or {}
+    failure=data.get('validation_failure') or {};diagnostic=(data.get('failed_execution_diagnostic')
+        or data.get('completed_validation_diagnostic') or {})
     paths=sorted('/evidence/candidate/'+p for p in set(reference['readonly_tests'])|set(reference['editable_files']))
     if (reference['issue_id']!=route['issue_id'] or reference['origin_issue']==route['issue_id']
             or reference['original_depth']!=2 or len({route[k] for k in ('author','reviewer','techlead','cto')})!=4
@@ -40,6 +41,70 @@ def proposal(route,reference,data,task,decision,reads):
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS inherited_test_replans(source_task TEXT PRIMARY KEY,proposal TEXT,state TEXT)')
     con.execute('CREATE TABLE IF NOT EXISTS inherited_peer_format_recoveries(source_task TEXT PRIMARY KEY,receipt TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS completed_validation_diagnoses(source_task TEXT PRIMARY KEY,receipt TEXT)')
+
+
+def completed_diagnosis(fx,route,data,source,reference):
+    """Qualify failed frozen Green separately from a failed native execution.
+
+    This grants diagnosis only. It never changes native status, Red, test bytes,
+    approval or execution authority. A restart reuses the exact durable receipt.
+    """
+    b=fx.b;key=source['id'];failure=data.get('validation_failure') or {}
+    volume=failure.get('volume')
+    if (source.get('status')!='completed' or source.get('agent_id')!=route['author']
+            or source.get('issue_id')!=route['issue_id'] or key!=data['source_task']
+            or data.get('source_status')!='completed' or data.get('artifact_diagnosis') is not True
+            or failure.get('phase')!='frozen_green' or failure.get('source_task')!=key
+            or failure.get('category')!='executed_test_failure' or failure.get('exit_code')!=1
+            or not failure.get('failures') or type(failure.get('tests_executed')) is not int
+            or failure['tests_executed']<=0 or not isinstance(volume,str)):
+        raise ValueError('exact completed author with failed frozen Green required')
+    with b.db() as con:
+        initialize(con)
+        snapshot=con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',(key,)).fetchone()
+        bindings=con.execute('SELECT l.status FROM native_bindings n JOIN leases l USING(request_id) '
+            'WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',(key,route['author'],route['issue_id'])).fetchall()
+        row=handoffs.load(con,key)
+        latest=con.execute('SELECT task_id FROM native_bindings WHERE agent_id=? AND issue_id=? '
+            'ORDER BY rowid DESC LIMIT 1',(route['author'],route['issue_id'])).fetchone()
+        if (not snapshot or snapshot['status']!='complete' or snapshot['volume']!=volume
+                or len(bindings)!=1 or bindings[0]['status']!='closed' or not row
+                or not latest or latest['task_id']!=key
+                or row['issue_id']!=route['issue_id']
+                or json.loads(row['data']).get('validation_failure')!=failure):
+            raise ValueError('controller-recorded immutable failure and closed author scope required')
+        previous=con.execute('SELECT receipt FROM completed_validation_diagnoses WHERE source_task=?',(key,)).fetchone()
+        receipt=json.loads(previous[0]) if previous else None
+    red=fx.test_first_red(key)
+    if not red:raise ValueError('approved inherited Red required')
+    b.verify_test_first_green(volume,key,red)  # Hash verification, NOT a Green claim.
+    if receipt:
+        if receipt['failure']!=failure or receipt['reference_sha256']!=digest(reference):
+            raise ValueError('completed validation diagnosis identity drift')
+        return receipt
+    try:b.validate_frozen_delivery(volume,key)
+    except Exception as error:
+        reproduced=getattr(error,'validation_failure',None)
+        fields=('category','phase','source_task','volume','exit_code','tests_executed','failures','numeric_assertion_details')
+        if not isinstance(reproduced,dict) or any(reproduced.get(k)!=failure.get(k) for k in fields):
+            raise ValueError('same frozen functional failure must be reproduced') from error
+    else:raise ValueError('frozen Green succeeded; test-replan diagnosis prohibited')
+    receipt=dict(operation='completed_validation_diagnosis_v1',source_task=key,
+        issue_id=route['issue_id'],volume=volume,failure=failure,reproduced_failure=reproduced,
+        reference_sha256=digest(reference),native_status='completed',
+        status='diagnostic_only_not_approved',delivery_approval=False,test_edits_authorized=False)
+    with b.LOCK,b.db() as con:
+        row=handoffs.load(con,key)
+        live=con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',(key,)).fetchone()
+        if (not row or json.loads(row['data']).get('validation_failure')!=failure
+                or not live or live['status']!='complete' or live['volume']!=volume):
+            raise ValueError('completed failure changed during diagnosis')
+        initialize(con)
+        con.execute('INSERT OR IGNORE INTO completed_validation_diagnoses VALUES (?,?)',(key,json.dumps(receipt,sort_keys=True)))
+        saved=json.loads(con.execute('SELECT receipt FROM completed_validation_diagnoses WHERE source_task=?',(key,)).fetchone()[0])
+        if saved!=receipt:raise ValueError('concurrent completed diagnosis drift')
+    return receipt
 
 
 def recover_format(b,source,rejection):
@@ -101,13 +166,19 @@ def recover_format(b,source,rejection):
 def sponsor(fx,route,data,task,decision):
     b=fx.b;reference=references.qualified(b,route['issue_id'])
     if reference is None:raise ValueError('registered inherited Red required')
+    if (task.get('agent_id')!=route['cto'] or task.get('status')!='completed'
+            or task.get('id')!=data.get('recipient_task') or data.get('target')!=route['cto']):
+        raise ValueError('exact completed CTO diagnostic required')
     source=native.task_record(fx.settings,data['source_task'],route['author'])
-    if source['status']!='failed' or source['issue_id']!=route['issue_id']:
+    if source['status']=='completed':
+        data['completed_validation_diagnostic']=completed_diagnosis(fx,route,data,source,reference)
+    elif source['status']!='failed' or source['issue_id']!=route['issue_id']:
         raise ValueError('exact failed author required for diagnostic proposal')
-    with b.db() as con:
-        saved=con.execute('SELECT receipt FROM failed_execution_diagnoses WHERE source_task=?',(source['id'],)).fetchone()
-        if not saved or json.loads(saved[0])!=data.get('failed_execution_diagnostic'):
-            raise ValueError('controller-recorded failed snapshot diagnosis required')
+    else:
+        with b.db() as con:
+            saved=con.execute('SELECT receipt FROM failed_execution_diagnoses WHERE source_task=?',(source['id'],)).fetchone()
+            if not saved or json.loads(saved[0])!=data.get('failed_execution_diagnostic'):
+                raise ValueError('controller-recorded failed snapshot diagnosis required')
     value=proposal(route,reference,data,task,decision,fx.read_evidence(task))
     with b.db() as con:
         initialize(con)

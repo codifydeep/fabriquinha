@@ -576,3 +576,25 @@ cannot reconstruct this type and remain bounded to 12,000 characters. The
 qualification disappears on JSON serialization. This changes no file/tool,
 test, review or release permission. Transport prompt-bound errors now receive
 the explicit `native_prompt_bounds` category rather than `broker_internal`.
+
+### Completed execution with failed frozen Green
+
+`inherited_test_replan.completed_diagnosis` distinguishes a completed native
+implementation from a subsequent controller-run functional failure. It requires
+the latest exact author binding, a closed scope, a complete controller snapshot,
+the persisted failed Green and an approved inherited Red. Frozen test bytes are
+verified before a fixed validation job reproduces the same failures, test count
+and numeric witnesses. Original and reproduced output hashes remain separate
+because runner timing can differ; no old receipt is rewritten.
+
+A durable receipt permits only a CTO proposal followed by independent Tech Lead
+inspection. It never marks the implementation failed or successful, approves
+delivery, edits tests, resets revision depth or authorizes another execution.
+Reconciliation reuses the exact receipt after checking its failure and reference
+identities. Infrastructure failures, successful Green, incomplete snapshots,
+foreign bindings and changed failures remain blocked. A Tech Lead proposal first
+escalates to the CTO instead of entering the CTO-only sponsorship operation.
+
+The complete offline suite exercised 2,281 tests with seven existing skips on
+7 October 2026. Live peer inspection and the remaining product review, PR/CI,
+same-commit deployment and QA are still required; this is not full autonomy.

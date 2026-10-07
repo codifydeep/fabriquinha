@@ -1105,6 +1105,8 @@ def reconcile(con, route, runs, effects, *, now=None):
             return save(con,key,issue,'technical_decision_required',route['cto'],data,now)
         if decision['action'] == 'request_test_revision':
             if not route.get('test_first') and hasattr(effects,'sponsor_inherited_test_replan'):
+                if data['target'] != route['cto']:
+                    return save(con,key,issue,'diagnose_cto',route['cto'],data,now)
                 value=effects.sponsor_inherited_test_replan(route,data,recipient,decision)
                 data.update(inherited_test_replan=value,
                             required_action='independent Tech Lead inspection; no test edits or depth reset')

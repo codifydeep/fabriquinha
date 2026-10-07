@@ -52,6 +52,12 @@ diagnóstico não é uma recuperação genérica nem uma entrega autônoma quali
 
 ## O que queremos construir
 
+O diagnóstico agora distingue execução do agente concluída de falha posterior
+na suíte congelada. Esse caminho exige snapshot completo, escopo fechado,
+testes preservados e reprodução controlada da falha antes da proposta do CTO e
+inspeção independente do Tech Lead. Ele não concede edição de testes ou aprovação
+da entrega. A validação ponta a ponta desse caminho continua em andamento.
+
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.
 
 Não é um chat de bots que considera uma promessa como ação executada. Responsabilidade, dependências, snapshots, incidentes e recibos ficam em estado persistente. O término de uma resposta não encerra uma release.

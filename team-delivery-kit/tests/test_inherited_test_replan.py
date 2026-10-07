@@ -38,6 +38,58 @@ class InheritedTestReplanTests(unittest.TestCase):
         args=list(copy.deepcopy(self.fixture()));args[2]['validation_failure']['exit_code']=0
         with self.assertRaises(ValueError):proposal(*args)
 
+    def test_completed_validation_diagnostic_is_separate_and_not_approval(self):
+        args=list(copy.deepcopy(self.fixture()))
+        args[2]['completed_validation_diagnostic']=args[2].pop('failed_execution_diagnostic')
+        value=proposal(*args)
+        self.assertFalse(value['execution_authorized']);self.assertFalse(value['test_edits_authorized'])
+
+    def test_completed_capture_reproduces_failure_once_and_preserves_status(self):
+        import json,sqlite3,threading
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        from broker import inherited_test_replan as module,handoffs
+        from broker.suite_failure import FrozenSuiteFailure
+        route,reference,data,task,decision,reads=self.fixture()
+        failure=data['validation_failure'];failure.update(phase='frozen_green',volume='frozen')
+        data.pop('failed_execution_diagnostic');data.update(source_status='completed',artifact_diagnosis=True)
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row
+        handoffs.initialize(con)
+        con.execute('CREATE TABLE snapshots(task_id TEXT,volume TEXT,status TEXT)')
+        con.execute('CREATE TABLE leases(request_id TEXT,status TEXT)')
+        con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT,agent_id TEXT,issue_id TEXT)')
+        con.execute("INSERT INTO snapshots VALUES('source','frozen','complete')")
+        con.execute("INSERT INTO leases VALUES('request','closed')")
+        con.execute("INSERT INTO native_bindings VALUES('request','source','author','r2')")
+        handoffs.save(con,'source','r2','technical_decision_required','cto',data,0)
+        calls=[]
+        def validate(volume,key):
+            calls.append((volume,key));raise FrozenSuiteFailure({**failure,'output_sha256':'d'*64})
+        @contextmanager
+        def db():yield con
+        b=SimpleNamespace(db=db,LOCK=threading.RLock(),verify_test_first_green=lambda *a:None,validate_frozen_delivery=validate)
+        fx=SimpleNamespace(b=b,test_first_red=lambda *a:dict(red='approved'))
+        source=dict(id='source',agent_id='author',issue_id='r2',status='completed')
+        first=module.completed_diagnosis(fx,route,data,source,reference)
+        second=module.completed_diagnosis(fx,route,data,source,reference)
+        self.assertEqual(first,second);self.assertEqual(calls,[('frozen','source')])
+        self.assertEqual(source['status'],'completed');self.assertFalse(first['delivery_approval'])
+        self.assertEqual(first['failure']['output_sha256'],'c'*64)
+        self.assertEqual(first['reproduced_failure']['output_sha256'],'d'*64)
+        con.execute("UPDATE snapshots SET status='incomplete'")
+        with self.assertRaises(ValueError):module.completed_diagnosis(fx,route,data,source,reference)
+        con.execute("UPDATE snapshots SET status='complete'")
+        for changes in (dict(status='failed'),dict(agent_id='foreign'),dict(issue_id='other')):
+            with self.assertRaises(ValueError):module.completed_diagnosis(fx,route,data,{**source,**changes},reference)
+        con.execute('DELETE FROM completed_validation_diagnoses')
+        b.validate_frozen_delivery=lambda *a:dict(green=True)
+        with self.assertRaises(ValueError):module.completed_diagnosis(fx,route,data,source,reference)
+        def different(*a):raise FrozenSuiteFailure({**failure,'tests_executed':1})
+        b.validate_frozen_delivery=different
+        with self.assertRaises(ValueError):module.completed_diagnosis(fx,route,data,source,reference)
+        self.assertEqual(con.execute('SELECT count(*) FROM completed_validation_diagnoses').fetchone()[0],0)
+        con.close()
+
     def test_unknown_ack_is_observed_and_peer_review_cannot_grant_execution(self):
         import json,sqlite3,tempfile
         from pathlib import Path
