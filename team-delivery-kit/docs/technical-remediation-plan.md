@@ -208,3 +208,27 @@ that original snapshot, and durable TDD records retain `red_origin_issue` and
 These hooks do not create R2, prepare its Docker base, wake its author, approve
 its product delivery or publish it. Those dependent controller transitions and
 the live R1/R2/R3 chain remain required before the trial can be declared passed.
+
+### Durable dependent-card creation
+
+The watchdog invokes `remediation_r2_issue.py` after an actual approved R1 gate.
+It rechecks the independent review and nonterminal root, retains every criterion
+and product-only scope, then persists a create intent before contacting Multica.
+The R2 card remains unassigned and conveys no execution authority.
+
+The same recovery contract and R1 gate produce one stable card identity. After
+an uncertain POST or process restart, subsequent calls perform read-only lookup;
+they never repeat creation. Ten minutes of unresolved observation raises the
+alert flag; thirty minutes produces a retained technical hold for Tech Lead.
+Pre-intent semantic failures are also recorded in the parent execution and
+existing handoff channel. Blocked operations do not spin or disappear, and
+neither a created card nor a recovered connection implies delivery.
+
+The sequencer waits only for the R1 source/review leases to close. Unrelated
+workers do not prevent creation of an unassigned dependent card; that creation
+consumes no worker slot. Closing a dependency lease is a capacity wait, not a
+semantic failure. Actual worker dispatch retains its own concurrency gates.
+
+Original-base preparation, immutable R1 seeding, R2 context registration,
+controlled dispatch and product delivery/R3 remain subsequent gates. No trial
+is approved by the deterministic creation tests alone.
