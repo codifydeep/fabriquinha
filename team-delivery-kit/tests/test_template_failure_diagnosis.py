@@ -6,6 +6,37 @@ from broker import template_failure_diagnosis as diagnosis,calibration_rework as
 
 
 class TemplateFailureDiagnosisTests(unittest.TestCase):
+    def test_omitted_false_CTO_recovery_is_once_only_not_transport_or_author_replay(self):
+        from tests.test_worker_creation_intent import WorkerCreationIntentTests
+        payload,_,info=WorkerCreationIntentTests().inputs()
+        info['Config'].pop('NetworkDisabled')
+        config=dict(bootstrap_failure={'operation':'worker_bootstrap_failure_v1'},source_task='source',
+            manifest_sha256='a'*64,cto='cto',issue_id='issue')
+        state=dict(stage='blocked',category='surgical_failure_diagnosis_rejected',cto_wakeup='wake',
+            probe={'immutable':'preserved'})
+        task=dict(id='task',status='failed',agent_id='cto',issue_id='issue',wakeup_id='wake')
+        intent=dict(stage='ownership_or_policy_conflict')
+        startup=dict(stage='failed',category='startup_broker_internal')
+        before=copy.deepcopy((config,state))
+        changed,new=diagnosis.recover_network_default(config,state,task,payload,intent,startup,info,0,0)
+        self.assertEqual((config,state),before)
+        self.assertEqual(new['stage'],'bootstrap_retirement_pending')
+        self.assertNotIn('cto_wakeup',new);self.assertNotIn('executor',new)
+        self.assertEqual(new['bootstrap_policy_recovery']['previous_state'],state)
+        self.assertFalse(new['bootstrap_policy_recovery']['transport_replayed'])
+        self.assertNotEqual(lane.marker(config,'cto'),lane.marker(changed,'cto'))
+        for c,s,t,p,i,st,inf,tools,events in (
+            (changed,new,task,payload,intent,startup,info,0,0),
+            (config,state,{**task,'status':'running'},payload,intent,startup,info,0,0),
+            (config,state,{**task,'agent_id':'author'},payload,intent,startup,info,0,0),
+            (config,{**state,'peer_wakeup':'peer'},task,payload,intent,startup,info,0,0),
+            (config,state,task,payload,intent,{**startup,'stage':'ready'},info,0,0),
+            (config,state,task,payload,intent,startup,info,1,0),
+            (config,state,task,payload,intent,startup,info,0,1),
+            (config,state,task,{**payload,'NetworkDisabled':True},intent,startup,info,0,0),
+            (config,state,task,payload,intent,startup,{**info,'Image':'wrong'},0,0)):
+            with self.assertRaises(ValueError):diagnosis.recover_network_default(c,s,t,p,i,st,inf,tools,events)
+
     def bootstrap_fixture(self):
         con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
         con.executescript("""

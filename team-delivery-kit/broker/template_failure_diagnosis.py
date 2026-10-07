@@ -84,6 +84,106 @@ def installed_line_qualification(b,con):
     return proof
 
 
+def recover_network_default(config,state,task,payload,intent,startup,info,tool_calls,acp_events):
+    """One changed-policy CTO planning round, never replay the failed transport."""
+    try:import worker_creation_intent as workers
+    except ImportError:from broker import worker_creation_intent as workers
+    if (not config.get('bootstrap_failure') or config.get('bootstrap_policy_revision')
+            or state.get('bootstrap_policy_recovery') or state.get('stage')!='blocked'
+            or state.get('category')!='surgical_failure_diagnosis_rejected'
+            or state.get('executor') or state.get('binding_recovery')
+            or state.get('peer_wakeup') or state.get('cto_decision')
+            or task.get('status')!='failed' or task.get('agent_id')!=config['cto']
+            or task.get('issue_id')!=config['issue_id'] or task.get('wakeup_id')!=state.get('cto_wakeup')
+            or tool_calls!=0 or acp_events!=0
+            or intent.get('stage')!='ownership_or_policy_conflict'
+            or startup.get('stage')!='failed' or startup.get('category')!='startup_broker_internal'
+            or payload.get('NetworkDisabled') is not False or not info
+            or 'NetworkDisabled' in info.get('Config',{})):
+        raise ValueError('one authenticated omitted-false pre-ACP CTO incident required')
+    observed,_=workers.observe(payload,{'stage':'start_acknowledged'},info,'failed',0,time.time())
+    if observed['stage']!='late_start_observed':raise ValueError('complete original worker policy must match')
+    receipt=dict(operation='docker_omitted_false_CTO_recovery_v1',previous_state=state,
+        failed_task=task['id'],failed_wakeup=task['wakeup_id'],container_id=info['Id'],
+        payload_sha256=observed['fact']['payload_sha256'],previous_startup=startup,previous_creation_intent=intent,
+        tool_calls=0,acp_events=0,transport_replayed=False,author_retry_authorized=False,delivery_approval=False)
+    changed={**config,'bootstrap_policy_revision':1}
+    new={k:v for k,v in state.items() if not k.startswith(('cto_','peer_'))
+         and k not in ('at','intent_at','category','error_type','required_action')}
+    new.update(stage='bootstrap_retirement_pending',bootstrap_policy_recovery=receipt,
+        required_action='retire_exact_terminal_CTO_worker_before_fresh_planning',
+        author_retry_authorized=False,delivery_approval=False)
+    return changed,new
+
+
+def arm_network_default_recovery(b,source):
+    """Maintenance-only bootstrap: no worker endpoint and no native wakeup here."""
+    _,admission,_,jobs,_,native=modules()
+    with b.LOCK:
+        with b.db() as con:
+            row=con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(source,)).fetchone()
+            if not row:raise ValueError('actual incident required')
+            config,state=map(json.loads,row)
+            if config.get('bootstrap_policy_revision'):return state
+            installed_line_qualification(b,con)
+            route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(config['issue_id'],)).fetchone()[0])
+            if (not route['enabled'] or route['contract_sha256']!=config['contract_sha256']
+                    or any(config[k]!=route[v] for k,v in (('author','author'),('cto','cto'),('peer','techlead')))
+                    or len({config[k] for k in ('author','cto','peer')})!=3
+                    or con.execute('SELECT 1 FROM test_first_red WHERE issue_id=?',(config['issue_id'],)).fetchone()):
+                raise ValueError('unchanged pre-Red independent route required')
+        settings=json.loads((b.STATE/'native.json').read_text())
+        runs=native.issue_task_runs(settings,config['issue_id'])
+        tasks=[t for t in runs if t.get('wakeup_id')==state.get('cto_wakeup')]
+        if len(tasks)!=1 or any(t['status'] in ('queued','dispatched','running') for t in runs):
+            raise ValueError('one terminal CTO task and idle native issue required')
+        task=tasks[0]
+        current_cto=[t for t in runs if t.get('agent_id')==config['cto']]
+        authors=[t for t in runs if t.get('agent_id')==config['author']]
+        if (not current_cto or max(current_cto,key=lambda t:(t.get('created_at') or '',t['id']))['id']!=task['id']
+                or not authors or max(authors,key=lambda t:(t.get('created_at') or '',t['id']))['id']!=source):
+            raise ValueError('recovery superseded by a newer execution')
+        messages=native.task_messages(settings,task['id'])
+        tools=sum(m.get('type') in ('tool_use','tool_result') for m in messages)
+        with b.db() as con:
+            records=con.execute('SELECT n.request_id,l.name,l.status,g.used,g.mode FROM native_bindings n '
+                'JOIN leases l USING(request_id) JOIN grants g USING(request_id) '
+                'WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',
+                (task['id'],config['cto'],config['issue_id'])).fetchall()
+            if len(records)!=1 or records[0][3]!=1 or records[0][4]!='planning':
+                raise ValueError('exact consumed planning capability required')
+            request,name,_,_,_=records[0]
+            if con.execute("SELECT 1 FROM leases WHERE request_id!=? AND status IN ('creating','starting','running','active','closing')",(request,)).fetchone():
+                raise ValueError('other active lease')
+            acp=con.execute('SELECT count(*) FROM acp_events WHERE request_id=?',(request,)).fetchone()[0]
+            payload,intent=map(json.loads,con.execute('SELECT payload,state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone())
+            startup=json.loads(con.execute('SELECT state FROM acp_startups WHERE request_id=?',(request,)).fetchone()[0])
+            errors=[tuple(r) for r in con.execute('SELECT operation,category FROM broker_errors WHERE request_id=?',(request,))]
+            if ('acp_startup','startup_broker_internal') not in errors or any(r[0]=='transport_start' for r in errors):
+                raise ValueError('actual pre-transport startup failure required')
+        rec=state['probe'];frozen=b.docker('GET','/containers/'+rec['container_id']+'/json')
+        jobs.verify_job(frozen,rec['payload'])
+        if frozen['State']['Status']!='exited' or frozen['State']['Running'] or frozen['State']['ExitCode']!=0:
+            raise ValueError('completed immutable preservation job required')
+        raw=b.docker_stdout(frozen['Id'],include_stderr=False,limit=4096)
+        if hashlib.sha256(raw.encode()).hexdigest()!=rec['receipt_sha256'] or json.loads(raw)!=rec['proof']:
+            raise ValueError('immutable preservation receipt drift')
+        admission.validate_preservation(rec['proof'],config)
+        info=b.docker('GET','/containers/'+name+'/json')
+        changed,new=recover_network_default(config,state,task,payload,intent,startup,info,tools,acp)
+        labels=payload['Labels']
+        if (payload['Image']!=b.IMAGE or labels.get('delivery-kit.owner')!=b.OWNER
+                or labels.get('delivery-kit.request')!=request):raise ValueError('exact qualified owned worker required')
+        new['bootstrap_policy_recovery'].update(request_id=request,name=name)
+        with b.db() as con:
+            if tuple(con.execute('SELECT config,state FROM calibration_failure_plans WHERE source_task=?',(source,)).fetchone())!=tuple(row):
+                raise ValueError('incident changed during recovery')
+            con.execute('UPDATE calibration_failure_plans SET config=?,state=? WHERE source_task=?',
+                (json.dumps(changed,sort_keys=True),json.dumps(new,sort_keys=True),source))
+            con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(request,))
+        return new
+
+
 def reconcile(config,state,identity,experiment):
     """One changed-evidence planning round; retain the original decisions verbatim."""
     try:import calibration_failure_plan as plans
@@ -253,6 +353,17 @@ def handle(b,route,runs,source,prior,effects):
                 owner=config['author']
             handoffs.save(con,key,issue,'calibration_failure_plan',owner,data,time.time())
     try:
+        if state['stage']=='bootstrap_retirement_pending':
+            recovery=state['bootstrap_policy_recovery']
+            # remove_owned persists the exact deletion intent; repeated calls
+            # observe its outcome instead of repeating a DELETE.
+            try:b.remove_owned(recovery['name'],recovery['request_id'])
+            except b.DockerOperationTimeout:return True
+            if b.docker('GET','/containers/'+recovery['name']+'/json') is not None:return True
+            with b.db() as con:
+                con.execute("UPDATE leases SET status='failed' WHERE request_id=?",(recovery['request_id'],))
+            persist({**state,'stage':'cto_pending','required_action':'fresh_CTO_planning_after_verified_policy_correction'})
+            return True
         repaired=lane.recover_technical_escalation(config,state,runs,effects)
         if repaired:
             persist(repaired)

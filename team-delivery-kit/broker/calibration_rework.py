@@ -152,7 +152,8 @@ def marker(config,role):
         'operation':'calibration_failure_plan_v1' if config.get('diagnosis_only') else 'calibration_rework_v1',
         'format_revision':config.get('format_revision',0),
         **({'line_recipe_revision':config['line_recipe_revision']} if config.get('line_recipe_revision') else {}),
-        **({'evidence_revision':config['evidence_revision']} if config.get('evidence_revision') else {})})
+        **({'evidence_revision':config['evidence_revision']} if config.get('evidence_revision') else {}),
+        **({'bootstrap_policy_revision':config['bootstrap_policy_revision']} if config.get('bootstrap_policy_revision') else {})})
 
 
 def recover_format(config,state,task,reads):

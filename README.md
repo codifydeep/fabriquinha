@@ -14,6 +14,16 @@ e do proxy continua obrigatória. A instalação preserva o worker e o proxy
 qualificados; o handoff nativo completo ainda precisa ser comprovado. Os testes
 offline não liberam o Truco.
 
+Uma recuperação administrativa específica do CTO exige falha anterior ao ACP,
+zero ferramentas, capability de planejamento consumida e a política completa do
+worker conferida. Somente a omissão de `NetworkDisabled=false` na inspeção Docker
+é normalizada; modo de rede, mounts, imagem e demais controles continuam exatos.
+A intenção de retirada do worker terminal precede o novo planejamento, e um
+resultado incerto de remoção é observado sem repetir o DELETE. Decisão anterior,
+startup e identidade da execução ficam preservados; a nova identidade de handoff
+não aprova entrega, reinicia o autor nem amplia limites. Esta recuperação ainda
+exige validação instalada e não qualifica a autonomia ponta a ponta.
+
 ## O que queremos construir
 
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.
