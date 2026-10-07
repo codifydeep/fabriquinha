@@ -41,6 +41,21 @@ class RemediationExecutionContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):contract(self.c,self.s,['tests/test_new.py'],['tests/test_old.py'])
         with self.assertRaises(ValueError):contract(self.c,self.s,['tests/test_new.py'],['../app.js'])
 
+    def test_approved_amendment_is_preserved_without_depth_reset(self):
+        amendment=dict(operation='inherited_harness_contract_amendment_v1',original_depth=2,attempt_limit=1,
+            revision_depth_reset=False,execution_authorized=False,seed_red={'task_id':'original-red'},experiment_sha256='e'*64)
+        c={**self.c,'amendment':amendment};s=copy.deepcopy(self.s)
+        s['plan']['evidence_sha256']=digest(c);sha=digest(s['plan']);s['plan_sha256']=sha
+        s['review'].update(plan_sha256=sha,evidence_sha256=sha)
+        value=contract(c,s,['tests/test_new.py'],['app.js'])
+        self.assertEqual(value['amendment'],amendment);self.assertEqual(value['original_depth'],2)
+        self.assertEqual(value['steps'][0]['editable_files'],['tests/test_new.py'])
+        self.assertFalse(value['historical_snapshots_editable'])
+        c['amendment']={**amendment,'revision_depth_reset':True}
+        s['plan']['evidence_sha256']=digest(c);sha=digest(s['plan']);s['plan_sha256']=sha
+        s['review'].update(plan_sha256=sha,evidence_sha256=sha)
+        with self.assertRaises(ValueError):contract(c,s,['tests/test_new.py'],['app.js'])
+
     def test_r1_issue_preserves_all_criteria_without_assignment_or_dispatch(self):
         value=contract(self.c,self.s,['tests/test_new.py'],['app.js'])
         spec=issue_spec(value,dict(project_id='project'))

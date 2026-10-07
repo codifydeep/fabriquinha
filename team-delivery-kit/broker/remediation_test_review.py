@@ -19,10 +19,18 @@ def config(b, issue):
         route = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?', (issue,)).fetchone()[0])
         source = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?', (value['source_issue'],)).fetchone()[0])
         old_row = con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?', (value['source_issue'],)).fetchone()
-    if not old_row:
-        raise ValueError('preserved historical Red required')
-    old = json.loads(old_row[0]); seed = value['previous_new_test_delivery']
-    if (old.get('issue_id') != value['source_issue']
+    if value.get('amendment'):
+        try:import remediation_red_reference as references
+        except ImportError:from broker import remediation_red_reference as references
+        inherited=references.qualified(b,value['source_issue'])
+        if not inherited or inherited['red']!=value['amendment']['seed_red']:
+            raise ValueError('exact unchanged inherited amendment Red required')
+        old=inherited['red'];origin=inherited['origin_issue']
+    else:
+        if not old_row:raise ValueError('preserved historical Red required')
+        old=json.loads(old_row[0]);origin=value['source_issue']
+    seed = value['previous_new_test_delivery']
+    if (old.get('issue_id') != origin
             or any(old.get(k) != seed[k] for k in ('task_id', 'volume'))
             or any(old.get('red', {}).get(k) != seed[k] for k in ('manifest_sha256', 'test_sha256'))
             or old['red'].get('evidence_version') != 2

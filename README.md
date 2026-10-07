@@ -43,6 +43,14 @@ Uma rota pausada pode fornecer sua referência de Red exclusivamente para diagn�
 
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
+O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,
+extrai uma constante Python sem importar os testes e compila o JavaScript sem
+executar o produto. Seu resultado é somente diagnóstico: sintaxe válida não
+comprova funcionamento, Red legítimo ou homologação. O planejamento de uma emenda
+preserva a linhagem e exige uma nova revisão independente; a nova execução ainda
+precisa demonstrar compilação do harness, controles negativos comportamentais,
+Red no baseline original e todos os gates posteriores.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe

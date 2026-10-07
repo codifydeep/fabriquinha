@@ -40,13 +40,22 @@ def contract(config,state,tests,products):
             'gates':(['original_base','preserved_previous_new_tests','real_red','independent_test_review'] if i==1 else
                 ['approved_exact_r1_red','frozen_tests_readonly','full_green','independent_product_review'] if i==2 else
                 ['independent_review_exact_sha','product_pr','ci_exact_sha','merge','deploy_exact_sha','browser_qa_exact_sha'])})
-    return dict(version='remediation_execution_contract_v1',run_id='remediation-'+planning.digest(dict(
+    value=dict(version='remediation_execution_contract_v1',run_id='remediation-'+planning.digest(dict(
         source=config['source_task'],plan=sha))[:20],source_task=config['source_task'],source_issue=config['source_issue'],
         root_issue=config['root_issue'],plan_sha256=sha,plan_task=state['plan_task'],review_task=state['review_task'],
         criteria=config['criteria'],steps=result,base=config['base'],contract_sha256=config['contract_sha256'],
         context_sha256=config['context_sha256'],original_depth=config['original_depth'],
         revision_lineage=config['revision_lineage'],baseline_edits_allowed=False,
         historical_snapshots_editable=False,release_homologated=False)
+    if config.get('amendment'):
+        amendment=config['amendment']
+        if (amendment.get('operation')!='inherited_harness_contract_amendment_v1'
+                or amendment.get('original_depth')!=2 or amendment.get('attempt_limit')!=1
+                or amendment.get('revision_depth_reset') is not False or amendment.get('execution_authorized') is not False
+                or not amendment.get('seed_red') or not amendment.get('experiment_sha256')):
+            raise ValueError('exact independently reviewed harness amendment required')
+        value['amendment']=amendment
+    return value
 
 
 def initialize(con):
@@ -64,12 +73,23 @@ def register(b,source):
                     or route.get('techlead')!=config['reviewer'] or route.get('contract_sha256')!=config['contract_sha256']
                     or route.get('execution_context',{}).get('sha256')!=config['context_sha256']):
                 raise ValueError('approved source route or context drift')
-            old_red=json.loads(con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',(config['source_issue'],)).fetchone()[0])
-            if set(route['test_first_files'])!=set(old_red['red']['test_sha256']):raise ValueError('historic NEW-test scope drift')
+            if config.get('amendment'):
+                try:import remediation_red_reference as references
+                except ImportError:from broker import remediation_red_reference as references
+                origin=references.qualified(b,config['source_issue'])
+                if (not origin or origin['red']!=config['amendment']['seed_red']
+                        or origin['source_task']!=config['amendment']['previous_source']
+                        or origin['execution_contract_sha256']!=config['amendment']['previous_execution_sha256']):
+                    raise ValueError('unchanged inherited amendment seed required')
+                old_red=origin['red'];tests=sorted(old_red['red']['test_sha256'])
+            else:
+                old_red=json.loads(con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',(config['source_issue'],)).fetchone()[0])
+                tests=sorted(route['test_first_files'])
+            if set(tests)!=set(old_red['red']['test_sha256']):raise ValueError('historic NEW-test scope drift')
             inputs=config['experiment']['proof']['input_sha256']
             if any(inputs.get(p)!=sha for p,sha in old_red['red']['test_sha256'].items()):raise ValueError('approved diagnostic test seed drift')
             paths=[r[0] for r in con.execute('SELECT path FROM issue_editables WHERE issue_id=?',(config['source_issue'],))]
-            tests=sorted(route['test_first_files']);products=sorted(p.removeprefix('/workspace/') for p in paths
+            products=sorted(p.removeprefix('/workspace/') for p in paths
                 if p.removeprefix('/workspace/') not in tests)
             value=contract(config,state,tests,products)
             value['previous_new_test_delivery']=dict(task_id=old_red['task_id'],volume=old_red['volume'],

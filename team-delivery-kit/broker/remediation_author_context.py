@@ -70,6 +70,10 @@ def prepare(b, source_task):
             preparation.validate_proof(value,state['preparation']['proof'])
             source = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(value['source_issue'],)).fetchone()[0])
             scope = sorted(r[0] for r in con.execute('SELECT path FROM issue_editables WHERE issue_id=?',(value['source_issue'],)))
+            if value.get('amendment'):
+                # R2 source permissions stay product-only. NEW-test writes are
+                # introduced only on the separate, paused amended R1 runtime.
+                scope=sorted(set(scope)|{'/workspace/'+p for p in value['steps'][0]['editable_files']})
             command = con.execute('SELECT command FROM issue_test_commands WHERE issue_id=?',(value['source_issue'],)).fetchone()[0]
             existing = con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(state['issue_id'],)).fetchone()
         desired = route(value,source,state['issue_id'])

@@ -151,6 +151,7 @@ COPY broker/test_first_handoffs.py /test_first_handoffs.py
 COPY broker/cto_prompt_bound_recovery.py /cto_prompt_bound_recovery.py
 COPY broker/bound_failure_context.py /bound_failure_context.py
 COPY broker/inherited_test_replan.py /inherited_test_replan.py
+COPY broker/inherited_harness_amendment.py /inherited_harness_amendment.py
 COPY broker/pre_red_infra_replan.py /pre_red_infra_replan.py
 COPY broker/selected_read_recovery.py /selected_read_recovery.py
 COPY broker/test_bootstrap_recovery.py /test_bootstrap_recovery.py

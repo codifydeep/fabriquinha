@@ -57,6 +57,19 @@ class RemediationTestReviewTests(unittest.TestCase):
             self.assertIsNone(con.execute('SELECT parent_issue FROM test_revision_trials WHERE issue_id=?',('r1',)).fetchone()[0])
             self.assertEqual(con.execute('SELECT count(*) FROM test_first_red WHERE issue_id=?',('r1',)).fetchone()[0],0)
 
+    def test_amendment_uses_foreign_red_identity_without_manufacturing_local_receipt(self):
+        from broker import remediation_red_reference as references
+        old={**self.old,'issue_id':'original-r1'}
+        value={**self.value,'amendment':dict(seed_red=old)}
+        with self.b.db() as con:con.execute('DELETE FROM test_first_red WHERE issue_id=?',('old',))
+        with patch.object(adapter.guard,'qualified',return_value=value),patch.object(references,'qualified',return_value=dict(red=old,origin_issue='original-r1')):
+            cfg=adapter.config(self.b,'r1')
+        self.assertEqual(cfg['old_red']['issue_id'],'original-r1')
+        with self.b.db() as con:
+            self.assertIsNone(con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',('old',)).fetchone())
+        with patch.object(adapter.guard,'qualified',return_value=value),patch.object(references,'qualified',return_value=dict(red={**old,'task_id':'stale'},origin_issue='original-r1')):
+            with self.assertRaises(ValueError):adapter.config(self.b,'r1')
+
     def test_stale_previous_receipt_and_self_review_cannot_install(self):
         for bad in ({**self.old,'volume':'wrong'}, {**self.old,'task_id':'wrong'}):
             with self.b.db() as con:con.execute('UPDATE test_first_red SET receipt=? WHERE issue_id=?',(json.dumps(bad),'old'))

@@ -197,6 +197,12 @@ def instruction(config,state):
             '\nDELIVERY_REMEDIATION_REVIEW_V1:'+state['plan_sha256'])
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:review:'+state['plan_sha256']
         note+='\nDELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
+    if config.get('amendment'):
+        note+='\nCONTRACT AMENDMENT: the immutable embedded NEW-test harness fails Node syntax compilation; '
+        note+='do not rewrite product to accommodate invalid test code. Repair harness only in a NEW submission, '
+        note+='preserving every method/assertion, original base and depth 2. Require harness compilation and '
+        note+='behavioral negative controls before genuine Red and independent test review. Historical approvals '
+        note+='do not approve this amended submission. All R2/R3 gates and every criterion remain required.'
     result=common+note
     prefix='DELIVERY_PLANNING_START '+('0'*64)+'\nSource: '+config['source_task']+'\n'
     if len(result)+len(prefix)>4000:raise ValueError('split remediation context before dispatch')
@@ -286,7 +292,7 @@ class Effects:
         description=('TECHNICAL REMEDIATION PLANNING ONLY; original failed attempts and two revision generations remain preserved.\n'
             'Source: '+c['source_task']+'\nEvidence: '+digest(c)+'\nApproved acceptance (unchanged):\n'+
             '\n'.join(k+': '+v for k,v in c['criteria'].items())+
-            '\nIsolated schema SPIKE facts: '+json.dumps(c['experiment']['proof']['facts'],separators=(',',':'))+
+            '\nControlled diagnostic experiment facts: '+json.dumps(c['experiment']['proof']['facts'],separators=(',',':'))+
             '\nNo implementation, frozen-test editing, revision reset, release approval, merge or deployment authority. '
             'CTO proposes a scoped recovery; Tech Lead reviews independently. Preserve all historical receipts and baseline tests.')
         return self.issues.ensure(dict(title='Technical remediation plan '+digest(c)[:12],description=description,
