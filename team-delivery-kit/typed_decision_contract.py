@@ -9,6 +9,7 @@ import json
 import re
 from jsonschema import Draft202012Validator
 from structured_response_contract import StructuredResponseRejected,_unique
+import plan_length_feedback
 
 NAME='submit_delivery_decision'
 MARKER='DELIVERY_TYPED_DECISION_V1'
@@ -84,7 +85,7 @@ def remediation_length_feedback_enabled(body):
 
 
 def length_feedback_enabled(body):
-    return remediation_length_feedback_enabled(body) or review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
+    return plan_length_feedback.enabled(body) or remediation_length_feedback_enabled(body) or review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
         {'type':'function','function':{'name':RECOVERY_NAME}}) and any(
         m.get('role')=='user' and isinstance(m.get('content'),str)
         and re.search(r'^'+LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
@@ -193,6 +194,9 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
     if remediation_length_feedback_enabled(body):
         receipt.update(operation='remediation_review_length_feedback_v1',plan_acceptance_by_proxy=False,
             plan_sha256=body['tools'][0]['function']['parameters']['properties']['plan_sha256']['enum'][0])
+    if plan_length_feedback.enabled(body):
+        receipt.update(operation='remediation_plan_length_feedback_v1',plan_acceptance_by_proxy=False,
+            evidence_sha256=body['tools'][0]['function']['parameters']['properties']['evidence_sha256']['enum'][0])
     with ledger(counter_path) as con:
         con.execute('CREATE TABLE IF NOT EXISTS technical_length_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
         if con.execute('SELECT 1 FROM technical_length_feedback WHERE execution_id=?',(execution_id,)).fetchone():return None
@@ -612,6 +616,10 @@ def translate(body,data,media_type):
             parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
         violations=list(Draft202012Validator(schema).iter_errors(decision))
         if violations:
+            plan_feedback=plan_length_feedback.feedback(body,violations,decision,schema,arguments,data)
+            if plan_feedback:
+                error=StructuredResponseRejected('typed_schema_maxLength');error.length_feedback=plan_feedback
+                raise error
             if (remediation_length_feedback_enabled(body) and len(violations)==1
                     and violations[0].validator=='maxLength' and list(violations[0].path)==['reason']
                     and schema['properties']['reason'].get('maxLength')==600
@@ -658,6 +666,7 @@ def translate(body,data,media_type):
             reject('schema_'+(keyword if keyword in allowed else 'violation'))
         validate_review_feedback_identity(body,decision)
         validate_remediation_feedback_identity(body,decision)
+        plan_length_feedback.validate_identity(body,decision)
         phase='adapter'
         text=json.dumps(decision,sort_keys=True,separators=(',',':'),allow_nan=False)
         common={'id':'chatcmpl-typed-'+hashlib.sha256(data).hexdigest()[:24],

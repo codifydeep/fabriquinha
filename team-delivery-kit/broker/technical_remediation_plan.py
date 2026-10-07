@@ -203,6 +203,8 @@ def instruction(config,state):
         note+='preserving every method/assertion, original base and depth 2. Require harness compilation and '
         note+='behavioral negative controls before genuine Red and independent test review. Historical approvals '
         note+='do not approve this amended submission. All R2/R3 gates and every criterion remain required.'
+    if state['stage']=='plan_dispatch':
+        note+='\nDELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1\n'
     result=common+note
     prefix='DELIVERY_PLANNING_START '+('0'*64)+'\nSource: '+config['source_task']+'\n'
     if len(result)+len(prefix)>4000:raise ValueError('split remediation context before dispatch')
@@ -364,6 +366,57 @@ def reconcile_review_changes(b,source):
         with b.db() as con:
             if json.loads(con.execute('SELECT state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()[0])!=s:
                 raise ValueError('review rejection changed')
+            con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
+        return new
+
+
+def reconcile_plan_length_failure(b,source,rejection):
+    """One changed transport policy after a correlated plan-schema rejection.
+
+    Trusted operator supplies the sanitized proxy receipt. An invalid plan is
+    never accepted; the native framework dispatches a fresh readonly proposal.
+    """
+    with b.LOCK:
+        with b.db() as con:
+            row=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
+            c,s=map(json.loads,row)
+            if s.get('plan_length_recovery'):return s
+            diagnostic=s.get('format_diagnosis') or {};shape=rejection.get('response_shape') or {}
+            if (s.get('stage')!='blocked' or s.get('category')!='ValueError' or not c.get('amendment')
+                    or diagnostic.get('category')!='typed_schema_maxLength' or diagnostic.get('retry_authorized') is not False
+                    or rejection.get('execution_id')!=diagnostic.get('request_id')
+                    or rejection.get('category')!='typed_schema_maxLength'
+                    or rejection.get('operation')!='rejected_typed_decision_adapter_v1'
+                    or rejection.get('delivery_approval') is not False or rejection.get('worker_tool_executed') is not False
+                    or shape.get('parsed') is not True or shape.get('terminal') is not True
+                    or shape.get('submissions')!=1 or shape.get('expected_tool') is not True
+                    or shape.get('arguments_json_valid') is not True or shape.get('arguments_schema_valid') is not False
+                    or shape.get('content_shape')!='empty' or shape.get('content_chars')!=0
+                    or s.get('execution_authorized') is not False or s.get('plan')
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
+                raise ValueError('idle exact rejected readonly plan length failure required')
+            bindings=con.execute('SELECT n.request_id,l.status FROM native_bindings n JOIN leases l USING(request_id) '
+                'WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',
+                (diagnostic['failed_task'],c['cto'],s['issue_id'])).fetchall()
+            if len(bindings)!=1 or bindings[0]['request_id']!=diagnostic['request_id'] or bindings[0]['status']!='closed':
+                raise ValueError('exact closed planning transport required')
+        fx=Effects(b);task=fx.task(diagnostic['failed_task'],c['cto']);reads=fx.reads(task)
+        if (task['status']!='failed' or task['issue_id']!=s['issue_id'] or task['wakeup_id']!=s['wakeup_id']
+                or any(reads.get(p,{}).get('lines',0)<=0 or reads[p]['lines']!=reads[p]['total_lines'] for p in c['required_paths'])
+                or any(t['status'] in ('queued','dispatched','running') for t in native.issue_task_runs(fx.settings,s['issue_id']))):
+            raise ValueError('authentic failed plan with complete reads and no pending task required')
+        candidate={**s,'stage':'plan_dispatch','owner':c['cto'],'review_protocol':'typed-remediation-plan-length-feedback-v1'}
+        if '\nDELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1\n' not in instruction(c,candidate):
+            raise ValueError('changed bounded plan feedback instruction required')
+        proof=dict(operation='correlated_remediation_plan_length_recovery_v1',previous=s,
+            rejection=rejection,config_sha256=digest(c),attempt_limit=1,
+            implementation_authorized=False,limits_increased=False,revision_depth_reset=False)
+        new={**candidate,'plan_length_recovery':proof,'required_action':'CTO fresh readonly plan under one bounded prose correction; independent review remains required'}
+        for field in ('wakeup_id','dispatched_at','category'):new.pop(field,None)
+        with b.db() as con:
+            current=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
+            if list(map(json.loads,current))!=[c,s] or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():
+                raise ValueError('plan hold changed before recovery registration')
             con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
         return new
 

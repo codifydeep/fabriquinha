@@ -110,6 +110,7 @@ COPY test_artifact_schema.py /test_artifact_schema.py
 COPY artifact_response_contract.py /artifact_response_contract.py
 COPY structured_response_contract.py /structured_response_contract.py
 COPY typed_decision_contract.py /typed_decision_contract.py
+COPY plan_length_feedback.py /plan_length_feedback.py
 COPY typed_test_source.py /typed_test_source.py
 COPY read_stream_recovery.py /read_stream_recovery.py
 COPY read_stream_recovery_probe.py /read_stream_recovery_probe.py
