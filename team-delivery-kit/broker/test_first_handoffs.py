@@ -545,6 +545,10 @@ def reconcile(broker, route, runs, effects):
                     handoffs.save(con,source['id'],issue,'technical_decision_required',
                         route['cto'],preserved,time.time())
                     prior=handoffs.load(con,source['id'])
+        try:import cto_prompt_bound_recovery
+        except ImportError:from broker import cto_prompt_bound_recovery
+        if cto_prompt_bound_recovery.recover(broker,route,runs,source,prior,effects):
+            return None
         failed_authors = [run for run in authors if run['status'] == 'failed']
         completed_authors = [run for run in authors if run['status'] == 'completed']
         if prior and prior['stage'] in ('test_first_cto_diagnosis', 'test_first_cto_correction',
