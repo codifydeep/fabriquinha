@@ -232,3 +232,24 @@ semantic failure. Actual worker dispatch retains its own concurrency gates.
 Original-base preparation, immutable R1 seeding, R2 context registration,
 controlled dispatch and product delivery/R3 remain subsequent gates. No trial
 is approved by the deterministic creation tests alone.
+
+### R2 base preparation and read-only qualification
+
+`remediation_r2_preparation.py` advances a created R2 card only after verifying
+the exact current R1 review, original contract, paused R1 route and nonterminal
+root. An active R2 lease prevents base writes. Unrelated worker leases do not
+starve these fixed preparation probes.
+
+The controller copies the original Git base into the exact R2 volume, then
+qualifies the approved R1 test snapshot using the worker UID. Copy runs without
+the snapshot mounted; qualification mounts all persistent inputs read-only and
+seeds only temporary memory. It verifies original product/baseline hashes and
+unchanged snapshot permissions. The approved R1 Red is not converted into a new
+baseline, rerun or relabelled. The older failed test delivery remains preserved.
+
+Volume, create and start intents are saved before Docker calls. An uncertain
+acknowledgment permits observation of the same name/ID, never an identical POST.
+Semantic failures and thirty-minute observation deadlines retain a technical
+hold and project it into the existing Tech Lead handoff channel. Preparation
+receipts grant no worker execution or release approval. R2 context/route,
+dispatch, real Green, independent product review and R3 remain to be validated.

@@ -6,6 +6,7 @@ COPY broker/remediation_test_review.py /remediation_test_review.py
 COPY broker/remediation_author_context.py /remediation_author_context.py
 COPY broker/remediation_red_reference.py /remediation_red_reference.py
 COPY broker/remediation_r2_issue.py /remediation_r2_issue.py
+COPY broker/remediation_r2_preparation.py /remediation_r2_preparation.py
 COPY broker/helper_cleanup.py /helper_cleanup.py
 COPY broker/host_restart_recovery.py /host_restart_recovery.py
 COPY broker/host_restart_snapshot.py /host_restart_snapshot.py
