@@ -167,9 +167,12 @@ continua **não admitida para os workers reais**. O protocolo V6 passou pelos
 handlers, registro nativo/ACP, prompt com binding real e validação local do proxy
 em um contêiner descartável, com código público montado somente para leitura.
 O canary rejeitou escrita genérica, terminal, Python, alterações de assertions,
-intervalos sobrepostos, sintaxe inválida e hash obsoleto. Essa prova usa overlays
-de código: não qualifica as imagens instaladas nem a admissão independente, que
-continuam pendentes. O resultado não modifica a entrega nem substitui calibração,
+intervalos sobrepostos, sintaxe inválida e hash obsoleto. A prova inicial com
+overlays foi repetida na imagem candidata imutável do broker sem overlays de
+código. Um segundo canary na imagem candidata do proxy validou seus contratos
+reais de request/response e rejeitou protocolos misturados, payload antigo e
+caminho/hash divergentes. Isso qualifica as candidatas, não os serviços instalados
+nem a admissão independente, que continuam pendentes. O resultado não modifica a entrega nem substitui calibração,
 Red ou revisão; nenhum grant existente foi ampliado. O recibo reproduzível está em
 [TEMPLATE-LINES-V6-SOURCE-CANARY](team-delivery-kit/evaluation/TEMPLATE-LINES-V6-SOURCE-CANARY-2026-10-07.json).
 
