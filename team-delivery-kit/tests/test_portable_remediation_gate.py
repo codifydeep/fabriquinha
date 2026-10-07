@@ -5,8 +5,13 @@ from unittest.mock import patch
 from contextlib import ExitStack
 from pathlib import Path
 import tempfile
+import sqlite3
+import sys
+import io
+from types import SimpleNamespace
+from contextlib import redirect_stdout,contextmanager
 import portable_delivery as driver
-from portable_remediation_gate import qualify
+from portable_remediation_gate import qualify,QUERY
 
 
 class PortableRemediationGateTests(unittest.TestCase):
@@ -57,6 +62,27 @@ class PortableRemediationGateTests(unittest.TestCase):
         with self.assertRaises(TimeoutError):
             qualify(command,'delivery-kit-port2',self.context,self.delivery)
         self.assertEqual(command.call_count,1)
+
+    def test_fixed_query_refuses_missing_r2_reference_and_r1_publication(self):
+        for step in ('R1','R2'):
+            con=sqlite3.connect(':memory:')
+            con.execute('CREATE TABLE remediation_executions(state TEXT)')
+            con.execute('INSERT INTO remediation_executions VALUES (?)',
+                        (json.dumps({'steps':{step:{'issue_id':'r2'}}}),))
+            with patch.dict(sys.modules,{'broker':SimpleNamespace(db=lambda:con)}),\
+                 patch.object(sys,'argv',['query','r2',json.dumps(self.delivery)]):
+                with self.assertRaises(ValueError):exec(QUERY,{})
+
+    def test_fixed_query_unrelated_legacy_has_no_fabricated_proof(self):
+        con=sqlite3.connect(':memory:');output=io.StringIO()
+        @contextmanager
+        def db():
+            try:yield con
+            finally:con.close()
+        with patch.dict(sys.modules,{'broker':SimpleNamespace(db=db)}),\
+             patch.object(sys,'argv',['query','legacy',json.dumps(self.delivery)]),redirect_stdout(output):
+            exec(QUERY,{})
+        self.assertIsNone(json.loads(output.getvalue()))
 
     def driver_case(self, *, approval=None, qualification=None):
         stack=ExitStack();self.addCleanup(stack.close)

@@ -3,12 +3,16 @@ import json
 import re
 
 QUERY = (
-    'import broker as b,json,sys; '
-    'con=b.db(); '
-    'exists=con.execute("SELECT 1 FROM sqlite_master WHERE name=\'remediation_red_references\'").fetchone(); '
-    'row=con.execute("SELECT 1 FROM remediation_red_references WHERE issue_id=?",(sys.argv[1],)).fetchone() if exists else None; '
-    'con.close(); '
+    'import sys; sys.path.insert(0,"/"); import broker as b,json; '
+    '\nwith b.db() as con:\n'
+    ' exists=con.execute("SELECT 1 FROM sqlite_master WHERE name=\'remediation_red_references\'").fetchone()\n'
+    ' row=con.execute("SELECT 1 FROM remediation_red_references WHERE issue_id=?",(sys.argv[1],)).fetchone() if exists else None\n'
+    ' executions=con.execute("SELECT 1 FROM sqlite_master WHERE name=\'remediation_executions\'").fetchone()\n'
+    ' states=[json.loads(r[0]) for r in con.execute("SELECT state FROM remediation_executions")] if executions else []\n'
+    ' steps={k for state in states for k,v in state.get("steps",{}).items() if v.get("issue_id")==sys.argv[1]}\n'
     'proof=None; '
+    '\nif "R1" in steps: raise ValueError("tests-only R1 is not a product delivery")\n'
+    'if "R2" in steps and not row: raise ValueError("registered R2 Red reference missing")\n'
     '\nif row:\n'
     ' import remediation_delivery\n'
     ' proof=remediation_delivery.qualified(b,sys.argv[1],json.loads(sys.argv[2]))\n'
