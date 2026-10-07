@@ -187,8 +187,10 @@ mas **a recuperação ainda não foi validada com agentes reais**. A manutençã
 versionada conserva intenções de criação/start e observa resultados incertos sem
 repetir mutações. Um experimento ancestral é resolvido pela cadeia de predecessores
 preservados, exigindo o mesmo contrato, perfis, manifest e hash; seu recibo jamais
-é copiado para fingir que pertence a uma execução recente. Essa correção de
-linhagem ainda precisa de qualificação e instalação da nova imagem. O preflight também encontrou e
+é copiado para fingir que pertence a uma execução recente. A imagem corrigida foi
+qualificada e instalada; o experimento fixo terminou com sucesso e sua autenticação
+reabriu **somente o planejamento**. O autor continua dependendo das novas decisões
+independentes e de todos os gates posteriores. O preflight também encontrou e
 corrigiu um contexto excessivo: o contexto específico cabe no limite original,
 inclusive com a justificativa máxima do revisor, sem ampliar capacidades.
 

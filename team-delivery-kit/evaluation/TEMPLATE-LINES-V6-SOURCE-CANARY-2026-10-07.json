@@ -47,7 +47,21 @@
     "model_calls": 0,
     "delivery_approval": false
   },
-  "installed_image_qualification": false,
+  "installed_image_qualification": {
+    "scope": "V6_protocol_and_fixed_readonly_experiment_not_author_delivery",
+    "worker_image": "sha256:7cc31abed927797e8beb651a98a7f7f795a7e456f3d0f63e875b057ad085cd3f",
+    "proxy_image": "sha256:75c21a653c6a5639bebd7318c7afc16c00d50bf889ab633fa613508e966cf61a",
+    "registry_canary_status": "passed",
+    "source_overlays": false,
+    "fixed_readonly_experiment_exit_code": 0,
+    "original_inputs_unchanged": true,
+    "experiment_lineage_preserved": true,
+    "planning_reopened": true,
+    "new_independent_decisions_required": true,
+    "author_retry_authorized": false,
+    "delivery_approval": false,
+    "offline_suite": {"tests": 2211, "existing_skips": 7, "status": "passed"}
+  },
   "author_execution_admitted": false,
   "delivery_approval": false,
   "red_evidence": false,
