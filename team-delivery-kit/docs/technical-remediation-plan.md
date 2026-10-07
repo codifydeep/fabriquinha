@@ -528,3 +528,26 @@ agent decisions still have `execution_authorized=false` and no release success.
 Existing product PR, CI, merge, same-SHA deployment and automated browser QA
 gates are unchanged. A recovered process is not a delivered release. Full-chain
 admission and a real R1/R2/R3 recovery trial remain separate acceptance work.
+
+### Persistent full-chain admission
+
+`broker/remediation_admission.py` accepts an explicit controller/operator request
+bound to the already approved plan, original root and immutable execution
+contract. It re-reads actual CTO and independent Tech Lead plan executions.
+Unregistered recoveries remain paused. Registration itself does not wake an
+agent, change the proxy cap, enable a route or approve a release.
+
+The first phase requires at least 256 remaining proxy calls. This is an
+admission headroom check, not a monetary budget or an exclusive proxy reservation.
+Insufficient headroom waits without activating R1. Each dispatcher retains its
+own per-phase floor and the proxy's hard cap remains authoritative. Capacity
+uses the existing two-worker, one-profile and pending-dispatch reservations.
+
+The supervisor enables each exact native-presented phase once, atomically with
+its admission receipt. R1 completion requires the immutable independently
+reviewed fresh Red gate; only then may qualified R2 activate. R1 is never
+reopened, an operator-disabled already admitted phase is never re-enabled, and
+drift, cancellation or dependency holds retain a visible technical impediment.
+The existing durable dispatcher owns the actual one-shot wakeup and acceptance.
+R3 publication remains governed by its separate immutable delivery and resume
+checks. Full-chain admission is not homologation; live acceptance is pending.

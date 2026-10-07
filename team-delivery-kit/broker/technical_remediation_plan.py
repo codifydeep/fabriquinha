@@ -378,6 +378,9 @@ def tick(b):
     try:import remediation_native_context
     except ImportError:from broker import remediation_native_context
     remediation_native_context.tick(b)
+    try:import remediation_admission
+    except ImportError:from broker import remediation_admission
+    remediation_admission.tick(b)
     try:import remediation_dispatch
     except ImportError:from broker import remediation_dispatch
     remediation_dispatch.tick(b)
