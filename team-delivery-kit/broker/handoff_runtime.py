@@ -116,6 +116,11 @@ def task_base(broker, issue_id, task_id):
 
 
 class Effects:
+    def sponsor_inherited_test_replan(self,route,data,task,decision):
+        try:import inherited_test_replan
+        except ImportError:from broker import inherited_test_replan
+        return inherited_test_replan.sponsor(self,route,data,task,decision)
+
     def pre_red_format_rejection(self, route, recipient):
         """Exact native binding plus a sanitized receipt from the pinned proxy."""
         b=self.b

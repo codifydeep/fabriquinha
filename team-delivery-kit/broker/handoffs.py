@@ -427,6 +427,18 @@ def reconcile(con, route, runs, effects, *, now=None):
     if data['contract_sha256'] != route['contract_sha256']:
         raise ValueError('handoff contract revision drift')
     stage = prior['stage'] if prior else 'observed'
+    if (stage=='technical_decision_required' and not route.get('test_first')
+            and data.get('control_error')=='ValueError:test revision requires executed test-first failure evidence'
+            and data.get('recipient_task') and data.get('target')==route['cto']
+            and hasattr(effects,'sponsor_inherited_test_replan')):
+        recipient=next((r for r in runs if r['id']==data['recipient_task']),None)
+        if recipient and recipient.get('status')=='completed':
+            decision=effects.decision(recipient)
+            value=effects.sponsor_inherited_test_replan(route,data,recipient,decision)
+            data.update(decision=decision,inherited_test_replan=value,
+                        required_action='independent Tech Lead inspection; no test edits or depth reset')
+            data.pop('control_error',None);data.pop('control_error_count',None)
+            return save(con,key,issue,'inherited_replan_required',route['techlead'],data,now)
     try:import bound_failure_context
     except ImportError:from broker import bound_failure_context
     if (stage=='technical_decision_required'
@@ -570,7 +582,7 @@ def reconcile(con, route, runs, effects, *, now=None):
         if stage != 'author_active':
             return save(con, key, issue, 'author_active', route['author'], data, now)
         return stage
-    if stage in ('approved', 'superseded', 'technical_decision_required', 'test_revision_required'):
+    if stage in ('approved', 'superseded', 'technical_decision_required', 'test_revision_required','inherited_replan_required'):
         return stage
     if stage in ('observed', 'author_active', 'preflight_retry'):
         infrastructure_failure = (source['status'] == 'failed' and
@@ -1092,6 +1104,11 @@ def reconcile(con, route, runs, effects, *, now=None):
             data['required_action']='cto_resolve_rejected_lost_candidate_proposal'
             return save(con,key,issue,'technical_decision_required',route['cto'],data,now)
         if decision['action'] == 'request_test_revision':
+            if not route.get('test_first') and hasattr(effects,'sponsor_inherited_test_replan'):
+                value=effects.sponsor_inherited_test_replan(route,data,recipient,decision)
+                data.update(inherited_test_replan=value,
+                            required_action='independent Tech Lead inspection; no test edits or depth reset')
+                return save(con,key,issue,'inherited_replan_required',route['techlead'],data,now)
             failure = data.get('validation_failure') or {}
             if (not route.get('test_first') or failure.get('category') not in
                     ('executed_test_failure', 'source_harness_admission_failure')):

@@ -2429,6 +2429,8 @@ def main():
                     import incremental_supervisor
                     incremental_supervisor.tick(handoff_context())
                     handoff_runtime.tick(handoff_context())
+                    import inherited_test_replan
+                    inherited_test_replan.tick(handoff_context())
             except Exception:
                 print('watchdog reconciliation failed; leases remain visible', flush=True)
             time.sleep(1)
