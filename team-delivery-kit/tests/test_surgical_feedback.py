@@ -6,6 +6,32 @@ from broker import review_tool_policy as policy
 
 
 class SurgicalFeedbackTests(unittest.TestCase):
+    def test_budget_feedback_measures_bytes_and_reports_atomic_denial(self):
+        import hashlib,tempfile
+        from pathlib import Path
+        from surgical_test_edit import edit_file,rejection_feedback,FileBudgetError,FragmentSelectionError
+        source=b'import unittest\nNODE_HARNESS_TEMPLATE="""const value = 1;"""\nclass T(unittest.TestCase):\n def test_ok(self): self.assertTrue(True)\n'
+        source+=b'#'+b'x'*(32760-len(source)-2)+b'\n'
+        args=dict(expected_sha256=hashlib.sha256(source).hexdigest(),edits=[dict(old='const value = 1;',new='const value = 1; // '+'y'*100)])
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);target=root/'test_budget.py';target.write_bytes(source)
+            with self.assertRaises(FileBudgetError) as caught:
+                edit_file(target,args,root=root,observed_read=True,template_only=True)
+            result=rejection_feedback(caught.exception)
+            self.assertEqual(result['file_budget']['file_bytes'],32760)
+            self.assertEqual(result['file_budget']['available_growth_bytes'],8)
+            self.assertGreater(result['file_budget']['proposed_bytes'],32768)
+            self.assertEqual(target.read_bytes(),source)
+            self.assertFalse(result['transaction_applied']);self.assertEqual(result['target_bytes_modified'],0)
+            self.assertIn('transaction_applied=false',result['error'])
+            self.assertIn('available_growth_bytes=8',result['error'])
+            self.assertNotIn('y'*20,json.dumps(result))
+        fragment=rejection_feedback(FragmentSelectionError(2,0,'missing'))
+        self.assertIn('all_edits_rejected=true',fragment['error'])
+        self.assertFalse(fragment['transaction_applied'])
+        # Never claim rollback for an I/O error after a possible partial write.
+        self.assertNotIn('transaction_applied',rejection_feedback(OSError('partial write')))
+
     def test_node_feedback_is_source_free_bounded_and_acp_visible(self):
         from surgical_test_edit import DriverSyntaxError,rejection_feedback
         result=rejection_feedback(DriverSyntaxError(

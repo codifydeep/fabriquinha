@@ -132,6 +132,11 @@ antes de admitir uma única execução separada. O executor anterior continua
 bloqueado e intacto; criar o job ou o wakeup tem intenção persistida e retomada
 por observação, sem repostar após resultado incerto. Nem essa admissão nem a
 preservação dos arquivos comprovam Red, revisão ou entrega autônoma ponta a ponta.
+O ensaio seguinte chegou à ferramenta restrita, mas suas propostas foram
+rejeitadas por crescimento excessivo do arquivo e por fragmento inexistente.
+O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
+sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
+proposta técnica; a correção da integração não é conclusão da entrega.
 
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o

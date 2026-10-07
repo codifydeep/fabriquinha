@@ -37,6 +37,16 @@ class FragmentSelectionError(ValueError):
         self.index,self.matches,self.reason=index,matches,reason
 
 
+class FileBudgetError(ValueError):
+    """Measured UTF-8 byte budget, raised before any target-file write."""
+    def __init__(self,source_bytes,proposed_bytes):
+        if (type(source_bytes) is not int or not 1<=source_bytes<=32768
+                or type(proposed_bytes) is not int or not 0<=proposed_bytes<=49152):
+            raise ValueError('invalid file budget diagnostic')
+        super().__init__('surgical result exceeds file limit')
+        self.source_bytes,self.proposed_bytes=source_bytes,proposed_bytes
+
+
 def rejection_feedback(error):
     """Fixed, actionable categories; never disclose exception text or paths."""
     mapping={
@@ -79,6 +89,16 @@ def rejection_feedback(error):
         result['fragment_diagnostic']={'index':error.index,'match_count':error.matches,'reason':error.reason,'hint':hint}
         # ACP surfaces only the error field: preserve its stable first-line protocol.
         result['error']+='\nfragment_index='+str(error.index)+' match_count='+str(error.matches)+' reason='+error.reason+' hint='+hint
+        result['transaction_applied']=False
+        result['target_bytes_modified']=0
+        result['error']+='\ntransaction_applied=false target_bytes_modified=0 all_edits_rejected=true use_original_unchanged_fragments'
+    if isinstance(error,FileBudgetError):
+        result['file_budget']=dict(file_bytes=error.source_bytes,limit_bytes=32768,
+            available_growth_bytes=32768-error.source_bytes,proposed_bytes=error.proposed_bytes)
+        result['transaction_applied']=False
+        result['target_bytes_modified']=0
+        result['error']+='\n'+' '.join(k+'='+str(v) for k,v in result['file_budget'].items())
+        result['error']+=' transaction_applied=false target_bytes_modified=0 all_edits_rejected=true use_minimal_fragments_within_granted_scope'
     if isinstance(error,DriverSyntaxError):
         result['driver_diagnostic']=dict(error.diagnostic)
         result['error']+='\n'+' '.join(k+'='+str(v) for k,v in error.diagnostic.items())
@@ -240,7 +260,7 @@ def prepare(source,args):
         if edit['old']==edit['new']:raise FragmentSelectionError(index,matches,'unchanged')
         text=text.replace(edit['old'],edit['new'],1)
     result=text.encode('utf-8')
-    if not 0<len(result)<=32768:raise ValueError('surgical result exceeds file limit')
+    if not 0<len(result)<=32768:raise FileBudgetError(len(source),len(result))
     if result==source:raise ValueError('surgical edit made no bounded change')
     tree=ast.parse(text)
     if _tests(original)!=_tests(tree):raise ValueError('test bodies or methods changed')
@@ -283,7 +303,7 @@ def prepare_driver_lines(source,args):
         if old==edit['new']:raise FragmentSelectionError(index,1,'unchanged')
         pieces.extend(lines[cursor:start-1]);pieces.append(edit['new']);cursor=end
     pieces.extend(lines[cursor:]);result=''.join(pieces).encode()
-    if not 0<len(result)<=32768:raise ValueError('surgical result exceeds file limit')
+    if not 0<len(result)<=32768:raise FileBudgetError(len(source),len(result))
     if result==source:raise ValueError('surgical edit made no bounded change')
     if _tests(tree)!=_tests(ast.parse(result)):raise ValueError('test bodies or methods changed')
     _discoverable(ast.parse(result))
