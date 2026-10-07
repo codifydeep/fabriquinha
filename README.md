@@ -78,8 +78,14 @@ não recria jobs, reexecuta o autor ou transforma rejeição em aprovação.
 O diagnóstico de calibração distingue compilação, referência positiva e controles
 comportamentais. Rejeições retêm contagens, nomes dos métodos que falharam e hashes,
 sem tracebacks ou código submetido. Esses fatos são vinculados ao manifesto do job
-e não concedem retry, edição, Red, revisão aprovada ou homologação. O tratamento
-autônomo completo de replanejamento após esgotar a correção ainda está pendente.
+e não concedem retry, edição, Red, revisão aprovada ou homologação. O supervisor
+possui uma trilha de retrabalho para a rejeição autenticada da calibração: CTO e
+Tech Lead inspecionam integralmente o mesmo snapshot somente leitura e patrocinam
+independentemente uma correção pelo autor original. Há uma entrada por card, sem
+reset de profundidade ou limites, e todas as validações continuam obrigatórias.
+Envios incertos são somente observados, nunca repetidos. A implementação passou
+pelos testes offline; sua recuperação real e o ciclo integral ainda precisam ser
+qualificados antes de declarar autonomia.
 
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
@@ -93,7 +99,11 @@ flowchart TD
     C -->|Sim| D[CTO: decisões técnicas e arquitetura]
     D --> E[Tech Lead: grafo de cards e dependências]
     E --> F[Design, Backend/Data, Frontend ou Mobile conforme escopo]
-    F --> G[TDD: Red registrado, Green e suíte completa]
+    F --> CG{Calibração aplicável válida?}
+    CG -->|Sim / não aplicável| G[TDD: Red registrado, Green e suíte completa]
+    CG -->|Não| CD[CTO: diagnosticar snapshot imutável]
+    CD --> CP[Tech Lead: inspeção independente do retrabalho]
+    CP -->|Patrocínio válido| F
     G --> H[Snapshot durável da entrega]
     H --> I[Revisor independente: leitura e validações permitidas]
     I -->|Solicita mudanças| F
