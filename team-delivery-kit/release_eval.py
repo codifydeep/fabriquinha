@@ -106,18 +106,8 @@ def export_snapshot(delivery, target):
     details = json_command('docker', 'volume', 'inspect', volume)
     if len(details) != 1 or details[0].get('Labels', {}).get('delivery-kit.owner') != PROJECT + '-broker-v1' or details[0].get('Labels', {}).get('delivery-kit.source-task') != delivery['source_task']:
         raise ValueError('snapshot volume identity mismatch')
-    name = PROJECT + '-export-' + delivery['source_task'][:8]
-    subprocess.run(['docker', 'create', '--name', name, '--network', 'none',
-                    '--read-only', '--user', '10000:10000', '--cap-drop', 'ALL',
-                    '--security-opt', 'no-new-privileges', '--mount',
-                    'type=volume,source=' + volume + ',target=/delivery,readonly',
-                    '--entrypoint', '/bin/true', installed_image(PROJECT)], check=True,
-                   stdout=subprocess.DEVNULL)
-    try:
-        subprocess.run(['docker', 'cp', name + ':/delivery/.', str(target)], check=True,
-                       stdout=subprocess.DEVNULL)
-    finally:
-        subprocess.run(['docker', 'rm', name], check=True, stdout=subprocess.DEVNULL)
+    from snapshot_export_lifecycle import export
+    export(volume,target,PRIVATE,instance=PROJECT)
 
 
 def wait_pr_ci(number, head, base, timeout=180):

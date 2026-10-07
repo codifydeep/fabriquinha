@@ -336,8 +336,8 @@ recovery receipt into a legacy delivery. No arbitrary command is accepted.
 This is an additional prerequisite, not a substitute for GitHub review, exact
 SHA CI, frozen-file preflight, candidate QA or post-deploy QA. It does not mark
 the parent release delivered. The parent/sequence recovery mapping, automatic
-R3 controller scheduling and full-chain activation still need implementation
-and real validation; keep the live R1 route paused until those gates are ready.
+R3 controller scheduling and full-chain activation are implemented in the
+sections below; real full-chain validation is still pending.
 
 ### Durable R3 intake without another test-revision child
 
@@ -559,3 +559,11 @@ status transition or permission to dispatch. A restricted private pending
 receipt survives failed sends. Subsequent reconciliation reads current native
 metadata before another identical write; visibility failures cannot stop the
 delivery controller. No prompts, credentials or raw API errors are published.
+
+Snapshot publication export uses `snapshot_export_lifecycle.py`: unique helpers
+are grouped in `delivery-kit-<instance>-tests`, never execute delivered code,
+and mount only the owned snapshot read-only. Copy and restricted lifecycle
+evidence precede retirement. The exact stopped ID, ownership and mount are
+revalidated immediately before removal. Uncertain deletion is observed once,
+not repeated; unresolved helpers remain preserved for scoped investigation.
+Snapshot volumes, current deployments and unrelated projects are never removed.
