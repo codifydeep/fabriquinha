@@ -1028,6 +1028,11 @@ def run_controller(contract=None):
             return
         except QualityBlocked as error:
             incident = error.incident
+            if context.get('remediation_expected'):
+                status('escalation_required', context, owner='techlead',
+                       category='remediation_r3_quality_requires_r2_replan',
+                       child_issue_id=incident['child_issue_id'])
+                return
             status('qa_blocked', context, owner='techlead',
                    child_issue_id=incident['child_issue_id'],
                    phase=incident['phase'], category=incident['category'],
@@ -1054,6 +1059,10 @@ def run_controller(contract=None):
                               'issue_id': context['issue_id']}), flush=True)
             return
         except WaitingApproval:
+            if context.get('remediation_expected'):
+                status('escalation_required', context, owner='techlead',
+                       category='approved_recovery_delivery_unavailable')
+                return
             try:
                 worker_state = recover_implementation_worker(context)
             except RecoveryEscalation as error:
@@ -1092,7 +1101,7 @@ def run_controller(contract=None):
             time.sleep(10)
         except RecoveryEscalation as error:
             category = str(error)
-            if category.startswith('test_revision_required:') and RUN_SPEC:
+            if category.startswith('test_revision_required:') and RUN_SPEC and not context.get('remediation_expected'):
                 from portable_test_revision_recovery import schedule
                 try:
                     recovery = schedule(PRIVATE, context, RUN_SPEC, contract, managed_handoff(context))
@@ -1124,6 +1133,8 @@ def run_controller(contract=None):
 def main():
     contract = from_environment()
     configure_run(contract)
+    if '--managed-label' in sys.argv[1:] and sys.argv[1:] != ['--managed-label', LABEL]:
+        raise ValueError('exact managed publication label required')
     lock_dir = PRIVATE / 'controller-locks'
     lock_dir.mkdir(mode=0o700, exist_ok=True)
     lock_path = lock_dir / (LABEL + '.lock')

@@ -856,6 +856,27 @@ def reconcile_compiled_successor_dispatch(ledger, plan, cards, cli, private, *,
     return revised
 
 
+def supervise_recovery_publication(ledger,plan,private,cli,instance):
+    """Supervise a real approved recovery without resuming the failed author."""
+    if ledger.get('stage')!='blocked' or ledger.get('plan_sha256')!=plan['sha256']:return None
+    from remediation_publication_schedule import reconcile as supervise_publication
+    labels=[s['spec']['label'] for s in plan['stages']]
+    if ledger.get('active') not in labels:return None
+    index=labels.index(ledger['active']);current_stage=plan['stages'][index]
+    context=read_json(Path(private)/('portable-context-'+ledger['active']+'.json'))
+    if (not context or context.get('issue_id')!=ledger.get('issues',{}).get(ledger['active'])
+            or ledger.get('completed')!=labels[:index]):return None
+    publication=supervise_publication(private,current_stage,context,plan['project_config'],instance=instance)
+    if publication:
+        projection={k:publication[k] for k in ('stage','owner','category','attention_required') if k in publication}
+        metadata=cli('metadata','list',context['issue_id'])
+        value=json.dumps(projection,sort_keys=True,separators=(',',':'))
+        if metadata.get('remediation_publication_status')!=value:
+            cli('metadata','set',context['issue_id'],'--key','remediation_publication_status',
+                '--value',value,'--type','string')
+    return publication
+
+
 def run_sequence():
     selected = os.environ.get('DELIVERY_KIT_SEQUENCE_PLAN')
     if not selected:
@@ -892,6 +913,7 @@ def run_sequence():
         save_receipt(ledger_path, ledger)
     if ledger['stage'] == 'blocked':
         try:
+            supervise_recovery_publication(ledger,plan,PRIVATE,cli,PROJECT)
             resumed = resume_verified_recovery(ledger, plan, PRIVATE)
             if not resumed:
                 resumed = resume_verified_test_correction(ledger, plan, PRIVATE)

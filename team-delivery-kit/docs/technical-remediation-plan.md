@@ -381,5 +381,28 @@ the parent metadata in addition to the real delivered issue, GitHub and QA.
 Closing this parent card is not itself release homologation: the whole dependent
 sequence must still pass its existing end-to-end completion verification.
 
-The supervisor scheduling hook and full-chain admission are still outstanding;
-the live R1 route remains paused until they are implemented and qualified.
+### Approval-driven supervisor scheduling
+
+`remediation_publication_schedule.py` is called by the blocked dependent
+sequence before recovery verification. It admits only an actual approved R2
+handoff, native approval and freshly qualified frozen delivery. It prepares the
+exact R3 intake, persists one launch intent, and starts the existing publication
+controller with its fixed managed label. Private logs and journals use restricted
+permissions; no new agent or native test-revision child is started by scheduling.
+
+Lost launch acknowledgments allow only lookup of that script/label. An absent,
+different or ambiguous process becomes a Tech Lead hold, never another launch.
+An existing recorded process is observed; ten minutes without meaningful status
+change raises attention and thirty retains a visible technical hold. A hold may
+resolve only through full delivery evidence and live parent verification, not
+worker existence. A disappeared R2 dependency retains the existing controller
+and a responsible hold instead of silently vanishing from supervision.
+
+The sequence projects only stage/owner/category/attention into Multica metadata.
+It then uses the existing verified-recovery path to advance; controller launch
+does not advance the sequence. Publication-only R3 refuses implementation retry
+and recursive test-revision/QA-repair execution outside its approved plan.
+
+The real paused installation has no approved R3 candidate and the hook therefore
+starts nothing. Full-chain admission and live R1/R2/R3 acceptance still remain;
+keep R1 paused until those gates are qualified.
