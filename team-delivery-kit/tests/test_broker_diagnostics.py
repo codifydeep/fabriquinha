@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -15,6 +16,20 @@ with patch.dict(os.environ, {'BROKER_WORKER_IMAGE': 'sha256:' + 'a' * 64}):
 
 
 class BrokerDiagnosticTests(unittest.TestCase):
+    def test_worker_create_timeout_is_observed_without_delete_or_duplicate_post(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            with server.db() as con:
+                con.execute('CREATE TABLE leases(request_id TEXT PRIMARY KEY,scenario TEXT,name TEXT,status TEXT,deadline REAL)')
+                con.execute('CREATE TABLE broker_errors(request_id TEXT,operation TEXT,category TEXT,at REAL)')
+            error=server.DockerOperationTimeout('POST','/containers/create?name=owned')
+            with patch.object(server,'config',return_value={'Image':'fixture'}),patch.object(server,'docker',side_effect=error) as docker,patch.object(server,'remove_owned') as remove:
+                with self.assertRaises(server.DockerOperationTimeout):server.submit({'request_id':'request','scenario':'acp-session'},trusted_acp=True)
+                self.assertEqual(docker.call_count,1);remove.assert_not_called()
+                self.assertEqual(server.submit({'request_id':'request','scenario':'acp-session'},trusted_acp=True)['status'],'creating')
+                self.assertEqual(docker.call_count,1)
+            with server.db() as con:
+                self.assertEqual(con.execute('SELECT status FROM leases').fetchone()[0],'creating')
+                self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])['stage'],'create_outcome_unknown')
     def test_only_container_create_gets_bounded_longer_deadline(self):
         conn=Mock();conn.getresponse.return_value.status=204;conn.getresponse.return_value.read.return_value=b''
         for method,path,deadline in [('POST','/containers/create?name=public',30),('GET','/containers/public/json',10),('DELETE','/containers/public',10)]:

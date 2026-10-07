@@ -198,6 +198,15 @@ O código de feedback informa orçamento UTF-8 e rejeição atômica antes da es
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
 proposta técnica; a correção da integração não é conclusão da entrega.
 
+A primeira execução real admitida em V6 falhou antes de ferramentas ou ACP:
+o Docker excedeu o prazo de criação e materializou o worker depois da falha.
+O código agora conserva o payload e a intenção antes do `create`; uma resposta
+incerta não provoca repost ou exclusão às cegas. O watchdog observa a identidade
+e política do mesmo contêiner, sem iniciar uma tarefa já terminal, e registra a
+ação necessária. Essa correção ainda não está instalada. Não resolve por si só
+a prontidão assíncrona do transporte nem autoriza outra execução: ainda faltam
+qualificar o startup completo e uma recuperação que preserve a tentativa atual.
+
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
 handoff antigo sem esse marcador, admite uma única recuperação com a política

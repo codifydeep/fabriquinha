@@ -533,6 +533,9 @@ def remove_owned(name, request_id):
 
 
 def tick():
+    try:import worker_creation_intent
+    except ImportError:from broker import worker_creation_intent
+    worker_creation_intent.reconcile(handoff_context())
     with LOCK, db() as con:
         # A durable close intent precedes Docker deletion. Reconcile a crash or
         # failed acknowledgment without treating an unexplained disappearance
@@ -586,11 +589,24 @@ def submit(payload, trusted_acp=False):
                     (request_id, scenario, name, 'creating', time.time() +
                      (420 if scenario == 'acp-session' else 45)))
         con.commit()  # durable intent before Docker side effect
+        create_intent=False
         try:
-            docker('POST', '/containers/create?name=' + name, config(request_id, scenario))
+            expected=config(request_id, scenario)
+            try:import worker_creation_intent
+            except ImportError:from broker import worker_creation_intent
+            worker_creation_intent.record(con,request_id,expected)
+            con.commit()  # immutable payload before the possibly delayed create
+            create_intent=True
+            docker('POST', '/containers/create?name=' + name, expected)
             docker('POST', '/containers/' + name + '/start')
             con.execute("UPDATE leases SET status='running' WHERE request_id=?", (request_id,))
         except Exception as error:
+            if create_intent and isinstance(error,DockerOperationTimeout) and error.operation=='containers_create':
+                worker_creation_intent.uncertain(con,request_id)
+                con.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
+                    (request_id,'worker_submit','bootstrap:docker_containers_create',time.time()))
+                con.commit()  # unknown outcome is observed, not blindly deleted/reposted
+                raise
             # Preserve primary failure and close intent before slow cleanup can fail.
             con.execute("UPDATE leases SET status='closing' WHERE request_id=?", (request_id,))
             con.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
@@ -1602,6 +1618,8 @@ def execute_grant(token, payload, streaming=False):
         con.commit()  # fail closed if interrupted before launch; never replay the old grant
         # Implementation is limited to a task-scoped workspace volume.
         result = submit({'request_id': row['request_id'], 'scenario': 'acp-session' if streaming else 'acp'}, trusted_acp=True)
+        if result['status']!='running':
+            raise ValueError('worker startup requires observation before transport')
         if streaming:
             from acp_transport import Transport
             try:
