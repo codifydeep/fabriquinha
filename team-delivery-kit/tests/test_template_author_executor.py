@@ -58,6 +58,46 @@ class TemplateExecutorTests(unittest.TestCase):
         self.assertEqual(stored['executor']['status'],'author_completed_awaiting_gates')
         self.assertFalse(stored['executor']['delivery_approval'])
 
+    def test_historical_failures_do_not_starve_a_new_exact_executor(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE calibration_failure_plans(source_task TEXT,config TEXT,state TEXT)')
+        @contextmanager
+        def db():yield con
+        b=SimpleNamespace(db=db)
+        old=self.state();old['executor'].update(status='blocked',wakeup_id='old-wake')
+        active=self.state();active['executor'].update(status='waiting',wakeup_id='new-wake')
+        con.execute('INSERT INTO calibration_failure_plans VALUES(?,?,?)',('old',json.dumps(self.cfg()),json.dumps(old)))
+        con.execute('INSERT INTO calibration_failure_plans VALUES(?,?,?)',('new',json.dumps({**self.cfg(),'source_task':'new-source'}),json.dumps(active)))
+        task=dict(id='new-author',agent_id='author',issue_id='issue',wakeup_id='new-wake',status='running')
+        self.assertEqual(executor.for_task(b,'issue',task)['surgical']['protocol'],'typed_template_v5')
+        with self.assertRaises(ValueError):executor.for_task(b,'issue',{**task,'wakeup_id':'old-wake'})
+        self.assertEqual(json.loads(con.execute("SELECT state FROM calibration_failure_plans WHERE source_task='old'").fetchone()[0]),old)
+        old['executor']['status']='waiting'
+        con.execute("UPDATE calibration_failure_plans SET state=? WHERE source_task='old'",(json.dumps(old),))
+        with self.assertRaises(ValueError):executor.for_task(b,'issue',task)
+
+    def test_recovery_only_grant_is_selected_without_rearming_predecessor(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE calibration_failure_plans(source_task TEXT,config TEXT,state TEXT)')
+        con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT,agent_id TEXT)')
+        con.execute("INSERT INTO native_bindings VALUES('request','task','author')")
+        state=self.state();active={**state['executor'],'status':'waiting','wakeup_id':'wake'}
+        state.pop('executor');state['binding_recovery']={'executor':active}
+        con.execute('INSERT INTO calibration_failure_plans VALUES(?,?,?)',('source',json.dumps(self.cfg()),json.dumps(state)))
+        @contextmanager
+        def db():yield con
+        task=dict(id='task',agent_id='author',issue_id='issue',wakeup_id='wake',status='running')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'native.json').write_text('{}')
+            b=SimpleNamespace(db=db,STATE=root)
+            with patch('broker.native.task_record',return_value=task):
+                self.assertEqual(executor.worker_config(b,'request','issue')['surgical']['protocol'],'typed_template_v5')
+            state['binding_recovery']['executor']['status']='blocked'
+            con.execute('UPDATE calibration_failure_plans SET state=?',(json.dumps(state),))
+            with patch('broker.native.task_record') as lookup:
+                self.assertIsNone(executor.worker_config(b,'missing','issue'))
+                lookup.assert_not_called()
+
     def test_registry_qualification_cannot_omit_security_flags(self):
         proof=dict(schema='surgical-template-registry-probe-v5',status='passed',uid=10000,network='none',model_calls=0,
                    delivery_approval=False,worker_image='sha256:'+'a'*64,proxy_image='sha256:'+'b'*64,

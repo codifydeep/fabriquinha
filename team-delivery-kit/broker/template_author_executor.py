@@ -114,7 +114,15 @@ def for_task(b,issue,task):
     with b.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='calibration_failure_plans'").fetchone():return None
         rows=con.execute('SELECT config,state FROM calibration_failure_plans').fetchall()
-    matches=[(json.loads(c),json.loads(s)) for c,s in rows if json.loads(c)['issue_id']==issue and json.loads(s).get('executor')]
+    # Retained failures are audit evidence, not contenders for a live grant.
+    # In particular, select the recovery executor rather than its exhausted
+    # predecessor. Two simultaneously active grants still fail closed.
+    matches=[]
+    for raw_config,raw_state in rows:
+        config,state=json.loads(raw_config),json.loads(raw_state)
+        executor=selected_executor(state)
+        if config['issue_id']==issue and executor and executor.get('status') in ('intent','waiting'):
+            matches.append((config,state))
     if not matches:return None
     if len(matches)!=1:raise ValueError('one template executor per issue required')
     config,state=matches[0];executor=selected_executor(state)
@@ -150,7 +158,9 @@ def worker_config(b,request,issue):
     with b.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='calibration_failure_plans'").fetchone():return None
         rows=con.execute('SELECT config,state FROM calibration_failure_plans').fetchall()
-        if not any(json.loads(c)['issue_id']==issue and json.loads(s).get('executor') for c,s in rows):return None
+        if not any(json.loads(c)['issue_id']==issue and
+                   (selected_executor(json.loads(s)) or {}).get('status') in ('intent','waiting')
+                   for c,s in rows):return None
         bound=con.execute('SELECT task_id,agent_id FROM native_bindings WHERE request_id=?',(request,)).fetchone()
     if not bound:raise ValueError('template native binding required')
     try:import native
