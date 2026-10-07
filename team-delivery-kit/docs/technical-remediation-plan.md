@@ -449,3 +449,30 @@ Approved recommendations stop at `experiment_pending` or
 `resume_verification_pending`: they are not authority to restart, alter tests
 or declare homologation. Fixed experiment execution, verified resume and
 full-chain admission remain the next implementation/acceptance gates.
+
+### Fixed read-only diagnostic experiments
+
+The supervisor now executes an independently approved experiment through
+`r3_fixed_experiments.py`. It re-reads the exact native diagnosis/review tasks
+and checks their actors, wakeups and unchanged submissions before execution.
+An obsolete or unobservable approval produces a durable CTO hold, not a silent
+loop. Experiment journals bind the incident, proposal, review and immutable R3
+bundle; intention precedes the operation and recorded results are idempotent.
+
+Allowed operations are: observe the exact existing controller; verify current
+independent R2 approval/proof plus physical frozen-file hashes; verify merged
+PR and successful CI at the exact SHA; verify the owned loopback deployment at
+that SHA. Missing receipts are explicitly unavailable, not successful checks.
+No agent-supplied command, image, path, test waiver or restart is accepted.
+
+The hash probe uses an immutable installed image, Docker grouping labels,
+`--rm`, non-root UID, read-only snapshot, resource limits, no network, no
+credentials and no Docker socket. It hashes the declared inventory without
+importing or executing delivered code. Raw logs and complete inspect data are
+not exposed as agent facts. Lost output is observed without repeating execution;
+after thirty minutes it remains a visible CTO impediment, not success.
+
+Results remain diagnostic evidence with `execution_authorized=false` and
+`release_homologated=false`. A process found alive, matching snapshot or green
+CI alone does not authorize resume or complete the release. Post-experiment
+technical decisions and separately verified resume are still required.

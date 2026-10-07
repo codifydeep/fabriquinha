@@ -871,10 +871,10 @@ def supervise_recovery_publication(ledger,plan,private,cli,instance):
         projection={k:publication[k] for k in ('stage','owner','category','attention_required') if k in publication}
         if publication.get('stage')=='blocked':
             from r3_incident_runtime import supervise as supervise_incident
-            incident=supervise_incident(private,context,publication,instance=instance)
+            incident=supervise_incident(private,context,publication,instance=instance,contract=current_stage['contract'])
             if incident:
                 projection['incident']={k:incident[k] for k in
-                    ('stage','owner','category','incident_sha256','issue_id','attention_required') if k in incident}
+                    ('stage','owner','category','incident_sha256','issue_id','attention_required','experiment') if k in incident}
         metadata=cli('metadata','list',context['issue_id'])
         value=json.dumps(projection,sort_keys=True,separators=(',',':'))
         if metadata.get('remediation_publication_status')!=value:

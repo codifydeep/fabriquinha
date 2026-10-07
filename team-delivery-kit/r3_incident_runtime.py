@@ -164,7 +164,7 @@ def reconcile(private,evidence,*,instance='delivery-kit-port2',effects=None):
                      'next_action':'fixed controller verification required; no execution authority from agent text'})
 
 
-def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects=None):
+def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects=None,contract=None):
     """Use only the persisted exact R3 intake and matching controller hold."""
     if publication.get('stage')!='blocked':return None
     category=publication.get('category')
@@ -186,4 +186,10 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
     evidence=dict(operation='r3_incident_evidence_v1',root_issue=parent['issue_id'],source_task=proof['source_task'],
         controller_identity=saved['identity'],bundle_sha256=digest(value),r2_proof_sha256=digest(proof),category=category,
         facts={'F01':CATEGORIES[category],'F02':'delivery_not_verified'},execution_authorized=False,release_homologated=False)
-    return reconcile(private,evidence,instance=instance,effects=effects)
+    incident=reconcile(private,evidence,instance=instance,effects=effects)
+    if incident.get('stage')=='experiment_pending':
+        from r3_fixed_experiments import execute
+        result=execute(private,evidence,incident,value,instance=instance,contract=contract)
+        incident={**incident,'experiment':{k:result[k] for k in
+            ('stage','owner','category','identity','result_sha256') if k in result}}
+    return incident
