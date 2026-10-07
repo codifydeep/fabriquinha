@@ -93,6 +93,12 @@ handoff antigo sem esse marcador, admite uma única recuperação com a polític
 corrigida. A resposta anterior não é reaproveitada; o histórico e as leituras são
 preservados e nenhum retry do autor é autorizado por essa recuperação de formato.
 
+A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
+o diagnóstico especializado que exige `findings`. O teste integrado verifica a
+instrução real após leituras completas contra schema e adaptador do proxy. Uma
+rejeição de preflight permanece bloqueada até qualificar a condição corrigida;
+a instalação da política, por si só, não rearma o card nem reinicia tentativas.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe

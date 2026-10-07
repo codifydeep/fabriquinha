@@ -17,7 +17,7 @@ def initialize(con):
 
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
-    note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+    note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_REWORK_V1\n'
         'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
         'CALIBRATION GATE REWORK: '+('independent Tech Lead inspection of CTO proposal. ' if peer else 'CTO diagnosis. ')+
         'Read every immutable candidate file completely. No shell, edits, Red replay or approval of delivery. '

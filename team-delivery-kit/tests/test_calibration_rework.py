@@ -89,6 +89,22 @@ class CalibrationReworkTests(unittest.TestCase):
             self.assertIsNone(recover_format(self.config,state,{**task,**change},reads))
         self.assertIsNone(recover_format(self.config,state,task,{}))
 
+    def test_actual_instruction_passes_both_proxy_schema_and_typed_adapter_after_reads(self):
+        from decision_schema import apply as decision_schema
+        from typed_decision_contract import apply as typed_adapter,NAME
+        body=dict(messages=[dict(role='user',content=instruction(self.config,dict(stage='cto_pending')))],
+                  tools=[dict(type='function',function=dict(name='read_file',parameters={'type':'object','properties':{'path':{'type':'string'}}}))])
+        for i,path in enumerate(self.config['paths']):
+            body['messages'] += [dict(role='assistant',tool_calls=[dict(id='read-'+str(i),function=dict(
+                name='read_file',arguments=json.dumps(dict(path=path,offset=1,limit=128))))]),
+                dict(role='tool',tool_call_id='read-'+str(i),content=json.dumps(dict(content='1|pass',total_lines=1)))]
+        result=typed_adapter(decision_schema(body))
+        self.assertEqual(result['tool_choice']['function']['name'],NAME)
+        properties=result['tools'][0]['function']['parameters']['properties']
+        self.assertEqual(set(properties),{'action','reason','optional_files'})
+        self.assertEqual(properties['optional_files']['maxItems'],0)
+        self.assertNotIn('approve',properties['action']['enum'])
+
     def test_normal_supervisor_intakes_actual_failed_calibration_once_and_preserves_history(self):
         from broker import calibration_rework as lane,handoffs,harness_qualification as jobs,remediation_runtime_guard as guard
         con=sqlite3.connect(':memory:');self.addCleanup(con.close);con.row_factory=sqlite3.Row
