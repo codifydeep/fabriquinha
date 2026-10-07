@@ -152,6 +152,13 @@ arquivadas; os novos wakeups têm identidade distinta e não reproduzem decisõe
 Concordância entre CTO e Tech Lead não prova a hipótese: calibração e revisão da
 entrega efetiva continuam obrigatórias, sem retry de implementação nessa migração.
 
+Um `escalate_cto` autenticado, com leitura completa das evidências, é uma retenção
+técnica válida: conserva a decisão, aponta CTO e próxima ação, e não concede
+reexecução nem aprovação. Registros antigos que classificaram essa decisão como
+erro de protocolo podem ser reconciliados uma vez por observação, sem despertar
+novamente o agente. O teto de 40 iterações não elimina o limite separado de duas
+propostas de edição: duas rejeições exigem diagnóstico, não uma terceira escrita.
+
 O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
 proposta técnica; a correção da integração não é conclusão da entrega.

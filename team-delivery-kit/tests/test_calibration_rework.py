@@ -3,7 +3,7 @@ import sqlite3,json,threading
 from contextlib import contextmanager
 from unittest.mock import patch
 from types import SimpleNamespace
-from broker.calibration_rework import advance,decide,instruction,recover_format,marker
+from broker.calibration_rework import advance,decide,instruction,recover_format,marker,recover_technical_escalation
 
 
 class CalibrationReworkTests(unittest.TestCase):
@@ -78,7 +78,38 @@ class CalibrationReworkTests(unittest.TestCase):
         with self.assertRaises(ValueError):decide(self.config,state,[run],self.fx,'cto')
         self.fx.read_evidence=lambda t:{self.config['paths'][0]:dict(lines=10,total_lines=10)}
         self.fx.decision=lambda t:dict(action='escalate_cto',reason='Insufficient evidence',optional_files=[])
+        self.assertEqual(decide(self.config,state,[run],self.fx,'cto')[1]['action'],'escalate_cto')
+        self.fx.decision=lambda t:dict(action='approve',reason='Unsupported approval',optional_files=[])
         with self.assertRaises(ValueError):decide(self.config,state,[run],self.fx,'cto')
+
+    def test_valid_technical_escalation_is_a_durable_hold_not_a_protocol_error(self):
+        self.fx.decision=lambda t:dict(action='escalate_cto',reason='Experiment required',optional_files=[])
+        for role in ('cto','peer'):
+            state=dict(stage=role+'_waiting',**{role+'_wakeup':'wake'},at=1)
+            run=dict(id='task-'+role,agent_id=role,status='completed',wakeup_id='wake')
+            held=advance(self.config,state,[run],self.fx,self.save,now=2)
+            self.assertEqual(held['category'],'calibration_technical_impediment')
+            self.assertEqual(held[role+'_decision']['action'],'escalate_cto')
+            self.assertEqual(held['owner'],'cto')
+            self.assertFalse(held['author_retry_authorized']);self.assertFalse(held['delivery_approval'])
+            self.assertEqual(advance(self.config,held,[run],self.fx,self.save),held)
+        self.assertEqual(self.calls,[])
+
+    def test_previous_valid_escalation_can_be_reclassified_once_without_replay(self):
+        self.fx.decision=lambda t:dict(action='escalate_cto',reason='Experiment required',optional_files=[])
+        state=dict(stage='blocked',category='surgical_failure_diagnosis_rejected',error_type='ValueError',cto_wakeup='wake')
+        run=dict(id='task',agent_id='cto',status='completed',wakeup_id='wake')
+        original=copy.deepcopy(state)
+        held=recover_technical_escalation(self.config,state,[run],self.fx)
+        self.assertEqual(state,original)
+        self.assertEqual(held['category'],'calibration_technical_impediment')
+        self.assertNotIn('error_type',held)
+        self.assertEqual(held['escalation_classification_repair']['previous_state'],original)
+        self.assertIsNone(recover_technical_escalation(self.config,held,[run],self.fx))
+        self.assertIsNone(recover_technical_escalation(self.config,state,[{**run,'agent_id':'author'}],self.fx))
+        self.fx.read_evidence=lambda t:{}
+        self.assertIsNone(recover_technical_escalation(self.config,state,[run],self.fx))
+        self.assertEqual(self.calls,[])
 
     def test_budget_hold_does_not_record_or_dispatch_and_note_is_bounded(self):
         self.fx.remaining_calls=lambda:0

@@ -145,6 +145,10 @@ def _handle(b,route,runs,source,prior,effects):
                     calibration_failure_plan=data['calibration_failure_plan'],required_action=data['required_action'])
                 handoffs.save(con,source['id'],issue,'calibration_failure_plan',owner,mirror,time.time())
     try:
+        repaired=lane.recover_technical_escalation(config,state,runs,effects)
+        if repaired:
+            persist(repaired)
+            return True
         if state.get('executor'):
             try:import template_author_executor
             except ImportError:from broker import template_author_executor

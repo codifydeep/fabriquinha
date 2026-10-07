@@ -204,6 +204,10 @@ def handle(b,route,runs,source,prior,effects):
                 owner=config['author']
             handoffs.save(con,key,issue,'calibration_failure_plan',owner,data,time.time())
     try:
+        repaired=lane.recover_technical_escalation(config,state,runs,effects)
+        if repaired:
+            persist(repaired)
+            return True
         if state['stage'].startswith('preservation'):
             state=probe(b,config,state,persist)
         elif state.get('executor'):

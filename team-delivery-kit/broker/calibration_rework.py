@@ -132,12 +132,35 @@ def decide(config,state,runs,effects,role):
     if len(tasks)!=1 or tasks[0].get('agent_id')!=actor or tasks[0]['status']!='completed':
         raise ValueError('one completed independent calibration planner required')
     task=tasks[0];decision=effects.decision(task);reads=effects.read_evidence(task)
-    if (decision.get('action')!='request_test_revision' or decision.get('optional_files')!=[]
+    if (decision.get('action') not in ('request_test_revision','escalate_cto') or decision.get('optional_files')!=[]
             or not isinstance(decision.get('reason'),str) or not 1<=len(decision['reason'])<=1200
             or any(type(reads.get(p,{}).get('lines')) is not int or reads[p]['lines']<=0
                    or reads[p]['lines']!=reads[p].get('total_lines') for p in config['paths'])):
         raise ValueError('actual complete reads and concrete independent sponsorship required')
     return task['id'],decision
+
+
+def recover_technical_escalation(config,state,runs,effects):
+    """Classify an already executed valid hold; never replay or wake a planner."""
+    if (state.get('stage')!='blocked' or state.get('escalation_classification_repair')
+            or state.get('category') not in ('calibration_rework_rejected','calibration_failure_plan_rejected','surgical_failure_diagnosis_rejected')
+            or state.get('error_type')!='ValueError' or state.get('executor') or state.get('binding_recovery')):
+        return None
+    role='peer' if state.get('peer_wakeup') else 'cto'
+    if not state.get(role+'_wakeup'):return None
+    waiting={**state,'stage':role+'_waiting'}
+    try:result=decide(config,waiting,runs,effects,role)
+    except (ValueError,TypeError,KeyError):return None
+    if not result or result[1]['action']!='escalate_cto':return None
+    task,value=result
+    new={**state,role+'_task':task,role+'_decision':value,
+        'category':'calibration_technical_impediment','owner':config['cto'],
+        'required_action':'CTO_run_evidence_bound_experiment_and_replan',
+        'author_retry_authorized':False,'delivery_approval':False,
+        'escalation_classification_repair':dict(previous_state=state,task_id=task,
+            operation='executed_technical_hold_classification_v1',decision_replayed=False)}
+    new.pop('error_type',None)
+    return new
 
 
 def advance(config,state,runs,effects,persist,now=None):
@@ -196,7 +219,12 @@ def advance(config,state,runs,effects,persist,now=None):
         decision=decide(config,state,runs,effects,role)
         if decision:
             task,value=decision
-            state={**state,role+'_task':task,role+'_decision':value,'stage':'peer_pending' if role=='cto' else 'author_pending'}
+            if value['action']=='escalate_cto':
+                state={**state,role+'_task':task,role+'_decision':value,'stage':'blocked',
+                    'category':'calibration_technical_impediment','owner':config['cto'],
+                    'required_action':'CTO_run_evidence_bound_experiment_and_replan',
+                    'author_retry_authorized':False,'delivery_approval':False}
+            else:state={**state,role+'_task':task,role+'_decision':value,'stage':'peer_pending' if role=='cto' else 'author_pending'}
             persist(state)
         elif now-state['at']>=1800:
             state={**state,'stage':'blocked','category':'calibration_planner_deadline','owner':config['cto']};persist(state)
@@ -295,7 +323,10 @@ def _handle(b,route,runs,source,prior,effects):
             key=existing[0]
             advance(config,state,runs,effects,persist)
         return False
-    try:advance(config,state,runs,effects,persist)
+    try:
+        repaired=recover_technical_escalation(config,state,runs,effects)
+        if repaired:persist(repaired)
+        else:advance(config,state,runs,effects,persist)
     except (ValueError,TypeError,KeyError) as error:
         persist({**state,'stage':'blocked','category':'calibration_rework_rejected','error_type':type(error).__name__,'owner':config['cto']})
     return True
