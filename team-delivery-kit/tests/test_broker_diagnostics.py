@@ -5,6 +5,8 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import tempfile
+import sys
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch,Mock
 
@@ -16,6 +18,53 @@ with patch.dict(os.environ, {'BROKER_WORKER_IMAGE': 'sha256:' + 'a' * 64}):
 
 
 class BrokerDiagnosticTests(unittest.TestCase):
+    def test_pending_retirement_does_not_starve_other_closing_leases(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            with server.db() as con:
+                con.execute('CREATE TABLE leases(request_id TEXT,name TEXT,status TEXT,deadline REAL)')
+                con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT,agent_id TEXT)')
+                con.executemany('INSERT INTO leases VALUES (?,?,?,?)',[('first','one','closing',9999999999),('second','two','closing',9999999999)])
+            with patch.object(server,'remove_owned',side_effect=[server.DockerOperationTimeout('DELETE','/containers/one'),None]) as remove:
+                server.tick();self.assertEqual(remove.call_count,2)
+            with server.db() as con:
+                self.assertEqual([tuple(r) for r in con.execute('SELECT request_id,status FROM leases')],[('first','closing'),('second','closed')])
+
+    def test_unknown_delete_is_never_reposted_even_if_docker_still_reports_running(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            info={'Id':'owned-id','Config':{'Labels':{'delivery-kit.owner':server.OWNER,'delivery-kit.request':'request'}},'State':{'Status':'running'}}
+            error=server.DockerOperationTimeout('DELETE','/containers/owned-id')
+            with patch.object(server,'docker',side_effect=[info,error,info,None]) as docker:
+                with self.assertRaises(server.DockerOperationTimeout):server.remove_owned('owned','request')
+                with self.assertRaises(server.DockerOperationTimeout):server.remove_owned('owned','request')
+                server.remove_owned('owned','request')
+                self.assertEqual(len([c for c in docker.call_args_list if c.args[0]=='DELETE']),1)
+            with server.db() as con:self.assertEqual(con.execute('SELECT state FROM worker_retirement_intents').fetchone()[0],'gone')
+
+    def test_acknowledged_delete_waits_for_actual_absence(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            info={'Id':'owned-id','Config':{'Labels':{'delivery-kit.owner':server.OWNER,'delivery-kit.request':'request'}},'State':{'Status':'removing'}}
+            initial={**info,'State':{'Status':'running'}}
+            with patch.object(server,'docker',side_effect=[initial,{},info,None]) as docker:
+                with self.assertRaises(server.DockerOperationTimeout):server.remove_owned('owned','request')
+                server.remove_owned('owned','request')
+                self.assertEqual(len([c for c in docker.call_args_list if c.args[0]=='DELETE']),1)
+
+    def test_transport_primary_failure_is_not_replaced_by_cleanup_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
+            with server.db() as con:
+                con.execute('CREATE TABLE leases(request_id TEXT,status TEXT)')
+                con.execute("INSERT INTO leases VALUES ('request','running')")
+                con.execute('CREATE TABLE native_bindings(request_id TEXT,scope TEXT,issue_id TEXT,task_id TEXT)')
+                con.execute('CREATE TABLE broker_errors(request_id TEXT,operation TEXT,category TEXT,at REAL)')
+            transport=Mock(side_effect=RuntimeError('Docker did not upgrade stream'))
+            with patch.dict(sys.modules,{'acp_transport':SimpleNamespace(Transport=transport)}),patch.object(server,'remove_owned',side_effect=TimeoutError('cleanup')):
+                with self.assertRaisesRegex(RuntimeError,'Docker did not upgrade stream'):
+                    server.open_granted_transport({'request_id':'request','mode':'planning'},{'name':'owned'},None)
+            with server.db() as con:
+                self.assertEqual(con.execute('SELECT status FROM leases').fetchone()[0],'closing')
+                self.assertEqual([tuple(r) for r in con.execute('SELECT operation,category FROM broker_errors')],
+                    [('transport_start','bootstrap:worker_attach'),('transport_cleanup','prompt_timeout')])
+
     def test_worker_start_timeout_preserves_single_start_without_delete(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(server,'STATE',Path(tmp)):
             with server.db() as con:
@@ -45,6 +94,9 @@ class BrokerDiagnosticTests(unittest.TestCase):
             with server.db() as con:
                 self.assertEqual(con.execute('SELECT status FROM leases').fetchone()[0],'creating')
                 self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])['stage'],'create_outcome_unknown')
+                payload=json.loads(con.execute('SELECT payload FROM worker_creation_intents').fetchone()[0])
+                self.assertEqual(payload['Labels']['com.docker.compose.project'],server.PREFIX+'-tests')
+                self.assertEqual(payload['Labels']['com.docker.compose.oneoff'],'True')
     def test_only_container_create_gets_bounded_longer_deadline(self):
         conn=Mock();conn.getresponse.return_value.status=204;conn.getresponse.return_value.read.return_value=b''
         for method,path,deadline in [('POST','/containers/create?name=public',30),('GET','/containers/public/json',10),('DELETE','/containers/public',10)]:

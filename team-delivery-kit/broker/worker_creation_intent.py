@@ -50,7 +50,7 @@ def started(con,request):
 def observe(payload,state,info,native_status,deadline,now):
     """A late acknowledgement is not permission to start a terminal task."""
     stage=state.get('stage')
-    if stage not in ('create_intent','create_outcome_unknown','start_intent','start_outcome_unknown','start_acknowledged','start_running_observed'):return state,None
+    if stage not in ('create_intent','create_outcome_unknown','late_container_observed','start_intent','start_outcome_unknown','start_acknowledged','start_running_observed'):return state,None
     starting=stage in ('start_intent','start_outcome_unknown','start_acknowledged','start_running_observed')
     terminal=native_status in ('failed','completed','cancelled') or now>=deadline
     if info is None:
@@ -94,7 +94,7 @@ def reconcile(b):
         rows=con.execute("SELECT i.request_id,i.payload,i.state,l.name,l.deadline FROM worker_creation_intents i JOIN leases l USING(request_id)").fetchall()
     for request,raw_payload,raw_state,name,deadline in rows:
         state=json.loads(raw_state)
-        if state.get('stage') not in ('create_intent','create_outcome_unknown','start_intent','start_outcome_unknown','start_acknowledged','start_running_observed'):continue
+        if state.get('stage') not in ('create_intent','create_outcome_unknown','late_container_observed','start_intent','start_outcome_unknown','start_acknowledged','start_running_observed'):continue
         native_status=None
         with b.db() as con:
             present=con.execute("SELECT 1 FROM sqlite_master WHERE name='native_bindings'").fetchone()

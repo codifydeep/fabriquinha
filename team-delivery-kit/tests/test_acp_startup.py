@@ -86,6 +86,28 @@ class StartupTests(unittest.TestCase):
         self.assertTrue(all(op[0]=='GET' for op in self.operations))
         self.b.execute_grant.assert_not_called()
 
+    def test_process_restart_preserves_unknown_create_without_execution_authority(self):
+        with self.b.db() as con:
+            self.assertTrue(startup.preserve_on_restart(con,'request'))
+            self.assertEqual(con.execute('SELECT used FROM grants').fetchone()[0],1)
+            self.assertEqual(con.execute('SELECT status FROM leases').fetchone()[0],'creating')
+        self.b.docker.assert_not_called();self.b.execute_grant.assert_not_called()
+
+    def test_process_restart_fences_a_started_transport_without_reopening(self):
+        for stage in ('transport_intent','ready'):
+            with self.b.db() as con:
+                con.execute('UPDATE acp_startups SET state=?',(json.dumps({**self.state,'stage':stage}),))
+                self.assertFalse(startup.preserve_on_restart(con,'request'))
+                state=json.loads(con.execute('SELECT state FROM acp_startups').fetchone()[0])
+                self.assertEqual(state['stage'],'failed');self.assertFalse(state['delivery_approval'])
+        self.b.open_granted_transport.assert_not_called()
+
+    def test_restart_does_not_adopt_legacy_started_worker_without_startup_intent(self):
+        with self.b.db() as con:
+            con.execute('DELETE FROM acp_startups')
+            con.execute('UPDATE worker_creation_intents SET state=?',(json.dumps({'stage':'start_acknowledged'}),))
+            self.assertFalse(startup.preserve_on_restart(con,'request'))
+
     def test_lost_transport_intent_is_terminal_not_reopened(self):
         with self.b.db() as con:
             con.execute('UPDATE acp_startups SET state=?',(json.dumps({**self.state,'stage':'transport_intent'}),))

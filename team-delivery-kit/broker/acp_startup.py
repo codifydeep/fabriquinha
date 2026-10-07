@@ -14,8 +14,38 @@ THREADS={}
 STARTUP_SECONDS=90
 
 
+class StartupDeadline(TimeoutError):
+    pass
+
+
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS acp_startups(request_id TEXT PRIMARY KEY,state TEXT)')
+
+
+def preserve_on_restart(con,request_id):
+    """Classify old bootstrap before legacy fencing; grants remain consumed.
+
+    Preserving an intent authorizes observation only. Polling still revalidates
+    native identity and the current capability before any continuation.
+    """
+    initialize(con)
+    startup=con.execute('SELECT state FROM acp_startups WHERE request_id=?',(request_id,)).fetchone()
+    intent=None
+    if con.execute("SELECT 1 FROM sqlite_master WHERE name='worker_creation_intents'").fetchone():
+        intent=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request_id,)).fetchone()
+    startup_state=json.loads(startup[0]) if startup else None
+    intent_state=json.loads(intent[0]) if intent else None
+    if startup_state and startup_state['stage'] in ('ready','transport_intent'):
+        con.execute('UPDATE acp_startups SET state=? WHERE request_id=?',
+            (json.dumps({**startup_state,'stage':'failed','category':'startup_transport_outcome_unknown',
+                'required_action':'diagnose_transport_no_silent_recreation','delivery_approval':False},sort_keys=True),request_id))
+        return False
+    ambiguous=('create_intent','create_outcome_unknown','late_container_observed','start_intent','start_outcome_unknown')
+    if intent_state and intent_state['stage'] in ambiguous:return True
+    if (startup_state and startup_state['stage']=='pending' and intent_state
+            and intent_state['stage'] in ('start_acknowledged','start_running_observed')):
+        return True
+    return False
 
 
 def authority(b,token):
@@ -148,7 +178,7 @@ def run(b,token,request_id,state):
             result=advance_worker(b,row,binding)
             if result:
                 row,binding=authority(b,token)
-                if time.time()>=state['deadline']:raise TimeoutError('startup deadline')
+                if time.time()>=state['deadline']:raise StartupDeadline('startup deadline')
                 write(b,request_id,{**state,'stage':'transport_intent',
                     'required_action':'observe_single_transport_open'})
                 with b.LOCK:
@@ -159,10 +189,10 @@ def run(b,token,request_id,state):
                     'required_action':'forward_actual_ACP_initialize'})
                 return
             time.sleep(0.25)
-        raise TimeoutError('startup deadline')
+        raise StartupDeadline('startup deadline')
     except Exception as error:
         if request_id:
-            category='startup_deadline' if isinstance(error,TimeoutError) else 'startup_'+b.failure_category(error)
+            category='startup_deadline' if isinstance(error,StartupDeadline) else 'startup_'+b.failure_category(error)
             write(b,request_id,{**state,'stage':'failed','category':category,
                 'required_action':'diagnose_bootstrap_no_identical_retry','delivery_approval':False})
             with b.db() as con:

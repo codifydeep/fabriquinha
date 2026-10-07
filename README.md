@@ -229,6 +229,19 @@ controlador e Multica: essa integração permanece necessária antes da instala�
 e de outra execução do autor. A suíte offline passou com 2.240 testes e sete
 skips existentes; os probes não enviaram sessões ou prompts ao modelo.
 
+A integração de fontes do controlador e wrapper foi exercitada no Linux do
+controlador autorizado, com Docker, transporte ACP e Hermes reais, mas com
+identidade nativa **descartável**, não com um novo handoff do Multica. O probe
+injeta perda da confirmação de criação e verifica uma única criação, início,
+abertura de transporte e consumo da capability. Também exige observação da
+remoção física antes de reconciliar a lease como `closed`; não envia prompts.
+O contrato agora preserva bootstrap incerto durante reinício, registra o payload
+Compose já normalizado e persiste a intenção de retirada antes de `DELETE`.
+Uma retirada pendente não repete a exclusão nem impede o watchdog de atender
+outras leases. A suíte correspondente passou com 2.248 testes e sete skips.
+Essas correções ainda não estão instaladas; qualificação das imagens finais,
+integração nativa real e recuperação do autor continuam sendo gates abertos.
+
 A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
 execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
 handoff antigo sem esse marcador, admite uma única recuperação com a política

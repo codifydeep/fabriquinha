@@ -525,11 +525,33 @@ def remove_owned(name, request_id):
         session.close()
     info = docker('GET', '/containers/' + name + '/json')
     if info is None:
+        if (STATE/'leases.sqlite').exists():
+            with db() as con:
+                if con.execute("SELECT 1 FROM sqlite_master WHERE name='worker_retirement_intents'").fetchone():
+                    con.execute("UPDATE worker_retirement_intents SET state='gone' WHERE request_id=? AND name=?",(request_id,name))
         return
     labels = info['Config'].get('Labels', {})
     if labels.get('delivery-kit.owner') != OWNER or labels.get('delivery-kit.request') != request_id:
         raise RuntimeError('container identity mismatch')
-    docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+    with db() as con:
+        con.execute('CREATE TABLE IF NOT EXISTS worker_retirement_intents(request_id TEXT PRIMARY KEY,container_id TEXT,name TEXT,state TEXT)')
+        previous=con.execute('SELECT container_id,name,state FROM worker_retirement_intents WHERE request_id=?',(request_id,)).fetchone()
+        if previous:
+            if previous[0]!=info['Id'] or previous[1]!=name:raise RuntimeError('retirement identity drift')
+            # The previous request may still be queued in Docker Desktop.
+            # Even a running state is not authority to send another DELETE.
+            raise DockerOperationTimeout('DELETE','/containers/'+info['Id'])
+        state='delete_outcome_unknown' if info.get('State',{}).get('Status')=='removing' else 'delete_intent'
+        con.execute('INSERT INTO worker_retirement_intents VALUES (?,?,?,?)',(request_id,info['Id'],name,state))
+    if state=='delete_outcome_unknown':raise DockerOperationTimeout('DELETE','/containers/'+info['Id'])
+    try:docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+    except Exception:
+        with db() as con:con.execute("UPDATE worker_retirement_intents SET state='delete_outcome_unknown' WHERE request_id=?",(request_id,))
+        raise
+    with db() as con:con.execute("UPDATE worker_retirement_intents SET state='delete_acknowledged' WHERE request_id=?",(request_id,))
+    if docker('GET','/containers/'+name+'/json') is not None:
+        raise DockerOperationTimeout('DELETE','/containers/'+info['Id'])
+    with db() as con:con.execute("UPDATE worker_retirement_intents SET state='gone' WHERE request_id=?",(request_id,))
 
 
 def tick():
@@ -541,9 +563,11 @@ def tick():
         # failed acknowledgment without treating an unexplained disappearance
         # as completion. This receipt closes execution, never approves delivery.
         for row in con.execute("SELECT * FROM leases WHERE status='closing'").fetchall():
-            remove_owned(row['name'], row['request_id'])
+            try:remove_owned(row['name'], row['request_id'])
+            except DockerOperationTimeout:continue  # observe this retirement; do not starve other leases
             con.execute("UPDATE leases SET status='closed' WHERE request_id=? AND status='closing'",
                         (row['request_id'],))
+            con.commit()
         for row in con.execute("SELECT * FROM leases WHERE status='running'").fetchall():
             binding = con.execute('SELECT task_id,agent_id FROM native_bindings WHERE request_id=?',
                                   (row['request_id'],)).fetchone()
@@ -555,9 +579,13 @@ def tick():
                 except (OSError, ValueError, KeyError, json.JSONDecodeError):
                     task = None  # transient control-plane failure never cancels a live task
                 if task and task.get('status') == 'cancelled':
-                    remove_owned(row['name'], row['request_id'])
+                    con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(row['request_id'],))
+                    con.commit()
+                    try:remove_owned(row['name'], row['request_id'])
+                    except DockerOperationTimeout:continue
                     con.execute('UPDATE leases SET status=? WHERE request_id=?',
                                 ('cancelled', row['request_id']))
+                    con.commit()
                     continue
             info = docker('GET', '/containers/' + row['name'] + '/json')
             if info is None:
@@ -568,8 +596,12 @@ def tick():
                 status = 'expired'
             else:
                 continue
-            remove_owned(row['name'], row['request_id'])
+            con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(row['request_id'],))
+            con.commit()
+            try:remove_owned(row['name'], row['request_id'])
+            except DockerOperationTimeout:continue
             con.execute('UPDATE leases SET status=? WHERE request_id=?', (status, row['request_id']))
+            con.commit()
 
 
 def submit(payload, trusted_acp=False):
@@ -592,7 +624,10 @@ def submit(payload, trusted_acp=False):
         create_intent=False
         starting=False
         try:
-            expected=config(request_id, scenario)
+            # Persist the exact grouped payload sent to Docker, not the
+            # pre-boundary labels that grouped_create intentionally replaces.
+            expected=grouped_create('POST','/containers/create?name='+name,
+                                    config(request_id, scenario),PREFIX)
             try:import worker_creation_intent
             except ImportError:from broker import worker_creation_intent
             worker_creation_intent.record(con,request_id,expected)
@@ -1665,12 +1700,19 @@ def open_granted_transport(row,result,scope):
             editable_paths=editables, test_commands=test_commands,
             review_suite_capability=suite_capability)
     except Exception as error:
-        remove_owned(result['name'], row['request_id'])
         with db() as failed:
-            failed.execute("UPDATE leases SET status='failed' WHERE request_id=?", (row['request_id'],))
+            failed.execute("UPDATE leases SET status='closing' WHERE request_id=?", (row['request_id'],))
             failed.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
                            (row['request_id'], 'transport_start',
                             'bootstrap:' + failure_category(error), time.time()))
+        try:
+            remove_owned(result['name'], row['request_id'])
+            with db() as failed:
+                failed.execute("UPDATE leases SET status='failed' WHERE request_id=?", (row['request_id'],))
+        except Exception as cleanup_error:
+            with db() as failed:
+                failed.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',
+                    (row['request_id'],'transport_cleanup',failure_category(cleanup_error),time.time()))
         raise
     if scope:
         from session_resume import prior_session
@@ -2443,10 +2485,19 @@ def main():
         con.execute("UPDATE review_incidents SET status='legacy_unqualified' "
                     "WHERE reason='review snapshot assignment missing' AND review_task_id NOT IN "
                     "(SELECT n.task_id FROM native_bindings n JOIN review_bindings b USING(request_id))")
-        # Restart fences old executions instead of assuming they successfully resumed.
+        # Ambiguous Docker bootstrap is observed, not blindly deleted. A
+        # transport already opened/attempted remains fenced after restart.
+        import acp_startup
+        con.commit()  # retirement persists its own intent before Docker IO
         for row in con.execute("SELECT * FROM leases WHERE status IN ('creating','running')").fetchall():
-            remove_owned(row['name'], row['request_id'])
+            if acp_startup.preserve_on_restart(con,row['request_id']):
+                continue
+            con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(row['request_id'],))
+            con.commit()
+            try:remove_owned(row['name'], row['request_id'])
+            except DockerOperationTimeout:continue
             con.execute("UPDATE leases SET status='interrupted' WHERE request_id=?", (row['request_id'],))
+            con.commit()
     def watchdog():
         cycle = 0
         while True:

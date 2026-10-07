@@ -127,3 +127,12 @@ class WorkerCreationIntentTests(unittest.TestCase):
         result=json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])
         self.assertEqual(result['stage'],'late_container_observed');self.assertFalse(result['author_retry_authorized'])
         self.assertEqual(len(operations),2)
+
+    def test_already_observed_create_expires_without_silent_capacity_leak(self):
+        payload,state,info=self.inputs()
+        new,_=intent.observe(payload,state,info,'running',1000,10)
+        self.assertEqual(new['stage'],'late_container_observed')
+        new,lease=intent.observe(payload,new,info,'running',1000,1001)
+        self.assertEqual(lease,'failed')
+        self.assertEqual(new['required_action'],'preserve_and_retire_terminal_bootstrap_container')
+        self.assertFalse(new['author_retry_authorized'])
