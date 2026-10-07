@@ -9,6 +9,7 @@ COPY broker/remediation_r2_issue.py /remediation_r2_issue.py
 COPY broker/remediation_r2_preparation.py /remediation_r2_preparation.py
 COPY broker/remediation_product_context.py /remediation_product_context.py
 COPY broker/remediation_native_context.py /remediation_native_context.py
+COPY broker/remediation_dispatch.py /remediation_dispatch.py
 COPY broker/helper_cleanup.py /helper_cleanup.py
 COPY broker/host_restart_recovery.py /host_restart_recovery.py
 COPY broker/host_restart_snapshot.py /host_restart_snapshot.py

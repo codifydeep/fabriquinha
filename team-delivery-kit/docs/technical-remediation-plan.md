@@ -292,3 +292,28 @@ the write. Unrelated leases do not starve it. Observation is bounded even when
 transport fails before intent creation; permission/schema HTTP rejection is a
 technical hold, not an endless transient retry. Holds retain a Tech Lead owner
 and next action. Presentation receipts authorize neither execution nor release.
+
+### Durable initial dispatch and acceptance
+
+`remediation_dispatch.py` consumes the actual published native context and
+immutable execution/runtime/review-policy hashes. It rechecks the original full
+suite and tests-only R1 or approved foreign-Red/product-only R2 scopes. A paused
+route creates neither dispatch intent nor observation timer. Route activation
+remains a separate full-chain admission operation, not a model declaration.
+
+After activation, the controller saves intent before its single native wakeup
+POST. Unknown acknowledgments and restarts permit lookup with `allow_create=false`
+only. Acceptance requires one actual task matching issue, author and wakeup;
+prose, a queued task or a failed execution cannot count as delivery. Even a
+completed author task proves acceptance only, not review, merge or homologation.
+
+Capacity includes two global leases, one active lease per profile and unresolved
+wakeup reservations. A reservation already represented by a lease is not
+counted twice. New dispatch needs the current approved model-call floor; existing
+wakeup observation does not need additional budget. Ten minutes raises an alert;
+thirty retains a Tech Lead hold with evidence and next action, including transport
+failure before intent creation. Failed tasks are never identically restarted.
+
+The installed routes remain paused until R3 publication/deploy/QA integration
+and the activation contract are qualified. Dispatch fixture tests are not proof
+that the complete R1/R2/R3 trial passed.
