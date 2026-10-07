@@ -93,7 +93,10 @@ class TypedSurgicalTests(unittest.TestCase):
 
     def test_receipt_allows_controller_capture_not_another_edit(self):
         body=self.body()
-        body['messages'].append({'role':'tool','content':json.dumps({
+        body['messages'].append({'role':'assistant','tool_calls':[{'id':'edited','function':{
+            'name':'surgical_test_edit','arguments':json.dumps(self.args())}}]})
+        body['messages'].append({'role':'tool','tool_call_id':'edited','content':json.dumps({
             'operation':'surgical_test_edit_v1','verified':True,'path':self.config()['path'],
-            'before_sha256':'a'*64,'test_bodies_preserved':True,'delivery_approval':False})})
+            'before_sha256':'a'*64,'sha256':'b'*64,'bytes_written':10,
+            'test_bodies_preserved':True,'delivery_approval':False})})
         self.assertIs(apply(body),body)

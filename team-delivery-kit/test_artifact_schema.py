@@ -9,7 +9,7 @@ import json
 import re
 
 from artifact_read_evidence import observations, next_read, coverage
-from surgical_test_edit import marker_config,typed_schema
+from surgical_test_edit import marker_config,typed_schema,validate_typed
 from author_read_policy import page_size
 
 def additive_phase(body):
@@ -33,6 +33,56 @@ def _selected(result,name,instruction):
     result.setdefault('provider',{})['require_parameters']=True
     result['messages'].append({'role':'system','content':instruction})
     return result
+
+
+def surgical_write_completed(history, target, sources, config):
+    """Freeze author inspection at a paired, verified edit, not later reads.
+
+    Immutable review coverage deliberately remains unchanged. This releases
+    only request steering; snapshots, calibration, Red and review still apply.
+    """
+    calls = {}
+    consumed = set()
+    for index, message in enumerate(history):
+        if message.get('role') == 'assistant':
+            for call in message.get('tool_calls') or []:
+                fn = call.get('function') or {}
+                identifier = call.get('id')
+                if fn.get('name') != 'surgical_test_edit' or not isinstance(identifier, str) or not identifier:
+                    continue
+                if identifier in calls:
+                    calls[identifier] = False
+                    continue
+                try:
+                    args = json.loads(fn.get('arguments', ''))
+                    validate_typed(args, config)
+                except (ValueError, TypeError, KeyError):
+                    calls[identifier] = False
+                    continue
+                calls[identifier] = sources <= observations(history[:index], wire=True).keys()
+        if message.get('role') != 'tool':
+            continue
+        identifier = message.get('tool_call_id')
+        if not calls.get(identifier) or identifier in consumed:
+            continue
+        consumed.add(identifier)
+        try:
+            receipt = json.loads(message.get('content', ''))
+        except (ValueError, TypeError):
+            continue
+        if (isinstance(receipt, dict) and not receipt.get('error')
+                and receipt.get('operation') == 'surgical_test_edit_v1'
+                and receipt.get('verified') is True and receipt.get('path') == target
+                and receipt.get('before_sha256') == config['expected_sha256']
+                and isinstance(receipt.get('sha256'), str)
+                and re.fullmatch('[a-f0-9]{64}', receipt['sha256'])
+                and receipt['sha256'] != config['expected_sha256']
+                and type(receipt.get('bytes_written')) is int
+                and 0 < receipt['bytes_written'] <= 32768
+                and receipt.get('test_bodies_preserved') is True
+                and receipt.get('delivery_approval') is False):
+            return True
+    return False
 
 
 def seeded_repair_progress(body):
@@ -191,6 +241,8 @@ def apply(body):
                     and not receipt.get('already_applied') and not receipt.get('no_change')
                     and isinstance(receipt.get('diff'),str) and receipt['diff'].strip()):
                 return seeded_repair_progress(body)  # Never Red, review or delivery approval.
+    if surgical and surgical_write_completed(read_history, target, sources, surgical):
+        return body  # Saved local edit only; never Red, review or delivery approval.
     missing = sorted(sources - observations(read_history, wire=True).keys())
     if missing:
         path = missing[0]
@@ -205,14 +257,6 @@ def apply(body):
         instruction = 'TEST AUTHOR INSPECTION: read the selected source page, then proceed to actual test writing.'
     else:
         if surgical:
-            for message in read_history:
-                if message.get('role')!='tool':continue
-                try:receipt=json.loads(message.get('content',''))
-                except (ValueError,TypeError):continue
-                if (receipt.get('operation')=='surgical_test_edit_v1' and receipt.get('verified') is True
-                        and receipt.get('before_sha256')==surgical['expected_sha256']
-                        and receipt.get('path')==target and receipt.get('test_bodies_preserved') is True):
-                    return body  # Local edit receipt only, never controller Red or approval.
             typed=surgical.get('protocol') in ('typed_v2','typed_driver_v3','typed_driver_lines_v4','typed_template_v5','typed_template_lines_v6')
             writes=sum(1 for m in read_history if m.get('role')=='assistant'
                 for call in m.get('tool_calls',[]) if call.get('function',{}).get('name') in ('write_file','surgical_test_edit'))

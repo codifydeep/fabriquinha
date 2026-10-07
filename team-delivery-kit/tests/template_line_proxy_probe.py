@@ -29,7 +29,24 @@ mixed={**body,'messages':[dict(role='user',content=body['messages'][0]['content'
 try:validate_request(mixed)
 except (ValueError,ArtifactResponseRejected):pass
 else:raise AssertionError('mixed protocols accepted')
+# A real author's changed reread must not erase its complete pre-edit reads.
+# This remains request-contract qualification, not evidence of a saved product.
+import copy
+saved=copy.deepcopy(body)
+saved['messages'] += [dict(role='assistant',tool_calls=[dict(id='edited',function=dict(
+ name='surgical_test_edit',arguments=json.dumps(args)))]),
+ dict(role='tool',tool_call_id='edited',content=json.dumps(dict(
+ operation='surgical_test_edit_v1',path=target,verified=True,before_sha256='a'*64,
+ sha256='b'*64,bytes_written=10,test_bodies_preserved=True,delivery_approval=False))),
+ dict(role='assistant',tool_calls=[dict(id='changed-read',function=dict(name='read_file',
+ arguments=json.dumps(dict(path=target,offset=1,limit=100))))]),
+ dict(role='tool',tool_call_id='changed-read',content=json.dumps(dict(content='1|changed',total_lines=1)))]
+validate_request(saved)
+from artifact_read_evidence import observations
+assert target not in observations(saved['messages'],wire=True)
 sources={name:hashlib.sha256(Path('/'+name).read_bytes()).hexdigest() for name in ('surgical_test_edit.py','test_artifact_schema.py')}
 print(json.dumps(dict(schema='template-line-proxy-image-probe-v6',status='passed',source_sha256=sources,
  actual_proxy_request_validation=True,actual_response_validation=True,legacy_payload_denied=True,
- mixed_protocol_denied=True,path_and_hash_mismatch_denied=True,model_calls=0,delivery_approval=False)))
+ mixed_protocol_denied=True,path_and_hash_mismatch_denied=True,
+ author_post_edit_generation_preserved=True,immutable_mixed_reads_still_denied=True,
+ model_calls=0,delivery_approval=False)))

@@ -1,4 +1,31 @@
-# Estado de validação — 2026-10-06
+# Estado de validação — 2026-10-07
+
+## Inspeção do autor após edição cirúrgica
+
+O diagnóstico independente do CTO e do Tech Lead voltou a acionar o autor.
+Ele salvou uma correção, mas sua execução nativa terminou como falha: o proxy
+misturava leituras anteriores e posteriores à edição, invalidava a cobertura
+do arquivo e retornava `review inspection stalled`. Uma comparação somente
+leitura dos snapshots preservados verificou que apenas o novo teste mudou,
+sem alteração da AST externa ao template. Isso não constitui Red, aprovação
+de testes, conclusão da execução nem homologação.
+
+A correção separa a inspeção pré-edição do autor por uma chamada real pareada
+com recibo verificado, hash de entrada da autorização, hash de saída distinto,
+limite de bytes e preservação dos testes. Todas as fontes devem ter sido lidas
+integralmente **antes** dessa chamada. Recibos soltos, replay, IDs duplicados
+e leituras posteriores não suprem essa condição. A cobertura de revisão
+imutável continua rejeitando versões conflitantes do mesmo arquivo.
+
+A suíte offline executou **2.268 testes, com sete skips existentes**. A imagem
+candidata do proxy passou pela validação de requests/respostas V6 e pela
+fronteira pós-edição em container sem rede, credenciais ou socket, com zero
+chamadas ao modelo. Esse probe usa recibos de fixture, não uma execução
+nativa completa do agente. O serviço ativo
+não é substituído automaticamente por essa construção. Ainda é necessário
+qualificar a recuperação da entrega já salva sem repetir sua edição, executar
+calibração, Red e revisão independente e completar PR/CI/deploy/QA. O novo
+ciclo continua com intervenção do operador e não comprova autonomia integral.
 
 ## Exportação inicial
 
