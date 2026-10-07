@@ -1,4 +1,4 @@
-import copy,json,unittest
+import copy,json,sqlite3,unittest
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -100,3 +100,21 @@ class TemplateLineReplanTests(unittest.TestCase):
         self.assertNotIn('/var/run/docker.sock',str(payload))
         with self.assertRaises(ValueError):replan.job_payload(b,cfg,'arbitrary shell')
         with self.assertRaises(ValueError):replan.arm(b,'source','invalid-container')
+
+    def test_experiment_lineage_keeps_the_original_identity_and_rejects_cycles_or_drift(self):
+        cfg,_,proof,_=self.inputs();cfg.update(predecessor_plan='parent',contract_sha256='contract')
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE calibration_failure_plans(source_task TEXT,config TEXT)')
+        con.execute('CREATE TABLE observation_hypothesis_experiments(source_task TEXT,identity TEXT,state TEXT)')
+        parent={**cfg,'source_task':'parent','predecessor_plan':'root'}
+        con.execute('INSERT INTO calibration_failure_plans VALUES (?,?)',('parent',json.dumps(parent)))
+        identity=dict(source_task='root',issue_id=cfg['issue_id'],manifest_sha256=cfg['manifest_sha256'])
+        experiment=dict(stage='complete',proof=dict(original_manifest_sha256=cfg['manifest_sha256'],original_test_sha256=cfg['diagnostic']['test_sha256']))
+        con.execute('INSERT INTO observation_hypothesis_experiments VALUES (?,?,?)',('root',json.dumps(identity),json.dumps(experiment)))
+        root,found,observed=replan.experiment_for(con,cfg)
+        self.assertEqual(root,'root');self.assertEqual(found,identity);self.assertEqual(observed,experiment)
+        self.assertEqual(con.execute('SELECT source_task FROM observation_hypothesis_experiments').fetchall(),[('root',)])
+        for bad in ({**parent,'predecessor_plan':cfg['source_task']},{**parent,'author':'other'},
+                    {**parent,'contract_sha256':'other'},{**parent,'manifest_sha256':'d'*64}):
+            con.execute('UPDATE calibration_failure_plans SET config=?',(json.dumps(bad),))
+            with self.subTest(bad=bad),self.assertRaises(ValueError):replan.experiment_for(con,cfg)

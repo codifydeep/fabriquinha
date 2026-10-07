@@ -182,8 +182,13 @@ snapshot, hash e recibo antes de reabrir o planejamento. A decisão anterior fic
 arquivada; CTO e Tech Lead precisam ler novamente e produzir decisões distintas.
 O supervisor só admite o autor após essas decisões e revalidação da instalação,
 contrato e ausência de execução concorrente. Essa integração possui testes de
-contrato e preflight somente leitura com o bloqueio real, mas **ainda não foi
-instalada nem validada com agentes reais**. O preflight também encontrou e
+contrato e preflight somente leitura com o bloqueio real. A base V6 está instalada,
+mas **a recuperação ainda não foi validada com agentes reais**. A manutenção
+versionada conserva intenções de criação/start e observa resultados incertos sem
+repetir mutações. Um experimento ancestral é resolvido pela cadeia de predecessores
+preservados, exigindo o mesmo contrato, perfis, manifest e hash; seu recibo jamais
+é copiado para fingir que pertence a uma execução recente. Essa correção de
+linhagem ainda precisa de qualificação e instalação da nova imagem. O preflight também encontrou e
 corrigiu um contexto excessivo: o contexto específico cabe no limite original,
 inclusive com a justificativa máxima do revisor, sem ampliar capacidades.
 

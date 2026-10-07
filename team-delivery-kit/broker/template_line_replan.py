@@ -69,6 +69,31 @@ def job_payload(b,config,variant_sha):
     return payload
 
 
+def experiment_for(con,config):
+    """Resolve the actual root, never relabel a root receipt as a newer failure."""
+    key=config['predecessor_plan'];seen={config['source_task']}
+    while key and key not in seen:
+        seen.add(key)
+        observed=con.execute('SELECT identity,state FROM observation_hypothesis_experiments WHERE source_task=?',(key,)).fetchone()
+        if observed:
+            identity,experiment=map(json.loads,observed)
+            if (identity.get('source_task')!=key or identity.get('issue_id')!=config['issue_id']
+                    or identity.get('manifest_sha256')!=config['manifest_sha256']
+                    or experiment.get('proof',{}).get('original_manifest_sha256')!=config['manifest_sha256']
+                    or experiment.get('proof',{}).get('original_test_sha256')!=config['diagnostic']['test_sha256']):
+                raise ValueError('root experiment identity drift')
+            return key,identity,experiment
+        parent=con.execute('SELECT config FROM calibration_failure_plans WHERE source_task=?',(key,)).fetchone()
+        if not parent:raise ValueError('preserved experiment ancestry required')
+        previous=json.loads(parent[0])
+        if (previous.get('source_task')!=key or any(previous.get(k)!=config.get(k) for k in
+                ('issue_id','contract_sha256','author','cto','peer','manifest_sha256'))
+                or previous.get('diagnostic',{}).get('test_sha256')!=config['diagnostic']['test_sha256']):
+            raise ValueError('experiment ancestry contract drift')
+        key=previous.get('predecessor_plan')
+    raise ValueError('acyclic preserved experiment ancestry required')
+
+
 def arm(b,source,container_id):
     """Controller-only migration backed by actual jobs and native decisions.
 
@@ -98,9 +123,7 @@ def arm(b,source,container_id):
                     or con.execute('SELECT 1 FROM test_first_red WHERE issue_id=?',(config['issue_id'],)).fetchone()
                     or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
                 raise ValueError('idle unchanged exact pre-Red route required')
-            experiment_row=con.execute('SELECT identity,state FROM observation_hypothesis_experiments WHERE source_task=?',(config['predecessor_plan'],)).fetchone()
-            if not experiment_row:raise ValueError('executed predecessor hypothesis required')
-            identity,experiment=map(json.loads,experiment_row)
+            experiment_root,identity,experiment=experiment_for(con,config)
         proxy=b.docker('GET','/containers/'+b.PREFIX+'-model-proxy-1/json')
         if (not proxy or proxy['Image']!=qualification['proxy_image'] or not proxy['State']['Running']
                 or proxy['Config']['Labels'].get('com.docker.compose.project')!=b.PREFIX):
@@ -118,7 +141,7 @@ def arm(b,source,container_id):
                 or any(reads.get(p,{}).get('lines',0)<=0 or reads[p]['lines']!=reads[p].get('total_lines') for p in config['paths'])):
             raise ValueError('actual complete-read CTO technical hold required')
         plans.validate_experiment(experiment['proof'],identity)
-        if (experiment['stage']!='complete' or identity['source_task']!=config['predecessor_plan']
+        if (experiment['stage']!='complete' or identity['source_task']!=experiment_root
                 or identity['issue_id']!=config['issue_id']
                 or experiment['proof']['original_manifest_sha256']!=config['manifest_sha256']):
             raise ValueError('same preserved original and completed experiment required')
@@ -139,7 +162,8 @@ def arm(b,source,container_id):
         raw=b.docker_stdout(info['Id'],include_stderr=False,limit=4096);proof=json.loads(raw)
         if proof.get('variant_test_sha256')!=variant:raise ValueError('executed hypothesis variant drift')
         changed,new=prepare(config,state,proof,qualification)
-        new['line_recipe_reconciliation'].update(container_id=container_id,receipt_sha256=hashlib.sha256(raw.encode()).hexdigest())
+        new['line_recipe_reconciliation'].update(container_id=container_id,receipt_sha256=hashlib.sha256(raw.encode()).hexdigest(),
+            experiment_root=experiment_root,experiment_receipt_sha256=experiment['receipt_sha256'])
         try:import calibration_rework as lane
         except ImportError:from broker import calibration_rework as lane
         lane.instruction(changed,new)
