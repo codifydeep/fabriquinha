@@ -17,6 +17,29 @@ def initialize(con):
 
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
+    if config.get('bootstrap_failure'):
+        note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
+            'PRE-EXECUTION INFRASTRUCTURE INCIDENT: '+('Independent Tech Lead review. ' if peer else 'CTO diagnosis. ')+
+            'The latest author worker never started: no ACP initialization or tools executed. '
+            'The failed execution and consumed capability remain preserved, never replayed. '
+            'The controller verified an unchanged frozen submission and changed startup/retirement infrastructure. '
+            'Read all assigned frozen files completely. No shell, edits, Red replay, limit/depth/iteration reset '
+            'or delivery approval. Decide whether a fresh independently sponsored bounded V6 correction is '
+            'supported, or retain the technical hold. Do not mistake this startup incident for a new functional '
+            'or TDD failure. Historical surgical denials remain historical; they did not occur in this execution. '
+            'Preserve every assertion, test method, baseline/product byte and acceptance criterion. '
+            'Use only the original-author NODE_HARNESS_TEMPLATE scope and inclusive line recipe below. '
+            'No author admission yet: controller calibration, full pinned Red, independent review, PR/CI and '
+            'same-commit deploy/QA remain mandatory. Return ONLY JSON action=request_test_revision or '
+            'escalate_cto, reason<=1200 characters, optional_files=[].\n'
+            'Authenticated bootstrap: '+json.dumps(config['bootstrap_failure'],sort_keys=True)+'\n'
+            'Bounded recipe: '+json.dumps(config['line_recipe']['recipe'],sort_keys=True)+'\n'+
+            ('CTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True)+'\n' if peer else '')+
+            'Unchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
+            ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
+        if len(note)+100>4000:raise ValueError('bounded bootstrap diagnosis context required')
+        return note
     if config.get('line_recipe_revision'):
         proof=config['line_recipe']
         note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'

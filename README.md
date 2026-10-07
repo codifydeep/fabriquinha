@@ -4,6 +4,15 @@ Uma equipe de agentes de IA para transformar um brief de produto em software rev
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+O encaminhamento de falhas anteriores ao início do worker possui uma extensão
+em validação: exige capability consumida, execução nativa falha, erro persistido
+de criação e o contêiner original identificado, nunca iniciado, sem eventos ACP
+ou ferramentas executadas. Antes do planejamento técnico, congela a nova entrega
+e compara todos os bytes com a anterior. CTO e Tech Lead recebem decisões novas,
+sem reaproveitar aprovações ou repetir o autor. A qualificação instalada do worker
+e do proxy continua obrigatória. Esta extensão ainda não está instalada nem
+comprovada por um handoff nativo completo; seus testes offline não liberam o Truco.
+
 ## O que queremos construir
 
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.

@@ -6,6 +6,86 @@ from broker import template_failure_diagnosis as diagnosis,calibration_rework as
 
 
 class TemplateFailureDiagnosisTests(unittest.TestCase):
+    def bootstrap_fixture(self):
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
+        con.executescript("""
+            CREATE TABLE native_bindings(request_id TEXT,task_id TEXT,issue_id TEXT,agent_id TEXT);
+            CREATE TABLE grants(request_id TEXT,used INTEGER,mode TEXT);
+            CREATE TABLE leases(request_id TEXT,name TEXT,status TEXT);
+            CREATE TABLE broker_errors(request_id TEXT,operation TEXT,category TEXT);
+            CREATE TABLE acp_events(request_id TEXT);
+            INSERT INTO native_bindings VALUES('req','failed','issue','author');
+            INSERT INTO grants VALUES('req',1,'implementation');
+            INSERT INTO leases VALUES('req','worker','failed');
+            INSERT INTO broker_errors VALUES('req','worker_submit','bootstrap:docker_containers_create');
+        """)
+        info=dict(Id='physical-id',Image='sha256:old',ExecIDs=None,
+            Config={'Labels':{'delivery-kit.owner':'owned','delivery-kit.request':'req'}},
+            State={'Status':'created','Running':False,'StartedAt':'0001-01-01T00:00:00Z'})
+        b=SimpleNamespace(OWNER='owned',docker=lambda *a:info)
+        held={'executor':{'worker_image':'sha256:old'}}
+        return con,b,held,info
+
+    def test_bootstrap_requires_consumed_exact_never_started_worker_without_tools(self):
+        con,b,held,info=self.bootstrap_fixture()
+        proof=diagnosis.bootstrap_evidence(b,con,'failed','issue','author',held,[])
+        self.assertEqual(proof['container_id'],'physical-id')
+        self.assertFalse(proof['author_retry_authorized']);self.assertFalse(proof['delivery_approval'])
+        for messages in ([{'type':'tool_use'}],[{'type':'tool_result'}]):
+            with self.assertRaises(ValueError):diagnosis.bootstrap_evidence(b,con,'failed','issue','author',held,messages)
+        for key,value in [('Status','exited'),('Running',True),('StartedAt','2026-10-07')]:
+            changed=copy.deepcopy(info);changed['State'][key]=value;b.docker=lambda *a:changed
+            with self.subTest(key=key),self.assertRaises(ValueError):diagnosis.bootstrap_evidence(b,con,'failed','issue','author',held,[])
+        for key,value in [('Image','other'),('ExecIDs',['exec'])]:
+            changed=copy.deepcopy(info);changed[key]=value;b.docker=lambda *a:changed
+            with self.subTest(key=key),self.assertRaises(ValueError):diagnosis.bootstrap_evidence(b,con,'failed','issue','author',held,[])
+        for key in ('delivery-kit.owner','delivery-kit.request'):
+            changed=copy.deepcopy(info);changed['Config']['Labels'][key]='foreign';b.docker=lambda *a:changed
+            with self.subTest(key=key),self.assertRaises(ValueError):diagnosis.bootstrap_evidence(b,con,'failed','issue','author',held,[])
+        b.docker=lambda *a:info
+        for sql in ("UPDATE grants SET used=0","UPDATE grants SET mode='review'",
+                    "UPDATE leases SET status='closed'","DELETE FROM broker_errors",
+                    "INSERT INTO acp_events VALUES('req')",
+                    "INSERT INTO native_bindings VALUES('req','failed','issue','author')"):
+            con.execute('SAVEPOINT mutation');con.execute(sql)
+            with self.subTest(sql=sql),self.assertRaises(ValueError):diagnosis.bootstrap_evidence(b,con,'failed','issue','author',held,[])
+            con.execute('ROLLBACK TO mutation');con.execute('RELEASE mutation')
+        with self.assertRaises(ValueError):diagnosis.bootstrap_evidence(b,con,'failed','other','author',held,[])
+
+    def test_bootstrap_planning_keeps_independent_review_and_delivery_gates(self):
+        config=dict(bootstrap_failure=dict(operation='worker_bootstrap_failure_v1',worker_never_started=True,
+            source_task='s'*36,request_id='r'*36,container_id='c'*64,worker_image='sha256:'+'i'*64,
+            category='docker_create_ack_timeout',acp_events=0,tool_calls=0,
+            author_retry_authorized=False,delivery_approval=False),
+            line_recipe={'recipe':{'edits':[{'start_line':476,'end_line':476,
+                'new':'    const after_ok = { text: modeText(), calls: after_ok_calls };\n'}],
+                'expected_sha256':'a'*64}},
+            criteria={f'A0{i}':'unchanged' for i in range(1,9)},
+            paths=['/evidence/candidate/app/static/app.js','/evidence/candidate/tests/test_service_mode_indicator.py'])
+        for state in (dict(stage='cto_pending'),dict(stage='peer_pending',cto_decision={
+                'action':'request_test_revision','reason':'a'*1200,'optional_files':[]})):
+            note=lane.instruction(config,state)
+            self.assertLessEqual(len(note)+100,4000)
+            for text in ('never replayed','Historical surgical denials remain historical','No author admission yet',
+                         'full pinned Red','independent review','same-commit deploy/QA','DELIVERY_REVIEW_READ_PATH:'):
+                self.assertIn(text,note)
+
+    def test_bootstrap_qualification_requires_registered_exact_worker_and_live_proxy(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        b=SimpleNamespace(IMAGE='worker',PREFIX='project',docker=lambda *a:dict(Image='proxy',State={'Running':True},
+            Config={'Labels':{'com.docker.compose.project':'project'}}))
+        with self.assertRaises(ValueError):diagnosis.installed_line_qualification(b,con)
+        con.execute('CREATE TABLE template_registry_qualifications(worker_image TEXT,receipt TEXT)')
+        with self.assertRaises(ValueError):diagnosis.installed_line_qualification(b,con)
+        proof=dict(worker_image='worker',proxy_image='proxy')
+        con.execute('INSERT INTO template_registry_qualifications VALUES(?,?)',('worker',json.dumps(proof)))
+        with patch('broker.template_author_executor.validate_line_qualification') as validate:
+            self.assertEqual(diagnosis.installed_line_qualification(b,con),proof);validate.assert_called_once_with(proof)
+            for proxy in (None,dict(Image='other',State={'Running':True}),dict(Image='proxy',State={'Running':False}),
+                          dict(Image='proxy',State={'Running':True},Config={'Labels':{'com.docker.compose.project':'foreign'}})):
+                b.docker=lambda *a:proxy
+                with self.assertRaises(ValueError):diagnosis.installed_line_qualification(b,con)
+
     def test_reconciliation_is_once_only_same_manifest_and_keeps_previous_decisions(self):
         from tests.test_calibration_failure_plan import CalibrationFailurePlanTests
         proof=CalibrationFailurePlanTests().proof()
@@ -108,25 +188,36 @@ class TemplateFailureDiagnosisTests(unittest.TestCase):
         with self.assertRaises(ValueError):lane.instruction(config,dict(stage='cto_pending'))
 
     def test_normal_intake_preserves_predecessor_and_never_reposts_probe(self):
+        self.intake_case(bootstrap=False)
+
+    def test_bootstrap_intake_freezes_new_source_before_planning_without_replaying_author(self):
+        self.intake_case(bootstrap=True)
+
+    def intake_case(self,bootstrap):
         con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
         handoffs.initialize(con)
         con.execute('CREATE TABLE calibration_failure_plans(source_task TEXT PRIMARY KEY,config TEXT,state TEXT)')
         con.execute('CREATE TABLE leases(request_id TEXT,status TEXT)')
         con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT,issue_id TEXT,agent_id TEXT)')
         con.execute('CREATE TABLE test_first_red(issue_id TEXT)')
-        con.execute("INSERT INTO leases VALUES('req','closed')")
+        con.execute('INSERT INTO leases VALUES(?,?)',('req','failed' if bootstrap else 'closed'))
         con.execute("INSERT INTO native_bindings VALUES('req','failed','issue','author')")
         config=dict(issue_id='issue',source_task='parent',author='author',cto='cto',peer='lead',
             contract_sha256='c'*64,manifest_sha256='a'*64,volume='previous',diagnostic={'test_sha256':'b'*64},
             paths=['/evidence/candidate/test.py'],criteria={'A01':'unchanged'},minimum_calls=8,
             experiment_summary={'diagnostic_copy_only':True})
         old=dict(stage='plan_qualified',executor=dict(status='blocked',task_id='failed',wakeup_id='wake'))
+        if bootstrap:
+            config.update(line_recipe_revision=1,line_recipe={'recipe':{'edits':[]}},line_qualification_sha256='old')
         old_raw=json.dumps(old)
         con.execute('INSERT INTO calibration_failure_plans VALUES(?,?,?)',('parent',json.dumps(config),old_raw))
         handoffs.save(con,'failed','issue','test_first_blocked','cto',dict(error='failed'),0)
         @contextmanager
         def db():yield con;con.commit()
         requests=[]
+        captures=[]
+        def snapshot(payload,diagnostic=False):
+            captures.append((payload,diagnostic));return dict(volume='frozen')
         def docker(method,path,body=None):
             requests.append((method,path))
             if path.startswith('/volumes/'):
@@ -134,14 +225,21 @@ class TemplateFailureDiagnosisTests(unittest.TestCase):
                                   'delivery-kit.diagnostic-only':'true'}}
             return None
         b=SimpleNamespace(db=db,OWNER='owned',PREFIX='delivery-kit-test',docker=docker,
-                          snapshot_submission=lambda *a,**kw:dict(volume='frozen'))
+                          snapshot_submission=snapshot)
         route=dict(issue_id='issue',author='author',cto='cto',techlead='lead',enabled=True,contract_sha256='c'*64)
         source=dict(id='failed',agent_id='author',status='failed',wakeup_id='wake')
         effects=SimpleNamespace(settings={})
         payload=dict(HostConfig={'Mounts':[]},Labels={})
-        with patch('broker.native.task_messages',return_value=self.messages()),patch('broker.harness_qualification.payload',return_value=payload):
+        proof=dict(operation='worker_bootstrap_failure_v1',worker_never_started=True)
+        with patch('broker.native.task_messages',return_value=[] if bootstrap else self.messages()),\
+                patch('broker.harness_qualification.payload',return_value=payload),\
+                patch('broker.template_failure_diagnosis.bootstrap_evidence',return_value=proof) as classify,\
+                patch('broker.template_failure_diagnosis.installed_line_qualification',return_value={'worker_image':'new'}) as qualify:
             for _ in range(2):
                 self.assertTrue(diagnosis.handle(b,route,[source],source,handoffs.load(con,'failed'),effects))
+            self.assertEqual(classify.call_count,1 if bootstrap else 0)
+            self.assertEqual(qualify.call_count,1 if bootstrap else 0)
+        self.assertEqual(captures,[({'task_id':'failed'},True)])
         self.assertEqual(sum(m=='POST' for m,p in requests),1)
         self.assertEqual(con.execute("SELECT state FROM calibration_failure_plans WHERE source_task='parent'").fetchone()[0],old_raw)
         new_config,new_state=map(json.loads,con.execute("SELECT config,state FROM calibration_failure_plans WHERE source_task='failed'").fetchone())
@@ -149,6 +247,9 @@ class TemplateFailureDiagnosisTests(unittest.TestCase):
         self.assertFalse(new_state['author_retry_authorized'])
         self.assertEqual(new_config['predecessor_plan'],'parent')
         self.assertNotIn('executor',new_state)
+        if bootstrap:
+            self.assertEqual(new_config['bootstrap_failure'],proof)
+            self.assertNotEqual(new_config['line_qualification_sha256'],'old')
         self.assertEqual(handoffs.load(con,'failed')['owner'],'cto')
 
     def test_qualified_diagnostic_dispatches_its_admitted_executor_not_the_planner(self):

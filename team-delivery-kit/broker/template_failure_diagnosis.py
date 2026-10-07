@@ -41,6 +41,49 @@ def denials(messages):
                 author_retry_authorized=False,delivery_approval=False)
 
 
+def bootstrap_evidence(b,con,source,issue,author,held,messages):
+    """Only an authenticated worker that never started; no prose-derived retry."""
+    if any(m.get('type') in ('tool_use','tool_result') for m in messages):
+        raise ValueError('bootstrap incident cannot contain executed tools')
+    rows=con.execute('SELECT n.request_id,g.used,g.mode,l.name,l.status FROM native_bindings n '
+        'JOIN grants g USING(request_id) JOIN leases l USING(request_id) '
+        'WHERE n.task_id=? AND n.issue_id=? AND n.agent_id=?',(source,issue,author)).fetchall()
+    if len(rows)!=1 or rows[0][1]!=1 or rows[0][2]!='implementation' or rows[0][4]!='failed':
+        raise ValueError('one consumed failed implementation bootstrap required')
+    request,_,_,name,_=rows[0]
+    errors=[tuple(r) for r in con.execute('SELECT operation,category FROM broker_errors WHERE request_id=?',(request,))]
+    if ('worker_submit','bootstrap:docker_containers_create') not in errors:
+        raise ValueError('recorded pre-start create failure required')
+    if con.execute('SELECT 1 FROM acp_events WHERE request_id=?',(request,)).fetchone():
+        raise ValueError('bootstrap recovery cannot replay an initialized execution')
+    info=b.docker('GET','/containers/'+name+'/json')
+    labels=(info or {}).get('Config',{}).get('Labels',{})
+    state=(info or {}).get('State',{})
+    executor,_,_,_,_,_=modules();previous=executor.selected_executor(held)
+    if (not info or info['Image']!=previous['worker_image'] or state.get('Status')!='created'
+            or state.get('Running') is not False or not str(state.get('StartedAt','')).startswith('0001-')
+            or info.get('ExecIDs') or labels.get('delivery-kit.owner')!=b.OWNER
+            or labels.get('delivery-kit.request')!=request):
+        raise ValueError('exact owned never-started worker required')
+    return dict(operation='worker_bootstrap_failure_v1',source_task=source,request_id=request,
+        container_id=info['Id'],worker_image=info['Image'],category='docker_create_ack_timeout',
+        worker_never_started=True,acp_events=0,tool_calls=0,
+        author_retry_authorized=False,delivery_approval=False)
+
+
+def installed_line_qualification(b,con):
+    if not con.execute("SELECT 1 FROM sqlite_master WHERE name='template_registry_qualifications'").fetchone():
+        raise ValueError('installed V6 qualification required before infrastructure replan')
+    row=con.execute('SELECT receipt FROM template_registry_qualifications WHERE worker_image=?',(b.IMAGE,)).fetchone()
+    if not row:raise ValueError('exact installed V6 qualification missing')
+    proof=json.loads(row[0]);executor,_,_,_,_,_=modules();executor.validate_line_qualification(proof)
+    proxy=b.docker('GET','/containers/'+b.PREFIX+'-model-proxy-1/json')
+    if (proof['worker_image']!=b.IMAGE or not proxy or proxy['Image']!=proof['proxy_image'] or not proxy['State']['Running']
+            or proxy.get('Config',{}).get('Labels',{}).get('com.docker.compose.project')!=b.PREFIX):
+        raise ValueError('installed qualification drift')
+    return proof
+
+
 def reconcile(config,state,identity,experiment):
     """One changed-evidence planning round; retain the original decisions verbatim."""
     try:import calibration_failure_plan as plans
@@ -163,12 +206,15 @@ def handle(b,route,runs,source,prior,effects):
             if not authors or max(authors,key=lambda t:(t.get('created_at') or '',t['id']))['id']!=key:return False
             bindings=con.execute('SELECT l.status FROM native_bindings n JOIN leases l USING(request_id) '
                 'WHERE n.task_id=? AND n.issue_id=? AND n.agent_id=?',(key,issue,previous['author'])).fetchall()
-            if len(bindings)!=1 or bindings[0][0]!='closed':return False
+            if len(bindings)!=1 or bindings[0][0] not in ('closed','failed'):return False
             if (previous['contract_sha256']!=route['contract_sha256']
                     or any(previous[k]!=route[v] for k,v in (('author','author'),('cto','cto'),('peer','techlead')))
                     or len({previous[k] for k in ('author','cto','peer')})!=3):
                 raise ValueError('unchanged distinct diagnostic roles required')
-            evidence=denials(native.task_messages(effects.settings,key))
+            messages=native.task_messages(effects.settings,key)
+            bootstrap=bindings[0][0]=='failed'
+            evidence=bootstrap_evidence(b,con,key,issue,previous['author'],held,messages) if bootstrap else denials(messages)
+            qualification=installed_line_qualification(b,con) if bootstrap else None
             frozen=b.snapshot_submission({'task_id':key},diagnostic=True)
             volume=frozen['volume']
             for name,task in ((previous['volume'],parent),(volume,key)):
@@ -182,6 +228,9 @@ def handle(b,route,runs,source,prior,effects):
             payload['Labels']['delivery-kit.purpose']='template-failure-diagnosis'
             config={**previous,'source_task':key,'volume':volume,'diagnosis_only':True,
                 'execution_failure':evidence,'predecessor_plan':parent}
+            if bootstrap:
+                if not previous.get('line_recipe_revision'):raise ValueError('qualified bounded line proposal required')
+                config.update(bootstrap_failure=evidence,line_qualification_sha256=executor.digest(qualification))
             state=dict(stage='preservation_pending',probe=dict(payload=payload,
                 name=b.PREFIX+'-template-failure-diagnosis-'+key),previous_executor_sha256=executor.digest(held),
                 author_retry_authorized=False,delivery_approval=False)
