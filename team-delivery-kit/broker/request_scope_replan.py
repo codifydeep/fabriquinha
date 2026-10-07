@@ -74,6 +74,50 @@ def payload(b,source,volume):
             Tmpfs={'/tmp':'rw,nosuid,nodev,size=32m,mode=1777'}))
 
 
+def continue_approved(b,source,result):
+    """Continue only an already authorized root and independently approved plan."""
+    try:import remediation_execution as execution,remediation_admission as admission,remediation_dispatch as dispatch
+    except ImportError:from broker import remediation_execution as execution,remediation_admission as admission,remediation_dispatch as dispatch
+    with b.db() as con:
+        row=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
+        if not row:return
+        config,state=map(json.loads,row)
+        if state['stage']!='plan_approved':return
+        if (config.get('amendment',{}).get('kind')!='request_scope'
+                or config['amendment']['experiment_sha256']!=plans.digest(result)):
+            raise ValueError('exact independently reviewed request-scope evidence required')
+        previous=config['amendment']['previous_source']
+        old=con.execute('SELECT intent FROM remediation_admissions WHERE source_task=?',(previous,)).fetchone()
+        if (not old or json.loads(old[0]).get('root_issue')!=config['root_issue']
+                or json.loads(old[0]).get('execution_contract_sha256')!=config['amendment']['previous_execution_sha256']):
+            raise ValueError('preserved authorized root admission required')
+        if con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():return
+    execution_state=execution.register(b,source)
+    if execution_state['stage'] in ('r1_issue_intent','r1_issue_post_pending','r1_issue_observe'):
+        execution.provision_issue(b,source)
+        return
+    if execution_state['stage']=='r1_provision_pending':
+        try:import remediation_preparation
+        except ImportError:from broker import remediation_preparation
+        remediation_preparation.prepare(b,source)
+        return
+    if execution_state['stage']!='r1_base_qualified':return
+    if not execution_state.get('r1_runtime'):
+        try:import remediation_author_context
+        except ImportError:from broker import remediation_author_context
+        remediation_author_context.prepare(b,source)
+        return
+    with b.db() as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='remediation_native_contexts'").fetchone():return
+        presented=con.execute('SELECT state FROM remediation_native_contexts WHERE source_task=? AND step=?',(source,'R1')).fetchone()
+        if not presented or json.loads(presented[0]).get('stage')!='published':return
+    fx=admission.Effects(b);bound=dispatch.binding(b,source,'R1',fx)
+    if bound and not bound['enabled']:
+        with b.db() as con:
+            exists=con.execute('SELECT 1 FROM remediation_admissions WHERE source_task=?',(source,)).fetchone()
+        if not exists:admission.request(b,source)
+
+
 def tick_one(b,proposal,peer):
     try:return advance(b,proposal,peer)
     except (ValueError,TypeError,KeyError) as error:
@@ -120,7 +164,10 @@ def advance(b,proposal,peer):
     if row:
         stored,state=map(json.loads,row)
         if stored!=identity:raise ValueError('request-scope job identity drift')
-        if state['stage'] in ('blocked','plan_registered'):return
+        if state['stage']=='blocked':return
+        if state['stage']=='plan_registered':
+            continue_approved(b,source,state['result'])
+            return
         create=False
     else:
         state=dict(stage='create_intent',at=time.time());create=True

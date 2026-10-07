@@ -642,3 +642,56 @@ uncertain-create restart observation and refusal of repeated same-kind amendment
 The new live plan, background calibration enforcement on a future submission and
 the complete product delivery still require qualification. This does not prove
 a fresh brief can be delivered without operator repair.
+
+### Original-base copy equivalence and mandatory background calibration
+
+An approved request-scope plan can refer to the original base volume while its
+source phase owns a separate copy. `broker/base_equivalence.py` permits only
+`issue_id`/`volume` binding differences, only for that completed-validation plan.
+Git SHA, manifest and every other metadata field remain exact. A fixed offline
+job verifies both complete file inventories against the same manifest, including
+every file's size/hash and the absence of extra files. Matching Git SHA alone is
+never sufficient. Both owned volumes, inspected job and durable output receipt
+remain distinct; the approved config, plan and review are not rewritten.
+
+Create/start intents precede Docker writes. A restart observes the original job,
+not a new POST. Unresolved observations have a ten-minute deadline and preserve
+a visible technical hold without deleting a potentially running job. The base
+comparison itself grants neither implementation nor delivery authority.
+
+`service_mode_background_qualification.py` adds a fixed positive control that
+issues `/service-status`, `/feedback` and `/feedback/summary` alongside the probe.
+All existing positive assertions and twelve defect controls remain required.
+The controller runs this pinned-image calibration before Red capture for new
+request-scope amendments and rechecks its exact snapshot and fixture proof before
+test approval. Older receipts remain unchanged and cannot satisfy this new gate.
+
+After a new exact plan is independently approved, the request-scope controller
+registers its execution and provisions R1. Admission waits for original-base
+qualification and actual native context publication. Continuation requires the
+previous explicit admission for the same root and execution hash; it does not
+increase the proxy cap or bypass capacity, cancellation or downstream gates.
+The complete offline suite covers 2,292 tests with seven existing skips. The
+installed fixed base-equivalence probe has verified matching full inventories.
+New candidate calibration and end-to-end delivery still need their own runtime
+evidence; base equivalence is not delivery approval.
+
+The first installed equivalence job rejected the base because it used the frozen
+delivery manifest parser. Bases have a separate `{base_sha, files}` schema.
+The corrected immutable tool uses `initial_base_inspect`, including the protected
+baseline/contract inventory, not a relaxed parser. The original failed job and
+ledger remain untouched. A once-only maintenance receipt verifies its actual
+schema error, owned stopped job and unchanged independent plan before a new
+versioned job/ledger may run. This correction does not rewrite the approved
+config or reinterpret the old failure as a pass.
+
+### Automatic preparation after independent plan approval
+
+The request-scope continuation starts the fixed original-base preparation when
+R1 is provisioned. Once that preparation is qualified, it starts author-context
+preparation if no runtime binding exists. Subsequent ticks observe the durable
+operations instead of relying on an operator to invoke those entry points.
+Native publication and all admission checks remain prerequisites for dispatch.
+This removes two passive waiting states; it does not grant a worker capability,
+approve tests or bypass the independent R1/R2/R3 gates. Installed preparation has
+started automatically; its complete handoff and delivery are not yet qualified.

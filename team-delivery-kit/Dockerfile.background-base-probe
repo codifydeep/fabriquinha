@@ -1,0 +1,4 @@
+FROM delivery-kit-hermes-runtime:20260921.1
+# Required local base ID sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf.
+COPY service_mode_background_qualification.py service_mode_harness_qualification.py inherited_harness_probe.py r3_snapshot_probe.py base_equivalence_probe.py /
+USER 10000:10000

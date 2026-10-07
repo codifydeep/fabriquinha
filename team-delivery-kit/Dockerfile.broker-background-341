@@ -1,0 +1,7 @@
+FROM delivery-kit-execution-broker:20261007.340
+USER root
+COPY broker/base_equivalence.py /base_equivalence.py
+COPY broker/remediation_execution.py /remediation_execution.py
+COPY broker/request_scope_replan.py /request_scope_replan.py
+COPY broker/harness_qualification.py /harness_qualification.py
+COPY service_mode_background_qualification.py /service_mode_background_qualification.py

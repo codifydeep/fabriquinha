@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261007.342
+USER root
+COPY broker/base_equivalence.py /base_equivalence.py

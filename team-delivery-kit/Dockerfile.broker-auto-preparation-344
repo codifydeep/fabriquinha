@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261007.343
+USER root
+COPY broker/request_scope_replan.py /request_scope_replan.py

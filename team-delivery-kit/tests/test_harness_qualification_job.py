@@ -41,6 +41,19 @@ class HarnessJobTests(unittest.TestCase):
             bad=copy.deepcopy(value);mutate(bad)
             with self.assertRaises(ValueError):job.validate_result(bad,self.prepared)
 
+    def test_new_scope_amendment_requires_background_proof_without_upgrading_old_receipts(self):
+        from service_mode_background_qualification import BACKGROUND
+        value=self.result();job.validate_result(value,self.prepared)
+        with self.assertRaises(ValueError):job.validate_result(value,self.prepared,require_background=True)
+        value.update(background_control=copy.deepcopy(value['positive']),
+            background_fixture_sha256=hashlib.sha256((BACKGROUND+fixture('positive')).encode()).hexdigest())
+        job.validate_result(value,self.prepared,require_background=True)
+        for mutate in (lambda r:r['background_control'].update(tests=1),
+                       lambda r:r['background_control'].update(failures=1),
+                       lambda r:r.update(background_fixture_sha256='0'*64)):
+            bad=copy.deepcopy(value);mutate(bad)
+            with self.assertRaises(ValueError):job.validate_result(bad,self.prepared,require_background=True)
+
     def test_uncertain_creation_is_observed_without_second_post(self):
         con=sqlite3.connect(':memory:');self.addCleanup(con.close)
         calls=[]

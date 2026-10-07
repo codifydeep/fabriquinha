@@ -107,7 +107,11 @@ def register(b,source):
             if not planning.validate_result(config,{**state,'stage':phase,'wakeup_id':wake},task,body,fx.reads(task)):
                 raise ValueError('live independent approval required')
             if body!=state['plan' if role=='cto' else 'review']:raise ValueError('native approved artifact drift')
-        if b.issue_base(config['source_issue'])!=config['base']:raise ValueError('original Git base drift')
+        current_base=b.issue_base(config['source_issue'])
+        if current_base!=config['base']:
+            try:import base_equivalence
+            except ImportError:from broker import base_equivalence
+            base_equivalence.qualify(b,config,current_base)
         receipt=dict(stage='r1_issue_intent',owner=config['original_author'],execution_authorized=False,
             contract_sha256=planning.digest(value),created_at=time.time(),
             steps={step['id']:dict(stage='provision_pending' if step['id']=='R1' else 'waiting_dependency') for step in value['steps']})

@@ -4,6 +4,7 @@ import json
 import time
 import re
 from types import SimpleNamespace
+BACKGROUND_IMAGE='sha256:e5c5b7cbf4c99852e762bf5f36496c59dc8c147b7aeb55e1f05ccbcea03b3513'
 
 IMAGE_ENV_KEYS={'PATH','PYTHONUNBUFFERED','PYTHONDONTWRITEBYTECODE','PLAYWRIGHT_BROWSERS_PATH',
     'npm_config_install_links','HERMES_WEB_DIST','HERMES_TUI_DIR','HERMES_HOME','HERMES_WRITE_SAFE_ROOT',
@@ -26,9 +27,9 @@ def image_environment(b):
     return [key+'='+value for key,value in sorted(environment.items())]
 
 
-def payload(b,task,volume,manifest):
+def payload(b,task,volume,manifest,*,background=False):
     return dict(Image=b.IMAGE,User='10000:10000',Entrypoint=['python'],
-        Cmd=['/service_mode_harness_qualification.py','/delivery',manifest],
+        Cmd=['/service_mode_background_qualification.py' if background else '/service_mode_harness_qualification.py','/delivery',manifest],
         NetworkDisabled=True,Env=image_environment(b),
         Labels={'delivery-kit.owner':b.OWNER,'delivery-kit.harness-task':task,
                 'delivery-kit.harness-manifest':manifest},
@@ -48,7 +49,7 @@ def verify_job(info,expected):
         raise ValueError('offline harness job identity or isolation drift')
 
 
-def validate_result(result,prepared):
+def validate_result(result,prepared,*,require_background=False):
     from service_mode_harness_qualification import TEST,CASES,validate_controls,fixture
     if (result.get('operation')!='service_mode_harness_calibration_v1' or result.get('status')!='passed'
             or result.get('manifest_sha256')!=prepared['manifest_sha256']
@@ -63,6 +64,11 @@ def validate_result(result,prepared):
     hashes={case:hashlib.sha256(fixture(case).encode()).hexdigest() for case in ['positive',*CASES]}
     if result.get('control_fixture_sha256')!=hashes:raise ValueError('controller fixtures drift')
     validate_controls(result.get('positive',{}),result.get('negative_controls',{}))
+    if require_background:
+        from service_mode_background_qualification import BACKGROUND,validate
+        validate(result.get('background_control',{}),result['positive'])
+        expected=hashlib.sha256((BACKGROUND+fixture('positive')).encode()).hexdigest()
+        if result.get('background_fixture_sha256')!=expected:raise ValueError('fixed background fixture proof required')
 
 
 def rejection_state(con,issue,info,raw):
@@ -109,7 +115,9 @@ def reconcile_rejected(b,con,task):
     # An upgrade must observe the original immutable job, not reinterpret its
     # isolation contract using the new worker image or create a replacement.
     original=SimpleNamespace(IMAGE=pinned,docker=b.docker,OWNER=b.OWNER)
-    expected=payload(original,task,identity['volume'],identity['manifest_sha256'])
+    background=identity['payload'].get('Cmd',[None])[0]=='/service_mode_background_qualification.py'
+    if background and pinned!=BACKGROUND_IMAGE:raise ValueError('pinned background calibration image required')
+    expected=payload(original,task,identity['volume'],identity['manifest_sha256'],background=background)
     if identity['payload']!=expected:raise ValueError('recorded harness policy drift')
     info=b.docker('GET','/containers/'+state['container_id']+'/json');verify_job(info,expected)
     if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']==0:
@@ -127,7 +135,9 @@ def capture(b,con,issue,task,volume,prepared):
     if not value or not value.get('amendment'):return None
     from service_mode_harness_qualification import TEST
     if set(prepared['test_sha256'])!={TEST}:raise ValueError('declared amendment test scope required')
-    manifest=prepared['manifest_sha256'];expected=payload(b,task,volume,manifest)
+    background=value['amendment'].get('kind')=='request_scope'
+    image=SimpleNamespace(IMAGE=BACKGROUND_IMAGE,docker=b.docker,OWNER=b.OWNER) if background else b
+    manifest=prepared['manifest_sha256'];expected=payload(image,task,volume,manifest,background=background)
     con.execute('CREATE TABLE IF NOT EXISTS harness_qualifications(task_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
     identity=dict(issue_id=issue,task_id=task,volume=volume,manifest_sha256=manifest,payload=expected)
     row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(task,)).fetchone()
@@ -138,7 +148,7 @@ def capture(b,con,issue,task,volume,prepared):
     if row:
         if json.loads(row[0])!=identity:raise ValueError('immutable harness identity drift')
         state=json.loads(row[1])
-        if state['stage']=='passed':validate_result(state['result'],prepared);return state['result']
+        if state['stage']=='passed':validate_result(state['result'],prepared,require_background=background);return state['result']
         if state['stage']=='blocked':raise ValueError('harness qualification retained hold; no identical retry')
     else:
         state=dict(stage='create_intent',created_at=time.time(),delivery_approval=False)
@@ -159,7 +169,7 @@ def capture(b,con,issue,task,volume,prepared):
             raw=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
             try:
                 if info['State']['ExitCode']!=0:raise ValueError('offline harness calibration rejected')
-                result=json.loads(raw);validate_result(result,prepared)
+                result=json.loads(raw);validate_result(result,prepared,require_background=background)
             except (ValueError,KeyError,TypeError):
                 save(rejection_state(con,issue,info,raw))
                 raise ValueError('harness calibration rejected; CTO diagnose immutable candidate')
@@ -182,4 +192,4 @@ def require(b,issue,red):
     if (identity['issue_id']!=issue or identity['volume']!=red['volume']
             or identity['manifest_sha256']!=red['red']['manifest_sha256'] or state['stage']!='passed'):
         raise ValueError('same actual Red candidate calibration required')
-    validate_result(state['result'],red['red'])
+    validate_result(state['result'],red['red'],require_background=value['amendment'].get('kind')=='request_scope')

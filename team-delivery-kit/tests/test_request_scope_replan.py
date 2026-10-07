@@ -93,3 +93,30 @@ class RequestScopeReplanTests(unittest.TestCase):
         self.assertEqual(state['stage'],'blocked');self.assertIn('no repeated POST',state['required_action'])
         self.assertFalse(any(method=='POST' for method,_ in calls))
         con.close()
+
+    def test_approved_continuation_waits_for_preparation_without_reprovisioning(self):
+        import json,sqlite3,threading
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from broker import request_scope_replan as module,remediation_execution as execution,remediation_preparation,remediation_author_context
+        proposal,peer,result,reference,previous,route,volume=self.fixture()
+        cfg=config(proposal,peer,result,reference,previous,route,volume)
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row
+        con.execute('CREATE TABLE technical_remediation_plans(source_task TEXT,config TEXT,state TEXT)')
+        con.execute('CREATE TABLE remediation_admissions(source_task TEXT,intent TEXT)')
+        con.execute('CREATE TABLE leases(status TEXT)')
+        con.execute('INSERT INTO technical_remediation_plans VALUES(?,?,?)',('source',json.dumps(cfg),json.dumps(dict(stage='plan_approved'))))
+        con.execute('INSERT INTO remediation_admissions VALUES(?,?)',('previous',json.dumps(dict(root_issue='root',execution_contract_sha256=reference['execution_contract_sha256']))))
+        @contextmanager
+        def db():yield con
+        b=SimpleNamespace(db=db,LOCK=threading.RLock())
+        with patch.object(execution,'register',return_value=dict(stage='r1_provision_pending')),patch.object(execution,'provision_issue') as create,patch.object(remediation_preparation,'prepare') as prepare:
+            module.continue_approved(b,'source',result);create.assert_not_called()
+            prepare.assert_called_once_with(b,'source')
+        with patch.object(execution,'register',return_value=dict(stage='r1_base_qualified')),patch.object(execution,'provision_issue') as create,patch.object(remediation_author_context,'prepare') as runtime:
+            module.continue_approved(b,'source',result);create.assert_not_called()
+            runtime.assert_called_once_with(b,'source')
+        con.execute('DELETE FROM remediation_admissions')
+        with self.assertRaises(ValueError):module.continue_approved(b,'source',result)
+        con.close()

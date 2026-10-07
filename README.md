@@ -62,6 +62,10 @@ requisições e encaminha a evidência ao planejamento do CTO e à revisão do T
 Lead. Intenções Docker persistem antes das ações, e uma resposta incerta é
 observada sem repetição. Isso autoriza planejamento, não implementação ou
 homologação; o novo plano e os gates posteriores ainda precisam ser validados.
+O primeiro plano dessa continuação já recebeu aprovação independente. A passagem
+à execução exige equivalência física completa das cópias da base e, para os
+novos testes, calibração com tráfego paralelo. Recebimentos antigos não são
+convertidos retroativamente em evidência desses controles novos.
 
 O CEO descreve o resultado desejado. Produto refina o brief; CTO decide arquitetura; Tech Lead organiza o trabalho. Os agentes implementam com TDD, corrigem apontamentos de revisão e integram entregas pelo GitHub. A versão só é entregue quando o ambiente de homologação e suas evidências são verificáveis.
 
