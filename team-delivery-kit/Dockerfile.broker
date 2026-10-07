@@ -94,6 +94,7 @@ COPY proxy_request_rejections.py /proxy_request_rejections.py
 COPY author_read_policy.py /author_read_policy.py
 COPY decision_schema.py /decision_schema.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
+COPY r3_incident_contract.py /r3_incident_contract.py
 COPY remediation_transport_probe.py /remediation_transport_probe.py
 COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
 COPY broker/remediation_transport_recovery.py /remediation_transport_recovery.py

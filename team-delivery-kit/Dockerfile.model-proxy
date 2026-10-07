@@ -4,6 +4,7 @@ COPY model_proxy.py /model_proxy.py
 COPY model_policy.py /model_policy.py
 COPY decision_schema.py /decision_schema.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
+COPY r3_incident_contract.py /r3_incident_contract.py
 COPY remediation_transport_probe.py /remediation_transport_probe.py
 COPY observed_finding_locations.py /observed_finding_locations.py
 COPY work_proposal_contract.py /work_proposal_contract.py

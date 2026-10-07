@@ -24,6 +24,7 @@ REVIEW_LENGTH_MARKER='DELIVERY_REVIEW_LENGTH_FEEDBACK_V1'
 RECOVERY_NAME='submit_worker_recovery_request'
 RECOVERY_MARKER='DELIVERY_TYPED_WORKER_RECOVERY_V1'
 REMEDIATION_NAME='submit_remediation_contract'
+from r3_incident_contract import NAME as R3_NAME
 REMEDIATION_LENGTH_MARKER='DELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
 
 
@@ -153,6 +154,21 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
 
 
 def apply(body):
+    from r3_incident_contract import request_contract
+    incident = request_contract(body)
+    if incident is not None:
+        spec=body.get('response_format',{}).get('json_schema',{})
+        if (spec.get('name')!='delivery_r3_incident_v1' or spec.get('strict') is not True
+                or spec.get('schema')!=incident):
+            raise ValueError('exact nonauthorizing R3 schema required')
+        result=copy.deepcopy(body);result.pop('response_format',None);result.pop('parallel_tool_calls',None)
+        result['tools']=[dict(type='function',function=dict(name=R3_NAME,strict=True,
+            description='Submit technical diagnosis or review data only. No worker operation executes.',parameters=incident))]
+        result['tool_choice']=dict(type='function',function=dict(name=R3_NAME))
+        result['messages'].append(dict(role='system',content='Call '+R3_NAME+' exactly once with actual schema-valid arguments. '
+            'No prose or simulated calls. Reference all verified facts. This submission grants no execution, merge, '
+            'test waiver or release authority; execution_authorized and release_homologated remain false.'))
+        return result
     remediations={(kind,sha) for m in body.get('messages',[]) if m.get('role')=='user' and isinstance(m.get('content'),str)
         for kind,sha in re.findall(r'^DELIVERY_TYPED_REMEDIATION_V1:(plan|review):([a-f0-9]{64})$',m['content'],re.M)}
     if remediations:
@@ -344,7 +360,8 @@ def selected(body):
                                      {'type':'function','function':{'name':EVIDENCE_NAME}},
                                      {'type':'function','function':{'name':VALIDATION_NAME}},
                                      {'type':'function','function':{'name':RECOVERY_NAME}},
-                                     {'type':'function','function':{'name':REMEDIATION_NAME}})
+                                     {'type':'function','function':{'name':REMEDIATION_NAME}},
+                                     {'type':'function','function':{'name':R3_NAME}})
 
 
 def normalize_technical_padding(body,data,media_type):
@@ -627,6 +644,9 @@ def translate(body,data,media_type):
         if name==REMEDIATION_NAME:
             receipt.update(mode='technical_remediation_plan_or_review',execution_authorized=False,
                            release_homologated=False,plan_acceptance_by_proxy=False)
+        if name==R3_NAME:
+            receipt.update(mode='r3_incident_diagnosis_or_review',execution_authorized=False,
+                           release_homologated=False,diagnosis_acceptance_by_proxy=False)
         return output,media_type,receipt
     except Exception as error:
         if not isinstance(error,StructuredResponseRejected):

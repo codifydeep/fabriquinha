@@ -15,6 +15,14 @@ def validation_schema(sha):
 
 
 def apply(body):
+    from r3_incident_contract import request_contract
+    incident = request_contract(body)
+    if incident is not None:
+        body['tools']=[];body['tool_choice']='none'
+        body['response_format']={'type':'json_schema','json_schema':{
+            'name':'delivery_r3_incident_v1','strict':True,'schema':incident}}
+        body['provider']={**(body.get('provider') or {}),'require_parameters':True}
+        return body
     from work_proposal_contract import apply as work_proposal
     proposal = work_proposal(body)
     if proposal is not None: return proposal

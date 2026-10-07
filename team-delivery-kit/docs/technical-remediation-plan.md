@@ -406,3 +406,21 @@ and recursive test-revision/QA-repair execution outside its approved plan.
 The real paused installation has no approved R3 candidate and the hook therefore
 starts nothing. Full-chain admission and live R1/R2/R3 acceptance still remain;
 keep R1 paused until those gates are qualified.
+
+### Nonexecuting incident diagnosis contract
+
+`r3_incident_contract.py` binds a technical diagnosis to an exact evidence hash
+and every controller-supplied fact identity (one to ten distinct facts). An
+independent CTO review additionally binds the exact proposal hash. Both schemas
+reject extra properties, execution authority and release-completion claims.
+Fixed experiment names describe recommendations, never arbitrary commands.
+
+The proxy accepts only the matching strict schema and a real typed submission;
+prose, simulated tool calls, wrong functions and altered authority fields are
+rejected. Its transport receipt explicitly records that no worker tool executed
+and no diagnosis or delivery was approved by the proxy.
+
+This contract is only the data boundary. Persistent incident registration,
+actual Tech Lead/CTO handoffs, controlled experiment execution and verified
+resume authorization remain necessary before activating the live trial. Do not
+treat a schema-valid recommendation as permission to relaunch a controller.
