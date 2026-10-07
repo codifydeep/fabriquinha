@@ -501,5 +501,30 @@ their real delivery gates are satisfied or the CEO explicitly cancels them.
 
 Metadata contains only safe stage/owner/category/identity projections. Display
 metadata never enters the state used to verify an independent approval. Current
-process checks, proof revalidation and one-shot verified controller resume still
-need implementation and live acceptance before the paused R1 trial is enabled.
+process checks, proof revalidation and one-shot verified controller resume are
+implemented below; live acceptance is still required before claiming autonomy.
+
+### One-shot verified controller resume
+
+`r3_verified_resume.py` is a controller-only operation, not an agent tool. A
+post-experiment CTO recommendation and independent Tech Lead approval remain
+non-authorizing until the controller re-reads both actual native executions,
+the persisted experiment chain, current R2 independent approval and broker
+qualification. A physical read-only snapshot probe verifies the exact manifest.
+Active workers or an existing/ambiguous controller prevent a new launch.
+
+Each approval binds `controller_episode_sha256` to the entire exact persisted
+hold, not merely the immutable bundle identity. A changed hold requires a new
+technical decision. The same controller lock serializes initial publication
+and recovery. Verification and launch intents are durable before their effects;
+an interrupted verification stays blocked, and a lost launch acknowledgment is
+lookup-only. Only the exact fixed managed script/label may be adopted. Missing,
+changed or ambiguous handles remain visible CTO impediments, without another
+launch under the same approval. No process is killed by this operation.
+
+The old hold, original depth, full brief and test receipts remain preserved.
+`controller_resume_authorized` applies only to that single controller launch;
+agent decisions still have `execution_authorized=false` and no release success.
+Existing product PR, CI, merge, same-SHA deployment and automated browser QA
+gates are unchanged. A recovered process is not a delivered release. Full-chain
+admission and a real R1/R2/R3 recovery trial remain separate acceptance work.

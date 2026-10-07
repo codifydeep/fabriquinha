@@ -145,5 +145,6 @@ class R3IncidentRuntimeTests(unittest.TestCase):
         sent=self.fx.binding.call_args.args[0]
         self.assertEqual(sent['source_task'],fixture.bundle['context']['remediation_expected']['source_task'])
         self.assertEqual(sent['bundle_sha256'],digest(fixture.bundle))
+        self.assertEqual(sent['controller_episode_sha256'],digest(state))
         with self.assertRaises(ValueError):supervise(self.root,parent,{**state,'identity':'b'*64},effects=self.fx)
         self.assertIsNone(supervise(self.root,parent,{'stage':'running'},effects=self.fx))

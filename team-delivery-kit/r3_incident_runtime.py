@@ -20,7 +20,11 @@ CATEGORIES = dict(r3_controller_handle_missing='controller_handle_missing',
     r3_controller_identity_changed='controller_identity_changed',ambiguous_r3_controller='controller_ambiguous',
     unrecorded_r3_controller='controller_unrecorded',r3_progress_deadline='progress_deadline_exceeded',
     r3_dependency_not_qualified='r2_dependency_not_qualified',r3_delivery_receipt_disappeared='delivery_receipt_missing',
-    r3_status_identity_changed='status_identity_changed',invalid_r3_launch_handle='invalid_launch_handle')
+    r3_status_identity_changed='status_identity_changed',invalid_r3_launch_handle='invalid_launch_handle',
+    authorized_resume_handle_missing='controller_handle_missing',authorized_resume_handle_ambiguous='controller_ambiguous',
+    authorized_resume_identity_changed='controller_identity_changed',authorized_resume_handle_invalid='invalid_launch_handle',
+    authorized_resume_verification_failed='experiment_verification_failed',
+    authorized_resume_verification_unobservable='experiment_result_unobservable')
 
 RPC = '''import sys;sys.path.insert(0,"/")
 import json,r3_incident_native
@@ -48,7 +52,10 @@ def validate_evidence(evidence):
               'category','facts','execution_authorized','release_homologated'}
     continuation={'previous_incident_sha256','experiment_receipt_sha256','experiment_result_sha256','experiment_history'}
     import re
-    if (set(evidence) not in (expected,expected|continuation) or evidence['operation']!='r3_incident_evidence_v1'
+    episode={'controller_episode_sha256'}
+    if (set(evidence) not in (expected,expected|continuation,expected|episode,expected|continuation|episode)
+            or ('controller_episode_sha256' in evidence and not re.fullmatch('[a-f0-9]{64}',str(evidence['controller_episode_sha256'])))
+            or evidence['operation']!='r3_incident_evidence_v1'
             or any(not re.fullmatch('[a-f0-9]{64}',str(evidence[k])) for k in
                    ('controller_identity','bundle_sha256','r2_proof_sha256'))
             or not isinstance(evidence['category'],str) or not re.fullmatch('[a-z0-9_]{1,80}',evidence['category'])
@@ -183,7 +190,7 @@ def reconcile(private,evidence,*,instance='delivery-kit-port2',effects=None):
                      'next_action':'fixed controller verification required; no execution authority from agent text'})
 
 
-def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects=None,contract=None):
+def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects=None,contract=None,stage=None,project=None):
     """Use only the persisted exact R3 intake and matching controller hold."""
     if publication.get('stage')!='blocked':return None
     category=publication.get('category')
@@ -203,10 +210,16 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
         raise ValueError('actual nonauthorizing persisted R3 hold required')
     proof=context['remediation_expected']
     evidence=dict(operation='r3_incident_evidence_v1',root_issue=parent['issue_id'],source_task=proof['source_task'],
-        controller_identity=saved['identity'],bundle_sha256=digest(value),r2_proof_sha256=digest(proof),category=category,
+        controller_identity=saved['identity'],controller_episode_sha256=digest(saved),
+        bundle_sha256=digest(value),r2_proof_sha256=digest(proof),category=category,
         facts={'F01':CATEGORIES[category],'F02':'delivery_not_verified'},execution_authorized=False,release_homologated=False)
     incident=reconcile(private,evidence,instance=instance,effects=effects)
     if incident.get('stage')=='experiment_pending':
         from r3_post_experiment import drive
         incident=drive(private,evidence,incident,value,instance=instance,effects=effects,contract=contract)
+    if incident.get('stage')=='resume_verification_pending' and stage is not None and project is not None:
+        from r3_verified_resume import resume
+        result=resume(private,incident,value,stage,project,instance=instance)
+        incident={**incident,'resume':{k:result[k] for k in
+            ('stage','owner','category','resume_incident_sha256','controller_resume_authorized','release_homologated') if k in result}}
     return incident
