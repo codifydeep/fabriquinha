@@ -25,7 +25,9 @@ def compare(previous,current):
     name='tests/test_service_mode_indicator.py'
     return dict(operation='template_admission_preservation_v1',status='passed',
         manifest_sha256=hashlib.sha256(new).hexdigest(),test_sha256=files[name]['sha256'],
-        files=len(files),all_files_unchanged=True,delivery_approval=False)
+        files=len(files),test_bytes=files[name]['bytes'],file_limit_bytes=32768,
+        available_growth_bytes=32768-files[name]['bytes'],
+        all_files_unchanged=True,delivery_approval=False)
 
 
 if __name__=='__main__':

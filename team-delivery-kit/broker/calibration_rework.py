@@ -18,6 +18,41 @@ def initialize(con):
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
     if config.get('diagnosis_only'):
+        execution=config.get('execution_failure')
+        incident=''
+        if execution:
+            proof=state.get('probe',{}).get('proof',{})
+            if (proof.get('all_files_unchanged') is not True
+                    or type(proof.get('available_growth_bytes')) is not int):
+                raise ValueError('executed immutable byte-budget proof required')
+            incident=('NEW EXECUTION FAILURE: both surgical proposals were rejected; all original bytes remain unchanged. '
+                'Do not assume the first replacement was applied or reuse fragments from a rejected proposal. '
+                'Propose a minimal exact-original-fragment correction within the measured UTF-8 byte budget; '
+                'prefer replacing stale observation expressions, not adding a duplicate driver or removing assertions. '
+                'No larger file limit or repeated unchanged executor is authorized. '
+                'Native denials: '+json.dumps(execution,sort_keys=True)+'\nMeasured file budget: '+
+                json.dumps({k:proof[k] for k in ('test_bytes','file_limit_bytes','available_growth_bytes')},sort_keys=True)+'\n')
+            note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
+                'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
+                'POST-FAILURE PLAN ONLY: '+('Independent Tech Lead review. ' if peer else 'CTO diagnosis. ')+
+                'Read every frozen original file completely. No shell, edits, Red replay or delivery approval. '
+                'Preserve every test method/assertion, original product, existing tests and all acceptance. '
+                'Propose only a bounded NEW harness template correction by the original author. '
+                'Pending observations precede settlement; terminal observations must be read afresh after settlement. '
+                'The previous successful experiment used a disposable COPY, never an author submission or valid Red. '
+                'The original product lacks the new feature: expected Red, not a harness fault. '
+                'Neither decision grants execution, reset of limits/depth or recursive revision. '
+                'Require controller calibration, full pinned Red, independent test review and all later delivery gates. '
+                'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[]. '
+                'Explain a minimal exact-fragment proposal and its byte growth; if unsupported retain the hold.\n'+
+                incident+'Prior experiment: '+json.dumps({k:config['experiment_summary'][k] for k in
+                    ('hypothesis','original_failures','variant_positive_tests','variant_negative_controls','diagnostic_copy_only')
+                    if k in config['experiment_summary']},sort_keys=True)+
+                ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
+                '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
+                ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
+            if len(note)+100>4000:raise ValueError('surgical failure plan context too large')
+            return note
         note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
             'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
             'POST-FAILURE PLAN ONLY: '+('Independent Tech Lead review of CTO proposal. ' if peer else 'CTO diagnosis. ')+
@@ -30,8 +65,8 @@ def instruction(config,state):
             'Require fresh controller calibration, full pinned Red, independent test review and all later delivery gates. '
             'This lane retains a proposal only. Neither decision grants execution, reset of limits/depth or recursive revision. '
             'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[]. '
-            'Explain the changed evidence and minimal correction; if uncertain retain the hold with escalate_cto.\n'
-            'Executed experiment: '+json.dumps(config['experiment_summary'],sort_keys=True)+
+            'Explain the changed evidence and minimal correction; if uncertain retain the hold with escalate_cto.\n'+
+            incident+'Executed experiment: '+json.dumps(config['experiment_summary'],sort_keys=True)+
             '\nOriginal failure: '+json.dumps(config['diagnostic'],sort_keys=True)+
             ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
             '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+

@@ -57,6 +57,10 @@ def handle(b,route,runs,source,prior,effects):
 
 def _handle(b,route,runs,source,prior,effects):
     lane,jobs,handoffs,_=modules();key=source['id'];issue=route['issue_id']
+    try:import template_failure_diagnosis
+    except ImportError:from broker import template_failure_diagnosis
+    with b.db() as con:initialize(con)
+    if template_failure_diagnosis.handle(b,route,runs,source,prior,effects):return True
     parent=json.loads(prior['data']).get('calibration_failure_plan_source')
     if parent:
         with b.db() as con:

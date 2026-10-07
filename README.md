@@ -134,6 +134,16 @@ por observação, sem repostar após resultado incerto. Nem essa admissão nem a
 preservação dos arquivos comprovam Red, revisão ou entrega autônoma ponta a ponta.
 O ensaio seguinte chegou à ferramenta restrita, mas suas propostas foram
 rejeitadas por crescimento excessivo do arquivo e por fragmento inexistente.
+
+Essa combinação possui uma trilha de diagnóstico persistente: os retornos reais
+das ferramentas identificam o incidente, um job fixo compara todos os arquivos
+congelados e mede o orçamento de bytes, e somente então CTO e Tech Lead recebem
+uma proposta de planejamento somente leitura. Reiniciar o controlador não recria
+um job ou wakeup de resultado incerto. O plano não reinicia o autor, não altera
+limites nem substitui calibração, Red ou revisão. Executores históricos bloqueados
+não concorrem com uma permissão ativa, mas duas permissões ativas são rejeitadas.
+Essa recuperação ainda exige qualificação instalada e evidência ponta a ponta;
+seus testes offline não constituem prova de entrega autônoma.
 O código de feedback informa orçamento UTF-8 e rejeição atômica antes da escrita,
 sem aumentar limites. Essa melhoria ainda exige qualificação instalada e nova
 proposta técnica; a correção da integração não é conclusão da entrega.
