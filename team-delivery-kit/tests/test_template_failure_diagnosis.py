@@ -150,3 +150,28 @@ class TemplateFailureDiagnosisTests(unittest.TestCase):
         self.assertEqual(new_config['predecessor_plan'],'parent')
         self.assertNotIn('executor',new_state)
         self.assertEqual(handoffs.load(con,'failed')['owner'],'cto')
+
+    def test_qualified_diagnostic_dispatches_its_admitted_executor_not_the_planner(self):
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
+        handoffs.initialize(con)
+        con.execute('CREATE TABLE calibration_failure_plans(source_task TEXT PRIMARY KEY,config TEXT,state TEXT)')
+        config=dict(issue_id='issue',source_task='failed',author='author',cto='cto',peer='lead',
+            execution_failure={'operation':'surgical_failure_diagnosis_v1'},contract_sha256='c'*64,
+            manifest_sha256='a'*64,minimum_calls=8)
+        state=dict(stage='plan_qualified',peer_task='peer',cto_decision={'reason':'Fresh observation'},
+            peer_decision={'reason':'No timer edit'},executor=dict(status='ready',contract_sha256='d'*64))
+        con.execute('INSERT INTO calibration_failure_plans VALUES(?,?,?)',('failed',json.dumps(config),json.dumps(state)))
+        handoffs.save(con,'failed','issue','calibration_failure_plan','cto',{},0)
+        @contextmanager
+        def db():yield con;con.commit()
+        calls=[]
+        def wake(*a,**kw):calls.append(kw['allow_create']);return None
+        effects=SimpleNamespace(remaining_calls=lambda:100,implementation_available=lambda *a:True,ensure_wakeup=wake)
+        route=dict(enabled=True,issue_id='issue',author='author',cto='cto',techlead='lead',contract_sha256='c'*64)
+        with patch('broker.calibration_rework.advance') as planner:
+            for _ in range(2):diagnosis.handle(SimpleNamespace(db=db),route,[],{'id':'failed'},handoffs.load(con,'failed'),effects)
+            planner.assert_not_called()
+        self.assertEqual(calls,[True,False])
+        stored=json.loads(con.execute('SELECT state FROM calibration_failure_plans').fetchone()[0])
+        self.assertEqual(stored['executor']['status'],'intent')
+        self.assertEqual(handoffs.load(con,'failed')['owner'],'author')

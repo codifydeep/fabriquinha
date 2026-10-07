@@ -200,10 +200,14 @@ def handle(b,route,runs,source,prior,effects):
             data.update(calibration_failure_plan=dict(source_task=key,manifest_sha256=config['manifest_sha256'],state=new),
                 required_action=new.get('required_action','surgical_failure_diagnosis:'+new['stage']))
             owner=config['peer'] if new['stage'].startswith('peer') else config['cto']
+            if new.get('executor',{}).get('status') in ('ready','intent','waiting','author_completed_awaiting_gates'):
+                owner=config['author']
             handoffs.save(con,key,issue,'calibration_failure_plan',owner,data,time.time())
     try:
         if state['stage'].startswith('preservation'):
             state=probe(b,config,state,persist)
+        elif state.get('executor'):
+            executor.advance(config,state,effects,persist)
         else:lane.advance(config,state,runs,effects,persist)
     except (ValueError,TypeError,KeyError) as error:
         persist({**state,'stage':'blocked','category':'surgical_failure_diagnosis_rejected',
