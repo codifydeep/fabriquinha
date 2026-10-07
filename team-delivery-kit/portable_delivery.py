@@ -7,6 +7,7 @@ import hashlib
 import fcntl
 import json
 import os
+from portable_remediation_gate import qualify as qualify_remediation_delivery
 from pathlib import Path
 import re
 import subprocess
@@ -895,6 +896,8 @@ def reconcile(context, contract):
         save_receipt(RECEIPT, receipt)
         raise QualityBlocked(incident)
     delivery = candidate_delivery or approved(context)
+    recovery_proof = qualify_remediation_delivery(command, INSTANCE, context, delivery,
+        previous=receipt.get('remediation_delivery'))
     if context.get('durable_handoffs'):
         query = ('import sqlite3,json,sys; c=sqlite3.connect("file:/broker-state/leases.sqlite?mode=ro",uri=True); '
                  'r=c.execute("SELECT r.body FROM task_contracts t JOIN contract_revisions r USING(decision_task) WHERE t.task_id=?",(sys.argv[1],)).fetchone(); print(r[0] if r else "null")')
@@ -915,6 +918,8 @@ def reconcile(context, contract):
         if receipt.get('merge_sha'):
             receipt['merge_preceded_policy_revalidation'] = True
     receipt['delivery'] = delivery
+    if recovery_proof is not None:
+        receipt['remediation_delivery'] = recovery_proof
     files, preflight_result, tests = snapshot_files(
         delivery, context, contract, after_merge=bool(receipt.get('merge_sha')))
     receipt['preflight'] = preflight_result
@@ -963,6 +968,10 @@ def reconcile(context, contract):
         raise ValueError('portable PR changed')
     receipt.update(pr_number=pr['number'], pr_url=pr['url'])
     save_receipt(RECEIPT, receipt)
+    if recovery_proof is not None:
+        if approved(context) != delivery:
+            raise ValueError('recovery delivery changed before merge')
+        qualify_remediation_delivery(command, INSTANCE, context, delivery, previous=recovery_proof)
     sha = ensure_merge(pr, head, context['base_sha'], files)
     if receipt.get('merge_sha') and receipt['merge_sha'] != sha:
         raise ValueError('portable merge changed')
@@ -970,6 +979,10 @@ def reconcile(context, contract):
     save_receipt(RECEIPT, receipt)
     receipt['main_ci_run'] = wait_main_ci(sha)
     save_receipt(RECEIPT, receipt)
+    if recovery_proof is not None:
+        if approved(context) != delivery:
+            raise ValueError('recovery delivery changed before deployment')
+        qualify_remediation_delivery(command, INSTANCE, context, delivery, previous=recovery_proof)
     try:
         receipt['deployment'] = ensure_deployed(sha, contract)
     except ValueError as error:

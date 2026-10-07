@@ -317,3 +317,24 @@ failure before intent creation. Failed tasks are never identically restarted.
 The installed routes remain paused until R3 publication/deploy/QA integration
 and the activation contract are qualified. Dispatch fixture tests are not proof
 that the complete R1/R2/R3 trial passed.
+
+### Exact R2 publication gate
+
+`remediation_delivery.py` qualifies an existing approved R2 submission against
+the current independent review, complete frozen snapshot, closed reviewer lease,
+latest handoff and the actual foreign R1 Red reference. Controller Green must
+retain that Red's issue, task, scope and receipt, match the approved manifest,
+and execute at least the original full-suite test count. No receipts or board
+states are rewritten by this read-only qualification.
+
+`portable_remediation_gate.py` invokes this fixed broker operation from the
+existing portable publication driver. The driver retains the proof in its
+delivery receipt and rechecks it, together with the current native approval,
+before merge and deployment. A removed reference cannot downgrade an existing
+recovery receipt into a legacy delivery. No arbitrary command is accepted.
+
+This is an additional prerequisite, not a substitute for GitHub review, exact
+SHA CI, frozen-file preflight, candidate QA or post-deploy QA. It does not mark
+the parent release delivered. The parent/sequence recovery mapping, automatic
+R3 controller scheduling and full-chain activation still need implementation
+and real validation; keep the live R1 route paused until those gates are ready.
