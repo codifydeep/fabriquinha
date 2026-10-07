@@ -598,3 +598,26 @@ escalates to the CTO instead of entering the CTO-only sponsorship operation.
 The complete offline suite exercised 2,281 tests with seven existing skips on
 7 October 2026. Live peer inspection and the remaining product review, PR/CI,
 same-commit deployment and QA are still required; this is not full autonomy.
+
+### Request-scope causal experiment
+
+`service_mode_request_scope_experiment.py` is a fixed offline experiment for the
+specific helper that counts all page requests while asserting one service-mode
+request. It verifies the full immutable snapshot inventory, imports the existing
+client test class in a credential-free sandbox and changes only the helper's
+literal template in memory. All Python test methods and assertions remain intact.
+
+On the real completed implementation, the original 15 client tests reproduced
+the three recorded failures. The scoped helper passed those same 15 tests and
+15 positive-control tests with three unrelated existing endpoints. All twelve
+existing negative controls still failed by assertion, and injecting a duplicate
+service-mode request into an ephemeral copy of the real implementation was also
+rejected. Snapshot bytes were reverified after the experiment. No product or
+test file in the frozen delivery changed.
+
+The result is `experiment_only_not_approved`, not an official full-suite Green,
+test-edit permission, product approval or another recursive revision allowance.
+The next contract decision must bind this evidence to independent agent review,
+require background-traffic calibration and preserve all previous delivery gates.
+That experiment-to-contract continuation is not yet autonomous; the older
+syntax-only amendment path must not silently accept this different failure.
