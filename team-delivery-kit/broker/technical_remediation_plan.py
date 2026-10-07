@@ -180,11 +180,10 @@ def instruction(config,state):
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)
         if state.get('plan_revisions'):
             last=state['plan_revisions'][-1]
-            note=('CTO: correct the independently rejected plan after complete source inspection. Preserve ALL acceptance, '
-                  'baseline and snapshot immutability, genuine Red, independent reviews, PR/CI and same-SHA QA. '
-                  'R1=new_tests_only; R2=product_only; R3=controller_only, strictly dependent. '
-                  'Return a distinct proposal or retain_hold. No edits, depth reset or execution authority. '
-                  'reason<=600 chars.\nDELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
+            note=('CTO: inspect source and correct the rejected plan. Preserve ALL criteria, immutable baseline/snapshots, '
+                  'Red, independent reviews and same-SHA PR/CI/deploy/QA. R1 tests; R2 product; R3 controller, strictly dependent. '
+                  'Distinct proposal or retain_hold; no edits, reset or execution. reason<=600, objective<=240. '
+                  '\nDELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
                   ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria']))+
                   'DELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)+'\n')
             note+='Prior plan: '+json.dumps(last['plan'],separators=(',',':'))
@@ -419,6 +418,44 @@ def reconcile_plan_length_failure(b,source,rejection):
                 raise ValueError('plan hold changed before recovery registration')
             con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
         return new
+
+
+def reconcile_correction_context(b,source):
+    """Restore an undispatched correction from the SAME valid rejected review.
+
+    Only boilerplate changes. Both full model artifacts remain in the note and
+    storage; no criteria, schema or framework limit is increased.
+    """
+    with b.LOCK:
+        with b.db() as con:
+            c,s=map(json.loads,con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone())
+            if s.get('correction_context_recovery'):return s
+            history=s.get('plan_revisions') or []
+            if (s.get('stage')!='blocked' or s.get('category')!='ValueError' or not 1<=len(history)<=2
+                    or s.get('wakeup_id') or s.get('execution_authorized') is not False
+                    or s.get('decision_task')!=history[-1].get('review_task')
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
+                raise ValueError('idle undispatched rejected-review correction required')
+        last=history[-1];fx=Effects(b);task=fx.task(last['review_task'],c['reviewer']);body=fx.result(task)
+        pending={**s,'stage':'awaiting_review','owner':c['reviewer'],'wakeup_id':last['review_wakeup'],
+                 'plan_sha256':last['plan_sha256']}
+        if (body!=last['review'] or body.get('decision')!='request_changes'
+                or validate_result(c,pending,task,body,fx.reads(task))
+                or any(t['status'] in ('queued','dispatched','running') for t in native.issue_task_runs(fx.settings,s['issue_id']))):
+            raise ValueError('same exact independent rejection required')
+        candidate={**s,'stage':'plan_dispatch','owner':c['cto']};note=instruction(c,candidate)
+        if any(json.dumps(last[k],separators=(',',':')) not in note for k in ('plan','review')):
+            raise ValueError('lossless exact plan/review presentation required')
+        candidate['correction_context_recovery']=dict(previous=s,operation='lossless_correction_boilerplate_repair_v1',
+            review_task=task['id'],instruction_sha256=hashlib.sha256(note.encode()).hexdigest(),
+            note_characters=len(note),framework_limit=4000,limits_increased=False,implementation_authorized=False)
+        candidate.pop('category',None)
+        candidate['required_action']='CTO correct exact independently rejected plan; complete artifacts preserved'
+        with b.db() as con:
+            if json.loads(con.execute('SELECT state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()[0])!=s:
+                raise ValueError('correction context changed before registration')
+            con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(candidate,sort_keys=True),source))
+        return candidate
 
 
 def tick(b):

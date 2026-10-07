@@ -91,6 +91,39 @@ class TechnicalRemediationPlanTests(unittest.TestCase):
         self.assertIn(value['reason'],instruction(self.config,result))
         self.assertEqual(self.config['original_depth'],2)
 
+    def test_context_repair_preserves_exact_rejection_and_rejects_foreign_or_busy_review(self):
+        import sqlite3,threading
+        from contextlib import contextmanager
+        from unittest.mock import patch
+        from broker import technical_remediation_plan as module
+        state,task,value,fx=self.rejected_review()
+        pending=advance(self.config,state,[task],fx,now=120)
+        held={**pending,'stage':'blocked','category':'ValueError'}
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        module.initialize(con);con.execute('CREATE TABLE leases(status TEXT)')
+        con.execute('INSERT INTO technical_remediation_plans VALUES(?,?,?)',
+                    ('source',json.dumps(self.config),json.dumps(held)))
+        @contextmanager
+        def db():yield con
+        b=SimpleNamespace(db=db,LOCK=threading.RLock());fx.settings={}
+        with patch.object(module,'Effects',return_value=fx),patch.object(module.native,'issue_task_runs',return_value=[]):
+            fx.result=lambda _:dict(value,reason='different review')
+            with self.assertRaises(ValueError):module.reconcile_correction_context(b,'source')
+            fx.result=lambda _:value
+            con.execute("INSERT INTO leases VALUES('running')")
+            with self.assertRaises(ValueError):module.reconcile_correction_context(b,'source')
+            con.execute('DELETE FROM leases')
+            result=module.reconcile_correction_context(b,'source')
+            proof=result['correction_context_recovery']
+            self.assertEqual(proof['previous'],held)
+            self.assertEqual(result['stage'],'plan_dispatch')
+            self.assertFalse(proof['implementation_authorized'])
+            self.assertFalse(proof['limits_increased'])
+            self.assertEqual(result['plan_revisions'],pending['plan_revisions'])
+            self.assertIn(json.dumps(self.plan,separators=(',',':')),instruction(self.config,result))
+            self.assertIn(json.dumps(value,separators=(',',':')),instruction(self.config,result))
+            self.assertEqual(module.reconcile_correction_context(b,'source'),result)
+
     def test_rejected_plan_correction_is_bounded_and_not_an_identical_retry(self):
         state,task,value,fx=self.rejected_review()
         history=dict(plan=self.plan,plan_sha256=digest(self.plan),plan_task='plan-task',plan_wakeup='wake-plan',
