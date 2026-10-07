@@ -8,6 +8,14 @@ spec.loader.exec_module(transport)
 
 
 class ACPTests(unittest.TestCase):
+    def test_structured_worker_failure_categories_do_not_expose_stderr(self):
+        secret='PRIVATE PROVIDER BODY'
+        labels=transport.failure_diagnostics(('RuntimeError: hermes_run_failed:iteration_budget_exhausted\n'+secret).encode())
+        self.assertIn('iteration_budget_exhausted',labels)
+        self.assertNotIn(secret,str(labels))
+        self.assertEqual(transport.failure_diagnostics(b'RuntimeError: hermes_executor_failed'),['worker_executor_error'])
+        self.assertEqual(transport.failure_diagnostics(b'RuntimeError: hermes_run_failed:agent_exception'),['worker_agent_exception'])
+        self.assertEqual(transport.failure_diagnostics(b'private unclassified detail'),[])
     def test_model_environment_carries_execution_identity_without_secrets(self):
         identifier = '12345678-1234-1234-1234-123456789abc'
         env = transport.worker_env('planning', True, execution_id=identifier)

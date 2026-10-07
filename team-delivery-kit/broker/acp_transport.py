@@ -9,6 +9,27 @@ from pathlib import PurePosixPath
 from model_policy import MODEL, PROXY_BASE_URL, PLACEHOLDER_KEY, execution_base_url
 
 
+def failure_diagnostics(stderr):
+    """Only fixed categories leave the transport, never stderr or model text.
+
+    These are diagnostic hints, not retry, test or delivery authority. An
+    unknown failure stays unknown rather than being inferred from call counts.
+    """
+    diagnostic=stderr.decode(errors='replace').lower()
+    labels=[label for text,label in (
+        ('api key','provider_configuration'),('api_key','provider_configuration'),
+        ('read-only','readonly_filesystem'),('permission denied','filesystem_permission'),
+        ('modulenotfounderror','missing_dependency'),
+        ('runtimeerror: hermes_run_failed:iteration_budget_exhausted','iteration_budget_exhausted'),
+        ('runtimeerror: hermes_run_failed:agent_exception','worker_agent_exception'),
+        ('runtimeerror: hermes_run_failed:server_error','worker_provider_error'),
+        ('runtimeerror: hermes_run_failed:timeout','worker_timeout'),
+        ('runtimeerror: hermes_run_failed:request_timeout','worker_timeout'),
+        ('runtimeerror: hermes_executor_failed','worker_executor_error'),
+    ) if text in diagnostic]
+    return sorted(set(labels))
+
+
 def worker_env(mode, persistent, test_commands=(), review_suite_capability=None, execution_id=None):
     if mode not in ('review', 'implementation', 'planning'):
         raise ValueError('invalid execution mode')
@@ -193,14 +214,7 @@ class Transport:
                         on_notification(result)
                 elif result.get('id') == frame['id']:
                     if 'error' in result:
-                        diagnostic = self.stderr_tail.decode(errors='replace').lower()
-                        result['error']['data'] = {'broker_diagnostic': [label for text, label in (
-                            ('api key', 'provider_configuration'),
-                            ('api_key', 'provider_configuration'),
-                            ('read-only', 'readonly_filesystem'),
-                            ('permission denied', 'filesystem_permission'),
-                            ('modulenotfounderror', 'missing_dependency'),
-                        ) if text in diagnostic]}
+                        result['error']['data'] = {'broker_diagnostic': failure_diagnostics(self.stderr_tail)}
                     elif frame['method'] == 'session/new' and frame.get('params', {}).get('model') == MODEL:
                         self.model_selected = True
                     elif frame['method'] == 'session/set_model':

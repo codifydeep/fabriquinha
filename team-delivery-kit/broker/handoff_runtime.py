@@ -221,12 +221,12 @@ class Effects:
         result = self.b.validate_frozen_delivery(snapshot['volume'], task)
         return {**result, 'tdd': receipt}
 
-    def test_first_red(self, task):
+    def test_first_red(self, task, *, diagnostic=False):
         try:
             import remediation_red_reference
         except ImportError:
             from broker import remediation_red_reference
-        dependent = remediation_red_reference.task_red(self.b, task)
+        dependent = remediation_red_reference.task_red(self.b, task,diagnostic=diagnostic)
         if dependent is not None:
             return dependent
         with self.b.db() as con:

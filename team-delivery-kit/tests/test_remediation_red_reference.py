@@ -93,6 +93,15 @@ class RemediationRedReferenceTests(unittest.TestCase):
     def test_unrelated_legacy_issues_have_no_reference(self):
         self.assertIsNone(references.phase(self.b,'unrelated'))
         self.assertIsNone(references.seed_source(self.b,'unrelated'))
+
+    def test_paused_route_allows_only_diagnostic_red_reference_not_delivery(self):
+        self.register();self.task()
+        with self.b.db() as c:
+            c.execute('UPDATE delivery_routes SET config=? WHERE issue_id=?',(json.dumps(self.route),'r2'))
+        with self.assertRaises(ValueError):references.task_red(self.b,'product-task')
+        self.assertEqual(references.task_red(self.b,'product-task',diagnostic=True),self.f.new)
+        with self.b.db() as c:c.execute("UPDATE grants SET mode='planning'")
+        with self.assertRaises(ValueError):references.task_red(self.b,'product-task',diagnostic=True)
         self.assertIsNone(references.task_red(self.b,'unknown-task'))
 
     def test_unrelated_workers_do_not_starve_paused_reference_registration(self):

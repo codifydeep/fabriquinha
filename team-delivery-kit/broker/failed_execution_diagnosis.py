@@ -53,7 +53,7 @@ def register(broker, payload):
     snapshot = broker.snapshot_submission({'task_id': source}, diagnostic=True)
     volume = snapshot['volume']
     effects = broker.handoff_runtime.Effects(broker, settings)
-    red = effects.test_first_red(source)
+    red = effects.test_first_red(source,diagnostic=True)
     if not red:
         raise ValueError('immutable Red required for failed execution diagnosis')
     broker.verify_test_first_green(volume, source, red)  # hashes only; not Green

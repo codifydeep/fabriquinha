@@ -108,7 +108,13 @@ def seed_source(b,issue):
                 selection={k:red['red'][k] for k in ('manifest_sha256','test_sha256')})
 
 
-def task_red(b,task):
+def task_red(b,task,*,diagnostic=False):
+    """Read-only provenance; paused routes require explicit diagnostic use.
+
+    The diagnostic result cannot qualify delivery or dispatch. Normal callers
+    still require an enabled route; role, closed lease and lineage never relax.
+    """
+    if type(diagnostic) is not bool:raise ValueError('explicit diagnostic mode required')
     with b.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='remediation_red_references'").fetchone():return None
         row=con.execute('SELECT n.issue_id,n.agent_id,n.scope,g.mode,l.status FROM native_bindings n '
@@ -119,6 +125,6 @@ def task_red(b,task):
     if value is None:return None
     with b.db() as con:route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(row[0],)).fetchone()[0])
     if (row[1]!=value['author'] or row[3]!='implementation' or row[4]!='closed'
-            or route.get('enabled') is not True or task==value['red']['task_id']):
+            or (route.get('enabled') is not True and not diagnostic) or task==value['red']['task_id']):
         raise ValueError('closed exact R2 author execution required')
     return value['red']  # Original issue/task/scope are deliberately unchanged.
