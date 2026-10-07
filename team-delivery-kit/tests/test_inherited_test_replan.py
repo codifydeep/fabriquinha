@@ -82,3 +82,44 @@ class InheritedTestReplanTests(unittest.TestCase):
             self.assertEqual(state['stage'],'peer_reviewed');self.assertFalse(state['execution_authorized'])
             self.assertEqual(handoffs.load(con,'source')['stage'],'inherited_replan_required')
         con.close()
+
+    def test_format_recovery_preserves_failed_attempt_and_is_once_per_source(self):
+        import json,sqlite3,tempfile,threading
+        from pathlib import Path
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from broker import inherited_test_replan as module,handoffs
+        route,reference,data,task,decision,reads=self.fixture();value=proposal(route,reference,data,task,decision,reads)
+        state=dict(stage='blocked',task_id='peer-task',wakeup_id='peer-wake')
+        data.update(inherited_peer_review=state,inherited_test_replan=value)
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row
+        handoffs.initialize(con);module.initialize(con)
+        con.execute('CREATE TABLE leases(request_id TEXT,status TEXT)')
+        con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT,agent_id TEXT,issue_id TEXT)')
+        con.execute("INSERT INTO leases VALUES('request','closed')")
+        con.execute("INSERT INTO native_bindings VALUES('request','peer-task','lead','r2')")
+        con.execute('INSERT INTO inherited_test_replans VALUES(?,?,?)',('source',json.dumps(value),json.dumps(state)))
+        handoffs.save(con,'source','r2','inherited_replan_required','cto',data,0)
+        rejection=dict(operation='rejected_typed_decision_adapter_v1',category='typed_mixed_content',
+            execution_id='request',upstream_sha256='d'*64,delivery_approval=False,worker_tool_executed=False,
+            response_shape=dict(parsed=True,submissions=0,legacy_function_call=False,content_shape='nonempty',content_chars=760))
+        peer=dict(id='peer-task',status='failed',wakeup_id='peer-wake',issue_id='r2')
+        @contextmanager
+        def db():yield con
+        with tempfile.TemporaryDirectory() as root:
+            Path(root,'native.json').write_text('{}')
+            b=SimpleNamespace(db=db,STATE=Path(root),LOCK=threading.RLock())
+            fx=SimpleNamespace(read_evidence=lambda t:reads)
+            with patch.object(module.handoff_runtime,'Effects',return_value=fx),patch.object(module.native,'task_record',return_value=peer),patch.object(module.native,'issue_task_runs',return_value=[]):
+                for change in (dict(execution_id='foreign'),dict(response_shape={**rejection['response_shape'],'submissions':1})):
+                    with self.assertRaises(ValueError):module.recover_format(b,'source',{**rejection,**change})
+                first=module.recover_format(b,'source',rejection)
+                second=module.recover_format(b,'source',rejection)
+            self.assertEqual(first,second);self.assertEqual(first['previous_state'],state)
+            current=json.loads(con.execute('SELECT state FROM inherited_test_replans').fetchone()[0])
+            self.assertEqual(current['stage'],'peer_review_required')
+            self.assertNotEqual(current['recovery_marker'],module.digest(value))
+            self.assertFalse(first['test_edits_authorized']);self.assertFalse(first['revision_depth_reset'])
+            self.assertEqual(con.execute('SELECT count(*) FROM inherited_peer_format_recoveries').fetchone()[0],1)
+        con.close()

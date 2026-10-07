@@ -39,6 +39,63 @@ def proposal(route,reference,data,task,decision,reads):
 
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS inherited_test_replans(source_task TEXT PRIMARY KEY,proposal TEXT,state TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS inherited_peer_format_recoveries(source_task TEXT PRIMARY KEY,receipt TEXT)')
+
+
+def recover_format(b,source,rejection):
+    """Operator-controlled reconciliation of an exact rejected peer execution.
+
+    The sanitized proxy receipt is supplied by the trusted installation operator,
+    not a worker. Preserve the failed attempt and never reset depth/permissions.
+    Subsequent dispatch uses the existing durable intent/observe-only protocol.
+    """
+    settings=json.loads((b.STATE/'native.json').read_text());fx=handoff_runtime.Effects(b,settings)
+    with b.LOCK,b.db() as con:
+        initialize(con)
+        old=con.execute('SELECT receipt FROM inherited_peer_format_recoveries WHERE source_task=?',(source,)).fetchone()
+        if old:return json.loads(old[0])
+        row=con.execute('SELECT proposal,state FROM inherited_test_replans WHERE source_task=?',(source,)).fetchone()
+        if not row:raise ValueError('exact inherited proposal required')
+        value,state=map(json.loads,row);current=handoffs.load(con,source)
+        if (state.get('stage')!='blocked' or not state.get('task_id') or not current
+                or current['stage']!='inherited_replan_required'):
+            raise ValueError('exact failed peer hold required')
+        data=json.loads(current['data'])
+        if data.get('inherited_peer_review')!=state or data.get('inherited_test_replan')!=value:
+            raise ValueError('current peer hold drift')
+        if con.execute("SELECT count(*) FROM leases WHERE status IN ('creating','starting','running','active')").fetchone()[0]:
+            raise ValueError('idle workers required for format recovery')
+        bindings=con.execute('SELECT n.request_id,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',
+            (state['task_id'],value['reviewer'],value['issue_id'])).fetchall()
+        if len(bindings)!=1 or bindings[0]['status']!='closed':raise ValueError('exact closed peer lease required')
+        shape=rejection.get('response_shape') or {}
+        if (rejection.get('operation')!='rejected_typed_decision_adapter_v1'
+                or rejection.get('category') not in ('typed_mixed_content','typed_nonterminal')
+                or rejection.get('delivery_approval') is not False or rejection.get('worker_tool_executed') is not False
+                or shape.get('parsed') is not True or shape.get('submissions')!=0
+                or shape.get('legacy_function_call') is not False or shape.get('content_shape')!='nonempty'
+                or type(shape.get('content_chars')) is not int or not 1<=shape['content_chars']<=1200
+                or rejection.get('execution_id')!=bindings[0]['request_id']):
+            raise ValueError('correlated pure-prose proxy rejection required')
+        task=native.task_record(settings,state['task_id'],value['reviewer'])
+        reads=fx.read_evidence(task)
+        if (task['status']!='failed' or task['wakeup_id']!=state['wakeup_id'] or task['issue_id']!=value['issue_id']
+                or any(p not in reads or reads[p].get('lines')!=reads[p].get('total_lines') for p in value['required_paths'])
+                or any(t['status'] in ('queued','dispatched','running') for t in native.issue_task_runs(settings,value['issue_id']))):
+            raise ValueError('fully inspected failed peer with no pending execution required')
+        receipt=dict(operation='inherited_peer_format_recovery_v1',source_task=source,
+            previous_state=state,rejection=rejection,proposal_sha256=digest(value),
+            format_policy='one_fresh_schema_valid_response',attempt_limit=1,
+            execution_authorized=False,test_edits_authorized=False,revision_depth_reset=False)
+        marker=digest(receipt)
+        # Persist a new pre-dispatch phase, NOT dispatch_intent: the latter means
+        # a POST may already have occurred and must be observation-only.
+        new=dict(stage='peer_review_required',at=time.time(),recovery_marker=marker)
+        con.execute('INSERT INTO inherited_peer_format_recoveries VALUES (?,?)',(source,json.dumps(receipt,sort_keys=True)))
+        con.execute('UPDATE inherited_test_replans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
+        data.update(inherited_peer_format_recovery=receipt,required_action='Independent peer format recovery queued; no test or execution authority')
+        handoffs.save(con,source,value['issue_id'],'inherited_replan_required',value['reviewer'],data,time.time())
+        return receipt
 
 
 def sponsor(fx,route,data,task,decision):
@@ -89,7 +146,7 @@ def tick(b):
             with b.db() as con:
                 busy=con.execute("SELECT count(*) FROM leases WHERE status IN ('creating','starting','running','active')").fetchone()[0]
             if busy>=2 or not fx.implementation_available(issue,value['reviewer']) or fx.remaining_calls()<route['minimum_calls']:continue
-            intent={**state,'stage':'dispatch_intent','marker':digest(value),'at':time.time()}
+            intent={**state,'stage':'dispatch_intent','marker':state.get('recovery_marker') or digest(value),'at':time.time()}
             save(intent);state=intent;allow=True
         else:allow=False
         if state['stage']=='dispatch_intent':
@@ -108,6 +165,7 @@ def tick(b):
                 'This peer verdict cannot approve delivery or grant execution. No shell, writes or CEO architecture question.\n'
                 +from_marker+bound_failure_context.digest(data['validation_failure'])+
                 '\nDELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'
+                'DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1\n'
                 +''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in value['required_paths']))
             try:wake=fx.ensure_wakeup(issue,value['reviewer'],value['cto_task'],state['marker'],note,allow_create=allow)
             except (TimeoutError,ConnectionError,urllib.error.URLError):wake=None
