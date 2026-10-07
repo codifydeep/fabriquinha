@@ -2,6 +2,28 @@
 
 ## Inspeção do autor após edição cirúrgica
 
+### Recuperação do artefato salvo sem repetir a edição
+
+O controlador agora mantém checkpoints de falha por **issue e execução**.
+O ledger antigo permanece intacto; um checkpoint rejeitado de uma tentativa
+anterior não impede a avaliação da nova entrega do autor. Continuam exigidos
+identidade nativa, tentativa mais recente, lease fechado, ausência de tarefas
+ativas, snapshot congelado e contrato de escopo. Uma rejeição da mesma
+execução continua terminal; Red de outra execução não pode ser substituído.
+
+O broker instalado foi atualizado mantendo worker e proxy qualificados. Após
+backup SQLite com integridade verificada, o supervisor avaliou o snapshot já
+salvo sem uma nova execução de edição. A calibração real passou em 15 casos
+positivos e 12 controles negativos. A suíte completa produziu Red com código
+de saída 1, vinculado ao mesmo snapshot. O checkpoint registra explicitamente
+que a tarefa nativa **não** terminou com sucesso e que a entrega **não** foi
+aprovada. A revisão independente foi despachada e ainda precisa ser validada.
+
+A suíte offline dessa mudança executou **2.270 testes, com sete skips
+existentes**. Red e calibração não substituem revisão, Green, PR/CI,
+implantação e QA. Essa recuperação exigiu correção do operador e, portanto,
+não qualifica um novo ciclo integral sem intervenção.
+
 O diagnóstico independente do CTO e do Tech Lead voltou a acionar o autor.
 Ele salvou uma correção, mas sua execução nativa terminou como falha: o proxy
 misturava leituras anteriores e posteriores à edição, invalidava a cobertura

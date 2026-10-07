@@ -82,6 +82,28 @@ class FailedTestCheckpointTests(unittest.TestCase):
         with self.b.db() as con:
             self.assertFalse(checkpoint.qualified(con, ISSUE, TASK, self.red))
 
+    def test_old_rejected_attempt_does_not_starve_latest_saved_execution(self):
+        old = '33333333-3333-4333-8333-333333333333'
+        legacy = dict(operation='failed_test_checkpoint_v1', status='rejected', source_task=old)
+        with self.b.db() as con:
+            con.execute('INSERT INTO failed_test_checkpoints VALUES (?,?,?)',
+                        (ISSUE, old, json.dumps(legacy)))
+        self.runs.insert(0, {**self.task, 'id':old, 'created_at':'0'})
+        result = self.call()
+        self.assertEqual(result['status'], 'red_captured')
+        self.assertFalse(result['native_task_completed'])
+        with self.b.db() as con:
+            self.assertEqual(checkpoint.proof(con, ISSUE, old), legacy)
+            self.assertEqual(con.execute('SELECT receipt FROM failed_test_checkpoints').fetchone()[0], json.dumps(legacy))
+        self.assertEqual(self.call(), result)
+        self.assertEqual((self.snapshots, self.captures), (1,1))
+
+    def test_other_execution_red_is_not_replaced_by_new_checkpoint(self):
+        with self.b.db() as con:
+            con.execute('INSERT INTO test_first_red VALUES (?,?,?)', (ISSUE, 'previous', '{}'))
+        self.assertIsNone(self.call())
+        self.assertEqual((self.snapshots, self.captures), (0,0))
+
     def test_snapshot_failure_is_durable_and_not_repeated(self):
         self.b.snapshot_submission = lambda *a, **k: (_ for _ in ()).throw(ValueError('snapshot failure'))
         self.assertEqual(self.call()['status'], 'rejected')
@@ -93,7 +115,7 @@ class FailedTestCheckpointTests(unittest.TestCase):
         with self.b.db() as con:
             saved = checkpoint.proof(con, ISSUE, TASK)
             saved.update(status='capturing'); saved.pop('red_receipt_sha256')
-            con.execute('UPDATE failed_test_checkpoints SET receipt=?', (json.dumps(saved),))
+            con.execute('UPDATE failed_test_checkpoint_executions SET receipt=?', (json.dumps(saved),))
         self.b.capture_test_first_red = lambda *a, **k: self.red
         self.assertEqual(self.call()['status'], 'red_captured')
         with self.b.db() as con:
@@ -121,7 +143,7 @@ class FailedTestCheckpointTests(unittest.TestCase):
     def test_snapshot_ownership_and_route_hash_are_revalidated(self):
         r = self.call(); r.update(status='capturing')
         with self.b.db() as con:
-            con.execute('UPDATE failed_test_checkpoints SET receipt=?', (json.dumps(r),))
+            con.execute('UPDATE failed_test_checkpoint_executions SET receipt=?', (json.dumps(r),))
             row = con.execute('SELECT * FROM native_bindings').fetchone()
             with self.assertRaisesRegex(ValueError, 'durable'):
                 checkpoint.validate_capture(self.b, con, row, r, {**self.route, 'author': 'other'})
@@ -133,5 +155,5 @@ class FailedTestCheckpointTests(unittest.TestCase):
         self.call()
         with self.b.db() as con:
             saved = checkpoint.proof(con, ISSUE, TASK); saved['native_task_completed'] = True
-            con.execute('UPDATE failed_test_checkpoints SET receipt=?', (json.dumps(saved),))
+            con.execute('UPDATE failed_test_checkpoint_executions SET receipt=?', (json.dumps(saved),))
             self.assertFalse(checkpoint.qualified(con, ISSUE, TASK, self.red))

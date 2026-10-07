@@ -1,6 +1,6 @@
 """Controller-only salvage of immutable tests, never of a native task status.
 
-One attempt per issue. Genuine controller Red and the existing independent
+One attempt per execution. Genuine controller Red and the existing independent
 test-review gate remain mandatory before product edits may be dispatched.
 """
 import hashlib
@@ -17,6 +17,12 @@ except ImportError:
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS failed_test_checkpoints('
                 'issue_id TEXT PRIMARY KEY,source_task TEXT UNIQUE,receipt TEXT)')
+    # Retain the original issue-level ledger unchanged for audit/rollback.
+    # Its rejected old execution must not veto a later authenticated artifact.
+    con.execute('CREATE TABLE IF NOT EXISTS failed_test_checkpoint_executions('
+                'issue_id TEXT,source_task TEXT UNIQUE,receipt TEXT,PRIMARY KEY(issue_id,source_task))')
+    con.execute('INSERT OR IGNORE INTO failed_test_checkpoint_executions '
+                'SELECT issue_id,source_task,receipt FROM failed_test_checkpoints')
 
 
 def digest(value):
@@ -36,7 +42,7 @@ def eligible(route, source, runs):
 
 def proof(con, issue, task):
     initialize(con)
-    row = con.execute('SELECT receipt FROM failed_test_checkpoints WHERE issue_id=? AND source_task=?',
+    row = con.execute('SELECT receipt FROM failed_test_checkpoint_executions WHERE issue_id=? AND source_task=?',
                       (issue, task)).fetchone()
     return json.loads(row[0]) if row else None
 
@@ -80,10 +86,8 @@ def capture(b, issue, task):
         settings = json.loads((b.STATE / 'native.json').read_text())
         with b.db() as con:
             initialize(con)
-            existing = con.execute('SELECT source_task,receipt FROM failed_test_checkpoints WHERE issue_id=?',
-                                   (issue,)).fetchone()
-            if existing and existing['source_task'] != task:
-                return None  # Never apply an earlier intervention to a new execution.
+            existing = con.execute('SELECT source_task,receipt FROM failed_test_checkpoint_executions '
+                                   'WHERE issue_id=? AND source_task=?', (issue, task)).fetchone()
             saved = json.loads(existing['receipt']) if existing else None
             if saved and saved['status'] in ('rejected', 'red_captured'):
                 return saved
@@ -112,7 +116,7 @@ def capture(b, issue, task):
                 native_task_completed=False, delivery_approved=False, at=time.time())
             if saved['route_sha256'] != digest(route):
                 raise ValueError('failed-test checkpoint source drift')
-            con.execute('INSERT OR IGNORE INTO failed_test_checkpoints VALUES (?,?,?)',
+            con.execute('INSERT OR IGNORE INTO failed_test_checkpoint_executions VALUES (?,?,?)',
                         (issue, task, json.dumps(saved, sort_keys=True)))
         try:
             snapshot = b.snapshot_submission({'task_id': task}, diagnostic=True)
@@ -120,7 +124,7 @@ def capture(b, issue, task):
                 raise ValueError('failed-test checkpoint snapshot drift')
             saved.update(status='capturing', snapshot_volume=snapshot['volume'])
             with b.db() as con:
-                con.execute('UPDATE failed_test_checkpoints SET receipt=? WHERE issue_id=? AND source_task=?',
+                con.execute('UPDATE failed_test_checkpoint_executions SET receipt=? WHERE issue_id=? AND source_task=?',
                             (json.dumps(saved, sort_keys=True), issue, task))
             red = b.capture_test_first_red({'task_id': task}, _failed_checkpoint=saved)
         except Exception as error:
@@ -130,6 +134,6 @@ def capture(b, issue, task):
         else:
             saved.update(status='red_captured', red_receipt_sha256=digest(red))
         with b.db() as con:
-            con.execute('UPDATE failed_test_checkpoints SET receipt=? WHERE issue_id=? AND source_task=?',
+            con.execute('UPDATE failed_test_checkpoint_executions SET receipt=? WHERE issue_id=? AND source_task=?',
                         (json.dumps(saved, sort_keys=True), issue, task))
         return saved

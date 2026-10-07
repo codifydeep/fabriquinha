@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261007.334
+USER root
+COPY broker/failed_test_checkpoint.py /failed_test_checkpoint.py
