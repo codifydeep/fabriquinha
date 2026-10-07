@@ -18,6 +18,7 @@ def initialize(con):
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
     note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+        'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
         'CALIBRATION GATE REWORK: '+('independent Tech Lead inspection of CTO proposal. ' if peer else 'CTO diagnosis. ')+
         'Read every immutable candidate file completely. No shell, edits, Red replay or approval of delivery. '
         'The controller rejected this candidate before Red; a failed positive reference is not product Red. '
@@ -32,6 +33,34 @@ def instruction(config,state):
         ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
     if len(note)+100>4000:raise ValueError('calibration diagnosis context too large')
     return note
+
+
+def marker(config,role):
+    return digest({'source':config['source_task'],'manifest':config['manifest_sha256'],'role':role,
+        'operation':'calibration_rework_v1','format_revision':config.get('format_revision',0)})
+
+
+def recover_format(config,state,task,reads):
+    """One changed-controller-policy recovery; never replay a failed verdict."""
+    role='peer' if state.get('peer_wakeup') else 'cto'
+    note=task.get('handoff_note') or ''
+    if (state.get('stage')!='blocked' or state.get('category')!='calibration_rework_rejected'
+            or config.get('format_revision') or state.get('format_recovery')
+            or task.get('status')!='failed' or task.get('agent_id')!=config[role]
+            or task.get('issue_id')!=config['issue_id'] or task.get('wakeup_id')!=state.get(role+'_wakeup')
+            or 'CALIBRATION GATE REWORK' not in note or 'DELIVERY_STRUCTURED_DECISION_V1:technical' not in note
+            or 'DELIVERY_TYPED_DECISION_V1' in note
+            or any(reads.get(p,{}).get('lines',0)<=0 or reads[p]['lines']!=reads[p].get('total_lines') for p in config['paths'])):
+        return None
+    changed={**config,'format_revision':1}
+    if 'DELIVERY_TYPED_DECISION_V1' not in instruction(changed,{**state,'stage':role+'_pending'}):return None
+    receipt=dict(operation='missing_typed_adapter_marker_recovery_v1',task_id=task['id'],
+        previous_state=state,previous_note_sha256=hashlib.sha256(note.encode()).hexdigest(),
+        read_evidence=reads,decision_replayed=False,author_retry_authorized=False,delivery_approval=False)
+    new={**state,'stage':role+'_pending','format_recovery':receipt}
+    new.pop(role+'_wakeup',None)
+    for key in ('category','error_type','owner','intent_at','at'):new.pop(key,None)
+    return changed,new
 
 
 def decide(config,state,runs,effects,role):
@@ -67,11 +96,11 @@ def advance(config,state,runs,effects,persist,now=None):
                 'This is one gate rework; no iteration/size/depth change or recursive revision. No promise-only completion.')
         else:
             source=config['source_task'] if role=='cto' else state['cto_task'];note=instruction(config,state)
-        marker=digest({'source':config['source_task'],'manifest':config['manifest_sha256'],'role':role,'operation':'calibration_rework_v1'})
+        intent_marker=marker(config,role)
         if first:
             state={**state,'stage':role+'_intent','intent_at':now};persist(state)
         # A persisted ambiguous intent is OBSERVATION ONLY, never another POST.
-        wake=effects.ensure_wakeup(config['issue_id'],config[role],source,marker,note,allow_create=first)
+        wake=effects.ensure_wakeup(config['issue_id'],config[role],source,intent_marker,note,allow_create=first)
         if wake:
             state={**state,role+'_wakeup':wake['id'],'stage':'author_dispatched' if role=='author' else role+'_waiting','at':now}
             persist(state)
@@ -91,6 +120,11 @@ def advance(config,state,runs,effects,persist,now=None):
 
 def handle(b,route,runs,source,prior,effects):
     """Called by the normal supervisor; no operator-triggered wakeup required."""
+    if prior['stage'] not in ('test_first_blocked','calibration_rework'):return False
+    with b.LOCK:return _handle(b,route,runs,source,prior,effects)
+
+
+def _handle(b,route,runs,source,prior,effects):
     try:import handoffs,remediation_runtime_guard as guard,harness_qualification as jobs
     except ImportError:from broker import handoffs,remediation_runtime_guard as guard,harness_qualification as jobs
     if prior['stage'] not in ('test_first_blocked','calibration_rework'):return False
@@ -142,6 +176,23 @@ def handle(b,route,runs,source,prior,effects):
             if con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():return True
             con.execute('INSERT INTO calibration_reworks VALUES(?,?,?,?)',(issue,key,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
     else:config,state=map(json.loads,existing[1:])
+    if state.get('stage')=='blocked' and not config.get('format_revision'):
+        role='peer' if state.get('peer_wakeup') else 'cto'
+        candidates=[t for t in runs if t.get('wakeup_id')==state.get(role+'_wakeup') and t.get('agent_id')==config[role]]
+        if len(candidates)==1:
+            try:import native
+            except ImportError:from broker import native
+            task=native.task_record(effects.settings,candidates[0]['id'],config[role])
+            recovery=recover_format(config,state,task,effects.read_evidence(task))
+            if recovery:
+                with b.LOCK,b.db() as con:
+                    closed=con.execute('SELECT l.status FROM native_bindings n JOIN leases l USING(request_id) '
+                        'WHERE n.task_id=? AND n.issue_id=? AND n.agent_id=?',(task['id'],issue,config[role])).fetchall()
+                    if len(closed)==1 and closed[0][0]=='closed' and not con.execute(
+                            "SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():
+                        config,state=recovery
+                        con.execute('UPDATE calibration_reworks SET config=?,state=? WHERE issue_id=?',
+                            (json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True),issue))
     def persist(new):
         with b.db() as con:
             current=handoffs.load(con,key);data=json.loads(current['data'])
@@ -174,9 +225,9 @@ def mounts(b,binding):
     run=native.task_record(settings,task[0],binding['agent_id'])
     wake=state.get(role+'_wakeup')
     if not wake and state['stage']==role+'_intent':
-        marker=digest({'source':config['source_task'],'manifest':config['manifest_sha256'],'role':role,'operation':'calibration_rework_v1'})
+        intent_marker=marker(config,role)
         observed=native.ensure_task_handoff(settings,config['issue_id'],config[role],
-            config['source_task'] if role=='cto' else state['cto_task'],marker,instruction(config,state),allow_create=False)
+            config['source_task'] if role=='cto' else state['cto_task'],intent_marker,instruction(config,state),allow_create=False)
         wake=observed['id'] if observed else None
     if not wake or run.get('wakeup_id')!=wake:return []
     labels=(b.docker('GET','/volumes/'+config['volume']) or {}).get('Labels',{})

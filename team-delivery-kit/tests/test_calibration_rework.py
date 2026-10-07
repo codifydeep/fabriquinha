@@ -3,7 +3,7 @@ import sqlite3,json,threading
 from contextlib import contextmanager
 from unittest.mock import patch
 from types import SimpleNamespace
-from broker.calibration_rework import advance,decide,instruction
+from broker.calibration_rework import advance,decide,instruction,recover_format,marker
 
 
 class CalibrationReworkTests(unittest.TestCase):
@@ -71,6 +71,23 @@ class CalibrationReworkTests(unittest.TestCase):
         note=instruction(self.config,state)
         self.assertLess(len(note)+100,4000)
         self.assertIn('No shell, edits',note)
+        self.assertIn('DELIVERY_TYPED_DECISION_V1\n',note)
+
+    def test_missing_adapter_marker_recovery_requires_actual_complete_failed_inspection_once(self):
+        state=dict(stage='blocked',category='calibration_rework_rejected',cto_wakeup='wake',delivery_approval=False)
+        task=dict(id='task',status='failed',agent_id='cto',issue_id='issue',wakeup_id='wake',
+            handoff_note='DELIVERY_STRUCTURED_DECISION_V1:technical\nCALIBRATION GATE REWORK')
+        reads=self.fx.read_evidence(task)
+        config,new=recover_format(self.config,state,task,reads)
+        self.assertEqual(new['stage'],'cto_pending')
+        self.assertFalse(new['format_recovery']['decision_replayed'])
+        self.assertFalse(new['format_recovery']['author_retry_authorized'])
+        self.assertNotEqual(marker(config,'cto'),marker(self.config,'cto'))
+        self.assertIsNone(recover_format(config,new,task,reads))
+        for change in [dict(status='completed'),dict(agent_id='author'),dict(wakeup_id='other'),
+                       dict(handoff_note=task['handoff_note']+'\nDELIVERY_TYPED_DECISION_V1')]:
+            self.assertIsNone(recover_format(self.config,state,{**task,**change},reads))
+        self.assertIsNone(recover_format(self.config,state,task,{}))
 
     def test_normal_supervisor_intakes_actual_failed_calibration_once_and_preserves_history(self):
         from broker import calibration_rework as lane,handoffs,harness_qualification as jobs,remediation_runtime_guard as guard

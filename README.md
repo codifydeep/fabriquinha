@@ -87,6 +87,12 @@ Envios incertos são somente observados, nunca repetidos. A implementação pass
 pelos testes offline; sua recuperação real e o ciclo integral ainda precisam ser
 qualificados antes de declarar autonomia.
 
+A ativação do adaptador de decisão tipada é parte explícita desse contrato. Uma
+execução fechada que falhou após ler integralmente o snapshot, mas recebeu o
+handoff antigo sem esse marcador, admite uma única recuperação com a política
+corrigida. A resposta anterior não é reaproveitada; o histórico e as leituras são
+preservados e nenhum retry do autor é autorizado por essa recuperação de formato.
+
 O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
 
 ## Fluxo da equipe

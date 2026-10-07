@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+import threading
 
 from broker import handoffs, test_first_handoffs
 
@@ -11,6 +12,7 @@ from broker import handoffs, test_first_handoffs
 class Broker:
     def __init__(self, path):
         self.path = path
+        self.LOCK = threading.RLock()
 
     @contextmanager
     def db(self):
