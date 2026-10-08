@@ -97,6 +97,25 @@ class QaArtifactTests(unittest.TestCase):
             qa.register(self.broker, self.payload)
             copy.assert_called_once()
 
+    def test_every_supported_browser_scenario_can_register_diagnostic_evidence(self):
+        import ast
+        import portable_browser_qa
+        tree=ast.parse(Path(portable_browser_qa.__file__).read_text())
+        validate=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='validate')
+        scenarios={n.value for n in ast.walk(validate) if isinstance(n,ast.Constant)
+                   and isinstance(n.value,str) and n.value.startswith('feedback-board-')}
+        self.assertEqual(len(scenarios),14)
+        script=portable_browser_qa.SCRIPT.read_bytes()
+        self.assertLessEqual(len(script),32768)
+        self.payload['scenario_zlib']=base64.b64encode(zlib.compress(script)).decode()
+        self.payload['browser_receipt']['identity']['scenario_sha256']=hashlib.sha256(script).hexdigest()
+        config=self.payload['browser_receipt']['identity']['config']
+        for scenario in scenarios:
+            config['scenario']=scenario
+            with self.subTest(scenario=scenario):self.assertIn('scenario.py',qa.unpack(self.payload))
+        config['scenario']='arbitrary-agent-command'
+        with self.assertRaises(ValueError):qa.unpack(self.payload)
+
     def test_bundle_hash_and_decompression_bound_fail_closed(self):
         self.assertEqual(set(qa.unpack(self.payload)), {'qa.json','scenario.py'})
         self.assertTrue(qa.unpack(self.payload)['qa.json'].endswith(b'\n'))

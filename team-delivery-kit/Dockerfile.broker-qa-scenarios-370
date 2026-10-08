@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261008.369
+COPY broker/qa_artifacts.py /qa_artifacts.py
+RUN PYTHONPATH=/ python -c "import qa_artifacts"

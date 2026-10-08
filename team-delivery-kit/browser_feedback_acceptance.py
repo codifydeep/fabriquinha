@@ -8,6 +8,33 @@ from playwright.sync_api import sync_playwright, expect
 LAST_ERRORS = []
 
 
+class ExpectedServiceFailure:
+    """One console event, bound to an actual driver-injected response."""
+    URL = 'http://fixture:8080/service-mode'
+    MESSAGE = 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)'
+
+    def __init__(self):
+        self.pending = []
+
+    def injected(self, page, url, status):
+        if url != self.URL or status != 503:
+            raise AssertionError('exact injected service-mode failure required')
+        self.pending.append(page)
+
+    def console(self, page, message):
+        if message.type != 'error':
+            return
+        if (message.text == self.MESSAGE and message.location.get('url') == self.URL
+                and any(item is page for item in self.pending)):
+            index = next(i for i, item in enumerate(self.pending) if item is page)
+            self.pending.pop(index)
+            return
+        record_browser_error(message.text)
+
+    def finish(self, page):
+        self.pending = [item for item in self.pending if item is not page]
+
+
 def record_browser_error(message):
     if len(LAST_ERRORS) < 8:
         text = str(message)
@@ -25,9 +52,7 @@ def failure_output(error):
 
 
 def observe_filtered_submission(page, title, *, selected, choose, expect):
-    # The driver selected Completed while POST was held. A new open item must
-    # remain excluded and the selection must survive POST success. Only an
-    # explicit subsequent driver action may return to All for baseline checks.
+    # Keep Completed after POST; only the driver may subsequently select All.
     selected(page, 'Completed')
     item = page.locator('.feedback-title').filter(has_text=title)
     expect(item).to_have_count(0)
@@ -122,7 +147,7 @@ def observe_demo_mode_api(context):
         assert response.headers.get('content-type','').startswith('application/json')
 
 
-def observe_demo_mode_ui(a,b,expect):
+def observe_demo_mode_ui(a,b,expect,expected_failures):
     for page in (a,b):
         expect(page.locator('#service-mode')).to_have_text('Demo environment')
         expect(page.locator('#service-mode')).to_have_attribute('role','status')
@@ -139,14 +164,19 @@ def observe_demo_mode_ui(a,b,expect):
         expect(b.get_by_label('Title',exact=True)).to_have_value('Demo probe draft')
     finally:b.unroute('**/service-mode',hold)
     for body,status in [('not-json',200),('{"mode":"demo","extra":true}',200),('{"mode":"demo"}',503)]:
-        def invalid(route):route.fulfill(status=status,content_type='application/json',body=body)
+        def invalid(route):
+            if status == 503:
+                expected_failures.injected(b, route.request.url, status)
+            route.fulfill(status=status,content_type='application/json',body=body)
         b.route('**/service-mode',invalid)
         try:
             b.reload(wait_until='domcontentloaded')
             expect(b.locator('#service-mode')).to_have_text('Environment unavailable')
             expect(b.get_by_role('button',name='Submit feedback',exact=True)).to_be_enabled()
             expect(a.locator('#service-mode')).to_have_text('Demo environment')
-        finally:b.unroute('**/service-mode',invalid)
+        finally:
+            b.unroute('**/service-mode',invalid)
+            expected_failures.finish(b)
 
 
 def run(scenario='feedback-board-v1'):
@@ -175,6 +205,7 @@ def run(scenario='feedback-board-v1'):
     pending = scenario != 'feedback-board-v1'
     LAST_ERRORS.clear()
     errors = LAST_ERRORS
+    expected_failures = ExpectedServiceFailure()
     with sync_playwright() as runtime:
         browser = runtime.chromium.launch(headless=True, chromium_sandbox=False)
         first = browser.new_context()
@@ -183,8 +214,7 @@ def run(scenario='feedback-board-v1'):
         for page in pages:
             page.set_default_timeout(10000)
             page.on('pageerror', record_browser_error)
-            page.on('console', lambda message: record_browser_error(message.text)
-                    if message.type == 'error' else None)
+            page.on('console', lambda message, page=page: expected_failures.console(page, message))
         a, b = pages
         if generation:
             a.add_init_script('''(() => {
@@ -474,7 +504,7 @@ def run(scenario='feedback-board-v1'):
         if service_ui:
             observe_service_status_ui(a, b, expect)
         if demo_api:observe_demo_mode_api(first)
-        if demo_ui:observe_demo_mode_ui(a,b,expect)
+        if demo_ui:observe_demo_mode_ui(a,b,expect,expected_failures)
         assert not errors, 'browser errors: ' + repr(errors)
         screenshot = base64.b64encode(a.screenshot(full_page=True)).decode()
         result = {'status': 'passed', 'source_sha': health['source_sha'],
