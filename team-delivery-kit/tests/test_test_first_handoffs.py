@@ -70,6 +70,40 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_verified_new_tool_incident_routes_cto_but_unknown_cannot_retry_author(self):
+        from broker import verified_tool_incident as incidents
+        diagnostic=dict(kind='rejected_forced_tool_response',issue_id='issue',task_id='tests',
+            operation='rejected_forced_tool_response_v1',category='invalid_forced_argument',tool='patch',
+            provenance='owned_proxy_validator_log',proxy_image='sha256:'+'a'*64,
+            execution_id='eb720780-398c-4809-aa34-8c4848b279bf',call_number=5208,
+            write_executed=False,tests_executed=False,red_verified=False,delivery_approval=False)
+        with self.broker.db() as c:
+            receipt=incidents.claim(c,'issue','tests',diagnostic)
+            handoffs.save(c,'previous','issue','test_first_cto_correction_wait','author',
+                dict(test_first_cto_wakeup='old'),1)
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',
+                dict(error='test_first_correction_failed_after_cto_diagnosis',diagnostic=diagnostic),2)
+            prior=handoffs.load(c,'tests')
+        self.effects.verified_tool_incident=lambda *_:receipt
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        self.assertEqual(prior['stage'],'technical_decision_required')
+        self.assertEqual(self.effects.wakeups,[])
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        self.assertEqual(self.effects.wakeups[-1][0][1],'cto')
+        instruction=self.effects.wakeups[-1][0][4]
+        self.assertIn('invalid_forced_argument is NOT an incomplete stream',instruction)
+        self.assertIn('specific cause remains UNKNOWN',instruction)
+        cto=dict(id='new-cto',agent_id='cto',status='completed',wakeup_id='wakeup')
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task,cto],self.test_task,prior,self.effects)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        self.assertEqual(prior['stage'],'test_first_blocked')
+        self.assertEqual(json.loads(prior['data'])['error'],'test_first_unknown_argument_constraint_requires_diagnostic')
+        count=len(self.effects.wakeups)
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task,cto],self.test_task,prior,self.effects)
+        self.assertEqual(len(self.effects.wakeups),count)
+
     def test_transport_qualification_reopens_only_cto_once_without_author_grant(self):
         import hashlib
         self.broker.IMAGE='sha256:'+'a'*64

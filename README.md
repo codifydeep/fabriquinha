@@ -124,6 +124,16 @@ chamada, não comprova execução de ferramenta e não autoriza retentativa. Eve
 antigos sem essa informação permanecem com causa específica desconhecida; não
 se pode inferir o argumento errado apenas pela categoria genérica da rejeição.
 
+O controlador pode encaminhar uma rejeição de argumento comprovada para novo
+diagnóstico independente do CTO, desde que a execução encerrada tenha snapshot
+preservado, não exista Red nem worker ativo e autor/revisor permaneçam distintos.
+O fingerprint usa ferramenta, categoria e restrição; mudar IDs ou contagens de
+tamanho não rearma a mesma falha. Há no máximo dois diagnósticos distintos desse
+tipo por card, persistidos antes do despacho. Sem a restrição violada comprovada,
+uma decisão de repetir o trabalho do autor é bloqueada: o CTO deve especificar
+qual evidência ou experimento diagnóstico falta. Isso não constitui recuperação
+ponta a ponta, aprovação de entrega ou autorização para enfraquecer testes.
+
 O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
 de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo
 válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise não

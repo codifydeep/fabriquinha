@@ -230,6 +230,13 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                 data['diagnostic'] = diagnostic
                 save('test_first_blocked', route['cto'])
         diagnostic=data.get('diagnostic') or {}
+        if (data.get('error')=='test_first_correction_failed_after_cto_diagnosis'
+                and not data.get('verified_tool_incident')):
+            receipt=getattr(effects,'verified_tool_incident',lambda *_:None)(issue,key)
+            if receipt:
+                data.update(verified_tool_incident=receipt,error='verified_new_tool_incident_requires_cto')
+                save('technical_decision_required',route['cto'])
+                return
         if (data.get('error')=='test_first_cto_requires_replanning'
                 and data.get('unchanged_seed_diagnosis_replay') and not data.get('transport_qualification_replay')
                 and data.get('decision',{}).get('action')=='escalate_cto'):
@@ -389,17 +396,22 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import transport_qualification
         with broker.db() as con:
             qualified_transport=transport_qualification.qualified(con,issue,key,data,getattr(broker,'IMAGE',None))
+        try:import verified_tool_incident
+        except ImportError:from broker import verified_tool_incident
+        with broker.db() as con:
+            qualified_tool_incident=verified_tool_incident.qualified(con,issue,key,data)
         qualified_framework=(framework.get('kind')=='unpinned_pytest_cto_replan_v1'
             and framework.get('request',{}).get('issue_id')==issue
             and framework.get('request',{}).get('source_task')==key
             and framework.get('proof',{}).get('verified') is True
             and framework.get('proof',{}).get('framework_mismatch') is True
             and framework.get('diagnostic_sha256')==hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest())
-        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport):
+        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport or qualified_tool_incident):
             block('test_first_correction_failed_after_cto_diagnosis')
             return
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
         if qualified_byte_budget:suffix+=':preserved-seed-byte-budget-v1'
+        if qualified_tool_incident:suffix+=':verified-tool-incident-v1:'+data['verified_tool_incident']['fingerprint']
         if data.get('artifact_diagnosis_replay'):
             suffix+=':proxy-artifact-evidence-v1'
         if data.get('forced_tool_diagnosis_replay'):
@@ -468,7 +480,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'Only the new test may be corrected; inspect the workspace before writing. '
                'Do not disable the gate or treat this as an OpenRouter outage.'
                if diagnostic.get('kind')=='rejected_test_write' else '')
-            + ('\nPROXY PATCH RESPONSE REJECTION: the exact owned proxy refused an incomplete forced patch response '
+            + ('\nPROXY PATCH RESPONSE REJECTION: the exact owned proxy refused the forced tool response '
                'BEFORE forwarding that response to the worker. Earlier reads may have executed. '
                'No Red or successful patch follows from this receipt. A legacy receipt without shape counts does '
                'not prove truncation, multiple calls or a provider outage. The changed proxy can make ONE format '
@@ -477,6 +489,15 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'Decide whether a concrete tests-only correction is warranted, or name the remaining diagnostic. '
                'Never disable the gate, approve Red or ask the CEO to decide a technical issue.'
                if diagnostic.get('kind')=='rejected_forced_tool_response' else '')
+            + ('\nNEW VALIDATOR INCIDENT: read the category and constraint from the controller receipt; '
+               'invalid_forced_argument is NOT an incomplete stream or provider outage. A missing constraint '
+               'means the specific cause remains UNKNOWN: return escalate_cto with the exact evidence or '
+               'bounded diagnostic experiment required, not request_correction. The controller will reject '
+               'author retry for an unknown constraint. A measured constraint permits only a concrete '
+               'tests-only remedy via your independent decision; it never waives calibration, Red or review. '
+               'Identical constraints under new task/call IDs do not rearm diagnosis; size counts alone '
+               'are not changed evidence. No technical escalation to the CEO.'
+               if qualified_tool_incident else '')
             + ('\nUNCHANGED SEED INSPECTION: a NEW fixed offline job verified the entire failed snapshot against '
                'the approved seed manifest, not merely the test hash. All bytes remain unchanged and the actual '
                'native tool history contains only paired read_file calls. The author executed no patch or suite; no Red receipt exists. '
@@ -558,6 +579,10 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             block('test_first_cto_invalid_decision:' + type(error).__name__)
             return
         data.update(cto_task=recipient['id'], decision=decision)
+        if (data.get('verified_tool_incident') and decision['action']=='request_correction'
+                and data['verified_tool_incident'].get('cause_known') is not True):
+            block('test_first_unknown_argument_constraint_requires_diagnostic')
+            return
         if decision['action'] != 'request_correction' or decision['optional_files']:
             block('test_first_cto_requires_replanning')
             return
@@ -594,7 +619,7 @@ def diagnostic_presentation(data):
     diagnostic=data.get('diagnostic') or {}
     if not isinstance(diagnostic,dict):raise ValueError('structured pre-Red diagnostic required')
     result={'source_task':data.get('source_task'),'error':data.get('error'),
-        'diagnostic':{k:diagnostic[k] for k in ('kind','category','task_id','issue_id','reason',
+        'diagnostic':{k:diagnostic[k] for k in ('kind','category','task_id','issue_id','reason','tool','structure',
             'exit_code','command','manifest_sha256','test_sha256','output_sha256','tests_executed',
             'red_verified','delivery_approval') if k in diagnostic},
         'full_diagnostic_sha256':hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest(),
