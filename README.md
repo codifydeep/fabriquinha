@@ -434,7 +434,11 @@ Uma segunda falha permanece bloqueada; não existe retentativa infinita.
 No ensaio real, o candidato mais recente passou o controle positivo, os 12 controles
 negativos e o controle de background, e teve Red recuperado pelo controlador.
 Sua primeira revisão independente falhou no transporte antes de emitir parecer.
-Essa evidência **não** valida a recuperação da revisão, Green ou a entrega ponta a ponta.
+A recuperação limitada concluiu uma nova revisão independente, com leituras
+integrais de ambas as revisões e aprovação do manifesto exato. O controlador
+criou, preparou e despachou o card dependente de implementação sem intervenção
+manual nessas transições. Isso valida essa recuperação e o handoff R1→R2,
+**não** Green, revisão da implementação ou entrega ponta a ponta.
 
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
@@ -469,6 +473,9 @@ flowchart TD
     DP --> QE[Qualificar executor limitado; sem retry ou aprovação implícitos]
     G --> H[Snapshot durável da entrega]
     H --> I[Revisor independente: leitura e validações permitidas]
+    I -->|Erro ACP sem parecer; leituras integrais| RO[Uma observação de transporte: mesma entrega somente leitura]
+    RO -->|Nova execução com diagnóstico durável| I
+    RO -->|Tentativa consumida e nova falha| RB[Impedimento visível: sem aprovação ou retry infinito]
     I -->|Solicita mudanças| F
     I -->|Aprova o snapshot exato| J[PR + checks + integração validada]
     J --> K[DevOps: implantação local]
