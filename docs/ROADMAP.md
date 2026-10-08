@@ -148,3 +148,12 @@ Os prompts de proposta/revisão de escopo também são isolados pelo controlador
 exigem a nota registrada e o wakeup/tarefa exatos, sem carregar protocolos
 históricos conflitantes da descrição da issue e sem criar trabalho ao consultar.
 Aprovar o plano não equivale a conceder escrita ou homologar.
+
+`broker/native_scope_note.py` reconhece o envelope conhecido de wakeup
+one-shot `time.due` para tarefas de escopo. Confere o identificador do wakeup,
+o formato exato do rodapé e uma única ocorrência de seus campos; não procura
+uma instrução confiável dentro de texto arbitrário. Após retirar somente os
+metadados conhecidos, continuam obrigatórias a identidade nativa da tarefa,
+o wakeup autenticado e a igualdade integral com a instrução registrada.
+Falhas anteriores permanecem bloqueadas: instalar o decoder não reabre planos,
+não dispensa revisão e não autoriza retentativas idênticas.

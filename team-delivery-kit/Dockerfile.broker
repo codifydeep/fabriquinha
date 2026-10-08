@@ -48,6 +48,7 @@ COPY broker/worker_model_config.py /worker_model_config.py
 COPY model_policy.py /model_policy.py
 COPY browser_qa_recipes.py /browser_qa_recipes.py
 COPY broker/native.py /native.py
+COPY broker/native_scope_note.py /native_scope_note.py
 COPY broker/handoffs.py /handoffs.py
 COPY broker/suite_failure.py /suite_failure.py
 COPY broker/suite_diagnosis_repair.py /suite_diagnosis_repair.py

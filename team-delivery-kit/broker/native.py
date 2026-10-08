@@ -155,6 +155,11 @@ def task_record(settings, task_id, agent_id):
             or task.get('workspace_id') != settings['workspace_id']
             or task.get('runtime_id') != settings['runtime_id']):
         raise ValueError('native task ownership or state mismatch')
+    if ('DELIVERY_PRODUCT_SCOPE_V1:' in (task.get('handoff_note') or '')
+            or 'DELIVERY_SCOPE_AUTHOR_START ' in (task.get('handoff_note') or '')):
+        try:import native_scope_note
+        except ImportError:from broker import native_scope_note
+        task={**task,'handoff_note':native_scope_note.canonical(task['handoff_note'],task.get('wakeup_id'))}
     return task
 
 
