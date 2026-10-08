@@ -44,7 +44,8 @@ def request(operation,body,*,broker=None,settings=None):
         if set(body)!={'evidence'}:raise ValueError('exact binding query required')
         return binding(b,settings,body['evidence'])
     allowed={'issue':{'config','allow_create'},'wake':{'config','state','note','allow_create'},
-             'runs':{'config','state'},'task':{'config','state','task'}}
+             'runs':{'config','state'},'task':{'config','state','task'},
+             'revision':{'config','state','review'},'reassess':{'config','state'}}
     if operation not in allowed or set(body)!=allowed[operation]:raise ValueError('fixed R3 planning operation required')
     config=body['config'];evidence=config['evidence']
     if (set(config)!={'evidence','evidence_sha256','techlead','cto'}
@@ -73,13 +74,76 @@ def request(operation,body,*,broker=None,settings=None):
             or item.get('stage')!=3 or item.get('status') in ('done','cancelled')):
         raise ValueError('exact live technical incident issue required')
     target=config[('techlead' if review else 'cto') if state.get('escalated') else ('cto' if review else 'techlead')]
+    if operation=='reassess':
+        from r3_decision_revision import qualify
+        from r3_resume_contract import sha
+        if (not state.get('post_experiment') or state.get('resume_contract_reassessment_sha256')
+                or set(evidence.get('experiment_history',[]))!={'observe_existing_controller','verify_frozen_delivery','verify_github_ci','verify_local_deployment'}
+                or not {'experiment_snapshot_intact','experiment_github_ci_exact_sha','experiment_local_deployment_exact_sha',
+                        'experiment_controller_absent'}<=set(evidence['facts'].values())):
+            raise ValueError('one reviewed hold after complete distinct passed observations required')
+        author=config['cto' if state.get('escalated') else 'techlead']
+        proof=qualify(config,state,state['review'],native.task_record(settings,state['diagnosis_task'],author),
+                      native.task_record(settings,state['task_id'],target),accepted_decision='retain_hold')
+        if proof['proposal']['action']!='retain_hold' or digest(proof['proposal'])!=proof['proposal_sha256']:
+            raise ValueError('original reviewed hold required')
+        saved=dict(operation='qualified_resume_contract_reassessment_v1',incident_sha256=config['evidence_sha256'],
+            issue_id=state['issue_id'],record=proof,policy_sha256=sha(),execution_authorized=False,release_homologated=False)
+        key=digest(saved)
+        with b.LOCK,b.db() as con:
+            con.execute('CREATE TABLE IF NOT EXISTS r3_resume_reassessments(reassessment_sha256 TEXT PRIMARY KEY,incident_sha256 TEXT UNIQUE,proof TEXT)')
+            old=con.execute('SELECT reassessment_sha256,proof FROM r3_resume_reassessments WHERE incident_sha256=?',(config['evidence_sha256'],)).fetchone()
+            if old:
+                if old[0]!=key or json.loads(old[1])!=saved:raise ValueError('immutable resume policy reassessment changed')
+            else:con.execute('INSERT INTO r3_resume_reassessments VALUES(?,?,?)',(key,config['evidence_sha256'],json.dumps(saved,sort_keys=True)))
+        return dict(reassessment_sha256=key,proof=saved)
+    if operation=='revision':
+        from r3_decision_revision import qualify
+        author=config['cto' if state.get('escalated') else 'techlead']
+        proof=qualify(config,state,body['review'],
+            native.task_record(settings,state['diagnosis_task'],author),
+            native.task_record(settings,state['task_id'],target))
+        key=digest(proof)
+        if digest(proof['proposal'])!=proof['proposal_sha256']:raise ValueError('exact proposal hash required')
+        saved=dict(operation='independent_incident_revision_v1',incident_sha256=config['evidence_sha256'],
+                   issue_id=state['issue_id'],record=proof,execution_authorized=False)
+        with b.LOCK,b.db() as con:
+            con.execute('CREATE TABLE IF NOT EXISTS r3_decision_revisions(revision_sha256 TEXT PRIMARY KEY,review_task TEXT UNIQUE,proof TEXT)')
+            old=con.execute('SELECT revision_sha256,proof FROM r3_decision_revisions WHERE review_task=?',(state['task_id'],)).fetchone()
+            if old:
+                if old[0]!=key or json.loads(old[1])!=saved:raise ValueError('immutable incident revision changed')
+            else:con.execute('INSERT INTO r3_decision_revisions VALUES(?,?,?)',(key,state['task_id'],json.dumps(saved,sort_keys=True)))
+        return dict(revision_sha256=key)
     if operation=='wake':
         note=planning_instruction(config,state)
         if note!=body['note'] or type(body['allow_create']) is not bool or request_contract({'messages':[{'role':'user','content':note}]}) is None:
             raise ValueError('fixed typed incident instruction required')
         marker=digest(dict(incident=config['evidence_sha256'],phase='review' if review else 'diagnose',
                            escalation=state.get('escalated',False),proposal=state.get('proposal_sha256') if review else None))
-        if 'fixed_incident_capability_catalogue_qualified' in evidence.get('facts',{}).values():
+        if state.get('decision_revision_sha256'):
+            key=state['decision_revision_sha256']
+            with b.LOCK,b.db() as con:
+                row=con.execute('SELECT proof FROM r3_decision_revisions WHERE revision_sha256=?',(key,)).fetchone()
+            proof=json.loads(row[0]) if row else {}
+            if (proof.get('operation')!='independent_incident_revision_v1'
+                    or proof.get('incident_sha256')!=config['evidence_sha256'] or proof.get('issue_id')!=state['issue_id']
+                    or proof.get('record')!=(state.get('decision_revisions') or [None])[-1]
+                    or digest(proof.get('record'))!=key or proof.get('execution_authorized') is not False):
+                raise ValueError('registered independent revision required')
+            marker=digest(dict(original_marker=marker,decision_revision_sha256=key))
+        if state.get('resume_contract_reassessment_sha256'):
+            from r3_resume_contract import POLICY,sha
+            key=state['resume_contract_reassessment_sha256']
+            with b.LOCK,b.db() as con:
+                row=con.execute('SELECT proof FROM r3_resume_reassessments WHERE reassessment_sha256=?',(key,)).fetchone()
+            proof=json.loads(row[0]) if row else {}
+            if (digest(proof)!=key or proof.get('policy_sha256')!=sha()
+                    or proof.get('incident_sha256')!=config['evidence_sha256'] or proof.get('issue_id')!=state['issue_id']
+                    or proof.get('execution_authorized') is not False or proof.get('release_homologated') is not False):
+                raise ValueError('registered unchanged conditional-resume policy required')
+            note+='\nConditional resume contract (not execution evidence): '+POLICY
+            marker=digest(dict(original_marker=marker,resume_contract_reassessment_sha256=key))
+        elif 'fixed_incident_capability_catalogue_qualified' in evidence.get('facts',{}).values():
             from r3_incident_capabilities import note as capability_note, sha as catalogue_sha
             note+=capability_note()
             if len(note)>3850:raise ValueError('bounded catalogue context required')
@@ -97,6 +161,7 @@ def request(operation,body,*,broker=None,settings=None):
             marker=digest(dict(original_marker=marker,json_review_recovery_sha256=recovery))
             note+='\nThe previous review had malformed JSON; no decision was accepted. Submit fresh schema-valid arguments only.'
             if len(note)>3850:raise ValueError('bounded recovery review context required')
+        if len(note)>3850:raise ValueError('bounded fixed incident context required')
         return native.ensure_planning_start(settings,state['issue_id'],target,evidence['source_task'],marker,note,
                                            allow_create=body['allow_create'])
     if operation=='runs':return native.issue_task_runs(settings,state['issue_id'])

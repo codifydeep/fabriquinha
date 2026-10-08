@@ -46,7 +46,9 @@ def recover(private,incoming,*,instance='delivery-kit-port2'):
     qualify(report)
     actual=command('docker','inspect','--format','{{.Image}}',instance+'-model-proxy-1')
     expected=command('docker','image','inspect','--format','{{.Id}}','delivery-kit-model-proxy:20261008.102')
-    if actual!=expected:return None
+    if actual!=expected:
+        expected=command('docker','image','inspect','--format','{{.Id}}','delivery-kit-model-proxy:20261008.103')
+        if actual!=expected:return None
     canary=json.loads(command('docker','exec','-w','/',instance+'-model-proxy-1','python','-c',
         'import json,sys;from r3_json_probe import run;print(json.dumps(run(sys.argv[1])))',task['handoff_note']))
     policy=hashlib.sha256(Path(__file__).with_name('typed_decision_contract.py').read_bytes()).hexdigest()

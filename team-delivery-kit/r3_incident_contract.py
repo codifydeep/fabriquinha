@@ -26,6 +26,10 @@ def planning_instruction(config,state):
     if state.get('post_experiment'):
         note+='\nAlready observed operations (do not repeat without changed inputs): '+json.dumps(config['evidence']['experiment_history'])
         note+='\nExperiment receipt SHA: '+config['evidence']['experiment_receipt_sha256']
+    if state.get('decision_revisions'):
+        prior=state['decision_revisions'][-1]
+        note+='\nIndependent changes requested on proposal '+prior['proposal_sha256']+': '+prior['review']['reason']
+        note+='\nReturn a revised technical decision; unchanged proposals stop for diagnosis. No execution authority.'
     if review:
         note+='\nDELIVERY_R3_PROPOSAL_V1:'+state['proposal_sha256']
         note+='\nProposal data: '+json.dumps(state['proposal'],sort_keys=True,separators=(',',':'))

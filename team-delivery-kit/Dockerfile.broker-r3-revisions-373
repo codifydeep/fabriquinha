@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261008.372
+COPY broker/r3_incident_native.py /r3_incident_native.py
+COPY r3_incident_contract.py /r3_incident_contract.py
+COPY r3_decision_revision.py /r3_decision_revision.py
+COPY r3_resume_contract.py /r3_resume_contract.py
+RUN PYTHONPATH=/ python -c "import r3_incident_native,r3_decision_revision,r3_resume_contract"

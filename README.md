@@ -138,6 +138,17 @@ falha e qualificação sem modelo da receita instalada. O novo revisor continua
 vinculado à proposta original e aos mesmos gates; a falha anterior é preservada.
 Esse mecanismo não aprova a entrega nem comprova autonomia ponta a ponta.
 
+Uma revisão de incidente com `request_changes` retorna ao autor técnico original.
+Proposta, crítica e execuções independentes ficam preservadas e registradas no
+controlador antes de um novo wakeup. A aprovação anterior não é reaproveitada;
+repetir a proposta rejeitada ou insistir na mesma operação sem nova evidência
+mantém um impedimento explícito, nunca conclui a release. Uma retenção revisada
+após os quatro probes distintos e bem-sucedidos admite uma única reavaliação
+com o contrato de retomada qualificado. Isso esclarece que fatos iniciais de
+entrega incompleta não proíbem recuperação: ainda são necessárias proposta do
+CTO, revisão do Tech Lead e verificação fresca pelo controlador antes do launch.
+CI, implantação, QA e homologação continuam sujeitos aos gates normais.
+
 Uma retenção de publicação diagnosticada e revisada pode receber uma única
 reavaliação quando o catálogo fixo de capacidades foi qualificado e ainda não
 constava da evidência original. Esse catálogo explica que ausência do processo

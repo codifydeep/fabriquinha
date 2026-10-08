@@ -109,3 +109,37 @@ class R3IncidentNativeTests(unittest.TestCase):
             task.assert_not_called()
             task.return_value=dict(id='selected',issue_id='foreign',agent_id='tl',wakeup_id='wake')
             with self.assertRaises(ValueError):self.invoke('task',dict(config=self.config,state=state,task='selected'))
+
+    def test_revision_registration_is_idempotent_and_wakeup_requires_the_real_critique(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        @contextmanager
+        def database():
+            with con:yield con
+        broker=SimpleNamespace(LOCK=threading.RLock(),db=database)
+        proposal=dict(action='retain_hold',experiment='none',evidence_sha256=self.config['evidence_sha256'],
+            reason='Gap remains',fact_ids=['F01'],execution_authorized=False,release_homologated=False)
+        review=dict(decision='request_changes',proposal_sha256=digest(proposal),evidence_sha256=self.config['evidence_sha256'],
+            reason='Assess resume rather than repeating probes',fact_ids=['F01'],execution_authorized=False,release_homologated=False)
+        state=dict(stage='awaiting_review',issue_id='incident',proposal=proposal,proposal_sha256=digest(proposal),
+                   diagnosis_task='author',diagnosis_wakeup='author-wake',task_id='review',wakeup_id='review-wake')
+        tasks={actor:dict(id=task,agent_id=actor,issue_id='incident',wakeup_id=wake,status='completed',result={'output':json.dumps(output)})
+               for actor,task,wake,output in [('tl','author','author-wake',proposal),('cto','review','review-wake',review)]}
+        with patch('broker.r3_incident_native.binding',return_value={'techlead':'tl','cto':'cto'}),\
+             patch('broker.r3_incident_native.NativeIssues') as issues,\
+             patch('broker.r3_incident_native.native.task_record',side_effect=lambda settings,task,actor:tasks[actor]),\
+             patch('broker.r3_incident_native.native.ensure_planning_start',return_value={'id':'wake'}) as wake:
+            issues.return_value.request.return_value=self.item
+            body=dict(config=self.config,state=state,review=review)
+            result=request('revision',body,broker=broker,settings=self.settings)
+            self.assertEqual(request('revision',body,broker=broker,settings=self.settings),result)
+            self.assertEqual(con.execute('SELECT count(*) FROM r3_decision_revisions').fetchone()[0],1)
+            from r3_decision_revision import record
+            revised=dict(stage='observe_diagnose',issue_id='incident',decision_revision_sha256=result['revision_sha256'],
+                         decision_revisions=[record(state,review)])
+            body=dict(config=self.config,state=revised,note=planning_instruction(self.config,revised),allow_create=True)
+            request('wake',body,broker=broker,settings=self.settings)
+            self.assertEqual(wake.call_args.args[2],'tl');self.assertIn(review['reason'],wake.call_args.args[5])
+            revised['decision_revisions'][0]['review']['reason']='forged critique'
+            body['note']=planning_instruction(self.config,revised)
+            with self.assertRaises(ValueError):request('wake',body,broker=broker,settings=self.settings)
+            self.assertEqual(wake.call_count,1)

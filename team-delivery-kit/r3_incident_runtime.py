@@ -183,6 +183,26 @@ def reconcile(private,evidence,*,instance='delivery-kit-port2',effects=None):
             return save({**state,'stage':'review_dispatch','owner':'techlead' if state.get('escalated') else 'cto','proposal':decision,
                 'proposal_sha256':digest(decision),'diagnosis_task':state['task_id'],'diagnosis_wakeup':state['wakeup_id']})
         proposal=state['proposal']
+        if decision['decision']=='request_changes':
+            history=state.get('decision_revisions',[])
+            if (any(entry['proposal_sha256']==digest(proposal) for entry in history)
+                    or sum(entry['proposal']['action']==proposal['action'] and
+                           entry['proposal']['experiment']==proposal['experiment'] for entry in history)>=2):
+                return save({**state,'stage':'blocked','owner':'cto','category':'unchanged_incident_proposal',
+                    'review':decision,'review_task':state['task_id'],
+                    'next_action':'diagnose unchanged proposal after independent changes request; no identical retry'})
+            from r3_decision_revision import record
+            revision=record(state,decision)
+            # Registration verifies both actual native submissions, not host text.
+            registered=fx.request('revision',dict(config=config,state=state,review=decision))
+            if registered!=dict(revision_sha256=digest(revision)):
+                raise ValueError('revision registration uncertain; observe the same review')
+            revised={**state,'stage':'diagnose_dispatch','owner':'cto' if state.get('escalated') else 'techlead',
+                     'decision_revisions':[*history,revision],'decision_revision_sha256':digest(revision)}
+            for field in ('proposal','proposal_sha256','task_id','wakeup_id','diagnosis_task','diagnosis_wakeup',
+                          'review_transport_recovery_sha256','review_transport_recovery','dispatched_at','observation_started'):
+                revised.pop(field,None)
+            return save(revised)
         outcome='retained_hold'
         if decision['decision']=='approve_experiment' and proposal['action']=='request_experiment' and proposal['experiment']!='none':
             outcome='experiment_pending'
@@ -236,6 +256,10 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
     if incident.get('stage')=='experiment_pending':
         from r3_post_experiment import drive
         incident=drive(private,evidence,incident,value,instance=instance,effects=effects,contract=contract)
+    if effects is None and incident.get('stage')=='retained_hold':
+        from r3_resume_reassessment import recover as reassess_resume
+        reassessed=reassess_resume(private,incident,value,instance=instance)
+        if reassessed:return reassessed
     if incident.get('stage')=='blocked' and effects is None:
         from r3_review_json_recovery import recover as recover_review
         recovered=recover_review(private,incident,instance=instance)

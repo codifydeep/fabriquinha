@@ -88,6 +88,33 @@ class R3IncidentRuntimeTests(unittest.TestCase):
                     task[field]=value if field!='agent_id' else 'tl';self.fx.task.return_value=task
                     self.assertEqual(self.invoke()['stage'],'blocked')
 
+    def test_changes_request_returns_to_original_author_with_immutable_critique(self):
+        proposal,state=self.advance_to_diagnosis()
+        self.fx.wake.return_value={'id':'wake-cto'};self.invoke()
+        self.fx.runs.return_value=[{'id':'task-cto','wakeup_id':'wake-cto','status':'completed'}]
+        review=dict(decision='request_changes',proposal_sha256=digest(proposal),
+            evidence_sha256=digest(self.evidence),reason='Assess conditional resume after evidence.',
+            fact_ids=['F01','F02'],execution_authorized=False,release_homologated=False)
+        self.fx.task.return_value=dict(id='task-cto',issue_id='incident',agent_id='cto',wakeup_id='wake-cto',
+            status='completed',result={'output':json.dumps(review)})
+        from r3_decision_revision import record
+        expected=record(dict(state,task_id='task-cto',wakeup_id='wake-cto'),review)
+        self.fx.request.return_value={'revision_sha256':digest(expected)}
+        revised=self.invoke()
+        self.assertEqual(revised['stage'],'diagnose_dispatch');self.assertEqual(revised['owner'],'techlead')
+        self.assertEqual(revised['decision_revisions'],[expected]);self.assertNotIn('proposal',revised)
+        self.fx.wake.return_value={'id':'wake-revision'};self.invoke()
+        self.assertIn(review['reason'],self.fx.wake.call_args.args[2])
+        self.fx.runs.return_value=[{'id':'new-author','wakeup_id':'wake-revision','status':'completed'}]
+        self.fx.task.return_value=dict(id='new-author',issue_id='incident',agent_id='tl',wakeup_id='wake-revision',
+            status='completed',result={'output':json.dumps(proposal)})
+        self.invoke();self.fx.wake.return_value={'id':'wake-new-review'};self.invoke()
+        self.fx.runs.return_value=[{'id':'new-review','wakeup_id':'wake-new-review','status':'completed'}]
+        self.fx.task.return_value=dict(id='new-review',issue_id='incident',agent_id='cto',wakeup_id='wake-new-review',
+            status='completed',result={'output':json.dumps(review)})
+        blocked=self.invoke();self.assertEqual(blocked['category'],'unchanged_incident_proposal')
+        self.assertFalse(blocked['release_homologated']);self.assertEqual(self.fx.request.call_count,1)
+
     def test_budget_hold_is_visible_and_does_not_consume_dispatch_intent(self):
         self.invoke();self.fx.remaining.return_value=15
         self.assertEqual(self.invoke()['category'],'model_budget_reserve_unavailable')
