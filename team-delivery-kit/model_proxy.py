@@ -21,6 +21,7 @@ import deterministic_read_dispatch
 import typed_decision_contract
 import typed_test_source
 import planning_schema
+import provider_tool_routing
 import proxy_request_rejections
 from structured_response_contract import validate as validate_structured_response, StructuredResponseRejected
 
@@ -248,6 +249,7 @@ def read_bounded_response(response, conn, deadline):
 
 
 def forward(body):
+    body=provider_tool_routing.wire(body)
     key = Path('/secret/openrouter.key').read_text().strip()
     if not key or len(key) < 20:
         raise RuntimeError('model credential unavailable')
@@ -325,6 +327,10 @@ class Handler(BaseHTTPRequestHandler):
             body = validate_request(incoming)
             stage = 'metrics'
             request_metrics = safe_request_metrics(body)
+            upstream=provider_tool_routing.wire(body)
+            if upstream is not body:
+                request_metrics['routing_compatibility']='haiku_named_tool_v1'
+                request_metrics['upstream_require_parameters']=False
             stage = 'read_dispatch'
             dispatch=deterministic_read_dispatch.make(body,execution_id)
             if dispatch:

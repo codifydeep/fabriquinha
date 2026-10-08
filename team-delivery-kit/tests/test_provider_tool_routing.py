@@ -1,0 +1,33 @@
+import copy
+import unittest
+from provider_tool_routing import wire
+
+
+class ProviderToolRoutingTests(unittest.TestCase):
+    def body(self):
+        return {'model':'anthropic/claude-haiku-5.5','provider':{'require_parameters':True},
+            'tool_choice':{'type':'function','function':{'name':'selected'}},
+            'tools':[{'type':'function','function':{'name':'selected','strict':True,
+                'parameters':{'type':'object','properties':{'value':{'type':'string','maxLength':20}},
+                              'required':['value'],'additionalProperties':False}}}],
+            'messages':[{'role':'user','content':'Original instruction'}],'max_tokens':128}
+
+    def test_only_routing_hint_changes_not_schema_or_authority(self):
+        body=self.body();before=copy.deepcopy(body)
+        result=wire(body)
+        self.assertEqual(body,before)
+        self.assertIs(result['provider']['require_parameters'],False)
+        expected=copy.deepcopy(before);expected['provider']['require_parameters']=False
+        self.assertEqual(result,expected)
+        self.assertTrue(result['tools'][0]['function']['strict'])
+
+    def test_other_models_and_text_planning_are_untouched(self):
+        for change in ({'model':'another/model'},{'tool_choice':'none'},{'tool_choice':'auto'}):
+            body={**self.body(),**change}
+            self.assertEqual(wire(body),body)
+
+    def test_unknown_or_duplicate_selected_tool_fails_closed(self):
+        body=self.body();body['tools']=[]
+        with self.assertRaises(ValueError):wire(body)
+        body=self.body();body['tools']*=2
+        with self.assertRaises(ValueError):wire(body)

@@ -502,6 +502,15 @@ class Effects:
             b.docker('DELETE', '/containers/' + name + '?force=true')
 
 
+def error_stage(previous, data, cto, count):
+    """Escalation must not erase a pre-Red incident's protocol lineage."""
+    if count < 2:
+        return previous
+    if data.get('phase') == 'test_first':
+        return 'test_first_blocked'
+    return 'technical_decision_required' if data.get('target') == cto else 'diagnose_cto'
+
+
 def tick(broker):
     try: import adapted_test_review
     except ImportError: from broker import adapted_test_review
@@ -547,8 +556,7 @@ def tick(broker):
                     reason = type(error).__name__ + ':' + str(error)[:240]
                     count = data.get('control_error_count', 0) + 1 if data.get('control_error') == reason else 1
                     data.update(control_error=reason, control_error_count=count)
-                    stage = row['stage'] if count < 2 else (
-                        'technical_decision_required' if data.get('target') == route['cto'] else 'diagnose_cto')
+                    stage = error_stage(row['stage'], data, route['cto'], count)
                     handoffs.save(con, row['source_task'], route['issue_id'], stage, route['cto'], data, time.time())
                 else:
                     con.execute('INSERT INTO delivery_handoff_events(source_task,stage,data,at) VALUES (?,?,?,?)',
