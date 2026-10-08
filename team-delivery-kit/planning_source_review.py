@@ -1,10 +1,40 @@
 """Independent CTO source review; never manufacture a human answer or approval."""
 import hashlib
 import json
+import subprocess
+
+
+def transport(task):
+    from evalctl import PROJECT
+    if PROJECT!='delivery-kit-port2':raise ValueError('isolated source review required')
+    for name,service in ((PROJECT+'-execution-broker-1','execution-broker'),(PROJECT+'-model-proxy-1','model-proxy')):
+        labels=json.loads(subprocess.check_output(['docker','inspect','--format','{{json .Config.Labels}}',name],text=True,timeout=10))
+        if labels.get('com.docker.compose.project')!=PROJECT or labels.get('com.docker.compose.service')!=service:
+            raise ValueError('owned source review services required')
+    code='''import broker as b,json,sys
+with b.db() as c:
+ print(json.dumps([dict(r) for r in c.execute("SELECT * FROM native_bindings WHERE task_id=?",(sys.argv[1],))]))
+'''
+    bindings=json.loads(subprocess.check_output(['docker','exec','-w','/',PROJECT+'-execution-broker-1',
+        'python','-c',code,task],text=True,timeout=15))
+    if len(bindings)!=1 or ':planning:' not in bindings[0]['scope']:raise ValueError('source review binding required')
+    events=[]
+    for line in subprocess.check_output(['docker','logs','--tail','500',PROJECT+'-model-proxy-1'],text=True,timeout=15).splitlines():
+        try:event=json.loads(line)
+        except json.JSONDecodeError:continue
+        if event.get('event')=='model_proxy_request' and event.get('execution_id')==bindings[0]['request_id']:events.append(event)
+    if (len(events)!=1 or events[0].get('status')!=200 or events[0].get('structured_format')!='json_schema'
+            or events[0].get('strict_schema') is not True or events[0].get('tool_count')!=0):
+        raise ValueError('strict tool-free source review transport not proven')
+    return {'version':'source-review-transport-v1','execution_id':bindings[0]['request_id'],
+            'call_number':events[0]['call_number'],'task_id':task,'strict_schema':True,'tools':0}
 
 
 def pending(state):
     if not state or not state.get('configuration_sha256'):return False
+    receipt=state.get('source_review') or {}
+    if (state.get('stage')=='blocked_awaiting_ceo' and receipt.get('stage')=='verified'
+            and not receipt.get('transport') and not state.get('prior_unqualified_source_review')):return True
     return state.get('stage')=='reviewing_brief_sources' or (
         state.get('stage')=='blocked_awaiting_ceo' and state.get('brief_clarification_product')==1
         and not state.get('source_review') and bool(state.get('questions')))
@@ -25,14 +55,36 @@ def validate(answer,brief,questions):
         if row['classification']=='explicit_brief':
             if not row['quote'].strip() or row['quote'] not in brief or not row['answer'].strip():
                 raise ValueError('literal brief evidence required')
+            if any(marker in row['answer'].lower() for marker in (
+                    'brief does not say','not addressed','cannot be confirmed',
+                    'not specified','unspecified','unresolved')):
+                raise ValueError('unresolved answer cannot claim explicit brief support')
         elif row['quote'] or row['answer']:raise ValueError('CTO cannot answer missing business choices')
     return rows
+
+
+def revalidate(state,brief):
+    receipt=(state or {}).get('source_review') or {}
+    if receipt.get('stage')!='verified':return None
+    if receipt.get('brief_sha256')!=hashlib.sha256(brief.encode()).hexdigest():
+        raise ValueError('persisted source review brief drift')
+    try:validate({'role':'cto','resolutions':receipt['resolutions']},brief,receipt['questions'])
+    except ValueError as error:
+        return {**state,'prior_invalid_source_review':receipt,
+            'source_review':{**receipt,'stage':'blocked','validation_category':str(error)},
+            'stage':'blocked','owner':'cto','active':'source_review',
+            'category':'ValueError:'+str(error),
+            'next_action':'CTO diagnoses contradictory source evidence; no fabricated CEO response'}
+    return None
 
 
 def run(state,brief,registry,path):
     from planning_intake import issue_for,completed_output
     from release_eval import save_receipt
     if not pending(state):return state
+    if state.get('source_review',{}).get('stage')=='verified' and not state['source_review'].get('transport'):
+        state={**state,'prior_unqualified_source_review':state['source_review']}
+        state.pop('source_review')
     questions=state['questions']
     if state['brief_sha256']!=hashlib.sha256(brief.encode()).hexdigest():raise ValueError('source review brief drift')
     receipt=state.get('source_review') or {'stage':'intent','questions':questions,
@@ -53,12 +105,15 @@ def run(state,brief,registry,path):
         '"explicit_brief","quote":"literal source","answer":"faithful reading"}]}. '
         'Cover every question in exact index order.\nQuestions: '+json.dumps(questions)+'\nORIGINAL BRIEF:\n'+brief)
     try:
-        issue=issue_for('cto',context,registry['agents']['cto'],run_name=state['name']+'-SOURCE-REVIEW')
+        issue=issue_for('cto',context,registry['agents']['cto'],run_name=state['name']+
+            ('-SOURCE-REVIEW-STRICT' if state.get('prior_unqualified_source_review') else '-SOURCE-REVIEW'))
         receipt.update(stage='working',issue_id=issue);save_receipt(path,state)
         task,text=completed_output(issue,registry['agents']['cto'])
+        wire=transport(task)
         rows=validate(json.loads(text),brief,questions)
         receipt.update(stage='verified',task_id=task,resolutions=rows,
-            output_sha256=hashlib.sha256(text.encode()).hexdigest(),ceo_answer_created=False,scope_approval_created=False)
+            output_sha256=hashlib.sha256(text.encode()).hexdigest(),ceo_answer_created=False,
+            scope_approval_created=False,transport=wire)
         unresolved=[questions[r['index']] for r in rows if r['classification']=='requires_ceo']
         if unresolved:state.update(stage='blocked_awaiting_ceo',owner='ceo',active='product',questions=unresolved)
         else:

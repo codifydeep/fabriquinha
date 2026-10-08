@@ -398,7 +398,11 @@ def main():
     if clarified:
         existing = clarified
         save_receipt(ledger_path, existing)
-    from planning_source_review import pending as source_pending,run as source_review
+    from planning_source_review import pending as source_pending,run as source_review,revalidate as source_revalidate
+    rejected_source=source_revalidate(existing,brief)
+    if rejected_source:
+        existing=rejected_source
+        save_receipt(ledger_path,existing)
     if source_pending(existing):
         existing=source_review(existing,brief,registry,ledger_path)
     if existing and existing.get('stage') == 'blocked':

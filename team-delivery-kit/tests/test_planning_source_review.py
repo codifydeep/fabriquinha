@@ -5,10 +5,13 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from planning_source_review import pending,validate,run
+from planning_source_review import pending,validate,run,revalidate,transport as real_transport
 
 
 class SourceReviewTests(unittest.TestCase):
+    def setUp(self):
+        wire=patch('planning_source_review.transport',return_value={'version':'source-review-transport-v1'})
+        wire.start();self.addCleanup(wire.stop)
     def state(self,brief):
         return {'stage':'blocked_awaiting_ceo','brief_clarification_product':1,
             'configuration_sha256':'a'*64,'brief_sha256':hashlib.sha256(brief.encode()).hexdigest(),
@@ -27,6 +30,25 @@ class SourceReviewTests(unittest.TestCase):
         with self.assertRaises(ValueError):validate(bad,'No page navigation.',['Navigate?'])
         bad['resolutions'][0].update(quote='',answer='')
         self.assertEqual(validate(bad,'No page navigation.',['Navigate?'])[0]['classification'],'requires_ceo')
+
+    def test_literal_quote_does_not_validate_a_contradictory_unknown_answer(self):
+        bad=self.answer()
+        bad['resolutions'][0]['answer']='The brief does not say; direct navigation is not addressed.'
+        with self.assertRaisesRegex(ValueError,'unresolved answer'):
+            validate(bad,'No page navigation.',['Navigate?'])
+
+    def test_persisted_contradictory_review_is_invalidated_without_erasing_history(self):
+        brief='No page navigation.';state=self.state(brief)
+        bad=self.answer();bad['resolutions'][0]['answer']='Direct navigation is not addressed.'
+        state['source_review']={'stage':'verified','brief_sha256':state['brief_sha256'],
+            'resolutions':bad['resolutions'],'questions':['Navigate?'],'task_id':'old'}
+        before=copy.deepcopy(state)
+        result=revalidate(state,brief)
+        self.assertEqual(state,before)
+        self.assertEqual(result['owner'],'cto')
+        self.assertEqual(result['prior_invalid_source_review'],before['source_review'])
+        self.assertEqual(result['outputs'],before['outputs'])
+        self.assertIsNone(revalidate(result,brief))
 
     def test_coverage_order_types_and_unknown_fields_fail_closed(self):
         for index in (1,True):
@@ -59,6 +81,25 @@ class SourceReviewTests(unittest.TestCase):
             self.assertEqual((result['stage'],result['owner']),('blocked','cto'))
             self.assertFalse(pending(result))
 
+    def test_unproven_transport_cannot_resolve_or_approve_questions(self):
+        brief='No page navigation.'
+        with tempfile.TemporaryDirectory() as directory,patch('planning_intake.issue_for',return_value='review'),patch('planning_intake.completed_output',return_value=('task',json.dumps(self.answer()))),patch('planning_source_review.transport',side_effect=ValueError('not proven')):
+            result=run(self.state(brief),brief,{'agents':{'cto':'cto'}},Path(directory)/'receipt.json')
+            self.assertEqual(result['owner'],'cto')
+            self.assertEqual(result['stage'],'blocked')
+            self.assertNotIn('source_review_product',result)
+
+    def test_old_unqualified_review_is_preserved_and_requalified_once(self):
+        brief='No page navigation.';state=self.state(brief)
+        old={'stage':'verified','questions':['Navigate?'],'task_id':'old-review'}
+        state['source_review']=old
+        self.assertTrue(pending(state))
+        with tempfile.TemporaryDirectory() as directory,patch('planning_intake.issue_for',return_value='strict') as issue,patch('planning_intake.completed_output',return_value=('new-task',json.dumps(self.answer()))):
+            result=run(state,brief,{'agents':{'cto':'cto'}},Path(directory)/'receipt.json')
+            self.assertEqual(result['prior_unqualified_source_review'],old)
+            self.assertEqual(issue.call_args.kwargs['run_name'],'TEST-SOURCE-REVIEW-STRICT')
+            self.assertFalse(pending(result))
+
     def test_real_missing_choice_stays_with_ceo(self):
         brief='No page navigation.';answer=self.answer()
         answer['resolutions'][0].update(classification='requires_ceo',quote='',answer='')
@@ -75,6 +116,19 @@ class SourceReviewTests(unittest.TestCase):
             create.assert_not_called()
         state.pop('brief_clarification_product')
         self.assertFalse(pending(state))
+
+    def test_transport_requires_exact_binding_strict_schema_and_zero_tools(self):
+        labels=[json.dumps({'com.docker.compose.project':'delivery-kit-port2',
+                           'com.docker.compose.service':service}) for service in ('execution-broker','model-proxy')]
+        binding=json.dumps([{'request_id':'execution','scope':'workspace:planning:task'}])
+        event={'event':'model_proxy_request','execution_id':'execution','status':200,
+            'structured_format':'json_schema','strict_schema':True,'tool_count':0,'call_number':1}
+        with patch('evalctl.PROJECT','delivery-kit-port2'),patch('planning_source_review.subprocess.check_output',side_effect=[*labels,binding,json.dumps(event)]):
+            self.assertEqual(real_transport('task')['task_id'],'task')
+        for key,value in [('execution_id','other'),('strict_schema',False),('tool_count',18),('structured_format',None)]:
+            bad={**event,key:value}
+            with patch('evalctl.PROJECT','delivery-kit-port2'),patch('planning_source_review.subprocess.check_output',side_effect=[*labels,binding,json.dumps(bad)]),self.assertRaises(ValueError):
+                real_transport('task')
 
     def test_proxy_schema_and_native_stream_cover_source_review(self):
         from planning_schema import apply,caller_response

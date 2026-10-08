@@ -126,9 +126,9 @@ def main():
             if planning_path.is_symlink() or not planning_path.is_file():
                 return False
             state = json.loads(planning_path.read_text())
-            from planning_source_review import pending as source_pending
+            from planning_source_review import pending as source_pending,revalidate as source_revalidate
             if (state.get('configuration_sha256')==config['selection']['configuration_sha256']
-                    and source_pending(state)):
+                    and (source_pending(state) or source_revalidate(state,config['selection']['brief'].read_text()) is not None)):
                 return True
             from planning_constraint_recovery import pending as constraint_pending
             from start_eval import cli
