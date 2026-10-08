@@ -27,6 +27,14 @@ class PlanningSchemaTests(unittest.TestCase):
         self.assertEqual(props['stories']['maxItems'], 5)
         self.assertEqual(set(props['stories']['items']['properties']), {'title', 'acceptance'})
 
+    def test_model_sees_same_unweakened_schema_as_validator(self):
+        for role in ('product','cto','techlead'):
+            body=apply(self.body(role))
+            text=body['messages'][-1]['content']
+            self.assertEqual(json.loads(text.split('Exact output schema: ',1)[1]),
+                body['response_format']['json_schema']['schema'])
+            self.assertIn('maxItems',text)
+
     def test_techlead_stays_subject_to_controller_semantic_validation(self):
         props = apply(self.body('techlead'))['response_format']['json_schema']['schema']['properties']
         card = props['cards']['items']

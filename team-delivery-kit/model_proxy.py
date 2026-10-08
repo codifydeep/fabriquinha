@@ -450,6 +450,8 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(error,StructuredResponseRejected):
                 status,reason,content_type=502,'structured_decision_response_invalid','application/json'
                 response_metrics['structured_rejection_category']=error.category
+                if error.diagnostic:
+                    response_metrics['structured_rejection_diagnostic']=error.diagnostic
                 data=b'{"error":{"code":"structured_decision_response_invalid"}}'
                 rejection=getattr(error,'receipt',None)
                 if rejection:

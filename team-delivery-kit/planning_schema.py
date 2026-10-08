@@ -71,6 +71,14 @@ def apply(body):
         'execution or role suffixes. Product defines user acceptance, not '
         'architecture; CTO decides technical choices; Tech Lead defines the '
         'dependency graph. A proposal is not an approval or an executed delivery.'})
+    # Some providers enforce object shape but not length/cardinality constraints.
+    # Show the unchanged contract to the model too; never trim its answer or
+    # relax validation to make an invalid proposal pass.
+    body['messages'].append({'role':'system','content':
+        'Respect every minItems/maxItems and minLength/maxLength below. '
+        'Use concise acceptance criteria and combine related criteria rather '
+        'than exceeding the limits. Exact output schema: '+
+        json.dumps(obj(properties),sort_keys=True,separators=(',',':'))})
     return body
 
 

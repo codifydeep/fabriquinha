@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261008.104
+COPY model_proxy.py planning_schema.py structured_response_contract.py /

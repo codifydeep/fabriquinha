@@ -398,6 +398,12 @@ def main():
     if clarified:
         existing = clarified
         save_receipt(ledger_path, existing)
+    if existing and existing.get('stage') == 'blocked':
+        from planning_constraint_recovery import observe
+        recovered=observe(existing,registry,cli)
+        if recovered:
+            existing=recovered
+            save_receipt(ledger_path,existing)
     if (existing and existing.get('stage') == 'blocked'
             and existing.get('active') in ROLES
             and existing.get('category', '').startswith(('JSONDecodeError:', 'ValueError:'))

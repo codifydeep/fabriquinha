@@ -24,6 +24,24 @@ class StructuredResponseTests(unittest.TestCase):
         self.assertIsNone(validate(self.body,raw,'application/json'))
         self.assertEqual(raw,before)
 
+    def test_schema_diagnostic_contains_only_constraints_and_digest(self):
+        import hashlib
+        secret='PRIVATE_REJECTED_VALUE'
+        raw=self.wire(json.dumps({**self.decision,'reason':secret*3,secret:secret}))
+        with self.assertRaises(StructuredResponseRejected) as caught:
+            validate(self.body,raw,'application/json')
+        diagnostic=caught.exception.diagnostic
+        self.assertEqual(diagnostic,{'version':'structured-constraint-v1',
+            'constraints':['additionalProperties','maxLength'],
+            'upstream_sha256':hashlib.sha256(raw).hexdigest()})
+        self.assertNotIn(secret,json.dumps(diagnostic))
+        self.assertNotIn(secret,str(caught.exception))
+
+    def test_non_json_rejection_does_not_expose_content(self):
+        with self.assertRaises(StructuredResponseRejected) as caught:
+            validate(self.body,self.wire('PRIVATE_TEXT'),'application/json')
+        self.assertIsNone(caught.exception.diagnostic)
+
     def test_prose_fence_duplicate_keys_extra_fields_and_long_reason_rejected(self):
         raw=json.dumps(self.decision)
         for text in ['Preamble '+raw,'```json\n'+raw+'\n```',raw+' trailing',

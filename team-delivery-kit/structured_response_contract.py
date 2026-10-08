@@ -1,11 +1,13 @@
 """Validate actual decision bytes; schema requests alone are not evidence."""
 import json
+import hashlib
 from jsonschema import Draft202012Validator
 
 
 class StructuredResponseRejected(ValueError):
-    def __init__(self,category):
+    def __init__(self,category,diagnostic=None):
         self.category=category
+        self.diagnostic=diagnostic
         super().__init__('structured decision response invalid')
 
 
@@ -64,8 +66,18 @@ def validate(body,data,media_type):
         decision=json.loads(text,object_pairs_hook=_unique,
             parse_constant=lambda value: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
         if not isinstance(decision,dict):raise ValueError('decision object required')
-        if not Draft202012Validator(schema).is_valid(decision):
-            raise StructuredResponseRejected('schema_violation')
+        errors=list(Draft202012Validator(schema).iter_errors(decision))
+        if errors:
+            # Never expose instance paths, rejected values or exception messages.
+            # Only fixed JSON Schema keywords and a digest leave the validator.
+            allowed={'type','enum','const','required','additionalProperties','minLength',
+                     'maxLength','minItems','maxItems','uniqueItems','pattern',
+                     'minimum','maximum','anyOf','oneOf','allOf','not'}
+            constraints=sorted({e.validator if e.validator in allowed else 'other'
+                                for e in errors})
+            raise StructuredResponseRejected('schema_violation',{
+                'version':'structured-constraint-v1','constraints':constraints,
+                'upstream_sha256':hashlib.sha256(data).hexdigest()})
     except StructuredResponseRejected:raise
     except Exception:
         # No upstream text, JSON values or validation exception in public output.
