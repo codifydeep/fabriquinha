@@ -141,5 +141,5 @@ class ReviewContextRecoveryTests(unittest.TestCase):
         self.presentation['manifest_sha256']='b'*64
         with self.assertRaises(ValueError):self.register()
         self.presentation['manifest_sha256']='a'*64
-        with patch.object(recovery,'FIXED_SERVER_SHA','0'*64):
+        with patch.object(recovery.Path,'read_bytes',return_value=b'unapproved controller source'):
             with self.assertRaises(ValueError):self.register()

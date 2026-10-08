@@ -2506,8 +2506,9 @@ def main():
                             inherited_test_replan.tick(context)
                         finally:
                             controller_maintenance.end_cycle(context)
-            except Exception:
-                print('watchdog reconciliation failed; leases remain visible', flush=True)
+            except Exception as error:
+                from watchdog_fault import describe
+                print(json.dumps(describe(error),sort_keys=True), flush=True)
             time.sleep(1)
     import helper_cleanup
     threading.Thread(target=helper_cleanup.run,args=(handoff_context(),),daemon=True).start()
