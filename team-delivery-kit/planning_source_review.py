@@ -157,6 +157,7 @@ def run(state,brief,registry,path):
         if state.get('source_review_diagnosis'):
             state['source_review_diagnosis']={**state['source_review_diagnosis'],'stage':'decision_verified',
                 'task_id':task,'issue_id':issue,'output_sha256':receipt['output_sha256']}
+        for field in ('category','next_action'):state.pop(field,None)
         save_receipt(path,state);return state
     except Exception as error:
         receipt.update(stage='blocked',category=(type(error).__name__+':'+str(error))[:180])

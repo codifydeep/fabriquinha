@@ -13,19 +13,45 @@ def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def binding(ledger):
+def question_origin(ledger):
     if not isinstance(ledger,dict):raise ValueError('pending planning ledger required')
     questions=ledger.get('questions')
     output=(ledger.get('outputs') or {}).get('product') or {}
     if (ledger.get('stage')!='blocked_awaiting_ceo' or ledger.get('owner')!='ceo'
             or set(ledger.get('outputs') or {})!={'product'}
             or not isinstance(questions,list) or not questions
-            or any(not isinstance(q,str) or not q.strip() for q in questions)
-            or output.get('proposal',{}).get('business_questions')!=questions):
+            or any(not isinstance(q,str) or not q.strip() for q in questions)):
         raise ValueError('answer requires the exact pending Product question')
+    if output.get('proposal',{}).get('business_questions')==questions:
+        return output,ledger['issues']['product'],{}
+    review=ledger.get('source_review') or {}
+    prior=ledger.get('prior_source_review_product') or {}
+    rows=review.get('resolutions') or []
+    original=review.get('questions') or []
+    if (review.get('stage')!='verified'
+            or review.get('brief_sha256')!=ledger.get('brief_sha256')
+            or review.get('configuration_sha256')!=ledger.get('configuration_sha256')
+            or review.get('transport',{}).get('version')!='source-review-transport-v1'
+            or review.get('ceo_answer_created') is not False or review.get('scope_approval_created') is not False
+            or not isinstance(rows,list) or not isinstance(original,list)
+            or len(rows)!=len(original) or not original
+            or any(not isinstance(r,dict) or type(r.get('index')) is not int or r['index']!=i
+                or r.get('classification') not in ('requires_ceo','explicit_brief')
+                or r.get('classification')=='requires_ceo' and (r.get('quote')!='' or r.get('answer')!='')
+                for i,r in enumerate(rows))
+            or [original[r['index']] for r in rows if r['classification']=='requires_ceo']!=questions
+            or prior.get('questions')!=original
+            or prior.get('output',{}).get('proposal',{}).get('business_questions')!=original):
+        raise ValueError('source-reviewed pending question origin not proven')
+    return prior['output'],prior['issue_id'],{
+        'source_review_task_id':review['task_id'],'source_review_sha256':digest(review)}
+
+
+def binding(ledger):
+    output,issue,proof=question_origin(ledger)
+    questions=ledger['questions']
     return {key:ledger[key] for key in ('name','brief_sha256','configuration_sha256','base_sha')} | {
-        'question_sha256':digest(questions),'issue_id':ledger['issues']['product'],
-        'task_id':output['task_id']}
+        'question_sha256':digest(questions),'issue_id':issue,'task_id':output['task_id'],**proof}
 
 
 def make_answer(ledger,answer,source):
@@ -45,8 +71,12 @@ def resume(ledger,receipt):
     if receipt!=expected:
         raise ValueError('CEO answer identity or authority drift')
     result=copy.deepcopy(ledger)
-    result['prior_ceo_question']={'output':result['outputs']['product'],
-        'issue_id':result['issues']['product'],'questions':result['questions']}
+    output,issue,proof=question_origin(ledger)
+    result['prior_ceo_question']={'output':copy.deepcopy(output),
+        'issue_id':issue,'questions':result['questions'],**proof}
+    if output!=ledger['outputs']['product']:
+        result['prior_ceo_product_attempt']={'output':result['outputs']['product'],
+            'issue_id':result['issues']['product']}
     result.update(ceo_answer=copy.deepcopy(receipt),outputs={},stage='resuming_product_after_ceo')
     for key in ('owner','questions','active','category','next_action'):
         result.pop(key,None)

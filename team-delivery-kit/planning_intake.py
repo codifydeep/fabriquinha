@@ -546,7 +546,7 @@ def main():
                         'No Markdown, tool use, or explanations outside JSON.')
         ceo_answer = role == 'product' and bool(ledger.get('ceo_answer'))
         clarification = role == 'product' and bool(ledger.get('brief_clarification_product')) and not ceo_answer
-        reviewed = role == 'product' and bool(ledger.get('source_review_product'))
+        reviewed = role == 'product' and bool(ledger.get('source_review_product')) and not ceo_answer
         if reviewed:
             context += ('\nCTO SOURCE REVIEW (not a CEO answer or new scope): '+
                 json.dumps(ledger['source_review']['resolutions'])+

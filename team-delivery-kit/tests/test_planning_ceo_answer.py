@@ -44,6 +44,37 @@ class CEOAnswerTests(unittest.TestCase):
         for stage in ('plan_ready','blocked','working_product'):
             with self.assertRaises(ValueError):make_answer({**self.state,'stage':stage},self.answer,'reply')
 
+    def reviewed_state(self):
+        state=copy.deepcopy(self.state)
+        state['prior_source_review_product']={'output':copy.deepcopy(state['outputs']['product']),
+            'issue_id':state['issues']['product'],'questions':state['questions'][:]}
+        state['outputs']['product']['task_id']='task-later'
+        state['outputs']['product']['proposal']['business_questions']=['Later differently worded question?']
+        state['issues']['product']='issue-later'
+        state['source_review']={'stage':'verified','brief_sha256':state['brief_sha256'],
+            'configuration_sha256':state['configuration_sha256'],'task_id':'cto-review',
+            'output_sha256':'d'*64,'transport':{'version':'source-review-transport-v1'},
+            'questions':state['questions'][:],'resolutions':[{'index':0,'classification':'requires_ceo','quote':'','answer':''}],
+            'ceo_answer_created':False,'scope_approval_created':False}
+        return state
+
+    def test_answer_binds_original_question_after_source_review_not_later_attempt(self):
+        state=self.reviewed_state()
+        receipt=make_answer(state,self.answer,'direct CEO reply')
+        self.assertEqual(receipt['issue_id'],'issue-original')
+        self.assertEqual(receipt['task_id'],'task-original')
+        self.assertEqual(receipt['source_review_task_id'],'cto-review')
+        result=resume(state,receipt)
+        self.assertEqual(result['prior_ceo_question']['output']['task_id'],'task-original')
+        self.assertEqual(result['prior_ceo_product_attempt']['output']['task_id'],'task-later')
+        self.assertEqual(result['outputs'],{})
+
+    def test_unqualified_or_stale_source_question_cannot_receive_answer(self):
+        for field,value in [('stage','blocked'),('brief_sha256','wrong'),('configuration_sha256','wrong'),
+                            ('transport',{}),('questions',['Unrelated?'])]:
+            state=self.reviewed_state();state['source_review'][field]=value
+            with self.assertRaises(ValueError):make_answer(state,self.answer,'reply')
+
     def test_replay_does_not_restart_completed_product_or_grant_permissions(self):
         receipt=make_answer(self.state,self.answer,'reply')
         result=resume(self.state,receipt)
