@@ -361,6 +361,12 @@ e encaminha diagnóstico ao Tech Lead; não despacha correção pelo autor. Apen
 evidência funcional pode sustentar retrabalho de produto. Aprovação exige o recibo
 completo da execução independente vinculada ao snapshot exato.
 
+O supervisor reconhece a identidade exata do Python do host, incluindo o launcher
+`Python.app` das distribuições macOS, além de conferir script e label da execução.
+Um alerta falso de handle ausente só pode ser resolvido ao observar novamente o
+mesmo PID registrado e a mesma identidade; isso não relança o controlador nem
+aprova a entrega. Outros impedimentos permanecem bloqueados.
+
 Imagens incrementais antigas podem atingir o limite de camadas do Docker.
 `team-delivery-kit/import_controller_base.py` permite importar um export privado
 de um contêiner próprio, nunca iniciado, conferindo imagem de origem e metadados.

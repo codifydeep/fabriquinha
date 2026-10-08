@@ -9,6 +9,7 @@ import time
 from portable_remediation_intake import candidate,read_input,bundle,prepare,read,digest
 from remediation_parent_delivery import publish,verify_live
 from release_eval import approved_submission,command,save_receipt
+from controller_process_identity import interpreters,matches as matches_process
 
 ROOT=Path(__file__).resolve().parent
 SCRIPT=ROOT/'portable_delivery.py'
@@ -24,14 +25,13 @@ class Effects:
         return cli('get',issue)
     def now(self):return time.time()
     def processes(self,label):
+        allowed=interpreters()
         rows=subprocess.check_output(['ps','-axo','pid=,command='],text=True)
         matches=[]
         for line in rows.splitlines():
             parts=line.strip().split(None,1)
             if len(parts)!=2 or not parts[0].isdigit():continue
-            suffix=' -u '+str(SCRIPT)+' --managed-label '+label
-            if (parts[1].endswith(suffix)
-                    and Path(parts[1][:-len(suffix)]).resolve()==Path(sys.executable).resolve()):
+            if matches_process(parts[1],SCRIPT,label,allowed):
                 matches.append(int(parts[0]))
         return matches
     def launch(self,paths,stage,project,label):
@@ -107,7 +107,15 @@ def reconcile(private,stage,parent,project,*,instance='delivery-kit-port2',effec
             result=fx.publish(paths,receipt,stage)
             return save({**(state or {}),'identity':identity,'stage':result['stage'],
                 'parent_projection':result,'release_homologated':False})
-        if state and state.get('stage')=='blocked':return state
+        if state and state.get('stage')=='blocked':
+            # Resolve only a false missing-handle observation, never relaunch.
+            live=fx.processes(label) if state.get('category')=='r3_controller_handle_missing' else []
+            if type(state.get('pid')) is not int or live!=[state['pid']]:return state
+            prior=dict(state)
+            state={k:v for k,v in state.items() if k not in ('category','owner','next_action')}
+            state.update(stage='running',handle_recovery=dict(previous_state=prior,
+                pid=live[0],observed_at=fx.now(),process_relaunched=False,release_homologated=False))
+            save(state)
         if state and state.get('stage')=='parent_projected':return hold('r3_delivery_receipt_disappeared')
         if state is None:
             existing=fx.processes(label)

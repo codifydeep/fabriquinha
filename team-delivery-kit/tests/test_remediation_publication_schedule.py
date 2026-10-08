@@ -55,6 +55,17 @@ class RemediationPublicationScheduleTests(unittest.TestCase):
         self.assertEqual(result['owner'],'techlead');self.fx.launch.assert_called_once()
         self.assertEqual(self.invoke(),result);self.fx.launch.assert_called_once()
 
+    def test_exact_original_handle_can_resolve_false_missing_observation_without_relaunch(self):
+        self.invoke();self.invoke()
+        self.fx.processes.return_value=[999]
+        self.assertEqual(self.invoke()['stage'],'blocked')
+        self.fx.processes.return_value=[123]
+        result=self.invoke()
+        self.assertEqual(result['stage'],'running')
+        self.assertFalse(result['handle_recovery']['process_relaunched'])
+        self.assertEqual(result['handle_recovery']['previous_state']['category'],'r3_controller_handle_missing')
+        self.fx.launch.assert_called_once()
+
     def test_real_delivery_projects_parent_without_new_launch(self):
         self.fx.receipt.return_value=self.f.receipt
         self.assertEqual(self.invoke()['stage'],'parent_projected')
