@@ -483,6 +483,19 @@ O procedimento de atualização dos controladores com essa barreira será:
 Um estado `draining` não permite trocar a imagem. Não interromper workers para
 forçar a drenagem; resolver o impedimento com seus arquivos e recibos preservados.
 
+Uma sessão de diagnóstico interrompida pela manutenção pode receber **uma nova
+observação somente de leitura**, qualificada por
+`diagnostic_maintenance_recovery.register` no controlador selado. Ela exige o
+incidente atual, o CTO independente no modo `planning`, a tarefa anterior
+terminal, ausência de execução residual e as duas entregas congeladas montadas
+somente para leitura. O resultado do transporte anterior permanece `unknown`:
+ausência de eventos não é convertida em prova de zero chamadas. Um recibo
+atômico preserva o handoff antigo e limita a observação por origem; reinícios ou
+nova manutenção não renovam esse limite. Grants, sessões, experimentos e retries
+do implementador não são reaproveitados ou autorizados por essa operação.
+O registro real e sua idempotência foram validados; o diagnóstico pelos agentes
+e a posterior entrega ainda não são evidências de sucesso concluídas.
+
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
 instrução real após leituras completas contra schema e adaptador do proxy. Uma

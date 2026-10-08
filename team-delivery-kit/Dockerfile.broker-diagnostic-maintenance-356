@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261008.355
+COPY broker/diagnostic_maintenance_recovery.py /diagnostic_maintenance_recovery.py
