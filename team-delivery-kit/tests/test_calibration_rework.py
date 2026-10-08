@@ -1,4 +1,4 @@
-import unittest,copy
+import unittest,copy,hashlib
 import sqlite3,json,threading
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -59,6 +59,20 @@ class CalibrationReworkTests(unittest.TestCase):
         self.assertEqual(held['cto_decision'],state['cto_decision'])
         self.assertEqual(self.calls,[])
         self.assertEqual(advance(self.config,held,[run],self.fx,self.save),held)
+
+    def test_changed_calibration_diagnosis_retains_plan_without_author_wakeup(self):
+        config={**self.config,'post_execution_diagnosis':dict(previous_diagnostic={'negative_controls_detected':16}),
+            'diagnostic':dict(phase='background_timer_control',negative_controls={})}
+        note=instruction(config,dict(stage='cto_pending'))
+        self.assertIn('NEW FROZEN CALIBRATION INCIDENT',note)
+        self.assertIn('"negative_controls_total": 16',note)
+        self.assertIn('No shell, edits, author admission',note)
+        held=advance(config,dict(stage='author_pending'),[],self.fx,self.save)
+        self.assertEqual(held['stage'],'plan_qualified')
+        self.assertFalse(held['author_retry_authorized'])
+        self.assertFalse(held['delivery_approval'])
+        self.assertEqual(held['required_action'],'execute_read_only_experiment_for_exact_calibration_plan')
+        self.assertEqual(self.calls,[])
 
     def test_restart_after_ambiguous_intent_only_observes_never_reposts(self):
         state=dict(stage='cto_intent',intent_at=1)
@@ -203,3 +217,40 @@ class CalibrationReworkTests(unittest.TestCase):
             self.assertEqual(result['category'],'calibration_author_failed')
             self.assertEqual(result['author_task'],failed['id']);self.assertEqual(original['owner'],'cto')
             self.assertEqual(handoffs.load(con,failed['id'])['stage'],'test_first_blocked')
+            # A later authenticated failed calibration is a separate diagnosis,
+            # not a reset of the consumed author correction.
+            con.execute('CREATE TABLE failed_test_checkpoint_executions(issue_id TEXT,source_task TEXT,receipt TEXT)')
+            con.execute('INSERT INTO failed_test_checkpoint_executions VALUES(?,?,?)',
+                ('issue',failed['id'],json.dumps(dict(status='rejected',delivery_approved=False))))
+            expected=jobs.payload(b,failed['id'],'later-snapshot','e'*64)
+            info=dict(Id='later-job',Config={k:v for k,v in expected.items() if k!='HostConfig'},HostConfig=expected['HostConfig'],
+                State=dict(Status='exited',Running=False,ExitCode=1))
+            identity=dict(issue_id='issue',task_id=failed['id'],payload=expected,volume='later-snapshot',manifest_sha256='e'*64)
+            b.docker_stdout=lambda *args,**kwargs:'fixed calibration rejection'
+            held=dict(stage='blocked',container_id='later-job',output_sha256=hashlib.sha256(b'fixed calibration rejection').hexdigest(),diagnostic=dict(phase='background_timer_control',
+                manifest_sha256='e'*64,test_sha256='f'*64,positive=dict(tests=15,failures=0),negative_controls={}))
+            con.execute('INSERT INTO harness_qualifications VALUES(?,?,?)',(failed['id'],json.dumps(identity),json.dumps(held)))
+            original_docker=b.docker
+            b.docker=lambda method,path,body=None:dict(Labels={'delivery-kit.owner':'owned','delivery-kit.test-first-task':failed['id']}) if path.startswith('/volumes/') else original_docker(method,path,body)
+            failed['created_at']='2026-10-08T12:00:00Z'
+            prior=handoffs.load(con,failed['id'])
+            # The same manifest cannot re-open an incident.
+            original_manifest=identity['manifest_sha256']
+            identity['manifest_sha256']='b'*64;held['diagnostic']['manifest_sha256']='b'*64
+            con.execute('UPDATE harness_qualifications SET identity=?,state=? WHERE task_id=?',
+                (json.dumps(identity),json.dumps(held),failed['id']))
+            with patch.object(jobs,'verify_job'):
+                self.assertFalse(lane.handle(b,route,[source,failed],failed,prior,self.fx))
+            identity['manifest_sha256']=original_manifest;held['diagnostic']['manifest_sha256']=original_manifest
+            con.execute('UPDATE harness_qualifications SET identity=?,state=? WHERE task_id=?',
+                (json.dumps(identity),json.dumps(held),failed['id']))
+            self.assertTrue(lane.handle(b,route,[source,failed],failed,prior,self.fx))
+            archived=con.execute('SELECT source_task,state FROM calibration_rework_history WHERE issue_id=?',('issue',)).fetchone()
+            self.assertEqual(archived[0],'source')
+            self.assertEqual(json.loads(archived[1])['category'],'calibration_author_failed')
+            current=con.execute('SELECT source_task,config,state FROM calibration_reworks WHERE issue_id=?',('issue',)).fetchone()
+            self.assertEqual(current[0],failed['id'])
+            self.assertEqual(json.loads(current[2])['stage'],'cto_waiting')
+            self.assertFalse(json.loads(current[1])['post_execution_diagnosis']['author_retry_authorized'])
+            self.assertTrue(lane.handle(b,route,[source,failed],failed,handoffs.load(con,failed['id']),self.fx))
+            self.assertEqual(con.execute('SELECT count(*) FROM calibration_rework_history').fetchone()[0],1)

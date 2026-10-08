@@ -13,10 +13,31 @@ def digest(value):
 
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS calibration_reworks(issue_id TEXT PRIMARY KEY,source_task TEXT,config TEXT,state TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS calibration_rework_history('
+                'issue_id TEXT,source_task TEXT,config TEXT,state TEXT,PRIMARY KEY(issue_id,source_task))')
 
 
 def instruction(config,state):
     peer=state['stage'].startswith('peer')
+    if config.get('post_execution_diagnosis'):
+        note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
+            'NEW FROZEN CALIBRATION INCIDENT: '+('Independent Tech Lead inspection. ' if peer else 'CTO diagnosis. ')+
+            'Read all assigned frozen files completely. The previously sponsored author execution is terminal; '
+            'its changed artifact was copied and calibrated by the controller. This is a new measured rejection, '
+            'not a retry of its session or proof of product Red. Diagnose the exact remaining defects and propose '
+            'a bounded read-only experiment that can validate a remedy on a disposable copy. No shell, edits, '
+            'author admission, replay, limit/depth reset, product changes or delivery approval. Preserve every '
+            'test method/assertion, baseline byte and acceptance criterion. Both decisions retain a plan only; '
+            'execution still requires an evidence-bound qualified experiment and all existing gates. '
+            'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[].\n'
+            'Previous calibration: '+json.dumps(config['post_execution_diagnosis']['previous_diagnostic'],sort_keys=True)+
+            '\nCurrent calibration: '+json.dumps(diagnostic_index(config['diagnostic']),sort_keys=True)+
+            ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
+            '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
+            ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
+        if len(note)+100>4000:raise ValueError('bounded post-execution calibration diagnosis required')
+        return note
     if config.get('bootstrap_failure'):
         note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_CALIBRATION_FAILURE_PLAN_V1\n'
             'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
@@ -239,10 +260,11 @@ def recover_technical_escalation(config,state,runs,effects):
 def advance(config,state,runs,effects,persist,now=None):
     now=time.time() if now is None else now
     if state['stage'] in ('blocked','plan_qualified'):return state
-    if state['stage']=='author_pending' and config.get('diagnosis_only'):
+    if state['stage']=='author_pending' and (config.get('diagnosis_only') or config.get('post_execution_diagnosis')):
         state={**state,'stage':'plan_qualified','owner':config['cto'],
             'author_retry_authorized':False,'delivery_approval':False,
-            'required_action':'qualify_bounded_original_author_executor_for_exact_proposal'}
+            'required_action':('execute_read_only_experiment_for_exact_calibration_plan'
+                if config.get('post_execution_diagnosis') else 'qualify_bounded_original_author_executor_for_exact_proposal')}
         persist(state)
         return state
     if state['stage']=='author_dispatched':
@@ -319,7 +341,18 @@ def _handle(b,route,runs,source,prior,effects):
         initialize(con)
         existing=con.execute('SELECT source_task,config,state FROM calibration_reworks WHERE issue_id=?',(issue,)).fetchone()
     foreign_source=bool(existing and existing[0]!=key)
-    if not existing:
+    rollover=False
+    if foreign_source:
+        previous_config,previous_state=map(json.loads,existing[1:])
+        authors=[r for r in runs if r.get('agent_id')==route.get('author')]
+        rollover=(previous_state.get('stage')=='blocked'
+            and previous_state.get('category')=='calibration_author_failed'
+            and previous_state.get('author_task')==key
+            and source.get('wakeup_id')==previous_state.get('author_wakeup')
+            and source.get('status')=='failed' and bool(authors)
+            and max(authors,key=lambda r:(r.get('created_at') or '',r['id']))['id']==key
+            and not previous_config.get('post_execution_diagnosis'))
+    if not existing or rollover:
         if prior['stage']!='test_first_blocked':return False
         with b.db() as con:
             if not con.execute("SELECT 1 FROM sqlite_master WHERE name='harness_qualifications'").fetchone():return False
@@ -352,15 +385,43 @@ def _handle(b,route,runs,source,prior,effects):
             if proof.get('status')!='rejected' or proof.get('delivery_approval') is not False:return False
             diagnostic={k:proof[k] for k in ('phase','manifest_sha256','test_sha256','positive','negative_controls','background') if k in proof}
         if diagnostic.get('manifest_sha256')!=identity['manifest_sha256']:raise ValueError('exact calibration diagnostic manifest required')
+        if rollover:
+            with b.db() as con:
+                checkpoint=con.execute('SELECT receipt FROM failed_test_checkpoint_executions '
+                    'WHERE issue_id=? AND source_task=?',(issue,key)).fetchone()
+            proof=json.loads(checkpoint[0]) if checkpoint else {}
+            if (proof.get('status')!='rejected' or proof.get('delivery_approved') is not False
+                    or identity.get('task_id')!=key or identity.get('issue_id')!=issue
+                    or any(previous_config[k]!=route[v] for k,v in
+                        (('author','author'),('cto','cto'),('peer','techlead')))
+                    or previous_config['contract_sha256']!=route['contract_sha256']
+                    or previous_config['manifest_sha256']==identity['manifest_sha256']
+                    or previous_config['diagnostic'].get('test_sha256')==diagnostic.get('test_sha256')):
+                return False
+            observed=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
+            if hashlib.sha256(observed.encode()).hexdigest()!=held.get('output_sha256'):
+                raise ValueError('new calibration job receipt drift')
         config=dict(issue_id=issue,source_task=key,author=route['author'],cto=route['cto'],peer=route['techlead'],
             manifest_sha256=identity['manifest_sha256'],volume=identity['volume'],diagnostic=diagnostic,
             contract_sha256=route['contract_sha256'],criteria=value['criteria'],minimum_calls=route['minimum_calls'],
             paths=sorted('/evidence/candidate/'+p for p in set(route['test_first_files'])|{'app/static/app.js'}))
         state=dict(stage='cto_pending',delivery_approval=False,revision_depth_reset=False,attempt_limit=1)
+        if rollover:
+            config['post_execution_diagnosis']=dict(operation='changed_calibration_incident_v1',
+                previous_source=existing[0],previous_manifest=previous_config['manifest_sha256'],
+                previous_diagnostic=diagnostic_index(previous_config['diagnostic']),
+                checkpoint_sha256=digest(proof),author_retry_authorized=False,delivery_approval=False)
         instruction(config,state)
         with b.LOCK,b.db() as con:
             if con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():return True
-            con.execute('INSERT INTO calibration_reworks VALUES(?,?,?,?)',(issue,key,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
+            if rollover:
+                current=con.execute('SELECT source_task,config,state FROM calibration_reworks WHERE issue_id=?',(issue,)).fetchone()
+                if tuple(current)!=tuple(existing):raise ValueError('calibration incident changed before archival')
+                con.execute('INSERT INTO calibration_rework_history VALUES(?,?,?,?)',(issue,*existing))
+                con.execute('UPDATE calibration_reworks SET source_task=?,config=?,state=? WHERE issue_id=?',
+                    (key,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True),issue))
+                foreign_source=False
+            else:con.execute('INSERT INTO calibration_reworks VALUES(?,?,?,?)',(issue,key,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
     else:config,state=map(json.loads,existing[1:])
     if state.get('stage')=='blocked' and not config.get('format_revision'):
         role='peer' if state.get('peer_wakeup') else 'cto'

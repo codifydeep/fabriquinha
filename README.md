@@ -253,6 +253,14 @@ polling. Controles ausentes são apresentados como inválidos; passar a referên
 positiva não oculta defeitos não detectados. Esse resumo não autoriza uma nova
 execução nem substitui a revisão do snapshot.
 
+Se a correção patrocinada terminar em falha e produzir uma nova calibração
+rejeitada, o controlador pode abrir um diagnóstico separado para CTO e Tech Lead.
+Isso exige a última execução do autor, checkpoint rejeitado, novo manifest e hash
+de teste, contrato e responsáveis inalterados, job e saída conferidos, nenhum
+worker ativo e nenhum Red aprovado. O incidente anterior é arquivado antes da
+troca; ambos os pareceres produzem somente um plano de experimento em cópia
+descartável, sem nova execução do autor, reset de limites ou aprovação de entrega.
+
 O gate verifica compilação, referência correta e 12 defeitos controlados (respostas indevidas,
 requisições duplicadas, estado pendente, timers e interferência). O job usa o
 snapshot somente leitura, sem rede, credenciais ou socket Docker. Erros de runtime,
