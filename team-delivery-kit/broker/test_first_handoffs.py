@@ -696,6 +696,30 @@ def diagnostic_presentation(data):
     return result
 
 
+def lost_lineage(current, history, runs, cto):
+    """Restore only a recorded failed CTO pointer; never dispatch or approve."""
+    if (current.get('phase')!='test_first' or current.get('error')!='test_author_execution_failed'
+            or current.get('control_error')!='ValueError:handoff identity drift'
+            or current.get('test_first_cto_wakeup') or current.get('lineage_repair')
+            or not current.get('diagnostic')
+            or any(r.get('status') in ('queued','dispatched','running') for r in runs)):
+        return None
+    candidates=[d for d in history if d.get('phase')=='test_first'
+        and d.get('error')=='test_first_cto_execution_failed' and d.get('test_first_cto_wakeup')
+        and d.get('diagnostic')==current['diagnostic']]
+    pointers={d['test_first_cto_wakeup'] for d in candidates}
+    if len(pointers)!=1:return None
+    pointer=next(iter(pointers))
+    recipients=[r for r in runs if r.get('agent_id')==cto and r.get('wakeup_id')==pointer]
+    if len(recipients)!=1 or recipients[0].get('status')!='failed':return None
+    restored=dict(candidates[0])
+    restored.pop('control_error',None);restored.pop('control_error_count',None)
+    restored['lineage_repair']=dict(operation='restore_recorded_pre_red_cto_pointer_v1',
+        previous_blocker=current,failed_cto_task=recipients[0]['id'],
+        author_retry_authorized=False,delivery_approval=False)
+    return restored
+
+
 def reconcile(broker, route, runs, effects):
     """Return implementation-only runs once Red has been proven; else None."""
     issue = route['issue_id']
@@ -717,6 +741,16 @@ def reconcile(broker, route, runs, effects):
                 return None  # Next tick validates checkpoint provenance and independent review.
         with broker.db() as con:
             prior = handoffs.load(con, source['id'])
+            if (prior and source.get('status')=='failed' and prior['issue_id']==issue
+                    and json.loads(prior['data']).get('control_error')=='ValueError:handoff identity drift'):
+                active=con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()
+                history=[json.loads(r[0]) for r in con.execute(
+                    'SELECT data FROM delivery_handoff_events WHERE source_task=? AND stage=? ORDER BY id',
+                    (source['id'],'test_first_blocked'))]
+                restored=lost_lineage(json.loads(prior['data']),history,runs,route['cto']) if not active else None
+                if restored:
+                    handoffs.save(con,source['id'],issue,'test_first_blocked',route['cto'],restored,time.time())
+                    return None
             surgical_execution=bool(source.get('wakeup_id') and any(
                 json.loads(row[0]).get('surgical_wakeup')==source['wakeup_id'] for row in
                 con.execute('SELECT data FROM delivery_handoffs WHERE issue_id=?',(issue,))))

@@ -123,6 +123,11 @@ class Effects:
 
     def pre_red_format_rejection(self, route, recipient):
         """Exact native binding plus a sanitized receipt from the pinned proxy."""
+        if recipient.get('failure_reason')=='agent_error.provider_server_error':
+            # A provider failure is not a schema/length rejection. Do not query
+            # a historical format-only image or reinterpret it as invalid code.
+            return {'category':'provider_failure_not_format_rejection',
+                    'delivery_approval':False,'worker_tool_executed':False}
         b=self.b
         with b.db() as con:
             rows=con.execute('SELECT request_id,agent_id,issue_id FROM native_bindings WHERE task_id=?',
