@@ -53,10 +53,28 @@ def qualify_report(report, tasks):
             raise ValueError('exact native envelope rejection required')
 
 
-def recover_evidence(private, evidence, state, *, instance='delivery-kit-port2'):
+def qualify_reason_report(report,tasks):
+    if report.get('active')!=0 or [row.get('task') for row in report.get('failures',[])]!=tasks or len(tasks)!=2:
+        raise ValueError('idle exact independent reason failures required')
+    for row in report['failures']:
+        receipt=row['receipt'];rejections=row['rejections']
+        if receipt.get('method')!='session/prompt' or receipt.get('code')!=-32603 or receipt.get('approval') is not False or len(rejections)!=1:
+            raise ValueError('exact failed reason transport required')
+        rejected=rejections[0];shape=rejected.get('response_shape',{})
+        if (rejected.get('operation')!='rejected_typed_decision_adapter_v1'
+                or rejected.get('category')!='typed_schema_maxLength'
+                or rejected.get('delivery_approval') is not False or rejected.get('worker_tool_executed') is not False
+                or shape.get('parsed') is not True or shape.get('terminal') is not True
+                or shape.get('submissions')!=1 or shape.get('expected_tool') is not True
+                or shape.get('arguments_json_valid') is not True or shape.get('arguments_schema_valid') is not False):
+            raise ValueError('persisted sole structured length failure required')
+
+
+def recover_evidence(private, evidence, state, *, instance='delivery-kit-port2', reason=False):
     from r3_incident_runtime import Effects
     if (state.get('stage')!='blocked' or state.get('category')!='invalid_incident_submission'
-            or state.get('escalated') is not True or 'experiment_history' in evidence):
+            or state.get('escalated') is not True or 'experiment_history' in evidence
+            or reason and 'incident_reason_transport_qualified' in evidence.get('facts',{}).values()):
         return None
     root=Path(private);saved=read(root/'r3-incidents'/(digest(evidence)+'.json'))
     if saved['state']!=state or saved['config']['evidence']!=evidence:
@@ -82,10 +100,12 @@ def recover_evidence(private, evidence, state, *, instance='delivery-kit-port2')
         'docker','exec','-w','/',instance+'-execution-broker-1','python','-c',REPORT,json.dumps(tasks)))
     if not previous:
         for row in report['failures']:
-            row['rejections']=json.loads(command('docker','exec','-w','/',instance+'-model-proxy-1',
-                'python','-c','import json,sys;from proxy_request_rejections import read;'
-                'print(json.dumps(read("/meter/calls.json",sys.argv[1])))',row['execution']))
-    qualify_report(report,tasks)
+            program=('import json,sys,sqlite3; c=sqlite3.connect("file:/meter/deterministic-reads.sqlite?mode=ro",uri=True);'
+                     'print(json.dumps([json.loads(r[0]) for r in c.execute("SELECT receipt FROM typed_decision_rejections WHERE execution_id=?",(sys.argv[1],))]));c.close()'
+                     if reason else 'import json,sys;from proxy_request_rejections import read;'
+                     'print(json.dumps(read("/meter/calls.json",sys.argv[1])))')
+            row['rejections']=json.loads(command('docker','exec','-w','/',instance+'-model-proxy-1','python','-c',program,row['execution']))
+    (qualify_reason_report if reason else qualify_report)(report,tasks)
     proxy=instance+'-model-proxy-1'
     labels=json.loads(command('docker','inspect','--format','{{json .Config.Labels}}',proxy))
     if (labels.get('com.docker.compose.project')!=instance
@@ -93,17 +113,26 @@ def recover_evidence(private, evidence, state, *, instance='delivery-kit-port2')
         raise ValueError('owned running proxy required')
     image=command('docker','inspect','--format','{{.Image}}',proxy).strip()
     expected=command('docker','image','inspect','--format','{{.Id}}',
-                     'delivery-kit-model-proxy:20261008.100').strip()
-    if image!=expected: return None  # Do not wake against unchanged transport.
-    canary=json.loads(command('docker','exec','-w','/',proxy,'python','-c',CANARY,json.dumps(notes)))
-    source=hashlib.sha256(Path(__file__).with_name('r3_incident_contract.py').read_bytes()).hexdigest()
-    if canary!={'contract_sha256':source,'qualified':2,'execution_authorized':False}:
-        raise ValueError('installed native-envelope qualification drift')
-    proof=dict(operation='changed_native_envelope_diagnosis_v1',incident_sha256=digest(evidence),
-               proxy_image=image,contract_sha256=source,report=report,canary=canary,
+                     'delivery-kit-model-proxy:20261008.'+('101' if reason else '100')).strip()
+    if image!=expected:
+        if reason or not previous:return None
+        successor=command('docker','image','inspect','--format','{{.Id}}','delivery-kit-model-proxy:20261008.101').strip()
+        if image!=successor:return None
+    program='import json,sys;from r3_reason_probe import run;print(json.dumps(run(json.loads(sys.argv[1]))))' if reason else CANARY
+    canary=json.loads(command('docker','exec','-w','/',proxy,'python','-c',program,json.dumps(notes)))
+    source=hashlib.sha256(Path(__file__).with_name('typed_decision_contract.py' if reason else 'r3_incident_contract.py').read_bytes()).hexdigest()
+    expected_canary=(dict(status='r3_reason_transport_qualified',cases=2,policy_sha256=source,
+        probe_sha256=hashlib.sha256(Path(__file__).with_name('r3_reason_probe.py').read_bytes()).hexdigest(),
+        worker_tool_executed=False,execution_authorized=False) if reason else
+        dict(contract_sha256=source,qualified=2,execution_authorized=False))
+    if canary!=expected_canary:raise ValueError('installed incident transport qualification drift')
+    proof=dict(operation='changed_r3_reason_diagnosis_v1' if reason else 'changed_native_envelope_diagnosis_v1',incident_sha256=digest(evidence),
+               proxy_image=previous['proxy_image'] if previous else image,contract_sha256=source,report=report,canary=canary,
                failed_tasks_preserved=True,execution_authorized=False,release_homologated=False)
     if previous:
         if previous!=proof:raise ValueError('immutable transport recovery drift')
     else:save_receipt(path,proof)
     # New inputs, not another attempt against the original evidence identity.
-    return {**evidence,'facts':{**evidence['facts'],'F03':'incident_envelope_transport_qualified'}}
+    fact='incident_reason_transport_qualified' if reason else 'incident_envelope_transport_qualified'
+    key='F'+str(len(evidence['facts'])+1).zfill(2)
+    return {**evidence,'facts':{**evidence['facts'],key:fact}}

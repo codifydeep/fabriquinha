@@ -85,10 +85,38 @@ def remediation_length_feedback_enabled(body):
 
 
 def length_feedback_enabled(body):
-    return plan_length_feedback.enabled(body) or remediation_length_feedback_enabled(body) or review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
+    return r3_length_feedback_enabled(body) or plan_length_feedback.enabled(body) or remediation_length_feedback_enabled(body) or review_length_feedback_enabled(body) or (body.get('tool_choice') in ({'type':'function','function':{'name':NAME}},
         {'type':'function','function':{'name':RECOVERY_NAME}}) and any(
         m.get('role')=='user' and isinstance(m.get('content'),str)
         and re.search(r'^'+LENGTH_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
+
+
+def r3_length_feedback_enabled(body):
+    if body.get('tool_choice')!={'type':'function','function':{'name':R3_NAME}}:return False
+    tools=body.get('tools',[])
+    if len(tools)!=1:return False
+    schema=tools[0].get('function',{}).get('parameters',{})
+    from r3_incident_contract import request_contract
+    expected=request_contract(body)
+    return expected is not None and schema==expected
+
+
+def validate_r3_feedback_identity(body,decision):
+    if not r3_length_feedback_enabled(body) or len(body.get('messages',[]))<2:return
+    submitted,reply=body['messages'][-2:]
+    if reply.get('role')!='tool' or not isinstance(reply.get('content'),str):return
+    try:feedback=json.loads(reply['content'])
+    except ValueError:return
+    if feedback.get('operation')!='format_only_r3_reason_feedback_v1':return
+    try:
+        call=submitted['tool_calls'][0]
+        if (submitted.get('role')!='assistant' or len(submitted['tool_calls'])!=1
+                or call['id']!=reply.get('tool_call_id') or call['function']['name']!=R3_NAME):raise ValueError()
+        previous=json.loads(call['function']['arguments'],object_pairs_hook=_unique)
+        expected=copy.deepcopy(previous);expected['reason']=decision['reason']
+        if expected!=decision:raise ValueError()
+    except (ValueError,KeyError,IndexError,TypeError):
+        raise StructuredResponseRejected('typed_r3_feedback_identity_drift') from None
 
 
 def review_length_feedback_enabled(body):
@@ -197,6 +225,9 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
     if plan_length_feedback.enabled(body):
         receipt.update(operation='remediation_plan_length_feedback_v1',plan_acceptance_by_proxy=False,
             evidence_sha256=body['tools'][0]['function']['parameters']['properties']['evidence_sha256']['enum'][0])
+    if r3_length_feedback_enabled(body):
+        receipt.update(operation='r3_reason_length_feedback_v1',execution_authorized=False,
+            evidence_sha256=body['tools'][0]['function']['parameters']['properties']['evidence_sha256']['enum'][0])
     with ledger(counter_path) as con:
         con.execute('CREATE TABLE IF NOT EXISTS technical_length_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
         if con.execute('SELECT 1 FROM technical_length_feedback WHERE execution_id=?',(execution_id,)).fetchone():return None
@@ -218,6 +249,7 @@ def apply(body):
             description='Submit technical diagnosis or review data only. No worker operation executes.',parameters=incident))]
         result['tool_choice']=dict(type='function',function=dict(name=R3_NAME))
         result['messages'].append(dict(role='system',content='Call '+R3_NAME+' exactly once with actual schema-valid arguments. '
+            'reason must be one actionable sentence, target280characters, hard limit600characters. '
             'No prose or simulated calls. Reference all verified facts. This submission grants no execution, merge, '
             'test waiver or release authority; execution_authorized and release_homologated remain false.'))
         return result
@@ -616,6 +648,19 @@ def translate(body,data,media_type):
             parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
         violations=list(Draft202012Validator(schema).iter_errors(decision))
         if violations:
+            if (r3_length_feedback_enabled(body) and len(violations)==1
+                    and violations[0].validator=='maxLength' and list(violations[0].path)==['reason']
+                    and isinstance(decision.get('reason'),str) and 600<len(decision['reason'])<=4000):
+                error=StructuredResponseRejected('typed_schema_maxLength')
+                identity='format_'+hashlib.sha256(data).hexdigest()[:24]
+                error.length_feedback=[dict(role='assistant',content=None,tool_calls=[dict(id=identity,type='function',
+                    function=dict(name=name,arguments=arguments))]),dict(role='tool',tool_call_id=identity,
+                    content=json.dumps(dict(operation='format_only_r3_reason_feedback_v1',field='reason',maxLength=600,
+                    actualLength=len(decision['reason']),worker_tool_executed=False,execution_authorized=False,
+                    instruction='Submit NEW valid arguments once. Condense only reason to one actionable sentence, target280characters. '
+                    'Keep every other field identical, including action/decision, experiment, evidence/proposal hashes, fact_ids and false flags. '
+                    'No decision was accepted or operation authorized.')))]
+                raise error
             plan_feedback=plan_length_feedback.feedback(body,violations,decision,schema,arguments,data)
             if plan_feedback:
                 error=StructuredResponseRejected('typed_schema_maxLength');error.length_feedback=plan_feedback
@@ -666,6 +711,7 @@ def translate(body,data,media_type):
             reject('schema_'+(keyword if keyword in allowed else 'violation'))
         validate_review_feedback_identity(body,decision)
         validate_remediation_feedback_identity(body,decision)
+        validate_r3_feedback_identity(body,decision)
         plan_length_feedback.validate_identity(body,decision)
         phase='adapter'
         text=json.dumps(decision,sort_keys=True,separators=(',',':'),allow_nan=False)

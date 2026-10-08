@@ -1,9 +1,23 @@
 import copy
 import unittest
-from r3_incident_transport import qualify_report, ERROR_SHA
+from r3_incident_transport import qualify_report, qualify_reason_report, ERROR_SHA
 
 
 class R3IncidentTransportTests(unittest.TestCase):
+    def test_reason_recovery_requires_two_exact_persisted_nonaccepted_length_failures(self):
+        report=self.report()
+        rejected=dict(operation='rejected_typed_decision_adapter_v1',category='typed_schema_maxLength',
+                      delivery_approval=False,worker_tool_executed=False,
+                      response_shape=dict(parsed=True,terminal=True,submissions=1,expected_tool=True,
+                                          arguments_json_valid=True,arguments_schema_valid=False))
+        for row in report['failures']:row['rejections']=[copy.deepcopy(rejected)]
+        qualify_reason_report(report,['tl','cto'])
+        for key,value in [('category','typed_wrong_tool_name'),('delivery_approval',True),('worker_tool_executed',True)]:
+            changed=copy.deepcopy(report);changed['failures'][0]['rejections'][0][key]=value
+            with self.assertRaises(ValueError):qualify_reason_report(changed,['tl','cto'])
+        changed=copy.deepcopy(report);changed['failures'][0]['rejections'][0]['response_shape']['arguments_schema_valid']=True
+        with self.assertRaises(ValueError):qualify_reason_report(changed,['tl','cto'])
+
     def report(self):
         rows=[]
         for task,execution in [('tl','exec-tl'),('cto','exec-cto')]:

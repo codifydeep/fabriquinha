@@ -1,0 +1,4 @@
+FROM delivery-kit-model-proxy:20261008.100
+COPY typed_decision_contract.py /typed_decision_contract.py
+COPY r3_reason_probe.py /r3_reason_probe.py
+RUN PYTHONPATH=/ python -c "import typed_decision_contract"

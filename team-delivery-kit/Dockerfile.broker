@@ -117,6 +117,7 @@ COPY author_read_policy.py /author_read_policy.py
 COPY decision_schema.py /decision_schema.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
 COPY r3_incident_contract.py /r3_incident_contract.py
+COPY r3_reason_probe.py /r3_reason_probe.py
 COPY broker/r3_incident_native.py /r3_incident_native.py
 COPY remediation_transport_probe.py /remediation_transport_probe.py
 COPY broker/technical_remediation_plan.py /technical_remediation_plan.py

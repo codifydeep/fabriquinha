@@ -120,6 +120,15 @@ ou reinicia a publicação por si só. Falhas contra essa nova evidência contin
 visíveis, sem repetição automática idêntica. A qualificação do transporte não
 substitui a recuperação ponta a ponta.
 
+Diagnósticos e revisões de incidentes de publicação possuem uma única correção
+de formato para `reason` entre 601 e 4.000 caracteres quando esse é o único erro
+do schema. O modelo deve produzir novos argumentos válidos; o proxy não trunca
+texto, não altera a decisão e rejeita mudanças em qualquer outro campo. O ledger
+registra o consumo antes da nova chamada e impede outra correção na mesma
+execução, inclusive após reinício. Duas falhas técnicas antigas desse formato
+só admitem novo diagnóstico após qualificação model-free da receita instalada;
+essas falhas e seus recibos permanecem preservados, sem aprovação de entrega.
+
 O transporte ACP distingue prompts de cliente (até 12.000 caracteres) de contextos completos registrados, construídos e qualificados pelo broker (até 32.000). A qualificação é interna: JSON, marcadores de texto e declarações do agente não ampliam o limite nem concedem ferramentas. Isso preserva o contexto dos handoffs, mas não substitui a qualificação de recuperação e entrega ponta a ponta.
 
 Uma falha comprovada do diagnóstico do CTO antes de `session/prompt`, causada pelo antigo limite de contexto, admite uma única recuperação após validar a condição corrigida. O controlador preserva a tentativa anterior, registra a intenção antes do wakeup e apenas observa um envio de resultado incerto; não repete o POST. Essa recuperação não reinicia o autor, não produz Red e não aprova a entrega. Nova falha permanece visível e bloqueada para diagnóstico técnico.
