@@ -22,6 +22,7 @@ import typed_decision_contract
 import typed_test_source
 import planning_schema
 import provider_tool_routing
+from upstream_error_diagnostic import UpstreamRequestRejected
 import proxy_request_rejections
 from structured_response_contract import validate as validate_structured_response, StructuredResponseRejected
 
@@ -269,6 +270,7 @@ def forward(body):
         data = read_bounded_response(response, conn, deadline)
         media_type = response.getheader('Content-Type', '')
         content_type = 'text/event-stream' if media_type.startswith('text/event-stream') else 'application/json'
+        if response.status==400:raise UpstreamRequestRejected(data)
         return response.status, data if response.status == 200 else b'{}', content_type
     finally:
         conn.close()
@@ -430,6 +432,9 @@ class Handler(BaseHTTPRequestHandler):
                     response_metrics['forced_tool_feedback_passed']=status==200
                     patch_feedback=None
                 break
+        except UpstreamRequestRejected as error:
+            status,reason,data,content_type=error.status,'upstream_request_rejected',b'{}','application/json'
+            response_metrics['upstream_error_diagnostic']=error.diagnostic
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             if execution_id and request_sha and call_number is None:
                 local_rejection = proxy_request_rejections.describe(error,stage,execution_id,request_sha)

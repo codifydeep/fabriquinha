@@ -116,6 +116,17 @@ def task_base(broker, issue_id, task_id):
 
 
 class Effects:
+    def test_source_finalization(self, issue, task):
+        with self.b.db() as con:
+            row=con.execute('SELECT n.issue_id,n.agent_id,g.mode,l.status FROM native_bindings n '
+                'JOIN grants g USING(request_id) JOIN leases l USING(request_id) '
+                'WHERE n.task_id=? ORDER BY g.attempt DESC LIMIT 1',(task,)).fetchone()
+        if not row or row['issue_id']!=issue or row['mode']!='implementation':
+            raise ValueError('exact implementation finalization required')
+        if row['status']=='closed':return 'ready'
+        if row['status'] in ('creating','starting','running','active','closing'):return 'pending'
+        raise ValueError('implementation lease did not close successfully')
+
     def sponsor_inherited_test_replan(self,route,data,task,decision):
         try:import inherited_test_replan
         except ImportError:from broker import inherited_test_replan

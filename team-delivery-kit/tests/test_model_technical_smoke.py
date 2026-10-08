@@ -21,3 +21,10 @@ class TechnicalSmokeTests(unittest.TestCase):
     def test_identity_and_unpinned_images_rejected(self):
         for execution,image in [('not-uuid','sha256:'+'a'*64),('93e73506-580a-4fb5-834c-0eced5c34692','worker:latest')]:
             with self.assertRaises(ValueError):command('delivery-kit-port2',image,execution)
+
+    def test_history_is_explicit_synthetic_fixture_not_read_evidence(self):
+        cmd=command('delivery-kit-port2','sha256:'+'a'*64,'93e73506-580a-4fb5-834c-0eced5c34692',with_history=True)
+        script=cmd[-1];compile(script,'<history-probe>','exec')
+        self.assertIn('if True:',script)
+        self.assertIn('the following read was NOT executed',script)
+        self.assertIn('qualification_passed',script)

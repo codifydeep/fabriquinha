@@ -720,6 +720,20 @@ def lost_lineage(current, history, runs, cto):
     return restored
 
 
+def validation_wait(broker,route,source,prior,category):
+    """Observe the same lease/job; no model wakeup or retry-budget change."""
+    data=json.loads(prior['data']) if prior else {}
+    wait=data.get('validation_wait') or {'first_seen':time.time()}
+    wait=dict(wait,category=category,author_retry_authorized=False,delivery_approval=False)
+    data.update(source_task=source['id'],phase='test_first',validation_wait=wait,
+                required_action='Observe this task lease and fixed controller jobs; never restart the author')
+    stage='test_first_validation_pending'
+    if time.time()-wait['first_seen']>=600:
+        stage='test_first_blocked';data['error']='test_first_validation_observation_deadline'
+    with broker.db() as con:
+        handoffs.save(con,source['id'],route['issue_id'],stage,route['cto'],data,time.time())
+
+
 def reconcile(broker, route, runs, effects):
     """Return implementation-only runs once Red has been proven; else None."""
     issue = route['issue_id']
@@ -782,6 +796,11 @@ def reconcile(broker, route, runs, effects):
             return None
         failed_authors = [run for run in authors if run['status'] == 'failed']
         completed_authors = [run for run in authors if run['status'] == 'completed']
+        if (source['status']=='completed' and (not prior or prior['stage'] in (
+                'test_author_active','test_first_validation_pending'))
+                and getattr(effects,'test_source_finalization',lambda *_:'ready')(issue,source['id'])=='pending'):
+            validation_wait(broker,route,source,prior,'lease_finalization')
+            return None
         if prior and prior['stage'] in ('test_first_cto_diagnosis', 'test_first_cto_correction',
                                        'test_first_selected_read_recovery_pending','test_first_selected_read_recovery_wait',
                                        'test_first_surgical_recovery_pending','test_first_surgical_recovery_wait',
@@ -909,6 +928,9 @@ def reconcile(broker, route, runs, effects):
             try:
                 effects.capture_test_first_red({'task_id': source['id']})
                 return None  # Next tick verifies durable Red before waking anyone.
+            except TimeoutError:
+                validation_wait(broker,route,source,prior,'fixed_controller_job')
+                return None
             except Exception as failure:
                 error = type(failure).__name__ + ':' + str(failure)[:200]
         with broker.db() as con:

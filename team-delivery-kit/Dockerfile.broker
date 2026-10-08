@@ -114,6 +114,7 @@ COPY tests/surgical_line_registry_probe.py /line_probe.py
 COPY tests/surgical_template_registry_probe.py /template_probe.py
 COPY model_proxy.py /model_proxy.py
 COPY provider_tool_routing.py /provider_tool_routing.py
+COPY upstream_error_diagnostic.py /upstream_error_diagnostic.py
 COPY proxy_request_rejections.py /proxy_request_rejections.py
 COPY author_read_policy.py /author_read_policy.py
 COPY decision_schema.py /decision_schema.py
