@@ -727,6 +727,9 @@ def native_grant(payload):
     if binding['mode'] != 'planning' and not coverage_review:
         issue_base(binding['issue_id'])
     if binding['mode'] == 'implementation':
+        try:import product_scope_author
+        except ImportError:from broker import product_scope_author
+        product_scope_author.admit(handoff_context(),binding)
         with db() as con:
             enabled_schema = con.execute("SELECT 1 FROM sqlite_master WHERE name='task_contracts'").fetchone()
         if enabled_schema:
@@ -1940,6 +1943,11 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         raise ValueError('invalid native mode')
     if frame.get('method') != 'session/prompt':
         raise ValueError('prompt frame required')
+    if mode=='implementation' and (task.get('handoff_note') or '').startswith('DELIVERY_SCOPE_AUTHOR_START '):
+        try:import product_scope_author
+        except ImportError:from broker import product_scope_author
+        note=product_scope_author.prompt(handoff_context(),task)
+        return {**frame,'params':{**frame['params'],'prompt':[{'type':'text','text':note}]}}
     if mode=='implementation' and 'DELIVERY_ADDITIVE_CONTROL_V1' in (task.get('handoff_note') or ''):
         try:import u3_controls_execution
         except ImportError:from broker import u3_controls_execution

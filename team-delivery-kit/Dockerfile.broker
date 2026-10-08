@@ -128,6 +128,7 @@ COPY broker/product_scope_base_verify.py /product_scope_base_verify.py
 COPY broker/product_scope_registration.py /product_scope_registration.py
 COPY broker/product_scope_task_binding.py /product_scope_task_binding.py
 COPY broker/product_scope_worker.py /product_scope_worker.py
+COPY broker/product_scope_author.py /product_scope_author.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
 COPY r3_incident_contract.py /r3_incident_contract.py
 COPY r3_decision_revision.py /r3_decision_revision.py

@@ -104,6 +104,13 @@ seleção à base de seed, ao lockdown de arquivos e à lista de ferramentas ACP
 somente código recebe escrita, e o Red original deve continuar com os mesmos
 hashes, comando, falha observada e revisão independente aprovada. O job de seed
 confere os bytes dos testes congelados sem recriar o Red; tarefas antigas
-continuam usando a base anterior. Ainda falta integrar o despacho automático
-do autor e qualificar a transição de evidências no Green e o ciclo real instalado.
+continuam usando a base anterior. `product_scope_author.py` implementa um
+despacho único, persistido antes do efeito nativo e reconciliado pelo mesmo
+marcador. A admissão confere wakeup/tarefa, vincula a base antes dos grants e
+confere o Red; falhas ficam bloqueadas com responsável e próxima ação. A nova
+execução usa workspace por tarefa, sem reaproveitar o workspace da base antiga,
+e recebe somente a instrução registrada em vez de diretivas históricas.
+Esse adaptador ainda não está habilitado no loop instalado. Falta qualificar a
+transição de evidências no Green e a coordenação completa do ciclo real antes
+de habilitar o despacho e considerar o impedimento resolvido.
 Aprovar o plano não equivale a conceder escrita ou homologar.

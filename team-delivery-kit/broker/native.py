@@ -22,6 +22,11 @@ def ensure_review_start(settings, issue_id, target, source_task, marker, instruc
         allow_create=allow_create,expected_mode='review',prefix='DELIVERY_REVIEW_START')
 
 
+def ensure_scope_author_start(settings,issue_id,target,source_task,marker,instruction,*,allow_create=True):
+    return _ensure_initial_start(settings,issue_id,target,source_task,marker,instruction,
+        allow_create=allow_create,expected_mode='implementation',prefix='DELIVERY_SCOPE_AUTHOR_START')
+
+
 def _ensure_initial_start(settings, issue_id, target, source_task, marker, instruction, *, allow_create,expected_mode,prefix):
     """One-shot initial child run: parent task events cannot cross issue scope.
 
@@ -120,7 +125,7 @@ def task_binding(settings, task_id, agent_id):
     # Implementation retains issue context/workspace for corrections. Reviews
     # must start fresh so an old run cannot masquerade as reading a new snapshot.
     if mode in ('review', 'planning') or (mode=='implementation' and re.search(
-            r'(?:^|\n)DELIVERY_DRIVER_CHECKPOINT_V3(?:\n|$)',task.get('handoff_note') or '')):
+            r'(?:^|\n)(?:DELIVERY_DRIVER_CHECKPOINT_V3(?:\n|$)|DELIVERY_SCOPE_AUTHOR_START [a-f0-9]{64}(?:\n|$))',task.get('handoff_note') or '')):
         source = task_id
     source = str(uuid.UUID(source))
     return {'task_id': task_id, 'agent_id': agent_id, 'mode': mode,
