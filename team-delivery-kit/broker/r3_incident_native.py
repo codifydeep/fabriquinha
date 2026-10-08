@@ -79,6 +79,11 @@ def request(operation,body,*,broker=None,settings=None):
             raise ValueError('fixed typed incident instruction required')
         marker=digest(dict(incident=config['evidence_sha256'],phase='review' if review else 'diagnose',
                            escalation=state.get('escalated',False),proposal=state.get('proposal_sha256') if review else None))
+        if 'fixed_incident_capability_catalogue_qualified' in evidence.get('facts',{}).values():
+            from r3_incident_capabilities import note as capability_note, sha as catalogue_sha
+            note+=capability_note()
+            if len(note)>3850:raise ValueError('bounded catalogue context required')
+            marker=digest(dict(original_marker=marker,capability_catalogue_sha256=catalogue_sha()))
         return native.ensure_planning_start(settings,state['issue_id'],target,evidence['source_task'],marker,note,
                                            allow_create=body['allow_create'])
     if operation=='runs':return native.issue_task_runs(settings,state['issue_id'])

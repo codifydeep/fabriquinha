@@ -129,6 +129,15 @@ execução, inclusive após reinício. Duas falhas técnicas antigas desse forma
 só admitem novo diagnóstico após qualificação model-free da receita instalada;
 essas falhas e seus recibos permanecem preservados, sem aprovação de entrega.
 
+Uma retenção de publicação diagnosticada e revisada pode receber uma única
+reavaliação quando o catálogo fixo de capacidades foi qualificado e ainda não
+constava da evidência original. Esse catálogo explica que ausência do processo
+não impede observar sua ausência ou verificar snapshot, CI e implantação por
+seus próprios identificadores duráveis. Ele descreve operações, não comprova
+resultados nem concede ferramentas. A nova ocorrência continua sujeita a
+diagnóstico, revisão independente e verificação pelo controlador; a decisão
+antiga é preservada. Outra retenção com o mesmo catálogo não dispara repetição.
+
 O transporte ACP distingue prompts de cliente (até 12.000 caracteres) de contextos completos registrados, construídos e qualificados pelo broker (até 32.000). A qualificação é interna: JSON, marcadores de texto e declarações do agente não ampliam o limite nem concedem ferramentas. Isso preserva o contexto dos handoffs, mas não substitui a qualificação de recuperação e entrega ponta a ponta.
 
 Uma falha comprovada do diagnóstico do CTO antes de `session/prompt`, causada pelo antigo limite de contexto, admite uma única recuperação após validar a condição corrigida. O controlador preserva a tentativa anterior, registra a intenção antes do wakeup e apenas observa um envio de resultado incerto; não repete o POST. Essa recuperação não reinicia o autor, não produz Red e não aprova a entrega. Nova falha permanece visível e bloqueada para diagnóstico técnico.

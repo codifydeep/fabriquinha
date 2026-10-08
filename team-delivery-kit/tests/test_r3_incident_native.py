@@ -43,6 +43,29 @@ class R3IncidentNativeTests(unittest.TestCase):
             with self.assertRaises(ValueError):self.invoke('runs',dict(config=wrong,state=self.state))
             wake.assert_not_called()
 
+    def test_qualified_catalogue_is_fixed_nonexecuting_and_does_not_modify_legacy_wakes(self):
+        from r3_incident_capabilities import note,sha,OPERATIONS
+        from r3_incident_contract import request_contract
+        with patch('broker.r3_incident_native.binding',return_value={'techlead':'tl','cto':'cto'}),\
+             patch('broker.r3_incident_native.NativeIssues') as issues,\
+             patch('broker.r3_incident_native.native.ensure_planning_start',return_value={'id':'wake'}) as wake:
+            issues.return_value.request.return_value=self.item
+            original=planning_instruction(self.config,self.state)
+            self.invoke('wake',dict(config=self.config,state=self.state,note=original,allow_create=True))
+            self.assertEqual(wake.call_args.args[5],original)
+            config={**self.config,'evidence':{**self.config['evidence'],
+                'facts':{'F01':'controller_handle_missing','F02':'fixed_incident_capability_catalogue_qualified'}}}
+            config['evidence_sha256']=digest(config['evidence'])
+            issues.return_value.request.return_value={**self.item,'title':'R3 publication incident '+config['evidence_sha256'][:16]}
+            original=planning_instruction(config,self.state)
+            self.invoke('wake',dict(config=config,state=self.state,note=original,allow_create=True))
+            actual=wake.call_args.args[5]
+            self.assertEqual(actual,original+note())
+            self.assertIn('No live controller handle is required',actual)
+            self.assertEqual(set(OPERATIONS),set(request_contract({'messages':[{'role':'user','content':actual}]})['properties']['experiment']['enum'])-{'none'})
+            self.assertLess(len(actual),3850)
+            self.assertEqual(len(sha()),64)
+
     def test_restart_merge_shell_and_extra_parameters_are_not_adapter_operations(self):
         for operation,body in (('restart',{}),('merge',{}),('shell',{'command':'echo nope'}),('remaining',{'raise_cap':True})):
             with self.assertRaises(ValueError):self.invoke(operation,body)

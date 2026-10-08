@@ -15,7 +15,8 @@ FACTS = {'controller_handle_missing','controller_identity_changed','controller_a
     'experiment_controller_ambiguous','experiment_snapshot_intact','experiment_github_ci_exact_sha',
     'experiment_local_deployment_exact_sha','experiment_delivery_unavailable','experiment_verification_failed',
     'experiment_review_obsolete','experiment_review_unobservable','experiment_result_unobservable',
-    'incident_envelope_transport_qualified','incident_reason_transport_qualified'}
+    'incident_envelope_transport_qualified','incident_reason_transport_qualified',
+    'fixed_incident_capability_catalogue_qualified'}
 
 CATEGORIES = dict(r3_controller_handle_missing='controller_handle_missing',
     r3_controller_identity_changed='controller_identity_changed',ambiguous_r3_controller='controller_ambiguous',
@@ -226,6 +227,12 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
                 if reformatted:
                     evidence=validate_evidence(reformatted)
                     incident=reconcile(private,evidence,instance=instance)
+    if incident.get('stage')=='retained_hold' and effects is None:
+        from r3_capability_recovery import recover
+        clarified=recover(private,evidence,incident,instance=instance)
+        if clarified:
+            evidence=validate_evidence(clarified)
+            incident=reconcile(private,evidence,instance=instance)
     if incident.get('stage')=='experiment_pending':
         from r3_post_experiment import drive
         incident=drive(private,evidence,incident,value,instance=instance,effects=effects,contract=contract)
