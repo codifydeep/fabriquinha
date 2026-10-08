@@ -246,6 +246,21 @@ def claim_length_feedback(counter_path,execution_id,error,body,first_call):
 
 
 def apply(body):
+    from product_scope_contract import request as scope_request
+    scope=scope_request(body)
+    if scope is not None:
+        if not body.get('response_format') and body.get('tool_choice')=={'type':'function','function':{'name':'read_file'}}:
+            return body
+        spec=body.get('response_format',{}).get('json_schema',{})
+        if spec.get('name')!='delivery_product_scope_v1' or spec.get('strict') is not True or spec.get('schema')!=scope[1]:
+            raise ValueError('exact nonauthorizing scope schema required')
+        result=copy.deepcopy(body);result.pop('response_format',None);result.pop('parallel_tool_calls',None)
+        result['tools']=[dict(type='function',function=dict(name=NAME,strict=True,
+            description='Submit scope proposal or independent review data only; no operation executes.',parameters=scope[1]))]
+        result['tool_choice']=dict(type='function',function=dict(name=NAME))
+        result['messages'].append(dict(role='system',content='Call '+NAME+' exactly once with schema-valid arguments. '
+            'No prose or simulated calls. This is not an edit grant, test waiver, delivery approval or release approval.'))
+        return result
     from r3_incident_contract import request_contract
     incident = request_contract(body)
     if incident is not None:

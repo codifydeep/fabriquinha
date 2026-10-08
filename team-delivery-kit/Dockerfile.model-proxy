@@ -5,6 +5,7 @@ COPY provider_tool_routing.py /provider_tool_routing.py
 COPY upstream_error_diagnostic.py /upstream_error_diagnostic.py
 COPY model_policy.py /model_policy.py
 COPY decision_schema.py /decision_schema.py
+COPY product_scope_contract.py /product_scope_contract.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
 COPY r3_incident_contract.py /r3_incident_contract.py
 COPY r3_reason_probe.py /r3_reason_probe.py

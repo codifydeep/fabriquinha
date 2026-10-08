@@ -15,6 +15,9 @@ def validation_schema(sha):
 
 
 def apply(body):
+    from product_scope_contract import apply as product_scope
+    scope=product_scope(body)
+    if scope is not None:return scope
     from r3_incident_contract import request_contract
     incident = request_contract(body)
     if incident is not None:

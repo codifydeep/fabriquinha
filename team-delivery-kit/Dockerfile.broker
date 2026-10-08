@@ -118,6 +118,9 @@ COPY upstream_error_diagnostic.py /upstream_error_diagnostic.py
 COPY proxy_request_rejections.py /proxy_request_rejections.py
 COPY author_read_policy.py /author_read_policy.py
 COPY decision_schema.py /decision_schema.py
+COPY product_scope_contract.py /product_scope_contract.py
+COPY broker/product_scope_revision.py /product_scope_revision.py
+COPY broker/product_scope_ledger.py /product_scope_ledger.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
 COPY r3_incident_contract.py /r3_incident_contract.py
 COPY r3_decision_revision.py /r3_decision_revision.py

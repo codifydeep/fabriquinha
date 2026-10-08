@@ -64,5 +64,10 @@ permissões e recuperação ponta a ponta ainda precisam de evidência própria.
 de edição de código Python: proposta vinculada ao contrato, snapshot e falha;
 dependências observadas; revisão por perfil independente; testes congelados e
 demais campos do contrato preservados. É uma política pura, não uma concessão
-de ferramentas. A integração com propostas reais dos agentes, recibos de leitura,
-contratos imutáveis e despacho ainda não está instalada nem qualificada.
+de ferramentas. `product_scope_contract.py` adiciona submissão tipada e leitura
+obrigatória das dependências antes de propor ou revisar; `product_scope_ledger.py`
+persiste intenção, proposta e qualificação, com identidade imutável, retomada
+idempotente e autor ainda bloqueado após aprovação do plano. Esses componentes
+estão cobertos por testes offline, mas a integração instalada com tarefas reais,
+recibos autenticados, materialização de contratos e despacho ainda não está
+qualificada. Aprovar o plano não equivale a conceder escrita ou homologar.
