@@ -74,8 +74,11 @@ def payload(b,source,volume):
             Tmpfs={'/tmp':'rw,nosuid,nodev,size=32m,mode=1777'}))
 
 
-def continue_approved(b,source,result):
+def continue_approved(b,source,result,*,kind='request_scope'):
     """Continue only an already authorized root and independently approved plan."""
+    if kind not in ('request_scope','timer_provenance'):raise ValueError('fixed amendment continuation required')
+    if kind=='timer_provenance' and result.get('operation')!='immutable_harness_timer_observation_v1':
+        raise ValueError('exact timer attribution observation required')
     try:import remediation_execution as execution,remediation_admission as admission,remediation_dispatch as dispatch
     except ImportError:from broker import remediation_execution as execution,remediation_admission as admission,remediation_dispatch as dispatch
     with b.db() as con:
@@ -83,7 +86,7 @@ def continue_approved(b,source,result):
         if not row:return
         config,state=map(json.loads,row)
         if state['stage']!='plan_approved':return
-        if (config.get('amendment',{}).get('kind')!='request_scope'
+        if (config.get('amendment',{}).get('kind')!=kind
                 or config['amendment']['experiment_sha256']!=plans.digest(result)):
             raise ValueError('exact independently reviewed request-scope evidence required')
         previous=config['amendment']['previous_source']

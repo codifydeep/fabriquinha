@@ -41,6 +41,11 @@ def capsule(value, source):
         provenance='\nPreserved superseded R2 context SHA: '+original['sha256']+'. '
         provenance+='Current R1 replaces phase instructions, not product criteria or historical evidence. '
         provenance+='Harness compilation and every controller behavioral control must pass before genuine Red.\n'
+        if value['amendment'].get('kind')=='timer_provenance':
+            provenance+='Timer attribution repair: preserve every assertion, distinguish legitimate board polling '
+            provenance+='from probe timers behaviorally. Do not subtract a constant, whitelist source lines, '
+            provenance+='ignore timers or remove product polling. Controls include background polling and probe '
+            provenance+='callbacks that only write the indicator; all must be correctly classified.\n'
     description = ('CURRENT TASK: R1 NEW-TEST HARNESS REPAIR ONLY.\n'
         'Run: ' + value['run_id'] + '\nApproved plan: ' + value['plan_sha256'] +
         '\nObjective: ' + step['objective'] + '\nAll approved criteria (unchanged):\n' + criteria +

@@ -6,6 +6,7 @@ import re
 from types import SimpleNamespace
 BACKGROUND_IMAGE='sha256:58f78524c522e3a30ce80a2a8f943c2429d740fb931adfc9385e219f1a8b70a5'
 LEGACY_BACKGROUND_IMAGE='sha256:e5c5b7cbf4c99852e762bf5f36496c59dc8c147b7aeb55e1f05ccbcea03b3513'
+TIMER_BACKGROUND_IMAGE='sha256:c1eba170920d10bf56a6279035a11c781416b711aed8875af5f47e99fb08be62'
 
 IMAGE_ENV_KEYS={'PATH','PYTHONUNBUFFERED','PYTHONDONTWRITEBYTECODE','PLAYWRIGHT_BROWSERS_PATH',
     'npm_config_install_links','HERMES_WEB_DIST','HERMES_TUI_DIR','HERMES_HOME','HERMES_WRITE_SAFE_ROOT',
@@ -28,9 +29,10 @@ def image_environment(b):
     return [key+'='+value for key,value in sorted(environment.items())]
 
 
-def payload(b,task,volume,manifest,*,background=False):
+def payload(b,task,volume,manifest,*,background=False,timers=False):
     return dict(Image=b.IMAGE,User='10000:10000',Entrypoint=['python'],
-        Cmd=['/service_mode_background_qualification.py' if background else '/service_mode_harness_qualification.py','/delivery',manifest],
+        Cmd=['/service_mode_timer_background_qualification.py' if timers else
+             '/service_mode_background_qualification.py' if background else '/service_mode_harness_qualification.py','/delivery',manifest],
         NetworkDisabled=True,Env=image_environment(b),
         Labels={'delivery-kit.owner':b.OWNER,'delivery-kit.harness-task':task,
                 'delivery-kit.harness-manifest':manifest},
@@ -50,7 +52,7 @@ def verify_job(info,expected):
         raise ValueError('offline harness job identity or isolation drift')
 
 
-def validate_result(result,prepared,*,require_background=False):
+def validate_result(result,prepared,*,require_background=False,require_timers=False):
     from service_mode_harness_qualification import TEST,CASES,validate_controls,fixture
     if (result.get('operation')!='service_mode_harness_calibration_v1' or result.get('status')!='passed'
             or result.get('manifest_sha256')!=prepared['manifest_sha256']
@@ -70,6 +72,18 @@ def validate_result(result,prepared,*,require_background=False):
         validate(result.get('background_control',{}),result['positive'])
         expected=hashlib.sha256((BACKGROUND+fixture('positive')).encode()).hexdigest()
         if result.get('background_fixture_sha256')!=expected:raise ValueError('fixed background fixture proof required')
+    if require_timers:
+        from service_mode_timer_background_qualification import validate,BACKGROUND,POLL,INDICATOR_TIMERS
+        validate(result.get('timer_background_control',{}),result.get('timer_negative_controls',{}))
+        if result.get('timer_background_policy')!='behavioral_timer_attribution_v1':
+            raise ValueError('new behavioral timer attribution policy required')
+        positive=BACKGROUND+fixture('positive')+POLL
+        negatives={case:hashlib.sha256((BACKGROUND+INDICATOR_TIMERS.get(case,'')+
+            fixture(case if case in CASES else 'positive')+POLL).encode()).hexdigest()
+            for case in set(CASES)|set(INDICATOR_TIMERS)}
+        if (result.get('timer_positive_fixture_sha256')!=hashlib.sha256(positive.encode()).hexdigest()
+                or result.get('timer_negative_fixture_sha256')!=negatives):
+            raise ValueError('fixed legitimate polling and all timer-defect fixtures required')
 
 
 def rejection_state(con,issue,info,raw):
@@ -84,7 +98,7 @@ def rejection_state(con,issue,info,raw):
         value=json.loads(raw);facts=value['facts'];phase=value['phase']
         expected=info['Config']['Labels']['delivery-kit.harness-manifest']
         if (value.get('status')!='rejected' or value.get('delivery_approval') is not False
-                or phase not in ('compile','positive_reference','behavioral_controls','background_control')
+                or phase not in ('compile','positive_reference','behavioral_controls','background_control','background_timer_control')
                 or facts.get('manifest_sha256')!=expected
                 or not re.fullmatch(r'[a-f0-9]{64}',facts.get('test_sha256',''))):return state
         diagnostic=dict(phase=phase,manifest_sha256=expected,test_sha256=facts['test_sha256'])
@@ -105,7 +119,8 @@ def rejection_state(con,issue,info,raw):
         negatives=facts.get('negative_controls')
         if isinstance(negatives,dict):
             from service_mode_harness_qualification import CASES
-            if set(negatives)<=set(CASES):
+            from service_mode_timer_background_qualification import INDICATOR_TIMERS
+            if set(negatives)<=set(CASES)|set(INDICATOR_TIMERS):
                 summaries={key:summarize(value) for key,value in negatives.items()}
                 if all(value is not None for value in summaries.values()):diagnostic['negative_controls']=summaries
         state['diagnostic']=diagnostic
@@ -126,8 +141,10 @@ def reconcile_rejected(b,con,task):
     # isolation contract using the new worker image or create a replacement.
     original=SimpleNamespace(IMAGE=pinned,docker=b.docker,OWNER=b.OWNER)
     background=identity['payload'].get('Cmd',[None])[0]=='/service_mode_background_qualification.py'
+    timers=identity['payload'].get('Cmd',[None])[0]=='/service_mode_timer_background_qualification.py'
     if background and pinned not in (BACKGROUND_IMAGE,LEGACY_BACKGROUND_IMAGE):raise ValueError('pinned background calibration image required')
-    expected=payload(original,task,identity['volume'],identity['manifest_sha256'],background=background)
+    if timers and pinned!=TIMER_BACKGROUND_IMAGE:raise ValueError('pinned timer calibration image required')
+    expected=payload(original,task,identity['volume'],identity['manifest_sha256'],background=background,timers=timers)
     if identity['payload']!=expected:raise ValueError('recorded harness policy drift')
     info=b.docker('GET','/containers/'+state['container_id']+'/json');verify_job(info,expected)
     if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']==0:
@@ -146,14 +163,17 @@ def capture(b,con,issue,task,volume,prepared):
     from service_mode_harness_qualification import TEST
     if set(prepared['test_sha256'])!={TEST}:raise ValueError('declared amendment test scope required')
     background=value['amendment'].get('kind')=='request_scope'
+    timers=value['amendment'].get('kind')=='timer_provenance'
     con.execute('CREATE TABLE IF NOT EXISTS harness_qualifications(task_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
     row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(task,)).fetchone()
-    selected=BACKGROUND_IMAGE
+    selected=TIMER_BACKGROUND_IMAGE if timers else BACKGROUND_IMAGE
     if background and row:
         selected=json.loads(row[0])['payload']['Image']
         if selected not in (BACKGROUND_IMAGE,LEGACY_BACKGROUND_IMAGE):raise ValueError('recorded background image is not qualified')
-    image=SimpleNamespace(IMAGE=selected,docker=b.docker,OWNER=b.OWNER) if background else b
-    manifest=prepared['manifest_sha256'];expected=payload(image,task,volume,manifest,background=background)
+    if timers and row and json.loads(row[0])['payload']['Image']!=TIMER_BACKGROUND_IMAGE:
+        raise ValueError('historic traffic-only receipt cannot satisfy timer policy')
+    image=SimpleNamespace(IMAGE=selected,docker=b.docker,OWNER=b.OWNER) if background or timers else b
+    manifest=prepared['manifest_sha256'];expected=payload(image,task,volume,manifest,background=background,timers=timers)
     identity=dict(issue_id=issue,task_id=task,volume=volume,manifest_sha256=manifest,payload=expected)
     def save(state):
         con.execute('UPDATE harness_qualifications SET state=? WHERE task_id=?',(json.dumps(state,sort_keys=True),task))
@@ -162,7 +182,7 @@ def capture(b,con,issue,task,volume,prepared):
     if row:
         if json.loads(row[0])!=identity:raise ValueError('immutable harness identity drift')
         state=json.loads(row[1])
-        if state['stage']=='passed':validate_result(state['result'],prepared,require_background=background);return state['result']
+        if state['stage']=='passed':validate_result(state['result'],prepared,require_background=background,require_timers=timers);return state['result']
         if state['stage']=='blocked':raise ValueError('harness qualification retained hold; no identical retry')
     else:
         state=dict(stage='create_intent',created_at=time.time(),delivery_approval=False)
@@ -183,7 +203,7 @@ def capture(b,con,issue,task,volume,prepared):
             raw=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
             try:
                 if info['State']['ExitCode']!=0:raise ValueError('offline harness calibration rejected')
-                result=json.loads(raw);validate_result(result,prepared,require_background=background)
+                result=json.loads(raw);validate_result(result,prepared,require_background=background,require_timers=timers)
             except (ValueError,KeyError,TypeError):
                 save(rejection_state(con,issue,info,raw))
                 raise ValueError('harness calibration rejected; CTO diagnose immutable candidate')
@@ -206,4 +226,5 @@ def require(b,issue,red):
     if (identity['issue_id']!=issue or identity['volume']!=red['volume']
             or identity['manifest_sha256']!=red['red']['manifest_sha256'] or state['stage']!='passed'):
         raise ValueError('same actual Red candidate calibration required')
-    validate_result(state['result'],red['red'],require_background=value['amendment'].get('kind')=='request_scope')
+    validate_result(state['result'],red['red'],require_background=value['amendment'].get('kind')=='request_scope',
+                    require_timers=value['amendment'].get('kind')=='timer_provenance')

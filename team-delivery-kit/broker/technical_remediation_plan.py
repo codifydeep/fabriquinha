@@ -196,7 +196,14 @@ def instruction(config,state):
             '\nDELIVERY_REMEDIATION_REVIEW_V1:'+state['plan_sha256'])
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:review:'+state['plan_sha256']
         note+='\nDELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
-    if config.get('amendment',{}).get('kind')=='request_scope':
+    if config.get('amendment',{}).get('kind')=='timer_provenance':
+        note+='\nTIMER ATTRIBUTION EVIDENCE: '+json.dumps(config['experiment']['proof']['facts'],separators=(',',':'))
+        note+=' The unchanged harness counts legitimate board polling as a probe interval. '
+        note+='R1 must preserve every method/assertion and repair attribution behaviorally, not subtract a constant, '
+        note+='ignore timers, hard-code source lines or remove polling from product. Calibration must accept legitimate '
+        note+='background polling and reject probe timeout/interval callbacks, including indicator-only callbacks. '
+        note+='This observation is not Green. Fresh Red, independent test/product reviews and every R2/R3 gate remain.'
+    elif config.get('amendment',{}).get('kind')=='request_scope':
         note+='\nCONTRACT AMENDMENT: the fixed immutable experiment reproduced three assertion failures because '
         note+='the NEW-test helper counted all page requests instead of GET /service-mode. The in-memory scoped '
         note+='helper passed the same tests, background traffic and all duplicate/negative controls. Propose a NEW '
@@ -340,7 +347,7 @@ def mounts(b,binding):
     if s['stage'] not in ('plan_dispatch','review_dispatch','observe_dispatch','awaiting_plan','awaiting_review') or s['owner']!=binding['agent_id']:
         raise ValueError('current readonly recovery role required')
     labels=(b.docker('GET','/volumes/'+c['volume']) or {}).get('Labels',{})
-    completed=c.get('diagnostic_snapshot_kind')=='completed_frozen_validation' and c.get('amendment',{}).get('kind')=='request_scope'
+    completed=c.get('diagnostic_snapshot_kind')=='completed_frozen_validation' and c.get('amendment',{}).get('kind') in ('request_scope','timer_provenance')
     if completed:
         with b.db() as con:
             snapshot=con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',(c['source_task'],)).fetchone()
@@ -475,6 +482,9 @@ def reconcile_correction_context(b,source):
 
 
 def tick(b):
+    try:import timer_scope_replan
+    except ImportError:from broker import timer_scope_replan
+    timer_scope_replan.tick(b)
     try:import remediation_preparation
     except ImportError:from broker import remediation_preparation
     remediation_preparation.tick(b)

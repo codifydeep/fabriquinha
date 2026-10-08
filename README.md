@@ -507,6 +507,22 @@ diagnóstica foi preservada, mas **não** aprova uma mudança do harness nem Gre
 uma correção ainda exige autoria separada, controles positivos/negativos,
 revisão independente e as etapas normais de entrega.
 
+O intake de atribuição de timers transforma esse recibo persistente em um
+**novo plano técnico**, sem substituir propostas, snapshots ou experimentos
+anteriores. Confere o CTO independente, sua leitura completa, o Red aprovado
+de origem, todos os critérios e a mesma profundidade de revisão. O CTO propõe;
+o Tech Lead revisa o plano exato; só então o executor prepara R1→R2→R3.
+Falhas de intake permanecem visíveis no handoff, sem retentativas idênticas;
+uma interrupção antes da gravação local pode reconciliar a mesma intenção.
+
+Para essa correção, a calibração antiga de tráfego não basta. A política
+`behavioral_timer_attribution_v1` exige aceitar polling e debounce legítimos e
+rejeitar 16 defeitos, incluindo timers que apenas escrevem no indicador e timers
+do probe com a mesma duração do polling. A imagem deve passar por preflight de
+imports. Os recibos anteriores não são promovidos a essa política. Assertions,
+baseline, Red novo, revisões independentes e CI/deploy/QA no mesmo SHA continuam
+obrigatórios; instalar esse intake não comprova entrega autônoma.
+
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
 instrução real após leituras completas contra schema e adaptador do proxy. Uma

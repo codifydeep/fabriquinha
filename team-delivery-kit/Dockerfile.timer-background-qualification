@@ -1,0 +1,4 @@
+FROM delivery-kit-harness-observation:20261008.1
+COPY service_mode_background_qualification.py /service_mode_background_qualification.py
+COPY service_mode_timer_background_qualification.py /service_mode_timer_background_qualification.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import service_mode_timer_background_qualification"
