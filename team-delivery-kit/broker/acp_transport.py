@@ -4,9 +4,25 @@ import socket
 import struct
 import time
 import threading
+import hashlib
 from pathlib import PurePosixPath
 
 from model_policy import MODEL, PROXY_BASE_URL, PLACEHOLDER_KEY, execution_base_url
+
+
+FAILURE_OBSERVATION_VERSION = 'acp-failure-receipt-v1'
+
+
+def failure_receipt(frame, error, stderr):
+    """Do not store messages, stderr, prompts, sessions, credentials or model text."""
+    return {'version': FAILURE_OBSERVATION_VERSION, 'method': frame.get('method')
+            if frame.get('method') in ('initialize', 'session/new', 'session/resume',
+                                       'session/set_model', 'session/prompt') else 'unknown',
+            'code': error.get('code') if type(error.get('code')) is int else None,
+            'categories': failure_diagnostics(stderr),
+            'stderr_bytes': len(stderr), 'stderr_sha256': hashlib.sha256(stderr).hexdigest(),
+            'cause': 'classified_hint' if failure_diagnostics(stderr) else 'unknown',
+            'approval': False}
 
 
 def failure_diagnostics(stderr):
@@ -94,6 +110,7 @@ class Transport:
         if mode not in ('review', 'implementation', 'planning'):
             raise ValueError('invalid execution mode')
         self.mode = mode
+        self.execution_id = name.rsplit('-job-', 1)[1]
         self.editable_paths = frozenset(editable_paths)
         self.test_commands = frozenset(test_commands)
         self.cwd = ('/workspace' if mode == 'implementation' else
@@ -215,6 +232,17 @@ class Transport:
                 elif result.get('id') == frame['id']:
                     if 'error' in result:
                         result['error']['data'] = {'broker_diagnostic': failure_diagnostics(self.stderr_tail)}
+                        receipt = failure_receipt(frame, result['error'], self.stderr_tail)
+                        # Workers cannot access this controller database. Commit before
+                        # returning the failure, which otherwise disappears on close.
+                        if getattr(self, 'execution_id', None):
+                            import broker
+                            with broker.db() as con:
+                                con.execute('CREATE TABLE IF NOT EXISTS acp_failure_receipts('
+                                            'request_id TEXT, method TEXT, receipt TEXT, '
+                                            'PRIMARY KEY(request_id,method))')
+                                con.execute('INSERT OR IGNORE INTO acp_failure_receipts VALUES (?,?,?)',
+                                    (self.execution_id, receipt['method'], json.dumps(receipt, sort_keys=True)))
                     elif frame['method'] == 'session/new' and frame.get('params', {}).get('model') == MODEL:
                         self.model_selected = True
                     elif frame['method'] == 'session/set_model':

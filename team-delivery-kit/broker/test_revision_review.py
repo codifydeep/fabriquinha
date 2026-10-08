@@ -628,6 +628,25 @@ def reconcile(broker, route, runs, effects, red):
             _save(broker, route, state)
         return True
     if state.get('status') == 'blocked':
+        if (not state.get('transport_observation_recovery')
+                and state.get('review_failure', {}).get('detail') == 'independent test review did not complete'):
+            failed = next((r for r in runs if r['id'] == state['review_failure']['task_id']), None)
+            if (failed and 'code=-32603' in str(failed.get('error', ''))
+                    and 'Internal error' in str(failed.get('error', ''))
+                    and not any(r.get('status') in ('queued', 'dispatched', 'running') for r in runs)):
+                from review_transport_recovery import prepare
+                required = ['/evidence/' + tree + '/' + name
+                    for tree in (('candidate',) if config.get('initial_review') else ('candidate', 'previous'))
+                    for name in route['test_first_files']]
+                try:
+                    updated = prepare(state, red, failed, config['reviewer'], required,
+                                      effects.read_evidence(failed))
+                except ValueError:
+                    pass  # Unknown/unobserved failures never waive the gate.
+                else:
+                    state = updated
+                    _save(broker, route, state)
+                    return False
         if (not state.get('citation_recovery') and state.get('review_failure',{}).get('detail')
                 == 'finding quote not observed at exact line'):
             failed=next((r for r in runs if r['id']==state['review_failure']['task_id']),None)
@@ -687,6 +706,8 @@ def reconcile(broker, route, runs, effects, red):
                              (':typed-terminal:1' if state.get('typed_terminal_recovery') else '')+
                              (':format-repair:1' if state.get('format_recovery') else '')+
                              (':citation-repair:1' if state.get('citation_recovery') else '')).encode()).hexdigest()
+    if state.get('transport_observation_recovery'):
+        marker = hashlib.sha256((marker + ':transport-observation:1').encode()).hexdigest()
     initial = config.get('initial_review', False)
     paths = ['/evidence/' + tree + '/' + name
              for tree in (('candidate',) if initial else ('candidate', 'previous'))
@@ -758,6 +779,12 @@ def reconcile(broker, route, runs, effects, red):
             'Keep reason <=1200 characters and finding quote/expected/observed <=500 each. '
             'The proxy permits one format-only correction, not a changed verdict or dropped findings. '
             'Previous failure was not approval; implementation remains blocked.\n')
+    if state.get('transport_observation_recovery'):
+        instruction += ('\nOne read-only diagnostic review after ACP internal error -32603, '
+            'with durable controller error receipts now enabled. Cause remains UNKNOWN. '
+            'No prior verdict exists: independently inspect this SAME frozen snapshot and '
+            'submit_test_review once you have a supported verdict. No author restart, '
+            'test editing or approval shortcut. A second execution failure stays blocked.\n')
     if 'wakeup_id' not in state:
         state.update(status='dispatch_intent', manifest_sha256=digest, terminal_contract='typed-review-v1',
                      source_task=red['task_id'], candidate_volume=red['volume'],

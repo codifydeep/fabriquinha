@@ -424,6 +424,18 @@ handoff antigo sem esse marcador, admite uma única recuperação com a polític
 corrigida. A resposta anterior não é reaproveitada; o histórico e as leituras são
 preservados e nenhum retry do autor é autorizado por essa recuperação de formato.
 
+A observação de falhas ACP agora conserva no controlador um recibo sem mensagens,
+prompts ou stderr bruto: código, categorias fixas, contagem e hash do stderr.
+Erro interno sem categoria continua com causa **desconhecida**. Uma revisão
+tipada que falhou sem parecer, após leituras integrais comprovadas, pode receber
+uma única nova execução somente leitura da mesma entrega imutável, com diagnóstico
+durável ativado. Isso não reaproveita um parecer, reinicia o autor ou aprova testes.
+Uma segunda falha permanece bloqueada; não existe retentativa infinita.
+No ensaio real, o candidato mais recente passou o controle positivo, os 12 controles
+negativos e o controle de background, e teve Red recuperado pelo controlador.
+Sua primeira revisão independente falhou no transporte antes de emitir parecer.
+Essa evidência **não** valida a recuperação da revisão, Green ou a entrega ponta a ponta.
+
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
 instrução real após leituras completas contra schema e adaptador do proxy. Uma
