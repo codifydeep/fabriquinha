@@ -34,7 +34,7 @@ def proxy_info(b):
     return info
 
 
-def register(b,payload):
+def register(b,payload,*,review=False):
     """Operator-only registration, using actual owned proxy logs and its ledger."""
     if not isinstance(payload,dict) or set(payload)!={'execution_id','response_sha256'}:
         raise ValueError('exact synthetic transport receipt required')
@@ -82,20 +82,32 @@ print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Pat
             if event.get('event')=='model_proxy_request' and event.get('execution_id')==execution:events.append(event)
         if len(events)!=1:raise ValueError('one correlated actual request required')
         from decision_schema import apply
-        expected=apply({'messages':[{'role':'user','content':'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'}]})
+        if review:
+            from review_transport_fixture import body
+            expected=apply(body())
+        else:
+            expected=apply({'messages':[{'role':'user','content':'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'}]})
         validate_canary(events[0],value['receipts'][0],execution,sha,
                         digest(expected['response_format']['json_schema']['schema']))
+        if review and (events[0].get('provider_schema_projection')!='haiku_review_union_v1'
+                or events[0].get('canonical_schema_validation_preserved') is not True
+                or value['receipts'][0].get('mode')!='test_review'
+                or value['receipts'][0].get('manifest_sha256')!='a'*64
+                or value['receipts'][0].get('review_acceptance_by_proxy') is not False):
+            raise ValueError('synthetic projected review receipt required')
         if proxy_info(b)['Id']!=proxy['Id']:raise ValueError('proxy changed during qualification')
         proof=dict(operation='provider_diagnosis_transport_qualification_v1',execution_id=execution,
             model=value['model'],proxy_image=proxy['Image'],routing_sha256=value['routing_sha256'],
             response_sha256=sha,event=events[0],adapter_receipt=value['receipts'][0],
             worker_tool_executed=False,delivery_approval=False)
+        table='provider_review_qualifications' if review else 'provider_diagnosis_qualifications'
+        if review:proof.update(operation='provider_review_transport_qualification_v1',actual_artifact_read=False)
         with b.db() as c:
-            c.execute('CREATE TABLE IF NOT EXISTS provider_diagnosis_qualifications('
+            c.execute('CREATE TABLE IF NOT EXISTS '+table+'('
                       'execution_id TEXT PRIMARY KEY,proof TEXT,at REAL)')
-            old=c.execute('SELECT proof FROM provider_diagnosis_qualifications WHERE execution_id=?',(execution,)).fetchone()
+            old=c.execute('SELECT proof FROM '+table+' WHERE execution_id=?',(execution,)).fetchone()
             if old and json.loads(old[0])!=proof:raise ValueError('qualification identity drift')
-            if not old:c.execute('INSERT INTO provider_diagnosis_qualifications VALUES(?,?,?)',
+            if not old:c.execute('INSERT INTO '+table+' VALUES(?,?,?)',
                                  (execution,json.dumps(proof,sort_keys=True),time.time()))
         return proof
 

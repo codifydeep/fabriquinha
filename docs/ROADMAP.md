@@ -38,3 +38,10 @@ inválida não constitui aprovação, mesmo que o provedor aceite o pedido.
 `model_review_smoke.py` exercita esse transporte com uma fixture explicitamente
 sintética, sem acesso a artefatos reais ou concessão de autoridade. Seu sucesso
 não recupera automaticamente uma revisão bloqueada e não qualifica entrega.
+
+Uma recuperação de revisão pode ser autorizada pelo controlador somente após
+conferir a qualificação sintética no ledger e nos logs do proxy instalado, a
+identidade do revisor, a lease encerrada, a leitura integral e o mesmo snapshot.
+O histórico da falha fica preservado e o novo handoff tem identidade distinta.
+Essa recuperação é única: outro erro não reinicia o contador nem libera o autor.
+Seu parecer ainda precisa passar pelos controles normais e não homologa a release.

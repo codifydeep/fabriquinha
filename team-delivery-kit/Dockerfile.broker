@@ -182,6 +182,8 @@ COPY broker/test_author_activity.py /test_author_activity.py
 COPY broker/test_first_handoffs.py /test_first_handoffs.py
 COPY broker/cto_prompt_bound_recovery.py /cto_prompt_bound_recovery.py
 COPY broker/provider_diagnosis_recovery.py /provider_diagnosis_recovery.py
+COPY broker/review_provider_recovery.py /review_provider_recovery.py
+COPY review_transport_fixture.py /review_transport_fixture.py
 COPY broker/bound_failure_context.py /bound_failure_context.py
 COPY broker/inherited_test_replan.py /inherited_test_replan.py
 COPY broker/inherited_harness_amendment.py /inherited_harness_amendment.py

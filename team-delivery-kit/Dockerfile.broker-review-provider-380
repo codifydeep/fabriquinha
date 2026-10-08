@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261008.379
+COPY broker/provider_diagnosis_recovery.py broker/review_provider_recovery.py broker/test_revision_review.py review_transport_fixture.py /

@@ -708,6 +708,8 @@ def reconcile(broker, route, runs, effects, red):
                              (':citation-repair:1' if state.get('citation_recovery') else '')).encode()).hexdigest()
     if state.get('transport_observation_recovery'):
         marker = hashlib.sha256((marker + ':transport-observation:1').encode()).hexdigest()
+    if state.get('provider_schema_recovery'):
+        marker = hashlib.sha256((marker + ':qualified-provider-schema:1').encode()).hexdigest()
     initial = config.get('initial_review', False)
     paths = ['/evidence/' + tree + '/' + name
              for tree in (('candidate',) if initial else ('candidate', 'previous'))
@@ -785,6 +787,12 @@ def reconcile(broker, route, runs, effects, red):
             'No prior verdict exists: independently inspect this SAME frozen snapshot and '
             'submit_test_review once you have a supported verdict. No author restart, '
             'test editing or approval shortcut. A second execution failure stays blocked.\n')
+    if state.get('provider_schema_recovery'):
+        instruction += ('\nThe installed provider adapter now has a qualified synthetic review transport '
+            'receipt. That fixture is NOT product evidence or your verdict. Independently read the SAME '
+            'frozen snapshot and submit your real findings. Local citation and verdict constraints are '
+            'unchanged. No author restart or permission to edit. One changed-condition recovery only; '
+            'another failure stays visible and blocked. Historical HTTP cause is not asserted.\n')
     if 'wakeup_id' not in state:
         state.update(status='dispatch_intent', manifest_sha256=digest, terminal_contract='typed-review-v1',
                      source_task=red['task_id'], candidate_volume=red['volume'],
