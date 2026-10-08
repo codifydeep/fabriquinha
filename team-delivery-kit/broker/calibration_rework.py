@@ -134,11 +134,12 @@ def instruction(config,state):
         'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TECHNICAL_LENGTH_FEEDBACK_V1\n'
         'CALIBRATION GATE REWORK: '+('independent Tech Lead inspection of CTO proposal. ' if peer else 'CTO diagnosis. ')+
         'Read every immutable candidate file completely. No shell, edits, Red replay or approval of delivery. '
-        'The controller rejected this candidate before Red; a failed positive reference is not product Red. '
+        'The controller rejected this candidate before Red. Passing the positive reference alone is '
+        'insufficient: every negative and background control must also pass. A harness rejection is not product Red. '
         'Diagnose the NEW harness and preserve every existing method/assertion and all original acceptance. '
         'Only the original author may execute a tests-only rework after BOTH independent decisions. '
         'A request sponsors one changed-evidence gate rework, never an identical retry, budget/depth reset, '
-        'baseline edit, product edit, merge or homologation.\nEvidence: '+json.dumps(config['diagnostic'],sort_keys=True)+
+        'baseline edit, product edit, merge or homologation.\nEvidence: '+json.dumps(diagnostic_index(config['diagnostic']),sort_keys=True)+
         ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
         '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+
         '\nReturn ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[]. '
@@ -146,6 +147,20 @@ def instruction(config,state):
         ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
     if len(note)+100>4000:raise ValueError('calibration diagnosis context too large')
     return note
+
+
+def diagnostic_index(diagnostic):
+    """Bounded planner facts; complete immutable evidence remains in storage."""
+    from service_mode_harness_qualification import CASES
+    result={k:diagnostic[k] for k in ('phase','manifest_sha256','test_sha256','positive','background') if k in diagnostic}
+    negatives=diagnostic.get('negative_controls')
+    if isinstance(negatives,dict):
+        expected=dict(tests=1,failures=1,errors=0,skipped=0,unexpected_successes=0,expected_failures=0)
+        failed=[case for case in CASES if not isinstance(negatives.get(case),dict)
+            or any(negatives[case].get(k)!=v for k,v in expected.items())]
+        result.update(negative_controls_total=len(CASES),negative_controls_detected=len(CASES)-len(failed),
+            undetected_or_invalid_controls=failed)
+    return result
 
 
 def marker(config,role):
@@ -331,7 +346,7 @@ def _handle(b,route,runs,source,prior,effects):
             if not observed:return False
             proof=json.loads(observed[0])
             if proof.get('status')!='rejected' or proof.get('delivery_approval') is not False:return False
-            diagnostic={k:proof[k] for k in ('phase','manifest_sha256','test_sha256','positive')}
+            diagnostic={k:proof[k] for k in ('phase','manifest_sha256','test_sha256','positive','negative_controls','background') if k in proof}
         if diagnostic.get('manifest_sha256')!=identity['manifest_sha256']:raise ValueError('exact calibration diagnostic manifest required')
         config=dict(issue_id=issue,source_task=key,author=route['author'],cto=route['cto'],peer=route['techlead'],
             manifest_sha256=identity['manifest_sha256'],volume=identity['volume'],diagnostic=diagnostic,

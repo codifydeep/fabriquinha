@@ -4,7 +4,8 @@ import json
 import time
 import re
 from types import SimpleNamespace
-BACKGROUND_IMAGE='sha256:e5c5b7cbf4c99852e762bf5f36496c59dc8c147b7aeb55e1f05ccbcea03b3513'
+BACKGROUND_IMAGE='sha256:58f78524c522e3a30ce80a2a8f943c2429d740fb931adfc9385e219f1a8b70a5'
+LEGACY_BACKGROUND_IMAGE='sha256:e5c5b7cbf4c99852e762bf5f36496c59dc8c147b7aeb55e1f05ccbcea03b3513'
 
 IMAGE_ENV_KEYS={'PATH','PYTHONUNBUFFERED','PYTHONDONTWRITEBYTECODE','PLAYWRIGHT_BROWSERS_PATH',
     'npm_config_install_links','HERMES_WEB_DIST','HERMES_TUI_DIR','HERMES_HOME','HERMES_WRITE_SAFE_ROOT',
@@ -125,7 +126,7 @@ def reconcile_rejected(b,con,task):
     # isolation contract using the new worker image or create a replacement.
     original=SimpleNamespace(IMAGE=pinned,docker=b.docker,OWNER=b.OWNER)
     background=identity['payload'].get('Cmd',[None])[0]=='/service_mode_background_qualification.py'
-    if background and pinned!=BACKGROUND_IMAGE:raise ValueError('pinned background calibration image required')
+    if background and pinned not in (BACKGROUND_IMAGE,LEGACY_BACKGROUND_IMAGE):raise ValueError('pinned background calibration image required')
     expected=payload(original,task,identity['volume'],identity['manifest_sha256'],background=background)
     if identity['payload']!=expected:raise ValueError('recorded harness policy drift')
     info=b.docker('GET','/containers/'+state['container_id']+'/json');verify_job(info,expected)
@@ -145,11 +146,15 @@ def capture(b,con,issue,task,volume,prepared):
     from service_mode_harness_qualification import TEST
     if set(prepared['test_sha256'])!={TEST}:raise ValueError('declared amendment test scope required')
     background=value['amendment'].get('kind')=='request_scope'
-    image=SimpleNamespace(IMAGE=BACKGROUND_IMAGE,docker=b.docker,OWNER=b.OWNER) if background else b
-    manifest=prepared['manifest_sha256'];expected=payload(image,task,volume,manifest,background=background)
     con.execute('CREATE TABLE IF NOT EXISTS harness_qualifications(task_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
-    identity=dict(issue_id=issue,task_id=task,volume=volume,manifest_sha256=manifest,payload=expected)
     row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(task,)).fetchone()
+    selected=BACKGROUND_IMAGE
+    if background and row:
+        selected=json.loads(row[0])['payload']['Image']
+        if selected not in (BACKGROUND_IMAGE,LEGACY_BACKGROUND_IMAGE):raise ValueError('recorded background image is not qualified')
+    image=SimpleNamespace(IMAGE=selected,docker=b.docker,OWNER=b.OWNER) if background else b
+    manifest=prepared['manifest_sha256'];expected=payload(image,task,volume,manifest,background=background)
+    identity=dict(issue_id=issue,task_id=task,volume=volume,manifest_sha256=manifest,payload=expected)
     def save(state):
         con.execute('UPDATE harness_qualifications SET state=? WHERE task_id=?',(json.dumps(state,sort_keys=True),task))
         con.commit();return state

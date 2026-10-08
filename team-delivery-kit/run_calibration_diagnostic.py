@@ -27,7 +27,7 @@ def presentation(result,task):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--task',required=True)
-    parser.add_argument('--image',required=True);args=parser.parse_args()
+    parser.add_argument('--image',required=True);parser.add_argument('--publish',action='store_true');args=parser.parse_args()
     if PROJECT!='delivery-kit-port2' or str(uuid.UUID(args.task))!=args.task:
         raise ValueError('canonical isolated failed task required')
     import re
@@ -88,6 +88,21 @@ print(json.dumps(dict(volume=identity['volume'],manifest_sha256=identity['manife
         result=dict(identity=identity,container_id=cid,exit_code=info['ExitCode'],
             output_sha256=hashlib.sha256(observed.stdout.encode()).hexdigest(),result=json.loads(observed.stdout))
         save_receipt(receipt,result)
+    if args.publish:
+        selector=dict(source_task=args.task,container_id=result['container_id'],image=args.image,
+            output_sha256=result['output_sha256'],original_output_sha256=metadata['original_output_sha256'])
+        publish='''import broker as b,json,sys,os
+value=json.load(sys.stdin);path=b.STATE/'calibration-diagnostic-observation.json'
+if path.exists():
+ assert not path.is_symlink() and not path.stat().st_mode&0o077 and json.loads(path.read_text())==value
+else:
+ with os.fdopen(os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:
+  json.dump(value,f,sort_keys=True);f.flush();os.fsync(f.fileno())
+print(json.dumps(dict(selector_published=True,author_retry_authorized=False,delivery_approval=False)))
+'''
+        acknowledgement=json.loads(subprocess.check_output(['docker','exec','-i','-w','/',
+            PROJECT+'-execution-broker-1','python','-c',publish],input=json.dumps(selector),text=True))
+        if acknowledgement.get('selector_published') is not True:raise ValueError('private selector publication uncertain')
     print(json.dumps(presentation(result,args.task)))
 
 

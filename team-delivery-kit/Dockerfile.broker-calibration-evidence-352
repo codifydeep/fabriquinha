@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261007.351
+COPY broker/harness_qualification.py /harness_qualification.py
+COPY broker/calibration_observation.py /calibration_observation.py
+COPY broker/calibration_rework.py /calibration_rework.py
+COPY broker/handoff_runtime.py /handoff_runtime.py

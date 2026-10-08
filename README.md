@@ -167,8 +167,13 @@ perderam esses dados, `run_calibration_diagnostic.py` permite uma única observa
 offline do snapshot congelado com imagem diagnóstica identificada: sem rede,
 credenciais, escrita no snapshot ou repetição da tarefa nativa. O resultado novo
 é separado do original e não concede Red, retry do autor ou aprovação de entrega.
-Essa correção está validada na imagem diagnóstica; sua ativação na imagem de
-calibração do fluxo normal ainda é pendente. Recibos históricos continuam intactos.
+Essa correção está ativada na imagem de calibração do fluxo normal. Execuções
+antigas continuam vinculadas à sua imagem original; seus recibos não são atualizados.
+Observações separadas são verificadas pelo controlador contra o contêiner terminal,
+imagem, isolamento, snapshot e hash reais. A recuperação existente exige leitura
+completa pelo CTO e revisão independente do Tech Lead antes de patrocinar o autor.
+O contexto dos planejadores destaca os controles negativos não detectados, mesmo
+quando todos os testes da referência positiva passam. Isso não aprova Red ou entrega.
 Para essa proposta estreita, o validador também preserva a forma estática de
 descoberta, decorators, assinaturas, escopo das assertions e transferências de
 controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de

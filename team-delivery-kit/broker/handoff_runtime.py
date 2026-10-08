@@ -364,6 +364,10 @@ class Effects:
         import uuid
         if str(uuid.UUID(task_id)) != task_id:
             raise ValueError('invalid test-first diagnostic task')
+        try:import calibration_observation
+        except ImportError:from broker import calibration_observation
+        observed=calibration_observation.capture(self.b,issue_id,task_id)
+        if observed:return observed
         path = self.b.STATE / 'test-first-incidents' / (task_id + '.json')
         if not path.exists():
             try:import artifact_rejection_evidence
