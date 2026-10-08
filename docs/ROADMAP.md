@@ -25,3 +25,16 @@ Não usamos quantidade de código, workers ativos ou percentual subjetivo como c
 - Licença escolhida pelo proprietário, documentação de operação e testes de atualização/rollback.
 
 Esses gates permanecem abertos até evidência específica. O ensaio atual não retoma automaticamente o Truco.
+
+## Compatibilidade de transporte dos modelos
+
+O adaptador de Haiku preserva o contrato canônico validado localmente. Para
+revisões tipadas, apenas o schema enviado ao provedor omite os combinadores
+`anyOf` que o endpoint rejeita. SHA, campos obrigatórios, ferramentas permitidas
+e limites permanecem vinculados; citações observadas e consistência entre
+parecer e findings continuam obrigatórias no validador local. Uma resposta
+inválida não constitui aprovação, mesmo que o provedor aceite o pedido.
+
+`model_review_smoke.py` exercita esse transporte com uma fixture explicitamente
+sintética, sem acesso a artefatos reais ou concessão de autoridade. Seu sucesso
+não recupera automaticamente uma revisão bloqueada e não qualifica entrega.

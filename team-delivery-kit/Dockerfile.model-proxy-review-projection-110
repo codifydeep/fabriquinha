@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261008.109
+COPY model_proxy.py provider_tool_routing.py /

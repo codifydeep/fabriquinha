@@ -61,6 +61,18 @@ class ObservedFindingLocationTests(unittest.TestCase):
         bad=copy.deepcopy(self.decision);bad['findings'][0]['test']='Cases'
         with self.assertRaises(StructuredResponseRejected):translate(body,wire(bad),'application/json')
 
+    def test_provider_projection_never_waives_local_citation_or_verdict_constraints(self):
+        from provider_tool_routing import wire as provider_wire
+        body=typed(apply({'model':'anthropic/claude-haiku-5.5','messages':copy.deepcopy(self.messages)}))
+        projection=provider_wire(body)
+        self.assertNotIn('anyOf',projection['tools'][0]['function']['parameters'])
+        self.assertIn('anyOf',body['tools'][0]['function']['parameters'])
+        for decision in ({**self.decision,'action':'approve_test_revision'},
+                         {**self.decision,'findings':[{**self.finding,'line':2}]}):
+            raw=json.dumps({'choices':[{'finish_reason':'tool_calls','message':{'content':None,
+                'tool_calls':[{'type':'function','function':{'name':REVIEW_NAME,'arguments':json.dumps(decision)}}]}}]}).encode()
+            with self.assertRaises(StructuredResponseRejected):translate(body,raw,'application/json')
+
     def test_unmarked_contract_is_unchanged_and_no_assistant_claim_creates_source(self):
         self.messages[0]['content']=self.messages[0]['content'].replace(MARKER+'\n','')
         self.assertNotIn('anyOf',self.schema()['properties']['findings']['items'])

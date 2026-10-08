@@ -31,3 +31,26 @@ class ProviderToolRoutingTests(unittest.TestCase):
         with self.assertRaises(ValueError):wire(body)
         body=self.body();body['tools']*=2
         with self.assertRaises(ValueError):wire(body)
+
+    def test_review_projection_does_not_mutate_canonical_union_constraints(self):
+        body=self.body();body['tool_choice']['function']['name']='submit_test_review'
+        function=body['tools'][0]['function'];function['name']='submit_test_review'
+        properties={'action':{'type':'string','enum':['approve_test_revision','reject_test_revision']},
+            'reason':{'type':'string','maxLength':1200},'optional_files':{'type':'array','maxItems':0},
+            'manifest_sha256':{'type':'string','enum':['a'*64]},
+            'findings':{'type':'array','items':{'type':'object','anyOf':[{'properties':{'line':{'enum':[3]}}}]}}}
+        function['parameters']={'type':'object','properties':properties,'anyOf':[{'type':'object'}]}
+        before=copy.deepcopy(body);result=wire(body)
+        self.assertEqual(body,before)
+        schema=result['tools'][0]['function']['parameters']
+        self.assertNotIn('anyOf',schema)
+        self.assertNotIn('anyOf',schema['properties']['findings']['items'])
+        self.assertEqual(schema['properties']['manifest_sha256'],properties['manifest_sha256'])
+        self.assertTrue(result['tools'][0]['function']['strict'])
+        self.assertEqual(result['messages'],body['messages'])
+
+    def test_unrecognized_review_schema_cannot_project(self):
+        body=self.body();body['tool_choice']['function']['name']='submit_test_review'
+        body['tools'][0]['function']['name']='submit_test_review'
+        body['tools'][0]['function']['parameters']['anyOf']=[{}]
+        with self.assertRaises(ValueError):wire(body)
