@@ -1062,12 +1062,7 @@ def verify_test_first_green(volume, task_id, red_receipt):
     name = PREFIX + '-test-first-verify-' + task_id
     labels = {'delivery-kit.owner': OWNER, 'delivery-kit.source-task': task_id,
               'com.docker.compose.project': PREFIX}
-    old = docker('GET', '/containers/' + name + '/json')
-    if old:
-        if old['Config'].get('Labels', {}).get('delivery-kit.source-task') != task_id:
-            raise ValueError('foreign test-first Green verifier')
-        docker('DELETE', '/containers/' + old['Id'] + '?force=true')
-    docker('POST', '/containers/create?name=' + name, {
+    payload = {
         'Image': IMAGE, 'User': '10000:10000', 'Entrypoint': ['python'],
         'Cmd': ['/test_first_verify.py'], 'NetworkDisabled': True,
         'Env': ['TEST_FIRST_TEST_HASHES=' + json.dumps(hashes, sort_keys=True),
@@ -1079,25 +1074,16 @@ def verify_test_first_green(volume, task_id, red_receipt):
                        'Mounts': [{'Type': 'volume', 'Source': volume,
                                    'Target': '/delivery', 'ReadOnly': True},
                                   {'Type': 'volume', 'Source': red_volume,
-                                   'Target': '/red', 'ReadOnly': True}]}})
-    try:
-        docker('POST', '/containers/' + name + '/start')
-        deadline = time.time() + 20
-        while time.time() < deadline:
-            state = docker('GET', '/containers/' + name + '/json')['State']
-            if not state['Running']:
-                if state['ExitCode']:
-                    raise ValueError('test changed after controller Red')
-                result = json.loads(docker_stdout(name))
-                if result != {'tests_unchanged': True, 'count': len(hashes)}:
-                    raise ValueError('invalid test-first Green verification')
-                return True
-            time.sleep(.2)
-        raise TimeoutError('test-first Green verification deadline')
-    finally:
-        info = docker('GET', '/containers/' + name + '/json')
-        if info and info['Config'].get('Labels', {}).get('delivery-kit.source-task') == task_id:
-            docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+                                   'Target': '/red', 'ReadOnly': True}]}}
+    try: import validation_job
+    except ImportError: from broker import validation_job
+    job = validation_job.run(handoff_context(), task_id, 'green', payload)
+    if job['exit_code']:
+        raise ValueError('test changed after controller Red')
+    result = json.loads(job['output'])
+    if result != {'tests_unchanged': True, 'count': len(hashes)}:
+        raise ValueError('invalid test-first Green verification')
+    return True
 
 
 def assign_review(payload):
@@ -1136,7 +1122,7 @@ def validation_job_name(kind, source_task_id):
     return PREFIX + '-' + kind + '-' + source_task_id + '-' + uuid.uuid4().hex[:12]
 
 
-def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=False):
+def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=False, review_request_id=None):
     """Run only the operator-frozen argv/image; never accept an agent command."""
     from portable_contract import IMAGE as PINNED_IMAGE
     image = specification['test_image']
@@ -1146,30 +1132,33 @@ def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=
             or any(not isinstance(arg, str) or not arg for arg in command)):
         raise ValueError('invalid portable test specification')
     name = validation_job_name('suite',source_task_id)
-    docker('POST', '/containers/create?name=' + name, {
+    payload = {
         'Image': image, 'User': '10000:10000', 'Entrypoint': [command[0]],
         'Cmd': command[1:], 'WorkingDir': '/delivery', 'NetworkDisabled': True,
         'Env': ['PYTHONDONTWRITEBYTECODE=1'],
         'Labels': {'delivery-kit.owner': OWNER, 'delivery-kit.source-task': source_task_id,
+                   **({'delivery-kit.review-request':review_request_id} if review_request_id else {}),
                    'com.docker.compose.project': PREFIX},
         'HostConfig': {'ReadonlyRootfs': True, 'NetworkMode': 'none',
                        'CapDrop': ['ALL'], 'SecurityOpt': ['no-new-privileges'],
                        'Memory': 268435456, 'NanoCpus': 1000000000, 'PidsLimit': 96,
                        'Mounts': [{'Type': 'volume', 'Source': volume,
                                    'Target': '/delivery', 'ReadOnly': True}],
-                       'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=32m,mode=1777'}}})
+                       'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=32m,mode=1777'}}}
+    try: import validation_job
+    except ImportError: from broker import validation_job
+    job = validation_job.run(handoff_context(), source_task_id, 'suite', payload)
     try:
-        docker('POST', '/containers/' + name + '/start')
         deadline = time.time() + 120
         while time.time() < deadline:
-            info = docker('GET', '/containers/' + name + '/json')
+            info = {'State': {'Running': False, 'ExitCode': job['exit_code']}}
             if info and not info['State']['Running']:
                 if info['State']['ExitCode'] != 0:
                     try:
                         from suite_failure import evidence, FrozenSuiteFailure, failing_source_files
                     except ImportError:
                         from broker.suite_failure import evidence, FrozenSuiteFailure, failing_source_files
-                    output = docker_stdout(name, include_stderr=True, limit=65536)
+                    output = job['output']
                     receipt = evidence(info['State']['ExitCode'], output, source_task_id, volume)
                     with db() as con:
                         paths = con.execute('SELECT DISTINCT e.path FROM issue_editables e '
@@ -1186,7 +1175,7 @@ def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=
                                     (source_task_id, receipt['output_sha256'],
                                      json.dumps(receipt, sort_keys=True), output))
                     raise FrozenSuiteFailure(receipt)
-                output = docker_stdout(name, include_stderr=True)
+                output = job['output']
                 if (not re.search(specification['test_success_pattern'], output)
                         or unacceptable_output(output)):
                     raise ValueError('portable test success evidence missing')
@@ -1202,9 +1191,7 @@ def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=
             time.sleep(0.2)
         raise TimeoutError('portable frozen suite deadline')
     finally:
-        info = docker('GET', '/containers/' + name + '/json')
-        if info and info['Config'].get('Labels', {}).get('delivery-kit.source-task') == source_task_id:
-            docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+        pass  # Result persisted before asynchronous owned-helper cleanup.
 
 
 def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite_evidence=False, review_request_id=None):
@@ -1229,11 +1216,12 @@ def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite
     if not source or not source['issue_id']:
         raise ValueError('source issue identity missing')
     base = handoff_runtime.task_base(handoff_context(), source['issue_id'], source_task_id)
-    docker('POST', '/containers/create?name=' + name, {
+    payload = {
         'Image': OFFLINE_IMAGE, 'User': '10000:10000', 'Entrypoint': ['python'],
         'Cmd': ['/snapshot_validate.py'], 'NetworkDisabled': True,
         'Env': ['REQUIRED_TESTS=' + ','.join(required_tests)],
         'Labels': {'delivery-kit.owner': OWNER, 'delivery-kit.source-task': source_task_id,
+                   **({'delivery-kit.review-request':review_request_id} if review_request_id else {}),
                    'com.docker.compose.project': PREFIX},
         'HostConfig': {'ReadonlyRootfs': True, 'NetworkMode': 'none',
                        'CapDrop': ['ALL'], 'SecurityOpt': ['no-new-privileges'],
@@ -1242,16 +1230,18 @@ def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite
                                    'Target': '/delivery', 'ReadOnly': True},
                                   {'Type': 'volume', 'Source': base['volume'],
                                    'Target': '/base', 'ReadOnly': True}],
-                       'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=8m,mode=1777'}}})
+                       'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=8m,mode=1777'}}}
+    try: import validation_job
+    except ImportError: from broker import validation_job
+    job = validation_job.run(handoff_context(), source_task_id, 'structure', payload)
     try:
-        docker('POST', '/containers/' + name + '/start')
         deadline = time.time() + 20
         while time.time() < deadline:
-            info = docker('GET', '/containers/' + name + '/json')
+            info = {'State': {'Running': False, 'ExitCode': job['exit_code']}}
             if info and not info['State']['Running']:
                 if info['State']['ExitCode'] != 0:
                     try:
-                        failure = json.loads(docker_stdout(name))
+                        failure = json.loads(job['output'])
                     except (ValueError, RuntimeError):
                         raise ValueError('frozen delivery validation failed') from None
                     missing = failure.get('missing') if isinstance(failure, dict) else None
@@ -1263,7 +1253,7 @@ def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite
                             and isinstance(failure.get('reason'), str) and len(failure['reason']) <= 300):
                         raise ValueError('artifact_validation: ' + failure['reason'])
                     raise ValueError('frozen delivery validation failed')
-                result = json.loads(docker_stdout(name))
+                result = json.loads(job['output'])
                 if result.get('mode') == 'portable':
                     legacy_keys = {'mode', 'manifest_sha256', 'baseline_tests_intact',
                                         'test_image', 'test_command', 'test_success_pattern',
@@ -1276,7 +1266,7 @@ def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite
                             or not 1 <= result['minimum_tests'] <= 128):
                         raise ValueError('invalid portable structural receipt')
                     suite = run_portable_suite(volume, source_task_id, result,
-                                               suite_evidence=True) if suite_evidence else None
+                                               suite_evidence=True,review_request_id=review_request_id) if suite_evidence else None
                     tests = suite['tests'] if suite else run_portable_suite(volume, source_task_id, result)
                     return {'manifest_sha256': result['manifest_sha256'],
                             **({'checkpoint_evidence': {k:result[k] for k in checkpoint_keys}}
@@ -1292,9 +1282,7 @@ def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite
             time.sleep(0.2)
         raise TimeoutError('frozen validation deadline')
     finally:
-        info = docker('GET', '/containers/' + name + '/json')
-        if info and info['Config'].get('Labels', {}).get('delivery-kit.source-task') == source_task_id:
-            docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+        pass  # Cleanup cannot replace a valid structural/suite verdict.
 
 
 def record_review(payload):

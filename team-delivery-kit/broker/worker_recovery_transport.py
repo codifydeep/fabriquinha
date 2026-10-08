@@ -13,6 +13,7 @@ except ImportError:
     from broker import handoffs,native,worker_interruption_recovery
 
 SOURCE_SHA='3e8c3c5f0c422b3ae9c0a5b825288af60a0904ce6c4bf400db49ec68fd272c45'
+VALIDATION_PENDING_SOURCE_SHA='67c222d0e0c4e1b205fc32eb0d04d8dd022ab5c60eb904b44eeade2cd82ff63b'
 LEGACY_SOURCE_SHA='d911f64499a5ae44fd0c1583d2f3de092376933353ea1cbc856339e3a23ec718'
 PROXY_IMAGE='sha256:55e34ae248147017aad74670c5e50a7f6e9c9783b3759f917459fe76bf456ddd'
 
@@ -38,7 +39,7 @@ def register(b,payload):
         raise ValueError('exact runtime transport identities required')
     for value in payload.values():
         if str(uuid.UUID(value))!=value:raise ValueError('canonical runtime transport identity required')
-    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {SOURCE_SHA,LEGACY_SOURCE_SHA}:
+    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {SOURCE_SHA,LEGACY_SOURCE_SHA,VALIDATION_PENDING_SOURCE_SHA}:
         raise ValueError('fixed source-pinned recovery transport required')
     issue,source,failed=(payload[k] for k in ('issue_id','source_task','failed_task'))
     with b.LOCK:

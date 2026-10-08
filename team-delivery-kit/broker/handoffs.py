@@ -584,7 +584,7 @@ def reconcile(con, route, runs, effects, *, now=None):
         return stage
     if stage in ('approved', 'superseded', 'technical_decision_required', 'test_revision_required','inherited_replan_required'):
         return stage
-    if stage in ('observed', 'author_active', 'preflight_retry'):
+    if stage in ('observed', 'author_active', 'preflight_retry', 'validation_pending'):
         infrastructure_failure = (source['status'] == 'failed' and
                                   'restricted broker operation failed: http_503' in
                                   (source.get('error') or ''))
@@ -629,6 +629,11 @@ def reconcile(con, route, runs, effects, *, now=None):
                 data.update(snapshot=frozen, evidence=evidence, review_ready_at=now)
                 stage = save(con, key, issue, 'ready_review', route['reviewer'], data, now)
             except Exception as error:
+                try: from validation_job import Pending as ValidationPending
+                except ImportError: from broker.validation_job import Pending as ValidationPending
+                if isinstance(error, ValidationPending):
+                    data['validation_observation'] = str(error)[:240]
+                    return save(con, key, issue, 'validation_pending', route['reviewer'], data, now)
                 # All errors remain durable. Only bounded infrastructure retries;
                 # invalid artifacts go straight to technical diagnosis.
                 data.update(error=str(error)[:240], error_type=type(error).__name__)

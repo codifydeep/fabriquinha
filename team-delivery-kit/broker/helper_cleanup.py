@@ -11,6 +11,7 @@ def new_name(b,role,issue,scope):
 
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS helper_cleanup(name TEXT PRIMARY KEY,issue_id TEXT,status TEXT,attempts INTEGER,next_try REAL,error TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS helper_cleanup_deletions(name TEXT PRIMARY KEY,container_id TEXT)')
 
 def schedule(b,name,issue):
     identity_label(b,name,issue)
@@ -29,7 +30,8 @@ def identity_label(b,name,identity):
     if valid and name in (b.PREFIX+'-test-first-copy-v2-'+identity,b.PREFIX+'-test-first-red-v2-'+identity):
         return 'delivery-kit.test-first-task'
     if valid and (name in (b.PREFIX+'-snapshot-job-'+identity,b.PREFIX+'-failed-snapshot-job-'+identity)
-            or re.fullmatch(prefix+r'-controls-job-[a-f0-9]{12}',name)):
+            or re.fullmatch(prefix+r'-controls-job-[a-f0-9]{12}',name)
+            or re.fullmatch(prefix+r'-validation-job-'+re.escape(identity)+r'-[a-f0-9]{12}',name)):
         return 'delivery-kit.source-task'
     raise ValueError('fixed helper name required')
 
@@ -46,11 +48,17 @@ def tick(b):
             key=identity_label(b,row['name'],row['issue_id'])
             if labels.get('delivery-kit.owner')!=b.OWNER or labels.get(key)!=row['issue_id']:raise ValueError('foreign helper')
             if info['State']['Running']:raise ValueError('running helper retained')
+            with b.db() as con:
+                intent=con.execute('SELECT container_id FROM helper_cleanup_deletions WHERE name=?',(row['name'],)).fetchone()
+                if intent and intent[0]!=info['Id']:raise ValueError('helper deletion identity changed')
+                if not intent:
+                    con.execute('INSERT INTO helper_cleanup_deletions VALUES(?,?)',(row['name'],info['Id']))
+            if intent:raise TimeoutError('observe uncertain helper deletion; never repeat DELETE')
             b.docker('DELETE','/containers/'+info['Id'])
         with b.db() as con:con.execute("UPDATE helper_cleanup SET status='done',error=NULL WHERE name=?",(row['name'],))
     except Exception as error:
         attempts=row['attempts']+1
-        status='blocked' if isinstance(error,ValueError) or attempts>=3 else 'pending'
+        status='blocked' if isinstance(error,ValueError) else 'pending'
         with b.db() as con:con.execute('UPDATE helper_cleanup SET status=?,attempts=?,next_try=?,error=? WHERE name=?',
             (status,attempts,time.time()+30*attempts,type(error).__name__,row['name']))
         print(json.dumps({'event':'helper_cleanup_pending','name':row['name'],'status':status,'category':type(error).__name__}),flush=True)

@@ -46,6 +46,10 @@ class HelperCleanupTests(unittest.TestCase):
         cleanup.schedule(self.b,self.name,'issue');self.timeout=True;cleanup.tick(self.b)
         self.assertEqual(self.status(),'pending')
         self.assertEqual(self.calls,['GET','DELETE'])
+        with self.db() as con:con.execute('UPDATE helper_cleanup SET next_try=0')
+        cleanup.tick(self.b)
+        self.assertEqual(self.calls,['GET','DELETE','GET'])
+        self.assertEqual(self.status(),'pending')
     def test_running_or_foreign_helper_never_deleted(self):
         for field in ('running','foreign'):
             with self.subTest(field=field):

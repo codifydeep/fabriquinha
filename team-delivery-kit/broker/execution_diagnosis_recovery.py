@@ -13,7 +13,8 @@ try:
 except ImportError:
     from broker import handoffs, native
 
-FIXED_SOURCE_SHA = '3e8c3c5f0c422b3ae9c0a5b825288af60a0904ce6c4bf400db49ec68fd272c45'
+FIXED_SOURCE_SHA = '67c222d0e0c4e1b205fc32eb0d04d8dd022ab5c60eb904b44eeade2cd82ff63b'
+VALIDATION_PENDING_SOURCE_SHA = '3e8c3c5f0c422b3ae9c0a5b825288af60a0904ce6c4bf400db49ec68fd272c45'
 LEGACY_SOURCE_SHA = 'd911f64499a5ae44fd0c1583d2f3de092376933353ea1cbc856339e3a23ec718'
 FORMAT_PROXY_IMAGE = 'sha256:f6ac67c6ce961f82c9c488a720e5485dd4e63d53c796eb4a9fdfdd8a3d876b1e'
 
@@ -63,7 +64,7 @@ def register_format(b, payload):
     for value in payload.values():
         if str(uuid.UUID(value)) != value: raise ValueError('canonical identity required')
     issue, source, failed = (payload[k] for k in ('issue_id', 'source_task', 'failed_task'))
-    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA}:
+    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, VALIDATION_PENDING_SOURCE_SHA}:
         raise ValueError('pinned diagnosis contract required')
     with b.LOCK:
         with b.db() as c:
@@ -143,7 +144,7 @@ def register(b, payload):
             raise ValueError('canonical diagnostic replay identity required')
     issue, source, failed = (payload[k] for k in ('issue_id', 'source_task', 'failed_task'))
     source_sha = hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest()
-    if source_sha not in {FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA}:
+    if source_sha not in {FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, VALIDATION_PENDING_SOURCE_SHA}:
         raise ValueError('pinned typed execution diagnosis repair required')
     with b.LOCK:
         with b.db() as c:

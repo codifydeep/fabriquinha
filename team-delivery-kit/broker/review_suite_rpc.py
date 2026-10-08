@@ -66,14 +66,27 @@ def execute(broker, token, payload):
         broker.assert_review_task_running(row)
         if capability['status'] == 'passed':
             return json.loads(capability['receipt'])
-        if capability['status'] != 'issued':
+        if capability['status'] not in ('issued','observing','running'):
             raise ValueError('review suite failed or interrupted; diagnosis required')
-        con.execute("UPDATE review_suite_rpc SET status='running' WHERE request_id=?",
-                    (capability['request_id'],))
+        if capability['status']!='issued' and json.loads(capability['receipt']).get('durable_validation')!=1:
+            raise ValueError('historical interrupted review cannot be upgraded; diagnosis required')
+        con.execute("UPDATE review_suite_rpc SET status='running',receipt=? WHERE request_id=?",
+                    (json.dumps({'durable_validation':1}),capability['request_id']))
         con.commit()  # An interrupted execution must not be silently repeated.
         try:
-            result = broker.validate_frozen_delivery(row['volume'], row['source_task_id'],
-                                                     suite_evidence=True, review_request_id=capability['request_id'])
+            try: from validation_job import Pending
+            except ImportError: from broker.validation_job import Pending
+            deadline=time.time()+25
+            while True:
+                try:
+                    result = broker.validate_frozen_delivery(row['volume'], row['source_task_id'],
+                        suite_evidence=True, review_request_id=capability['request_id'])
+                    break
+                except Pending:
+                    if time.time()>=deadline:raise
+                    binding(broker,con,capability['request_id'])
+                    broker.assert_review_task_running(row)
+                    time.sleep(.2)
             # Legacy fixture validators execute their own suite and cannot claim
             # this new isolation qualification; require the portable runner.
             if not result.get('portable') or not result.get('suite'):
@@ -97,6 +110,11 @@ def execute(broker, token, payload):
                         (json.dumps(receipt, sort_keys=True), capability['request_id']))
             return receipt
         except Exception as error:
+            if isinstance(error,Pending):
+                con.execute("UPDATE review_suite_rpc SET status='observing',receipt=? WHERE request_id=?",
+                    (json.dumps({'durable_validation':1,'next_action':'observe_same_validation_job'}),capability['request_id']))
+                con.commit()
+                raise
             con.execute("UPDATE review_suite_rpc SET status='failed',receipt=? WHERE request_id=?",
                 (json.dumps({'error_type': type(error).__name__, 'operation':getattr(error,'operation',None),
                              'next_action': 'technical_diagnosis'}),

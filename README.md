@@ -344,6 +344,21 @@ admissão, capacidade e revisão do produto continuam obrigatórias. Outros impe
 não são apagados. A resolução exige conferir novamente as evidências reais do gate,
 inclusive a leitura completa dos dois snapshots pelo revisor.
 
+As validações de estrutura, suíte Green e preservação dos testes congelados usam
+jobs persistentes, com intenção de criação/início gravada antes da operação Docker.
+Um timeout exige observar o mesmo handle, não repetir o efeito nem reiniciar o
+autor. O resultado e o hash do log ficam salvos antes da limpeza assíncrona; um
+timeout de exclusão não substitui o veredito da suíte. A suíte de revisão tem
+identidade própria por execução do revisor, sem reutilizar o Green do autor.
+Falhas funcionais continuam bloqueando a entrega. Essa implementação não é,
+isoladamente, comprovação de recuperação ponta a ponta ou homologação.
+
+Imagens incrementais antigas podem atingir o limite de camadas do Docker.
+`team-delivery-kit/import_controller_base.py` permite importar um export privado
+de um contêiner próprio, nunca iniciado, conferindo imagem de origem e metadados.
+O arquivo exportado não deve entrar no Git. Esse procedimento preserva a imagem
+anterior para rollback; não limpa Docker globalmente nem exporta volumes montados.
+
 Para uma falha posterior do autor, um SPIKE fixo pode testar uma hipótese de
 observação assíncrona numa cópia descartável, sem modificar a entrega original.
 Na instalação de referência, essa hipótese passou nos 15 testes da referência

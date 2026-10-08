@@ -13,6 +13,21 @@ from broker import review_suite_rpc as rpc
 
 
 class RpcTests(unittest.TestCase):
+    def test_pending_job_is_observed_not_failed_or_approved(self):
+        from broker.validation_job import Pending
+        result=self.broker.validate_frozen_delivery.return_value
+        self.broker.validate_frozen_delivery.side_effect=[Pending('same running handle'),result]
+        token=rpc.issue(self.broker,'request')
+        receipt=rpc.execute(self.broker,token,{})
+        self.assertEqual(receipt['exit_code'],0)
+        self.assertEqual(self.broker.validate_frozen_delivery.call_count,2)
+        self.assertEqual(self.broker.validate_frozen_delivery.call_args_list[0],
+                         self.broker.validate_frozen_delivery.call_args_list[1])
+    def test_legacy_interrupted_capability_is_not_upgraded(self):
+        token=rpc.issue(self.broker,'request')
+        with self.db() as con:con.execute("UPDATE review_suite_rpc SET status='running'")
+        with self.assertRaises(ValueError):rpc.execute(self.broker,token,{})
+        self.broker.validate_frozen_delivery.assert_not_called()
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)

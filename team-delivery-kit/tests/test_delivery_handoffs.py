@@ -55,6 +55,15 @@ class Effects:
 
 
 class HandoffTests(unittest.TestCase):
+    def test_validation_observation_preserves_attempts_and_never_wakes_author(self):
+        from broker.validation_job import Pending
+        self.effects.failure=Pending('same validation execution still running')
+        self.assertEqual(self.tick([]),'validation_pending')
+        first=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertEqual(first['attempts'],0)
+        self.assertEqual(self.tick([]),'validation_pending')
+        self.assertEqual(json.loads(handoffs.load(self.con,'source')['data'])['attempts'],0)
+        self.assertFalse(self.effects.created)
     def test_extra_review_requires_registered_repair_and_fresh_cto_once(self):
         from broker import review_context_recovery as recovery
         evidence=self.effects.validate(None,None)
