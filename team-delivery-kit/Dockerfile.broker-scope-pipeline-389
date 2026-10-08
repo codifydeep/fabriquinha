@@ -1,0 +1,23 @@
+# Local qualification overlay; preflight must verify the base image ID.
+# Expected: sha256:0c21954361d6cad922f3063b9499d0de037b80b397b09b1c9a2d36c379d39da3
+FROM delivery-kit-execution-broker:20261008.388
+COPY broker/server.py /broker.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/native.py /native.py
+COPY broker/adapted_test_review.py /adapted_test_review.py
+COPY broker/validation_job.py /validation_job.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY product_scope_contract.py /product_scope_contract.py
+COPY broker/product_scope_revision.py /product_scope_revision.py
+COPY broker/product_scope_ledger.py /product_scope_ledger.py
+COPY broker/product_scope_execution.py /product_scope_execution.py
+COPY broker/product_scope_materialize.py /product_scope_materialize.py
+COPY broker/product_scope_job.py /product_scope_job.py
+COPY broker/product_scope_base_verify.py /product_scope_base_verify.py
+COPY broker/product_scope_registration.py /product_scope_registration.py
+COPY broker/product_scope_task_binding.py /product_scope_task_binding.py
+COPY broker/product_scope_worker.py /product_scope_worker.py
+COPY broker/product_scope_author.py /product_scope_author.py
+COPY broker/product_scope_delivery.py /product_scope_delivery.py
+COPY broker/product_scope_bootstrap.py /product_scope_bootstrap.py
+COPY broker/product_scope_pipeline.py /product_scope_pipeline.py

@@ -1,0 +1,6 @@
+# Local qualification overlay; preflight must verify the base image ID.
+# Expected: sha256:1fd5fc29b4bdd132b0202c5fc5c19c9d3d812955d12da944efc2ad0d1b78114a
+FROM delivery-kit-model-proxy:20261008.110
+COPY product_scope_contract.py /product_scope_contract.py
+COPY decision_schema.py /decision_schema.py
+COPY typed_decision_contract.py /typed_decision_contract.py

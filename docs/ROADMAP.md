@@ -137,6 +137,13 @@ Pausa e manutenção preservam essa propriedade; jobs pendentes e confirmações
 incertas são observados novamente sem apagar suas intenções. Rejeições mantêm
 incidente técnico visível, sem concluir entrega ou repetir a mesma ação.
 Ainda falta instalar e qualificar essa coordenação no ciclo real dos agentes.
+Os overlays `Dockerfile.broker-scope-pipeline-389` e
+`Dockerfile.model-proxy-scope-111` preservam as imagens locais instaladas e
+adicionam os componentes de escopo. São artefatos de qualificação desta
+instalação, não um instalador portável: o operador deve conferir o ID da imagem
+base indicado em cada arquivo antes do build. IDs locais de imagem não são
+digests disponíveis em um registry. A troca dos serviços exige manutenção,
+backup verificável e conferência das imagens efetivas antes de liberar agentes.
 Os prompts de proposta/revisão de escopo também são isolados pelo controlador:
 exigem a nota registrada e o wakeup/tarefa exatos, sem carregar protocolos
 históricos conflitantes da descrição da issue e sem criar trabalho ao consultar.
