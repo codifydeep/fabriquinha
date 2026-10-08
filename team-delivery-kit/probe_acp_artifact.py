@@ -21,7 +21,42 @@ def valid_artifact(record):
             and record.get('syntax_valid') is True)
 
 
-def remote_probe(decomposition=False,unterminated=False,allocation=False,deterministic=False):
+def seeded_tool_receipts(notifications):
+    """Measure the actual pinned ACP stream, not the review-only read extractor."""
+    starts = {}
+    completed = set()
+    invalid = False
+    for frame in notifications:
+        if not isinstance(frame, dict) or frame.get('method') != 'session/update':
+            continue
+        params = frame.get('params')
+        update = params.get('update') if isinstance(params, dict) else None
+        if not isinstance(update, dict):
+            continue
+        identifier = update.get('toolCallId')
+        if not isinstance(identifier, str) or not identifier:
+            continue
+        if update.get('sessionUpdate') == 'tool_call':
+            title, kind = update.get('title'), update.get('kind')
+            tool = ('patch' if title == 'patch (replace): /workspace/tests/test_new.py' and kind == 'edit'
+                    else 'read_file' if title in ('read: /workspace/app.py',
+                        'read: /workspace/tests/test_new.py') and kind == 'read' else 'forbidden')
+            if identifier in starts:
+                invalid = True
+            starts[identifier] = tool
+        elif update.get('sessionUpdate') == 'tool_call_update' and update.get('status') == 'completed':
+            if identifier not in starts or identifier in completed:
+                invalid = True
+            completed.add(identifier)
+    patches = {key for key, tool in starts.items() if tool == 'patch'}
+    return dict(actual_patch_calls=len(patches),
+                actual_read_calls=sum(tool == 'read_file' for tool in starts.values()),
+                paired_patch_results=len(patches & completed),
+                tool_protocol_valid=not invalid and set(starts) == completed
+                    and all(tool != 'forbidden' for tool in starts.values()))
+
+
+def remote_probe(decomposition=False,unterminated=False,allocation=False,deterministic=False,seeded_patch=False):
     import hashlib
     import json
     import struct
@@ -29,7 +64,7 @@ def remote_probe(decomposition=False,unterminated=False,allocation=False,determi
     import time
     import uuid
     import broker as b
-    from acp_transport import Transport
+    from acp_transport import Transport, failure_diagnostics
     from model_policy import MODEL
     from artifact_read_evidence import observations
     from read_stream_receipts import extract
@@ -43,7 +78,7 @@ def remote_probe(decomposition=False,unterminated=False,allocation=False,determi
     identifier = str(uuid.uuid4())
     name = b.PREFIX + '-acp-artifact-job-' + identifier
     owner = b.PREFIX + '-acp-artifact-probe-v1'
-    result = {'schema': 'acp-decomposition-probe-v4' if deterministic else 'acp-decomposition-probe-v3' if allocation else 'acp-decomposition-probe-v2' if unterminated else 'acp-decomposition-probe-v1' if decomposition else 'acp-artifact-probe-v1', 'status': 'failed',
+    result = {'schema': 'acp-seeded-patch-probe-v1' if seeded_patch else 'acp-decomposition-probe-v4' if deterministic else 'acp-decomposition-probe-v3' if allocation else 'acp-decomposition-probe-v2' if unterminated else 'acp-decomposition-probe-v1' if decomposition else 'acp-artifact-probe-v1', 'status': 'failed',
               'execution_id': identifier, 'worker_image': b.IMAGE, 'model': MODEL,
               'delivery_approval': False, 'product_retry': False}
     setup = """from pathlib import Path
@@ -58,6 +93,10 @@ for f in (p/'app.py',p/'tests/test_old.py'): f.chmod(0o444)
 print('fixture-ready',flush=True)
 time.sleep(180)
 """
+    if seeded_patch:
+        if decomposition:raise ValueError('seeded patch and decomposition are separate probes')
+        initial="import unittest\nQUERY = 'calls.length'\nclass Probe(unittest.TestCase):\n    def test_fixture(self): self.assertEqual(QUERY, 'calls.length')\n"
+        setup=setup.replace("(p/'tests/test_new.py').touch()","(p/'tests/test_new.py').write_text("+repr(initial)+")")
     if decomposition:
         setup=setup.replace("p=Path('/workspace')", "p=Path('/evidence/candidate')")
         setup=setup.replace("(p/'tests/test_new.py').touch()", "(p/'tests/test_new.py').write_text('def helper(): return 0\\n')")
@@ -74,11 +113,16 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
  'baseline_unchanged':(p/'app.py').read_text()=='VALUE = 0\\n' and (p/'tests/test_old.py').read_text()==old,
  'credentials_absent':not any(Path(x).exists() for x in ['/var/run/docker.sock','/broker-state/token','/eval-state/.multica/config.json','/secret/openrouter.key','/run/secrets/openrouter_api_key'])}))
 """
+    if seeded_patch:
+        expected=initial.replace("QUERY = 'calls.length'","QUERY = 'calls.filter(c => c.url === \"/service-mode\").length'")
+        verify=verify.replace('import ast,hashlib,json,os','import ast,hashlib,json,os,base64')
+        verify=verify.replace("'uid':os.getuid()","'fixture_base64':base64.b64encode(raw).decode(),'expected_patch_applied':raw=="+repr(expected.encode())+",'uid':os.getuid()")
     if decomposition:
         verify=verify.replace("p=Path('/workspace')", "p=Path('/evidence/candidate')")
     transport = None
     timer = None
     created = False
+    private_evidence = {'notifications': []}
     def stop():
         b.docker('POST', '/containers/' + name + '/stop?t=1')
     try:
@@ -103,7 +147,8 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
         transport = Transport(b.docker, name, mode='planning' if decomposition else 'implementation',
                               editable_paths=[] if decomposition else ['/workspace/tests/test_new.py'])
         def exchange(i, method, params):
-            response = transport.exchange({'jsonrpc': '2.0', 'id': i, 'method': method, 'params': params})
+            response = transport.exchange({'jsonrpc': '2.0', 'id': i, 'method': method, 'params': params},
+                on_notification=private_evidence['notifications'].append if seeded_patch else None)
             if response.get('error'):
                 raise RuntimeError('ACP protocol error')
             return response
@@ -115,6 +160,17 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
                   'commands, modify old tests, or claim Red. Stop after writing.\n'
                   'DELIVERY_TEST_ARTIFACT_V1:/workspace/tests/test_new.py\n'
                   'DELIVERY_TEST_SOURCE_V1:/workspace/app.py\n')
+        if seeded_patch:
+            prompt=('Synthetic seeded-patch transport probe. Read app.py and the entire NEW test. '
+                'Use ONE actual patch call to replace exactly QUERY = '+repr('calls.length')+
+                ' with QUERY = '+repr('calls.filter(c => c.url === "/service-mode").length')+'. '
+                'Preserve every other byte, including all assertions. Do not run commands or tests, '
+                'modify baseline files, approve or claim Red. Stop after one verified patch. '
+                'This is a disposable fixture, not a product retry.\n'
+                'DELIVERY_TEST_ARTIFACT_V1:/workspace/tests/test_new.py\n'
+                'DELIVERY_TEST_SOURCE_V1:/workspace/app.py\n'
+                'DELIVERY_TEST_REVISION_V1:/workspace/tests/test_new.py\n'
+                'DELIVERY_SEEDED_EDIT_REQUIRED_V1:/workspace/tests/test_new.py\n')
         if decomposition:
             prompt=('Read all three immutable files below, then propose two sequential test units '
                 'U1 and U2 covering C01 and C02 exactly once. C01: test VALUE equals1; '
@@ -136,6 +192,8 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
             if deterministic:prompt+='DELIVERY_DETERMINISTIC_READ_V1\n'
         response = exchange(3, 'session/prompt', {'sessionId': session,
                             'prompt': [{'type': 'text', 'text': prompt}]})
+        if seeded_patch:
+            private_evidence['notifications'] = response.get('_broker_notifications', [])
         result['prompt_completed'] = True
         result['notification_count'] = len(response.get('_broker_notifications', []))
         # Fixed controller inspection, not an agent-supplied shell or command.
@@ -156,6 +214,7 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
                     raise RuntimeError('invalid inspection frame')
                 output += data[offset+8:offset+8+size]; offset += 8+size
             record = json.loads(output)
+            private_evidence['fixture_base64'] = record.pop('fixture_base64', None)
         finally:
             conn.close()
         result['inspection'] = record
@@ -189,8 +248,21 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
                 and record['credentials_absent'] and unchanged) else 'failed'
         else:
             result['status'] = 'passed' if valid_artifact(record) and record['uid'] == 10000 else 'failed'
+            if seeded_patch:
+                receipts=seeded_tool_receipts(response.get('_broker_notifications',[]))
+                result.update(synthetic_fixture=True,historical_failure_cause_proven=False,
+                    **receipts,red_verified=False)
+                if (record.get('expected_patch_applied') is not True or receipts['actual_patch_calls']!=1
+                        or receipts['paired_patch_results']!=1 or receipts['actual_read_calls']<2
+                        or not receipts['tool_protocol_valid']):
+                    result['status']='failed'
     except Exception as error:
         result['failure_category'] = type(error).__name__  # never raw model/transport data
+        if seeded_patch:
+            result.update(seeded_tool_receipts(private_evidence['notifications']))
+            if transport:
+                result['transport_diagnostics'] = failure_diagnostics(transport.stderr_tail)
+                private_evidence['stderr_base64'] = __import__('base64').b64encode(transport.stderr_tail).decode()
     finally:
         if timer:
             timer.cancel()
@@ -202,6 +274,20 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
             if labels.get('delivery-kit.owner') != owner or labels.get('delivery-kit.request') != identifier:
                 raise RuntimeError('cleanup identity mismatch')
             stop()
+            if seeded_patch:
+                from pathlib import Path
+                frozen=b.STATE/'synthetic-probe-evidence';frozen.mkdir(mode=0o700,exist_ok=True)
+                if frozen.is_symlink():raise ValueError('unsafe probe evidence directory')
+                stopped=b.docker('GET','/containers/'+container['Id']+'/json')
+                if stopped['State']['Running'] or stopped['Id']!=container['Id']:
+                    raise ValueError('exact stopped owned fixture required')
+                log=b.docker_stdout(container['Id'],limit=16384)
+                archive=frozen/(identifier+'.json')
+                with archive.open('x') as stream:
+                    json.dump(dict(result=result,container_id=container['Id'],
+                        container_log=log,private_evidence=private_evidence,
+                        source_fixture_only=True),stream,sort_keys=True)
+                archive.chmod(0o600)
             b.docker('DELETE', '/containers/' + name + '?force=false')
             result['fixture_removed'] = True
     return result
@@ -210,15 +296,17 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--decomposition',action='store_true')
     parser.add_argument('--unterminated',action='store_true');parser.add_argument('--allocation',action='store_true')
-    parser.add_argument('--deterministic',action='store_true');args=parser.parse_args()
+    parser.add_argument('--deterministic',action='store_true')
+    parser.add_argument('--seeded-patch',action='store_true');args=parser.parse_args()
+    if args.seeded_patch and args.decomposition:raise ValueError('separate fixture modes required')
     if args.unterminated and not args.decomposition:raise ValueError('EOF fixture requires decomposition mode')
     if args.allocation and not (args.decomposition and args.unterminated):raise ValueError('allocation requires immutable EOF fixture')
     if args.deterministic and not args.allocation:raise ValueError('deterministic reads require allocation fixture')
     if PROJECT != 'delivery-kit-port2' or read_model_budget()['remaining'] < 4:
         raise ValueError('isolated ACP probe reserve required')
     budget_before=read_model_budget()['calls'] if args.deterministic else None
-    source = 'import json\n' + inspect.getsource(valid_artifact) + '\n' + inspect.getsource(remote_probe)
-    source += '\nprint(json.dumps(remote_probe(decomposition='+str(args.decomposition)+',unterminated='+str(args.unterminated)+',allocation='+str(args.allocation)+',deterministic='+str(args.deterministic)+')))\n'
+    source = 'import json\n' + inspect.getsource(valid_artifact) + '\n' + inspect.getsource(seeded_tool_receipts) + '\n' + inspect.getsource(remote_probe)
+    source += '\nprint(json.dumps(remote_probe(decomposition='+str(args.decomposition)+',unterminated='+str(args.unterminated)+',allocation='+str(args.allocation)+',deterministic='+str(args.deterministic)+',seeded_patch='+str(args.seeded_patch)+')))\n'
     proxy_image = subprocess.check_output(['docker', 'inspect', PROJECT + '-model-proxy-1',
                                           '--format', '{{.Image}}'], text=True).strip()
     process = subprocess.run(['docker', 'exec', '-i', '-e', 'PYTHONPATH=/',
@@ -240,7 +328,7 @@ def main():
             result.update(controller_read_requests=evidence['controller_read_requests'],dispatch_provenance=evidence['provenance'])
             if result['controller_read_requests']!=3 or result['decision_model_calls']!=1:result['status']='failed'
     save_receipt(PRIVATE / 'provider-probes' / ('acp-' + result['execution_id'] + '.json'), result)
-    save_receipt(PRIVATE / ('acp-decomposition-probe.json' if args.decomposition else 'acp-artifact-probe.json'), result)
+    save_receipt(PRIVATE / ('acp-seeded-patch-probe.json' if args.seeded_patch else 'acp-decomposition-probe.json' if args.decomposition else 'acp-artifact-probe.json'), result)
     print(json.dumps(result))
     return 0 if result['status']=='passed' else 1
 

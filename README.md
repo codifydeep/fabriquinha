@@ -102,6 +102,14 @@ Falhas de suíte com Red herdado de um card dependente usam referências verific
 
 Uma rota pausada pode fornecer sua referência de Red exclusivamente para diagnóstico de uma execução encerrada e autenticada. A qualificação normal de entrega continua exigindo rota habilitada e seus gates independentes. Erros do worker saem do transporte somente como categorias fixas; categorias ausentes permanecem indeterminadas e não podem ser inferidas pela quantidade de chamadas nem usadas como autorização de retry.
 
+Os probes de patch distinguem uma proposta válida do provedor de uma edição
+realmente executada pelo worker ACP. O ensaio real verifica o conteúdo exato,
+sintaxe, preservação do baseline e pareamento dos eventos de ferramenta;
+evidências de arquivo e transporte ficam exclusivamente no armazenamento privado.
+Uma resposta com múltiplas chamadas onde o contrato exige uma só permanece
+rejeitada. A aprovação isolada do proxy não qualifica o worker, a recuperação
+automática ou a entrega ponta a ponta.
+
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
 O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,
