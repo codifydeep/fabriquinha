@@ -142,6 +142,12 @@ identidade do experimento são persistidas antes da chamada; resultado incerto
 não rearma a solicitação. O recibo distingue proposta válida, rejeição do proxy
 e falha do contrato da fixture. Mesmo um resultado positivo não prova a causa
 histórica, calibração, Red, revisão, implantação ou recuperação autônoma.
+Para essa proposta estreita, o validador também preserva a forma estática de
+descoberta, decorators, assinaturas, escopo das assertions e transferências de
+controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de
+`TestCase` e novas saídas antecipadas. Essas barreiras não demonstram ausência
+de enfraquecimento semântico: calibração e revisão independente continuam
+necessárias. Nenhum resultado desse experimento concede permissão de escrita.
 
 O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
 de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo

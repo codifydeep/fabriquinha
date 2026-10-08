@@ -83,8 +83,45 @@ def validate_reply(record):
             if isinstance(n,ast.Assert) or isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
                 and n.func.attr.startswith('assert'))
     if assertions(source)!=assertions(candidate):raise ValueError('proposed assertions changed')
+    def preservation(tree):
+        # Static proposal fences, not a semantic review or discovery execution.
+        headers=[];scoped_assertions=[];skip_calls=[];flow_transfers=[]
+        def walk(node,scope=()):
+            if isinstance(node,(ast.ClassDef,ast.FunctionDef,ast.AsyncFunctionDef)):
+                scope=scope+((type(node).__name__,node.name),)
+                fields=('bases','keywords','decorator_list') if isinstance(node,ast.ClassDef) else ('args','returns','decorator_list')
+                def dump(value):
+                    if isinstance(value,list):return tuple(ast.dump(v,include_attributes=False) for v in value)
+                    return ast.dump(value,include_attributes=False) if isinstance(value,ast.AST) else None
+                headers.append((scope,tuple((field,dump(getattr(node,field))) for field in fields)))
+            elif isinstance(node,(ast.If,ast.For,ast.AsyncFor,ast.While,ast.With,ast.AsyncWith,ast.Try,ast.ExceptHandler)):
+                field=next((getattr(node,key) for key in ('test','iter','type') if isinstance(getattr(node,key,None),ast.AST)),None)
+                scope=scope+((type(node).__name__,ast.dump(field,include_attributes=False) if field else None),)
+            if isinstance(node,ast.Assert) or isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and node.func.attr.startswith('assert'):
+                scoped_assertions.append((scope,ast.dump(node,include_attributes=False)))
+            if isinstance(node,ast.Call):
+                name=node.func.attr if isinstance(node.func,ast.Attribute) else node.func.id if isinstance(node.func,ast.Name) else ''
+                if name in ('skip','skipif','skipIf','skipUnless','skipTest','xfail','expectedFailure','xit','xdescribe'):
+                    skip_calls.append((scope,ast.dump(node,include_attributes=False)))
+            if isinstance(node,(ast.Return,ast.Raise,ast.Break,ast.Continue,ast.Yield,ast.YieldFrom)):
+                flow_transfers.append((scope,ast.dump(node,include_attributes=False)))
+            for child in ast.iter_child_nodes(node):walk(child,scope)
+        walk(tree)
+        bindings=[]
+        for node in tree.body:
+            if isinstance(node,(ast.Import,ast.ImportFrom,ast.Expr)):
+                # Existing module docstrings may be shortened; executable calls cannot be added.
+                if isinstance(node,ast.Expr) and isinstance(node.value,ast.Constant) and isinstance(node.value.value,str):continue
+                bindings.append(ast.dump(node,include_attributes=False))
+            elif isinstance(node,(ast.Assign,ast.AnnAssign,ast.AugAssign)):
+                targets=node.targets if isinstance(node,ast.Assign) else [node.target]
+                bindings.append((type(node).__name__,tuple(ast.dump(t,include_attributes=False) for t in targets)))
+        return repr((headers,scoped_assertions,skip_calls,flow_transfers,bindings))
+    if preservation(ast.parse(source))!=preservation(tree):
+        raise ValueError('proposed discovery or assertion execution shape changed')
     return dict(actual_single_patch=True,arguments_valid=True,tools_executed=False,
         proposed_python_syntax_valid=True,proposed_assertions_unchanged=True,
+        proposed_discovery_shape_unchanged=True,
         proposed_candidate_sha256=hashlib.sha256(candidate.encode()).hexdigest(),
         arguments_sha256=hashlib.sha256(json.dumps(args,sort_keys=True).encode()).hexdigest(),
         response_sha256=hashlib.sha256(json.dumps(record,sort_keys=True).encode()).hexdigest())

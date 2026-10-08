@@ -35,6 +35,26 @@ class FrozenPatchProviderTests(unittest.TestCase):
             for old,new in [('absent','new'),('self.assertTrue(QUERY)','self.assertTrue(True)'),('calls.length','calls.length')]:
                 with self.assertRaises(ValueError):p.validate_reply(self.reply(old,new))
 
+    def test_preserved_assertions_do_not_allow_skip_rename_or_lost_discovery(self):
+        changes=[('class T(unittest.TestCase):','@unittest.skip("skip")\nclass T(unittest.TestCase):'),
+            ('def test_x(self):','def helper_x(self):'),
+            ('class T(unittest.TestCase):','class T(object):'),
+            ('self.assertTrue(QUERY)','self.skipTest("skip"); self.assertTrue(QUERY)'),
+            ('import unittest','import unittest\nunittest.TestLoader.testMethodPrefix = "not_test"'),
+            (' def test_x(self): self.assertTrue(QUERY)',
+             ' def test_x(self):\n  if False:\n   self.assertTrue(QUERY)'),
+            (' def test_x(self): self.assertTrue(QUERY)',
+             ' def test_x(self): self.assertTrue(QUERY)\n def test_x(self): pass')]
+        with patch.object(p,'INPUT',self.inputs,create=True):
+            for old,new in changes:
+                with self.subTest(change=new):
+                    with self.assertRaises(ValueError):p.validate_reply(self.reply(old,new))
+
+    def test_early_return_cannot_make_preserved_assertion_unreachable(self):
+        with patch.object(p,'INPUT',self.inputs,create=True):
+            with self.assertRaises(ValueError):
+                p.validate_reply(self.reply('self.assertTrue(QUERY)','return; self.assertTrue(QUERY)'))
+
     def test_private_input_bounds_and_remote_intent_program(self):
         for changes in (dict(target='/workspace/app.py'),dict(manifest_sha256='wrong'),
                         dict(context='x'*16001),dict(sources=['/workspace/../secret'])):
@@ -43,3 +63,14 @@ class FrozenPatchProviderTests(unittest.TestCase):
         compile(source,'frozen-diagnostic','exec')
         self.assertIn("'intent'",source)
         self.assertIn('historical_failure_cause_proven=False',source)
+
+    def test_serialized_validator_has_same_fences_without_http_or_tool_execution(self):
+        source=p.remote_program('33333333-3333-4333-8333-333333333333',self.inputs)
+        namespace={}
+        # Only declarations/imports; deliberately omit the one remote-probe call.
+        exec(source.rsplit('\nprint(',1)[0],namespace)
+        good=namespace['validate_reply'](self.reply())
+        self.assertTrue(good['proposed_discovery_shape_unchanged'])
+        self.assertFalse(good['tools_executed'])
+        with self.assertRaises(ValueError):
+            namespace['validate_reply'](self.reply('self.assertTrue(QUERY)','return; self.assertTrue(QUERY)'))
