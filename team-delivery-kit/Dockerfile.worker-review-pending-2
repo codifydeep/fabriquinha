@@ -1,0 +1,3 @@
+FROM delivery-kit-hermes-worker:20261007.1
+COPY broker/review_tool_policy.py /opt/hermes/review_tool_policy.py
+RUN cd /opt/hermes && python -c "import review_tool_policy"

@@ -6,13 +6,28 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import unittest
 
 from broker import review_suite_rpc as rpc
 
 
 class RpcTests(unittest.TestCase):
+    def test_observation_timeout_returns_pending_not_false_failure_or_approval(self):
+        from broker.validation_job import Pending
+        result=self.broker.validate_frozen_delivery.return_value
+        self.broker.validate_frozen_delivery.side_effect=Pending('same handle running')
+        token=rpc.issue(self.broker,'request')
+        with patch.object(rpc.time,'monotonic',side_effect=[0,26]):
+            pending=rpc.execute(self.broker,token,{})
+        self.assertEqual(pending,dict(status='pending',executed_by='controller_offline_review_suite',
+                                     next_action='observe_same_validation_job'))
+        with self.db() as con:
+            self.assertEqual(con.execute('SELECT status FROM review_suite_rpc').fetchone()[0],'observing')
+            with self.assertRaises(ValueError):rpc.require_approval_proof(con,'request','source','a'*64)
+        self.broker.validate_frozen_delivery.side_effect=None
+        self.broker.validate_frozen_delivery.return_value=result
+        self.assertEqual(rpc.execute(self.broker,token,{})['exit_code'],0)
     def test_pending_job_is_observed_not_failed_or_approved(self):
         from broker.validation_job import Pending
         result=self.broker.validate_frozen_delivery.return_value

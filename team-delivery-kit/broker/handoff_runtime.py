@@ -394,6 +394,14 @@ class Effects:
                 return None
             result = dict(row)
             if result['status'] == 'changes_requested':
+                rpc=con.execute('SELECT status,receipt FROM review_suite_rpc WHERE request_id IN '
+                    '(SELECT request_id FROM native_bindings WHERE task_id=?)',(review,)).fetchone() if con.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='review_suite_rpc'").fetchone() else None
+                if rpc and (rpc['status'] in ('issued','observing','running') or
+                        (rpc['status']=='failed' and json.loads(rpc['receipt']).get('error_type') not in ('FrozenSuiteFailure','RequiredTestMissing'))):
+                    return {**result,'status':'infrastructure_blocked',
+                        'finding':'Independent review suite has no completed functional result; preserve delivery and diagnose review infrastructure.',
+                        'review_suite_status':rpc['status']}
                 finding = con.execute('SELECT finding FROM review_findings WHERE review_task_id=?', (review,)).fetchone()
                 if finding:
                     result['finding'] = finding[0]

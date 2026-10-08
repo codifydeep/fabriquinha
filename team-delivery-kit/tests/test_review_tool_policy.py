@@ -7,6 +7,19 @@ from broker import review_tool_policy as policy
 
 
 class ReviewPolicyTests(unittest.TestCase):
+    def test_pending_controller_job_is_observed_without_local_fallback_or_model_retry(self):
+        command='cd /workspace && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1'
+        pending=dict(status='pending',executed_by='controller_offline_review_suite',next_action='observe_same_validation_job')
+        passed=dict(output='Ran 323 tests\nOK',exit_code=0,executed_by='controller_offline_review_suite',
+                    network='none',snapshot_mount='readonly')
+        with (patch.dict(os.environ,{'DELIVERY_EXECUTION_MODE':'review','DELIVERY_REVIEW_SUITE_CAPABILITY':'a'*64,
+                                   'DELIVERY_TEST_COMMANDS_JSON':json.dumps([command])}),
+              patch.object(policy.urllib.request,'urlopen') as call,patch('time.sleep')):
+            call.return_value.__enter__.return_value.read.side_effect=[json.dumps(pending).encode(),json.dumps(passed).encode()]
+            result=json.loads(policy.controlled('terminal',{'command':command.replace('/workspace','/delivery')}))
+            self.assertEqual(result['exit_code'],0);self.assertEqual(call.call_count,2)
+            self.assertEqual(call.call_args_list[0].args[0].full_url,call.call_args_list[1].args[0].full_url)
+            self.assertEqual(call.call_args_list[0].args[0].data,b'{}')
     def test_additive_rejection_reason_survives_acp_error_field_without_private_details(self):
         cfg={'path':'/workspace/tests/test_new.py','criterion':'C01','sources':{}}
         with patch.dict(os.environ,{'DELIVERY_EXECUTION_MODE':'implementation',

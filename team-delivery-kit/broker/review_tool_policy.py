@@ -145,11 +145,23 @@ def controlled(name, args):
         data=b'{}', headers={'Authorization': 'Bearer ' + token,
                             'Content-Type': 'application/json'}, method='POST')
     try:
-        with urllib.request.urlopen(request, timeout=150) as response:
-            raw = response.read(65537)
-        if len(raw) > 65536:
-            raise ValueError('review suite response too large')
-        result = json.loads(raw)
+        import time
+        deadline=time.monotonic()+90
+        while True:
+            with urllib.request.urlopen(request, timeout=min(35,max(1,deadline-time.monotonic()))) as response:
+                raw = response.read(65537)
+            if len(raw) > 65536:
+                raise ValueError('review suite response too large')
+            result = json.loads(raw)
+            if result=={'status':'pending','executed_by':'controller_offline_review_suite',
+                        'next_action':'observe_same_validation_job'}:
+                if time.monotonic()>=deadline:
+                    return json.dumps({'status':'pending','delivery_approved':False,
+                        'instruction':'The same controller suite is still pending. Repeat this exact registered command to observe it. '
+                        'Do not request product changes or approve without a completed suite receipt.'})
+                time.sleep(.2)
+                continue
+            break
         if (result.get('executed_by') != 'controller_offline_review_suite'
                 or result.get('exit_code') != 0 or result.get('network') != 'none'
                 or result.get('snapshot_mount') != 'readonly'):

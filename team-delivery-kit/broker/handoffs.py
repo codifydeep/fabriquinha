@@ -1049,6 +1049,11 @@ def reconcile(con, route, runs, effects, *, now=None):
             if result['status'] == 'changes_requested':
                 data.update(finding=result['finding'], trigger_task=recipient['id'])
                 return save(con, key, issue, 'correct_author', route['author'], data, now)
+            if result['status'] == 'infrastructure_blocked':
+                data.update(error='review_infrastructure_pending',error_type='review_infrastructure',
+                    review_suite_status=result['review_suite_status'],trigger_task=recipient['id'],
+                    failed_dispatch_stage='ready_review',required_action='diagnose review suite; never restart author for infrastructure')
+                return save(con,key,issue,'diagnose',route['techlead'],data,now)
             raise ValueError('unknown review outcome')
         if data['dispatch_stage'] == 'correct_author':
             return save(con, key, issue, 'superseded', route['author'], data, now)

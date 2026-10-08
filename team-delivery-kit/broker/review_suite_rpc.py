@@ -76,14 +76,14 @@ def execute(broker, token, payload):
         try:
             try: from validation_job import Pending
             except ImportError: from broker.validation_job import Pending
-            deadline=time.time()+25
+            deadline=time.monotonic()+25
             while True:
                 try:
                     result = broker.validate_frozen_delivery(row['volume'], row['source_task_id'],
                         suite_evidence=True, review_request_id=capability['request_id'])
                     break
                 except Pending:
-                    if time.time()>=deadline:raise
+                    if time.monotonic()>=deadline:raise
                     binding(broker,con,capability['request_id'])
                     broker.assert_review_task_running(row)
                     time.sleep(.2)
@@ -114,7 +114,8 @@ def execute(broker, token, payload):
                 con.execute("UPDATE review_suite_rpc SET status='observing',receipt=? WHERE request_id=?",
                     (json.dumps({'durable_validation':1,'next_action':'observe_same_validation_job'}),capability['request_id']))
                 con.commit()
-                raise
+                return {'status':'pending','executed_by':'controller_offline_review_suite',
+                        'next_action':'observe_same_validation_job'}
             con.execute("UPDATE review_suite_rpc SET status='failed',receipt=? WHERE request_id=?",
                 (json.dumps({'error_type': type(error).__name__, 'operation':getattr(error,'operation',None),
                              'next_action': 'technical_diagnosis'}),

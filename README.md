@@ -353,6 +353,14 @@ identidade própria por execução do revisor, sem reutilizar o Green do autor.
 Falhas funcionais continuam bloqueando a entrega. Essa implementação não é,
 isoladamente, comprovação de recuperação ponta a ponta ou homologação.
 
+Uma suíte de revisão ainda em andamento retorna estado tipado `pending`, não
+falha funcional. O worker observa a mesma operação fixa durante uma janela
+limitada, sem fallback local ou nova execução do modelo. Se faltar resultado de
+suíte numa solicitação de mudanças, o handoff registra impedimento de infraestrutura
+e encaminha diagnóstico ao Tech Lead; não despacha correção pelo autor. Apenas
+evidência funcional pode sustentar retrabalho de produto. Aprovação exige o recibo
+completo da execução independente vinculada ao snapshot exato.
+
 Imagens incrementais antigas podem atingir o limite de camadas do Docker.
 `team-delivery-kit/import_controller_base.py` permite importar um export privado
 de um contêiner próprio, nunca iniciado, conferindo imagem de origem e metadados.

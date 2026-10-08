@@ -721,6 +721,15 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(list(self.effects.created.values())[-1]['target'], 'author')
         self.assertEqual(list(self.effects.created.values())[-1]['source'], 'recipient')
 
+    def test_infrastructure_review_cannot_dispatch_product_correction(self):
+        self.tick()
+        self.effects.verdict=dict(status='infrastructure_blocked',review_suite_status='observing')
+        recipient=self.recipient()
+        self.assertEqual(self.tick([recipient]),'diagnose')
+        self.tick([recipient],now=110)
+        self.assertEqual(list(self.effects.created.values())[-1]['target'],'lead')
+        self.assertFalse(any(r['target']=='author' for r in self.effects.created.values()))
+
     def test_author_correction_waits_for_release_before_wakeup(self):
         self.tick()
         self.effects.verdict = {'status': 'changes_requested', 'finding': 'Finish initial refresh.'}
