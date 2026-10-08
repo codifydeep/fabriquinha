@@ -8,6 +8,7 @@ import fcntl
 import json
 import os
 from portable_remediation_gate import qualify as qualify_remediation_delivery
+from portable_scope_gate import qualify as qualify_scope_delivery
 from pathlib import Path
 import re
 import subprocess
@@ -831,6 +832,8 @@ def reconcile(context, contract):
             raise ValueError('portable release receipt drift')
     else:
         receipt = {**context, 'branch': BRANCH}
+    if receipt.get('scope_delivery') and not context.get('durable_handoffs'):
+        raise ValueError('qualified scope delivery cannot lose durable handoff gates')
     prior = receipt.get('qa_incident') or find_qa_incident(PRIVATE, context['issue_id'], LABEL)
     if prior and prior['phase'] == 'browser':
         from portable_browser_qa import scenario_resolution
@@ -898,6 +901,8 @@ def reconcile(context, contract):
     delivery = candidate_delivery or approved(context)
     recovery_proof = qualify_remediation_delivery(command, INSTANCE, context, delivery,
         previous=receipt.get('remediation_delivery', context.get('remediation_expected')))
+    original_contract=contract
+    scope_proof=None
     if context.get('durable_handoffs'):
         query = ('import sqlite3,json,sys; c=sqlite3.connect("file:/broker-state/leases.sqlite?mode=ro",uri=True); '
                  'r=c.execute("SELECT r.body FROM task_contracts t JOIN contract_revisions r USING(decision_task) WHERE t.task_id=?",(sys.argv[1],)).fetchone(); print(r[0] if r else "null")')
@@ -911,6 +916,13 @@ def reconcile(context, contract):
                 raise ValueError('unqualified effective contract revision')
             contract = revised
             receipt['effective_contract_sha256'] = hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        scope_proof=qualify_scope_delivery(command,INSTANCE,context,delivery,original_contract,
+                                          previous=receipt.get('scope_delivery'))
+        if scope_proof is not None:
+            if revised:raise ValueError('scope and optional-artifact revisions cannot be composed implicitly')
+            contract=scope_proof['contract']
+            receipt['scope_delivery']=scope_proof
+            receipt['effective_contract_sha256']=scope_proof['effective_contract_sha256']
     if receipt.get('delivery') and receipt['delivery'] != delivery:
         previous = revalidated_delivery(receipt['delivery'], delivery)
         receipt.setdefault('review_revalidation_history', []).append(previous)
@@ -972,6 +984,9 @@ def reconcile(context, contract):
         if approved(context) != delivery:
             raise ValueError('recovery delivery changed before merge')
         qualify_remediation_delivery(command, INSTANCE, context, delivery, previous=recovery_proof)
+    if scope_proof is not None:
+        if approved(context)!=delivery:raise ValueError('scope delivery changed before merge')
+        qualify_scope_delivery(command,INSTANCE,context,delivery,original_contract,previous=scope_proof)
     sha = ensure_merge(pr, head, context['base_sha'], files)
     if receipt.get('merge_sha') and receipt['merge_sha'] != sha:
         raise ValueError('portable merge changed')
@@ -983,6 +998,9 @@ def reconcile(context, contract):
         if approved(context) != delivery:
             raise ValueError('recovery delivery changed before deployment')
         qualify_remediation_delivery(command, INSTANCE, context, delivery, previous=recovery_proof)
+    if scope_proof is not None:
+        if approved(context)!=delivery:raise ValueError('scope delivery changed before deployment')
+        qualify_scope_delivery(command,INSTANCE,context,delivery,original_contract,previous=scope_proof)
     try:
         receipt['deployment'] = ensure_deployed(sha, contract)
     except ValueError as error:

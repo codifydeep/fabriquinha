@@ -115,7 +115,11 @@ agora referencia explicitamente o Red original através do novo workspace,
 exige a suíte completa sem redução do número de testes e confere os hashes dos
 testes preexistentes e congelados contra a base revisada. O recibo durável liga
 as duas bases e o manifesto da entrega sem reescrever a evidência original nem
-aprovar a entrega. Falta qualificar a coordenação completa do ciclo real antes
-de habilitar o despacho e considerar o impedimento resolvido, incluindo o uso
-do contrato revisado nos gates posteriores de publicação e integração.
+aprovar a entrega. `product_scope_delivery.py` confere a revisão independente
+da entrega exata, as identidades nativas concluídas, o snapshot e a transição
+de TDD. `portable_scope_gate.py` entrega ao publicador somente esse contrato
+efetivo qualificado; ele é revalidado antes de merge e deploy. Não permite
+compor revisões diferentes implicitamente nem dispensar CI, QA ou revisão.
+Falta qualificar a coordenação completa do ciclo real e instalar os componentes
+antes de habilitar o despacho e considerar o impedimento resolvido.
 Aprovar o plano não equivale a conceder escrita ou homologar.
