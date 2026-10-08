@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.359
+COPY broker/fenced_patch_diagnosis.py /fenced_patch_diagnosis.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import fenced_patch_diagnosis, test_first_handoffs"

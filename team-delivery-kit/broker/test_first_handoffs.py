@@ -462,6 +462,13 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             suffix += ':verified-read-capacity-v1'
         if data.get('decision_format_retry'):
             suffix += ':bounded-format-1'
+        if data.get('fenced_patch_diagnosis'):
+            try:import fenced_patch_diagnosis
+            except ImportError:from broker import fenced_patch_diagnosis
+            with broker.db() as con:
+                if not fenced_patch_diagnosis.qualified(con,issue,key,data):
+                    raise ValueError('registered exact fenced-write diagnosis required')
+            suffix += ':measured-fenced-write-v1'
         marker = hashlib.sha256((issue + ':' + key + ':test-first-cto' + suffix).encode()).hexdigest()
         technical_evidence=diagnostic_presentation(data)
         if qualified_prospective_capacity:
@@ -727,6 +734,10 @@ def reconcile(broker, route, runs, effects):
                     handoffs.save(con,source['id'],issue,'technical_decision_required',
                         route['cto'],preserved,time.time())
                     prior=handoffs.load(con,source['id'])
+        try:import fenced_patch_diagnosis
+        except ImportError:from broker import fenced_patch_diagnosis
+        if fenced_patch_diagnosis.enrich(broker,route,runs,source,prior,effects):
+            return None
         try:import cto_prompt_bound_recovery
         except ImportError:from broker import cto_prompt_bound_recovery
         if cto_prompt_bound_recovery.recover(broker,route,runs,source,prior,effects):

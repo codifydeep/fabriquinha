@@ -14,6 +14,11 @@ O fluxo de diagnóstico de timers também verifica equivalência integral entre
 cópias da base original antes de provisionar a correção. Falhas semânticas dessa
 continuação são persistidas com responsável técnico e próxima ação, sem repetir
 indefinidamente a mesma operação ou converter o plano aprovado em entrega aprovada.
+Rejeições de patches pelo limite de tamanho do arquivo recebem diagnóstico
+estruturado a partir dos resultados reais das ferramentas. Uma execução falha,
+encerrada e com snapshot preservado pode gerar um novo diagnóstico independente
+do CTO quando a primeira escalada recebeu evidências vazias. O registro é único
+por card, não aumenta limites e não autoriza automaticamente repetir o autor.
 
 O encaminhamento de falhas anteriores ao início do worker possui uma extensão
 instalada, ainda em validação ponta a ponta: exige capability consumida, execução nativa falha, erro persistido
