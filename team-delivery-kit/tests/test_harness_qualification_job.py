@@ -53,7 +53,8 @@ class HarnessJobTests(unittest.TestCase):
         calls=[]
         def docker(method,path,body=None):
             calls.append((method,path))
-            return dict(Id=self.b.IMAGE,Config=dict(Env=['PATH=/usr/bin'])) if path.startswith('/images/') else None
+            if path.startswith('/images/'):self.fail('missing handle must not require a retired image')
+            return None
         self.b.docker=docker
         state=job.reconcile_rejected(self.b,con,'task')
         self.assertEqual(state['category'],'harness_observation_handle_missing')

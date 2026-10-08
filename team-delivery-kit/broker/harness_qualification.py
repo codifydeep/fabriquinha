@@ -151,6 +151,11 @@ def reconcile_rejected(b,con,task):
     if state['stage']!='observing' or identity['task_id']!=task:raise ValueError('observing exact harness task required')
     pinned=identity['payload'].get('Image','')
     if not re.fullmatch(r'sha256:[0-9a-f]{64}',pinned):raise ValueError('recorded pinned harness image required')
+    # A missing handle is a nonauthorizing incident, not calibration. Record
+    # that absence before requiring an old image to reconstruct job policy.
+    # If the container exists, all original isolation checks still apply.
+    info=b.docker('GET','/containers/'+state['container_id']+'/json')
+    if info is None:return retain_missing(con,identity,state)
     # An upgrade must observe the original immutable job, not reinterpret its
     # isolation contract using the new worker image or create a replacement.
     original=SimpleNamespace(IMAGE=pinned,docker=b.docker,OWNER=b.OWNER)
@@ -160,8 +165,6 @@ def reconcile_rejected(b,con,task):
     if timers and pinned!=TIMER_BACKGROUND_IMAGE:raise ValueError('pinned timer calibration image required')
     expected=payload(original,task,identity['volume'],identity['manifest_sha256'],background=background,timers=timers)
     if identity['payload']!=expected:raise ValueError('recorded harness policy drift')
-    info=b.docker('GET','/containers/'+state['container_id']+'/json')
-    if info is None:return retain_missing(con,identity,state)
     verify_job(info,expected)
     if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']==0:
         raise ValueError('existing terminal failed harness job required')
