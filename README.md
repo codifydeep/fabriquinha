@@ -129,6 +129,15 @@ execução, inclusive após reinício. Duas falhas técnicas antigas desse forma
 só admitem novo diagnóstico após qualificação model-free da receita instalada;
 essas falhas e seus recibos permanecem preservados, sem aprovação de entrega.
 
+Uma submissão de incidente com JSON malformado admite uma única nova chamada
+de formato, registrada antes do envio. Isso vale apenas para a ferramenta
+esperada e uma resposta terminal sem conteúdo paralelo; argumentos inválidos
+não são executados, reaproveitados ou tratados como decisão. Uma revisão antiga
+que falhou por esse motivo só pode receber novo wakeup após prova durável da
+falha e qualificação sem modelo da receita instalada. O novo revisor continua
+vinculado à proposta original e aos mesmos gates; a falha anterior é preservada.
+Esse mecanismo não aprova a entrega nem comprova autonomia ponta a ponta.
+
 Uma retenção de publicação diagnosticada e revisada pode receber uma única
 reavaliação quando o catálogo fixo de capacidades foi qualificado e ainda não
 constava da evidência original. Esse catálogo explica que ausência do processo

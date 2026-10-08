@@ -236,6 +236,10 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
     if incident.get('stage')=='experiment_pending':
         from r3_post_experiment import drive
         incident=drive(private,evidence,incident,value,instance=instance,effects=effects,contract=contract)
+    if incident.get('stage')=='blocked' and effects is None:
+        from r3_review_json_recovery import recover as recover_review
+        recovered=recover_review(private,incident,instance=instance)
+        if recovered:incident=recovered
     if incident.get('stage')=='resume_verification_pending' and stage is not None and project is not None:
         from r3_verified_resume import resume
         result=resume(private,incident,value,stage,project,instance=instance)

@@ -115,9 +115,11 @@ def recover_evidence(private, evidence, state, *, instance='delivery-kit-port2',
     expected=command('docker','image','inspect','--format','{{.Id}}',
                      'delivery-kit-model-proxy:20261008.'+('101' if reason else '100')).strip()
     if image!=expected:
-        if reason or not previous:return None
+        if not previous:return None
         successor=command('docker','image','inspect','--format','{{.Id}}','delivery-kit-model-proxy:20261008.101').strip()
-        if image!=successor:return None
+        if image!=successor:
+            successor=command('docker','image','inspect','--format','{{.Id}}','delivery-kit-model-proxy:20261008.102').strip()
+            if image!=successor:return None
     program='import json,sys;from r3_reason_probe import run;print(json.dumps(run(json.loads(sys.argv[1]))))' if reason else CANARY
     canary=json.loads(command('docker','exec','-w','/',proxy,'python','-c',program,json.dumps(notes)))
     source=hashlib.sha256(Path(__file__).with_name('typed_decision_contract.py' if reason else 'r3_incident_contract.py').read_bytes()).hexdigest()
@@ -127,7 +129,9 @@ def recover_evidence(private, evidence, state, *, instance='delivery-kit-port2',
         dict(contract_sha256=source,qualified=2,execution_authorized=False))
     if canary!=expected_canary:raise ValueError('installed incident transport qualification drift')
     proof=dict(operation='changed_r3_reason_diagnosis_v1' if reason else 'changed_native_envelope_diagnosis_v1',incident_sha256=digest(evidence),
-               proxy_image=previous['proxy_image'] if previous else image,contract_sha256=source,report=report,canary=canary,
+               proxy_image=previous['proxy_image'] if previous else image,
+               contract_sha256=previous['contract_sha256'] if previous else source,report=report,
+               canary=previous['canary'] if previous else canary,
                failed_tasks_preserved=True,execution_authorized=False,release_homologated=False)
     if previous:
         if previous!=proof:raise ValueError('immutable transport recovery drift')

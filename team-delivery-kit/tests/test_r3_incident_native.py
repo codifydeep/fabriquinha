@@ -1,5 +1,9 @@
 import json
 import unittest
+import sqlite3
+import threading
+from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import Mock,patch
 from broker.r3_incident_native import request,digest
 from r3_incident_contract import planning_instruction
@@ -69,6 +73,31 @@ class R3IncidentNativeTests(unittest.TestCase):
     def test_restart_merge_shell_and_extra_parameters_are_not_adapter_operations(self):
         for operation,body in (('restart',{}),('merge',{}),('shell',{'command':'echo nope'}),('remaining',{'raise_cap':True})):
             with self.assertRaises(ValueError):self.invoke(operation,body)
+
+    def test_review_recovery_requires_registered_exact_proof_and_keeps_technical_reviewer(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE r3_json_review_recoveries(recovery_sha256 TEXT,proof TEXT)')
+        proof=dict(operation='qualified_r3_json_review_recovery_v1',issue_id='incident',
+            incident_sha256=self.config['evidence_sha256'],proposal_sha256='a'*64,reviewer='cto',
+            execution_authorized=False,release_homologated=False)
+        key=digest(proof);con.execute('INSERT INTO r3_json_review_recoveries VALUES(?,?)',(key,json.dumps(proof)))
+        @contextmanager
+        def database():
+            with con:yield con
+        broker=SimpleNamespace(LOCK=threading.RLock(),db=database)
+        state=dict(stage='observe_review',issue_id='incident',proposal_sha256='a'*64,
+                   proposal={'action':'request_experiment'},review_transport_recovery_sha256=key)
+        with patch('broker.r3_incident_native.binding',return_value={'techlead':'tl','cto':'cto'}),\
+             patch('broker.r3_incident_native.NativeIssues') as issues,\
+             patch('broker.r3_incident_native.native.ensure_planning_start',return_value={'id':'wake'}) as wake:
+            issues.return_value.request.return_value=self.item
+            body=dict(config=self.config,state=state,note=planning_instruction(self.config,state),allow_create=True)
+            request('wake',body,broker=broker,settings=self.settings)
+            self.assertEqual(wake.call_args.args[2],'cto')
+            self.assertIn('previous review had malformed JSON',wake.call_args.args[5])
+            body['state']={**state,'review_transport_recovery_sha256':'b'*64}
+            with self.assertRaises(ValueError):request('wake',body,broker=broker,settings=self.settings)
+            self.assertEqual(wake.call_count,1)
 
     def test_foreign_task_is_never_exported_to_incident_controller(self):
         with patch('broker.r3_incident_native.binding',return_value={'techlead':'tl','cto':'cto'}),\

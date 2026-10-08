@@ -84,6 +84,19 @@ def request(operation,body,*,broker=None,settings=None):
             note+=capability_note()
             if len(note)>3850:raise ValueError('bounded catalogue context required')
             marker=digest(dict(original_marker=marker,capability_catalogue_sha256=catalogue_sha()))
+        if state.get('review_transport_recovery_sha256'):
+            recovery=state['review_transport_recovery_sha256']
+            with b.LOCK,b.db() as con:
+                row=con.execute('SELECT proof FROM r3_json_review_recoveries WHERE recovery_sha256=?',(recovery,)).fetchone()
+            proof=json.loads(row[0]) if row else {}
+            if (digest(proof)!=recovery or not review or proof.get('operation')!='qualified_r3_json_review_recovery_v1'
+                    or proof.get('issue_id')!=state['issue_id'] or proof.get('incident_sha256')!=config['evidence_sha256']
+                    or proof.get('proposal_sha256')!=state.get('proposal_sha256') or proof.get('reviewer')!=target
+                    or proof.get('execution_authorized') is not False or proof.get('release_homologated') is not False):
+                raise ValueError('registered exact changed-transport review required')
+            marker=digest(dict(original_marker=marker,json_review_recovery_sha256=recovery))
+            note+='\nThe previous review had malformed JSON; no decision was accepted. Submit fresh schema-valid arguments only.'
+            if len(note)>3850:raise ValueError('bounded recovery review context required')
         return native.ensure_planning_start(settings,state['issue_id'],target,evidence['source_task'],marker,note,
                                            allow_create=body['allow_create'])
     if operation=='runs':return native.issue_task_runs(settings,state['issue_id'])

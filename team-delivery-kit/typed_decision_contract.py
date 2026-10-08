@@ -32,6 +32,7 @@ FORMAT_MARKER='DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1'
 
 def format_feedback_enabled(body):
     """One opt-in format correction, restricted to nonauthorizing proposals."""
+    if r3_length_feedback_enabled(body):return True
     if body.get('tool_choice') != {'type':'function','function':{'name':NAME}}:return False
     tools=body.get('tools',[])
     if len(tools)!=1:return False
@@ -55,13 +56,20 @@ def format_feedback_preflight(counter_path,execution_id,body):
 
 def claim_format_feedback(counter_path,execution_id,error,body,first_call):
     """Reject prose; ask the model afresh. Never parse, echo or accept prose."""
-    if not format_feedback_enabled(body) or error.category not in ('typed_mixed_content','typed_nonterminal'):return None
+    if not format_feedback_enabled(body):return None
     shape=error.receipt['response_shape']
-    if (not shape['parsed'] or shape['submissions']!=0 or shape['legacy_function_call']
+    r3=r3_length_feedback_enabled(body)
+    if r3:
+        if (error.category!='typed_arguments_invalid' or shape.get('parsed') is not True
+                or shape.get('terminal') is not True or shape.get('submissions')!=1
+                or shape.get('expected_tool') is not True or shape.get('arguments_json_valid') is not False
+                or shape.get('legacy_function_call') is not False or shape.get('content_shape')!='empty'):return None
+    elif (error.category not in ('typed_mixed_content','typed_nonterminal') or not shape['parsed']
+            or shape['submissions']!=0 or shape['legacy_function_call']
             or shape['content_shape']!='nonempty' or not 1<=shape['content_chars']<=1200):return None
     if not isinstance(execution_id,str) or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',execution_id):return None
     from deterministic_read_dispatch import ledger
-    receipt=dict(operation='technical_format_feedback_v1',first_call=first_call,
+    receipt=dict(operation='r3_json_format_feedback_v1' if r3 else 'technical_format_feedback_v1',first_call=first_call,
         rejected_upstream_sha256=error.receipt['upstream_sha256'],attempt_limit=1,
         worker_tool_executed=False,delivery_approval=False)
     with ledger(counter_path) as con:
@@ -70,8 +78,9 @@ def claim_format_feedback(counter_path,execution_id,error,body,first_call):
         con.execute('INSERT INTO technical_format_feedback VALUES (?,?)',(execution_id,json.dumps(receipt,sort_keys=True)))
     revised=copy.deepcopy(body)
     revised['messages'].append(dict(role='user',content=
-        'The previous response was rejected: prose without the required structured submission. '
-        'Submit exactly one '+NAME+' tool call with all fields of the unchanged schema. '
+        ('The previous tool submission was rejected: its arguments were not valid JSON. '
+         if r3 else 'The previous response was rejected: prose without the required structured submission. ')+
+        'Submit exactly one '+(R3_NAME if r3 else NAME)+' tool call with all fields of the unchanged schema. '
         'Do not add prose. No files, tests, permissions or delivery approval are authorized. '
         'This is the only format correction attempt.'))
     return revised

@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261008.371
+COPY broker/r3_incident_native.py /r3_incident_native.py
+RUN PYTHONPATH=/ python -c "import r3_incident_native"
