@@ -151,7 +151,7 @@ class PortableDeliveryTests(unittest.TestCase):
             portable_delivery.detach_completed_candidate_author(
                 {'issue_id': 'parent'}, {'author': 'author'})
         self.assertEqual(client.call_args_list[2].args,
-                         ('assign', 'parent', '--unassign', '--no-start'))
+                         ('assign', 'parent', '--unassign'))
         with patch.object(portable_delivery, 'cli', return_value={'assignee_id': None}) as client:
             portable_delivery.detach_completed_candidate_author(
                 {'issue_id': 'parent'}, {'author': 'author'})

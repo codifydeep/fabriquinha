@@ -818,7 +818,7 @@ def detach_completed_candidate_author(context, delivery):
         raise ValueError('candidate publication assignee drift')
     cli('metadata', 'set', context['issue_id'], '--key', 'delivery_author',
         '--value', delivery['author'], '--type', 'string')
-    cli('assign', context['issue_id'], '--unassign', '--no-start')
+    cli('assign', context['issue_id'], '--unassign')
     if cli('get', context['issue_id']).get('assignee_id') is not None:
         raise ValueError('candidate author detachment not confirmed')
 

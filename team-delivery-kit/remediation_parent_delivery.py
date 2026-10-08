@@ -82,7 +82,8 @@ def publish(paths,receipt,cli,verify):
         if key not in metadata:
             cli('metadata','set',parent,'--key',key,'--value',value,'--type','string')
     if parent_item.get('assignee_id') is not None:
-        cli('assign',parent,'--unassign','--no-start')
+        # Unassignment cannot start an agent; --no-start applies only to assignment.
+        cli('assign',parent,'--unassign')
     current=cli('get',parent);current_meta=cli('metadata','list',parent)
     if (current.get('status') not in ('todo','in_progress','blocked','done') or current.get('assignee_id') is not None
             or any(current_meta.get(k)!=v for k,v in fields.items())):

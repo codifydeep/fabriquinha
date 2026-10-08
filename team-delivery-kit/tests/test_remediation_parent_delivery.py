@@ -88,6 +88,20 @@ class RemediationParentDeliveryTests(unittest.TestCase):
             self.assertEqual(writes,[c for c in self.calls if c[0] in ('assign','status') or c[:2]==('metadata','set')])
             self.assertEqual(verify.call_count,2)
 
+    def test_cli_rejects_no_start_on_unassign_but_projection_recovers_idempotently(self):
+        original=self.cli
+        def supported_cli(*args):
+            if args[0]=='assign' and '--unassign' in args and '--no-start' in args:
+                raise ValueError('CLI does not accept --no-start with --unassign')
+            return original(*args)
+        self.cli=supported_cli
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);verify=Mock()
+            first=self.publish(root,verify);self.publish(root,verify)
+        self.assertEqual(first['stage'],'parent_projected');self.assertEqual(self.items['root']['status'],'done')
+        self.assertEqual([c for c in self.calls if c[0]=='assign'],[('assign','root','--unassign')])
+        self.assertEqual(verify.call_count,2)
+
     def test_cancelled_parent_or_conflicting_metadata_causes_no_writes(self):
         for cancelled in (True,False):
             self.items['root']['status']='cancelled' if cancelled else 'blocked'
