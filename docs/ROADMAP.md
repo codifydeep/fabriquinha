@@ -78,6 +78,14 @@ runtime. A seleção das montagens já está integrada ao código do broker:
 confere tarefa, instrução, wakeup e snapshot exatos; é somente leitura e não
 cria wakeups durante a construção do worker. Diagnósticos antigos não herdam
 esse acesso e planos encerrados não reutilizam o snapshot como plano ativo.
-A materialização do contrato revisado, instalação dos componentes e despacho
-da implementação ainda precisam de integração e qualificação real.
+`product_scope_materialize.py` materializa uma nova base, preservando o SHA Git
+e todos os bytes da base original, exceto o contrato de edição revisado.
+Reconfere o plano qualificado; vincula os hashes dos testes congelados sem
+recriar Red; não aceita sobrescritas ou symlinks; grava arquivos por publicação
+atômica e retoma cópias parciais exatas. O resultado não instala permissões.
+`Dockerfile.scope-materializer` fornece a imagem dedicada, validada com uma
+fixture descartável sem rede, credenciais ou socket Docker; essa fixture não
+é uma revisão real dos agentes nem uma aprovação da entrega em andamento.
+A associação desse resultado ao controlador, instalação dos componentes e
+despacho da implementação ainda precisam de integração e qualificação real.
 Aprovar o plano não equivale a conceder escrita ou homologar.

@@ -122,6 +122,7 @@ COPY product_scope_contract.py /product_scope_contract.py
 COPY broker/product_scope_revision.py /product_scope_revision.py
 COPY broker/product_scope_ledger.py /product_scope_ledger.py
 COPY broker/product_scope_execution.py /product_scope_execution.py
+COPY broker/product_scope_materialize.py /product_scope_materialize.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
 COPY r3_incident_contract.py /r3_incident_contract.py
 COPY r3_decision_revision.py /r3_decision_revision.py
