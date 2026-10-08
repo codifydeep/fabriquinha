@@ -396,7 +396,8 @@ class Handler(BaseHTTPRequestHandler):
                             revised=forced_tool_feedback.claim(COUNTER_PATH,patch_scope,error,body,call_number)
                             if revised is not None:
                                 patch_feedback=patch_scope
-                                print(json.dumps(dict(event='model_proxy_patch_feedback',execution_id=execution_id,
+                                print(json.dumps(dict(event='model_proxy_forced_tool_feedback',execution_id=execution_id,
+                                    tool=forced_tool_feedback.metrics(body)['artifact_selected_tool'],
                                     first_call=call_number,attempt_limit=1,worker_tool_executed=False,
                                     response_forwarded=False)),flush=True)
                                 body=revised
@@ -420,7 +421,7 @@ class Handler(BaseHTTPRequestHandler):
                     recovery=None
                 if patch_feedback:
                     forced_tool_feedback.finish(COUNTER_PATH,patch_feedback,status==200)
-                    response_metrics['patch_feedback_passed']=status==200
+                    response_metrics['forced_tool_feedback_passed']=status==200
                     patch_feedback=None
                 break
         except (ValueError, TypeError, json.JSONDecodeError) as error:

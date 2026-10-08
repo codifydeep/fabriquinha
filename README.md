@@ -110,6 +110,13 @@ Uma resposta com múltiplas chamadas onde o contrato exige uma só permanece
 rejeitada. A aprovação isolada do proxy não qualifica o worker, a recuperação
 automática ou a entrega ponta a ponta.
 
+O proxy oferece uma única correção persistente de formato por execução para
+respostas completas com múltiplas chamadas do mesmo tool forçado: leitura de
+artefato com caminho/página fixados ou patch estreito do novo teste. Nenhuma das
+chamadas rejeitadas é encaminhada; o modelo precisa propor uma nova chamada única,
+validada pelo contrato original. Leituras e patches compartilham o mesmo limite;
+reinícios, uma segunda falha ou resposta incompleta não rearmam a correção.
+
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
 O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,

@@ -21,13 +21,13 @@ CATEGORIES={'artifact_test_methods_missing','artifact_test_syntax_invalid'}
 
 def from_event(event):
     if (event.get('event')=='model_proxy_request' and event.get('status')==502
-            and event.get('artifact_selected_tool')=='patch' and event.get('artifact_contract_present') is True
+            and event.get('artifact_selected_tool') in ('patch','read_file') and event.get('artifact_contract_present') is True
             and event.get('artifact_rejection_category')=='incomplete_forced_tool_response'):
         execution=event.get('execution_id');call=event.get('call_number')
         if not isinstance(execution,str) or str(uuid.UUID(execution))!=execution:return None
         if type(call) is not int or call<1:return None
         result=dict(operation='rejected_forced_tool_response_v1',execution_id=execution,call_number=call,
-            category='incomplete_forced_tool_response',tool='patch',write_executed=False,
+            category='incomplete_forced_tool_response',tool=event['artifact_selected_tool'],write_executed=False,
             tests_executed=False,red_verified=False,delivery_approval=False)
         shape=event.get('artifact_rejection_diagnostic')
         if shape:

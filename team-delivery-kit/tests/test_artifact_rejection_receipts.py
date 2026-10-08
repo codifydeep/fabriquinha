@@ -40,6 +40,15 @@ class RejectionReceiptTests(unittest.TestCase):
         for changed in (dict(source='PRIVATE'),dict(tool_calls=1000),dict(stream_complete=1)):
             with self.assertRaises(ValueError):r.from_event(dict(event,artifact_rejection_diagnostic=dict(shape,**changed)))
 
+    def test_forced_read_rejection_preserves_shape_without_tool_execution_authority(self):
+        shape=dict(schema='forced-tool-shape-v1',response_sha256='a'*64,streaming=True,
+            stream_complete=True,finish_reason='tool_calls',tool_calls=8,all_selected_tools=True)
+        receipt=r.from_event(dict(self.event,artifact_selected_tool='read_file',
+            artifact_rejection_category='incomplete_forced_tool_response',artifact_rejection_diagnostic=shape))
+        self.assertEqual(receipt['tool'],'read_file');self.assertEqual(receipt['structure'],shape)
+        self.assertFalse(receipt['write_executed']);self.assertFalse(receipt['delivery_approval'])
+        self.assertNotIn('private_payload',receipt)
+
     def test_unrelated_rejections_are_not_test_diagnostics(self):
         for key,value in [('status',200),('artifact_selected_tool','read_file'),
                           ('artifact_contract_present',False),('artifact_rejection_category','unknown')]:
