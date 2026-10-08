@@ -142,6 +142,21 @@ def prepare_typed_artifact_recovery(row, task, route, proxy_failure):
 
 
 def no_progress_cause(data):
+    failure = data.get('validation_failure') or {}
+    if (failure.get('category') == 'executed_test_failure'
+            and type(failure.get('tests_executed')) is int
+            and failure['tests_executed'] > 0 and failure.get('failures')):
+        # Execution IDs, snapshot volumes and transcript timing are provenance,
+        # not new functional evidence. Keep the original receipts; compare only
+        # controller-observed witnesses when bounding identical corrections.
+        witnesses = {key: failure.get(key, []) for key in (
+            'exception_types', 'numeric_assertion_details', 'missing_metadata_keys',
+            'missing_module_attributes')}
+        witnesses['tests_executed'] = failure['tests_executed']
+        witnesses['failures'] = sorted(
+            [(item.get('kind'), item.get('qualified_name')) for item in failure['failures']])
+        return 'frozen_suite:' + hashlib.sha256(json.dumps(witnesses,
+            sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     error = data.get('error', '')
     if 'author_context_exhausted' in error:
         return 'context_exhausted'

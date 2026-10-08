@@ -1168,7 +1168,7 @@ def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=
                             for row in paths if row[0].startswith('/workspace/')]
                         receipt['diagnostic_read_files'] = sorted(set(receipt['diagnostic_read_files']) |
                             set(failing_source_files(receipt, specification['test_files'])) |
-                            set(dependency_read_files(receipt, specification['files'])))
+                            set(dependency_read_files(receipt, specification.get('files', []))))
                         con.execute('CREATE TABLE IF NOT EXISTS frozen_suite_failures('
                                     'task_id TEXT, output_sha256 TEXT, receipt TEXT, output TEXT, '
                                     'PRIMARY KEY(task_id,output_sha256))')

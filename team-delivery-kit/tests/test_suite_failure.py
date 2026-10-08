@@ -18,6 +18,7 @@ class SuiteFailureTests(unittest.TestCase):
                     'app/private.json', 'outside/secret.py', 'app/nested/secret.py']
         self.assertEqual(dependency_read_files(receipt, declared), ['app/db.py', 'app/server.py', 'app/store.py'])
         self.assertEqual(dependency_read_files(receipt, ['app/store.py']), [])
+        self.assertEqual(dependency_read_files(receipt, []), [])
         self.assertEqual(dependency_read_files(receipt, ['app/db.py'] + ['app/f%d.py' % n for n in range(17)]), [])
 
     def test_failed_baseline_files_are_bound_to_known_manifest_for_diagnosis(self):

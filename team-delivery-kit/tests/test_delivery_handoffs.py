@@ -369,6 +369,38 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(state['stage'], 'technical_decision_required')
         self.assertFalse(self.effects.created)
 
+    def test_same_functional_failure_cannot_reset_budget_with_new_task_or_log_hash(self):
+        failure = dict(category='executed_test_failure', tests_executed=328,
+            failures=[dict(kind='ERROR', qualified_name='tests.test_detail.Cases.test_get')],
+            exception_types=['AttributeError'], numeric_assertion_details=[],
+            missing_module_attributes=[dict(module='app.db', attribute='get_item')])
+        data = dict(contract_sha256=self.route['contract_sha256'], error='portable frozen suite failed',
+            validation_failure=failure, dispatch_stage='correct_author')
+        for number in (1, 2):
+            prior = dict(data, dispatch_marker='functional-' + str(number),
+                validation_failure=dict(failure, source_task='old-' + str(number),
+                    output_sha256=str(number) * 64, volume='old-volume-' + str(number)))
+            for _ in range(2):
+                handoffs.save(self.con, 'old-' + str(number), 'issue', 'dispatch_intent', 'author', prior, 90)
+        self.assertEqual(handoffs.repeated_corrections(self.con, 'issue', data), 2)
+        handoffs.save(self.con, 'source', 'issue', 'correct_author', 'author', data, 100)
+        self.tick()
+        self.assertEqual(handoffs.load(self.con, 'source')['stage'], 'technical_decision_required')
+        self.assertFalse(self.effects.created)
+
+    def test_changed_functional_witness_or_contract_is_a_different_correction(self):
+        failure = dict(category='executed_test_failure', tests_executed=3,
+            failures=[dict(kind='FAIL', qualified_name='tests.test_detail.Cases.test_get')],
+            exception_types=['AssertionError'], numeric_assertion_details=[dict(observed=1, expected=2)])
+        data = dict(contract_sha256=self.route['contract_sha256'], error='portable frozen suite failed',
+            validation_failure=failure, dispatch_stage='correct_author', dispatch_marker='prior')
+        handoffs.save(self.con, 'old', 'issue', 'dispatch_intent', 'author', data, 90)
+        self.assertEqual(handoffs.repeated_corrections(self.con, 'issue', data), 1)
+        changed = dict(data, validation_failure=dict(failure,
+            numeric_assertion_details=[dict(observed=2, expected=3)]))
+        self.assertEqual(handoffs.repeated_corrections(self.con, 'issue', changed), 0)
+        self.assertEqual(handoffs.repeated_corrections(self.con, 'issue', dict(data, contract_sha256='c' * 64)), 0)
+
     def test_diagnosis_receives_existing_red_instead_of_inventing_missing_tests(self):
         self.effects.phase_evidence = lambda _: {'phase': 'implementation', 'red_manifest': 'a' * 64,
                                                 'independent_test_review': 'approved'}
