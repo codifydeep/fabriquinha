@@ -2,9 +2,30 @@ import copy
 import json
 import unittest
 import model_proxy
-from probe_seed_patch_provider import fixture,validate_reply,remote_program,TARGET,OLD,NEW
+from probe_seed_patch_provider import fixture,validate_reply,remote_program,rejection_diagnostic,TARGET,OLD,NEW
 
 class SeedPatchProbeTests(unittest.TestCase):
+    def test_rejection_receipt_classifies_without_private_content(self):
+        raw=b'private model response'
+        result=rejection_diagnostic(ValueError('proposed artifact exceeds file limit'),raw)
+        self.assertEqual(result['constraint'],'artifact_size')
+        self.assertEqual(result['response_bytes'],len(raw))
+        self.assertFalse(result['tools_executed'])
+        self.assertNotIn('private',json.dumps(result))
+        self.assertNotIn('proposed artifact',json.dumps(result))
+    def test_unknown_error_never_leaks_exception_or_key(self):
+        for error in (ValueError('SECRET_VALUE'),KeyError('SECRET_VALUE'),TypeError('SECRET_VALUE')):
+            result=rejection_diagnostic(error)
+            self.assertEqual(result['constraint'],'unclassified_local_validation')
+            self.assertNotIn('SECRET_VALUE',json.dumps(result))
+            self.assertNotIn('response_sha256',result)
+    def test_all_frozen_rejection_constraints_are_distinct_and_allowlisted(self):
+        messages=['one matching proposed fragment required','proposed Python syntax rejected',
+            'proposed artifact exceeds file limit','proposed assertions changed',
+            'proposed discovery or assertion execution shape changed']
+        constraints=[rejection_diagnostic(ValueError(message))['constraint'] for message in messages]
+        self.assertEqual(len(set(constraints)),len(messages))
+        self.assertNotIn('unclassified_local_validation',constraints)
     def test_actual_remote_program_compiles_and_does_not_call_host_main(self):
         import ast
         source=remote_program('11111111-1111-4111-8111-111111111111')

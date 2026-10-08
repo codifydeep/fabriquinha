@@ -142,6 +142,10 @@ identidade do experimento são persistidas antes da chamada; resultado incerto
 não rearma a solicitação. O recibo distingue proposta válida, rejeição do proxy
 e falha do contrato da fixture. Mesmo um resultado positivo não prova a causa
 histórica, calibração, Red, revisão, implantação ou recuperação autônoma.
+Rejeições locais novas registram a restrição allowlisted (fragmento, sintaxe,
+tamanho, assertions ou descoberta), tamanho e hash da resposta, sem gravar seu
+conteúdo no recibo público. Erros desconhecidos permanecem não classificados;
+recibos anteriores não recebem causas inferidas retroativamente.
 Para essa proposta estreita, o validador também preserva a forma estática de
 descoberta, decorators, assinaturas, escopo das assertions e transferências de
 controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de

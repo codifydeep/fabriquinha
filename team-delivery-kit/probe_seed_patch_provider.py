@@ -14,6 +14,30 @@ OLD="QUERY = 'calls.length'"
 NEW="QUERY = 'calls.filter(c => c.url === \"/service-mode\").length'"
 
 
+def rejection_diagnostic(error, raw=None):
+    """Allowlisted local evidence: never serialize exception text or proposal bytes."""
+    reasons={
+        'bounded fixture reply required':'response_size',
+        'actual proxy must select the seeded patch phase':'selected_phase',
+        'forced diagnostic patch phase required':'selected_phase',
+        'exact synthetic replacement required':'exact_replacement',
+        'one matching proposed fragment required':'fragment_match',
+        'proposed Python syntax rejected':'python_syntax',
+        'proposed artifact exceeds file limit':'artifact_size',
+        'proposed assertions changed':'assertion_preservation',
+        'proposed discovery or assertion execution shape changed':'discovery_preservation',
+    }
+    reason=reasons.get(str(error),'unclassified_local_validation')
+    if isinstance(error,json.JSONDecodeError):reason='response_json'
+    result=dict(schema='local-proposal-rejection-v1',constraint=reason,
+        exception_type=type(error).__name__ if type(error) in
+        (ValueError,KeyError,TypeError,json.JSONDecodeError) else 'Other',
+        tools_executed=False,candidate_files_written=False)
+    if isinstance(raw,bytes):
+        result.update(response_bytes=len(raw),response_sha256=hashlib.sha256(raw).hexdigest())
+    return result
+
+
 def fixture(model):
     prompt=('Synthetic transport fixture: replace exactly '+OLD+' with '+NEW+' using ONE patch call. '
         'Do not change any other bytes or assertions. Returned tools will NOT execute; no product files are available.\n'
@@ -83,6 +107,7 @@ def remote_probe(identifier):
         body=fixture(model_proxy.MODEL)
         request=urllib.request.Request('http://127.0.0.1:8080/executions/'+identifier+'/api/v1/chat/completions',
             data=json.dumps(body).encode(),headers=dict(Authorization=model_proxy.PLACEHOLDER,**{'Content-Type':'application/json'}))
+        raw=None
         try:
             with urllib.request.urlopen(request,timeout=250) as response:
                 raw=response.read(65537)
@@ -91,7 +116,9 @@ def remote_probe(identifier):
             result.update(validate_reply(record),status='passed')
         except urllib.error.HTTPError as error:result.update(failure_category='proxy_rejected',http_status=error.code)
         except (TimeoutError,ConnectionError,urllib.error.URLError):result.update(failure_category='transport_observation_failed')
-        except (ValueError,KeyError,TypeError):result.update(failure_category='fixture_protocol_rejected')
+        except (ValueError,KeyError,TypeError) as error:
+            result.update(failure_category='fixture_protocol_rejected',
+                local_rejection=rejection_diagnostic(error,raw))
         import artifact_rejection_receipts,forced_tool_feedback
         result['rejected_responses']=artifact_rejection_receipts.read(model_proxy.COUNTER_PATH,identifier)
         with forced_tool_feedback.ledger(model_proxy.COUNTER_PATH) as feedback:

@@ -2,6 +2,6 @@ services:
   model-proxy:
     image: delivery-kit-model-proxy:20261002.23
     environment:
-      MODEL_PROXY_MAX_CALLS: '8000'
+      MODEL_PROXY_MAX_CALLS: '10000'
       MODEL_PROXY_MAX_OUTPUT_TOKENS: '8192'
       MODEL_PROXY_REASONING_EFFORT: disabled
