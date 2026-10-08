@@ -246,8 +246,14 @@ preserva a linhagem e exige uma nova revisão independente; a nova execução ai
 precisa demonstrar compilação do harness, controles negativos comportamentais,
 Red no baseline original e todos os gates posteriores.
 
-A emenda do harness possui agora um gate de calibração antes da captura de Red:
-compilação, referência correta e 12 defeitos controlados (respostas indevidas,
+A emenda do harness possui agora um gate de calibração antes da captura de Red.
+O diagnóstico da fase com polling legítimo inclui os 16 controles esperados,
+inclusive timers que apenas alteram o indicador e timers com a mesma duração do
+polling. Controles ausentes são apresentados como inválidos; passar a referência
+positiva não oculta defeitos não detectados. Esse resumo não autoriza uma nova
+execução nem substitui a revisão do snapshot.
+
+O gate verifica compilação, referência correta e 12 defeitos controlados (respostas indevidas,
 requisições duplicadas, estado pendente, timers e interferência). O job usa o
 snapshot somente leitura, sem rede, credenciais ou socket Docker. Erros de runtime,
 skips ou uma referência correta rejeitada não contam como controles negativos

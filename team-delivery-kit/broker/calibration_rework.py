@@ -155,10 +155,14 @@ def diagnostic_index(diagnostic):
     result={k:diagnostic[k] for k in ('phase','manifest_sha256','test_sha256','positive','background') if k in diagnostic}
     negatives=diagnostic.get('negative_controls')
     if isinstance(negatives,dict):
+        required=set(CASES)
+        if diagnostic.get('phase')=='background_timer_control':
+            from service_mode_timer_background_qualification import INDICATOR_TIMERS
+            required.update(INDICATOR_TIMERS)
         expected=dict(tests=1,failures=1,errors=0,skipped=0,unexpected_successes=0,expected_failures=0)
-        failed=[case for case in CASES if not isinstance(negatives.get(case),dict)
+        failed=[case for case in sorted(required) if not isinstance(negatives.get(case),dict)
             or any(negatives[case].get(k)!=v for k,v in expected.items())]
-        result.update(negative_controls_total=len(CASES),negative_controls_detected=len(CASES)-len(failed),
+        result.update(negative_controls_total=len(required),negative_controls_detected=len(required)-len(failed),
             undetected_or_invalid_controls=failed)
     return result
 

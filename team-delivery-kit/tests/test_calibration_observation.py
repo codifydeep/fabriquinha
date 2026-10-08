@@ -42,6 +42,32 @@ class CalibrationObservationTests(unittest.TestCase):
         with self.assertRaises(ValueError):observation.claim(con,'source','d'*64,proof)
         with self.assertRaises(ValueError):observation.claim(con,'source','c'*64,dict(proof,status='passed'))
 
+    def test_timer_phase_reports_indicator_only_defects_to_both_planners(self):
+        from service_mode_timer_background_qualification import INDICATOR_TIMERS
+        facts=dict(self.value['facts'],phase='background_timer_control',
+            negative_controls={case:dict(self.counts) for case in set(CASES)|set(INDICATOR_TIMERS)})
+        for case in ('indicator_timeout','indicator_interval'):
+            facts['negative_controls'][case]['failures']=0
+        index=calibration_rework.diagnostic_index(facts)
+        self.assertEqual(index['negative_controls_total'],16)
+        self.assertEqual(index['negative_controls_detected'],14)
+        self.assertEqual(index['undetected_or_invalid_controls'],['indicator_interval','indicator_timeout'])
+        config=dict(diagnostic=facts,criteria={'C1':{}},paths=['/evidence/candidate/tests/test_service_mode_indicator.py'])
+        for state in (dict(stage='cto_pending'),dict(stage='peer_pending',cto_decision={'reason':'Preserve all controls'})):
+            note=calibration_rework.instruction(config,state)
+            self.assertIn('indicator_interval',note)
+            self.assertIn('indicator_timeout',note)
+            self.assertIn('"negative_controls_total": 16',note)
+
+    def test_timer_phase_cannot_hide_missing_controls(self):
+        facts=dict(self.value['facts'],phase='background_timer_control',
+            negative_controls={case:dict(self.counts) for case in CASES})
+        index=calibration_rework.diagnostic_index(facts)
+        self.assertEqual(index['negative_controls_total'],16)
+        self.assertEqual(index['negative_controls_detected'],12)
+        self.assertEqual(set(index['undetected_or_invalid_controls']),
+            {'indicator_interval','indicator_timeout','probe_interval_board_delay','probe_timeout_board_delay'})
+
     def test_both_planners_receive_negative_evidence_and_all_read_requirements(self):
         config=dict(diagnostic=dict(self.value['facts'],phase=self.value['phase']),criteria={'C1':{}},
             paths=['/evidence/candidate/tests/test_service_mode_indicator.py','/evidence/candidate/app/static/app.js'])
