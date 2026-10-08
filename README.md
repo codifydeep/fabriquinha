@@ -156,6 +156,11 @@ controlador, identidade/hash conferidos, snapshot completo e ausência de worker
 ou Red. O handoff mantém a causa histórica desconhecida e não muda limites.
 Somente uma decisão técnica independente pode propor uma recuperação tests-only;
 calibração, Red, revisão e homologação permanecem obrigatórios.
+Restrições de argumentos medidas são apresentadas ao CTO com campo, valor
+allowlisted e significado explícito. Um diagnóstico com `no_change` não recebe
+o roteiro de causa desconhecida. Após escalonamento terminal, há no máximo uma
+reanálise por card com essa apresentação corrigida, preservando a decisão
+anterior e sem conceder autorização ao autor. Repetir IDs não rearma esse caminho.
 Para essa proposta estreita, o validador também preserva a forma estática de
 descoberta, decorators, assinaturas, escopo das assertions e transferências de
 controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de

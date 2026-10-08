@@ -88,3 +88,69 @@ def qualified(c,issue,source,data):
     return bool(row and json.loads(row[0])==receipt
         and receipt.get('diagnostic_sha256')==digest(data.get('diagnostic'))
         and receipt.get('author_retry_authorized') is False and receipt.get('delivery_approval') is False)
+
+
+def measured_fact(diagnostic):
+    """Plain-language interpretation of canonical values, not model prose."""
+    from artifact_rejection_receipts import from_event
+    if not isinstance(diagnostic,dict):return None
+    shape=diagnostic.get('structure')
+    if not shape:return None
+    canonical=from_event(dict(event='model_proxy_request',status=502,
+        artifact_contract_present=True,artifact_selected_tool=diagnostic.get('tool'),
+        artifact_rejection_category=diagnostic.get('category'),execution_id=diagnostic.get('execution_id'),
+        call_number=diagnostic.get('call_number'),artifact_rejection_diagnostic=shape))
+    if not canonical or canonical.get('structure')!=shape:return None
+    meanings={'no_change':'old_string equals new_string; the proposed patch changes no bytes.',
+        'enum':'The supplied value is outside the pinned allowed values.',
+        'type':'The supplied value has the wrong schema type.',
+        'length':'The supplied value violates the pinned length bound.',
+        'utf8_length':'The supplied value violates the UTF-8 byte bound.'}
+    return dict(field=shape['field'],constraint=shape['constraint'],meaning=meanings[shape['constraint']],
+        scope='this exact rejected response only',constraint_known=True,
+        write_executed=False,tests_executed=False,delivery_approval=False)
+
+
+def presentation_capture(b,issue,source):
+    """One changed presentation after a terminal independent escalation."""
+    with b.db() as c:
+        row=c.execute('SELECT stage,data FROM delivery_handoffs WHERE issue_id=? AND source_task=?',(issue,source)).fetchone()
+        if not row or row['stage']!='test_first_blocked':return None
+        data=json.loads(row['data'])
+        if (data.get('error')!='test_first_cto_requires_replanning'
+                or data.get('decision',{}).get('action')!='escalate_cto'
+                or not data.get('cto_task') or data.get('constraint_presentation_replay')
+                or not qualified(c,issue,source,data)
+                or data['verified_tool_incident'].get('cause_known') is not True
+                or c.execute('SELECT 1 FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
+                or c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):return None
+        fact=measured_fact(data.get('diagnostic'))
+        if not fact:return None
+        route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
+        route=json.loads(route[0]) if route else {}
+        latest=c.execute('SELECT source_task FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC LIMIT 1',(issue,)).fetchone()
+        snapshot=c.execute('SELECT status FROM failed_execution_snapshots WHERE task_id=?',(source,)).fetchone()
+        if (route.get('enabled') is not True or route.get('test_first') is not True
+                or not route.get('author') or route.get('author')==route.get('cto')
+                or not latest or latest[0]!=source or not snapshot or snapshot[0]!='complete'):return None
+        c.execute('CREATE TABLE IF NOT EXISTS constraint_presentations('
+            'issue_id TEXT PRIMARY KEY,source_task TEXT,receipt TEXT)')
+        proof=dict(operation='measured_constraint_presentation_v1',issue_id=issue,source_task=source,
+            previous_cto_task=data['cto_task'],diagnostic_sha256=digest(data['diagnostic']),
+            measured_fact=fact,author_retry_authorized=False,delivery_approval=False)
+        old=c.execute('SELECT source_task,receipt FROM constraint_presentations WHERE issue_id=?',(issue,)).fetchone()
+        if old:
+            if old[0]!=source or json.loads(old[1])!=proof:return None
+            return proof
+        c.execute('INSERT INTO constraint_presentations VALUES(?,?,?)',(issue,source,json.dumps(proof,sort_keys=True)))
+        return proof
+
+
+def presentation_qualified(c,issue,source,data):
+    proof=(data.get('constraint_presentation_replay') or {}).get('certificate')
+    if not proof or not c.execute("SELECT 1 FROM sqlite_master WHERE name='constraint_presentations'").fetchone():return False
+    row=c.execute('SELECT source_task,receipt FROM constraint_presentations WHERE issue_id=?',(issue,)).fetchone()
+    return bool(row and row[0]==source and json.loads(row[1])==proof
+        and proof.get('diagnostic_sha256')==digest(data.get('diagnostic'))
+        and proof.get('measured_fact')==measured_fact(data.get('diagnostic'))
+        and proof.get('author_retry_authorized') is False and proof.get('delivery_approval') is False)

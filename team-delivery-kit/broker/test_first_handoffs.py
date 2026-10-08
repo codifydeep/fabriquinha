@@ -226,6 +226,17 @@ def technical_recovery(broker, route, runs, source, prior, effects):
     if prior['stage'] == 'test_first_blocked':
         if (data.get('error')=='test_first_cto_requires_replanning'
                 and data.get('decision',{}).get('action')=='escalate_cto'
+                and not data.get('constraint_presentation_replay')):
+            certificate=getattr(effects,'constraint_presentation',lambda *_:None)(issue,key)
+            if certificate:
+                data['constraint_presentation_replay']=dict(certificate=certificate,
+                    previous_decision=data.get('decision'),author_retry_authorized=False,delivery_approval=False)
+                for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):data.pop(field,None)
+                data['error']='measured_constraint_presentation_requires_independent_decision'
+                save('technical_decision_required',route['cto'])
+                return
+        if (data.get('error')=='test_first_cto_requires_replanning'
+                and data.get('decision',{}).get('action')=='escalate_cto'
                 and not data.get('prospective_capacity_replay')):
             certificate=getattr(effects,'prospective_capacity',lambda *_:None)(issue,key)
             if certificate:
@@ -412,6 +423,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import verified_tool_incident
         with broker.db() as con:
             qualified_tool_incident=verified_tool_incident.qualified(con,issue,key,data)
+            qualified_constraint_presentation=verified_tool_incident.presentation_qualified(con,issue,key,data)
         try:import prospective_capacity
         except ImportError:from broker import prospective_capacity
         with broker.db() as con:
@@ -428,6 +440,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
         if qualified_byte_budget:suffix+=':preserved-seed-byte-budget-v1'
         if qualified_tool_incident:suffix+=':verified-tool-incident-v1:'+data['verified_tool_incident']['fingerprint']
+        if qualified_constraint_presentation:suffix+=':measured-constraint-presentation-v1'
         if qualified_prospective_capacity:suffix+=':prospective-capacity-v1:'+data['prospective_capacity_replay']['certificate']['probe_sha256']
         if data.get('artifact_diagnosis_replay'):
             suffix+=':proxy-artifact-evidence-v1'
@@ -515,7 +528,8 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'it forwards none of the rejected calls, then revalidates every original gate. '
                'Decide whether a concrete tests-only correction is warranted, or name the remaining diagnostic. '
                'Never disable the gate, approve Red or ask the CEO to decide a technical issue.'
-               if diagnostic.get('kind')=='rejected_forced_tool_response' else '')
+               if diagnostic.get('kind')=='rejected_forced_tool_response'
+               and not verified_tool_incident.measured_fact(diagnostic) else '')
             + ('\nNEW VALIDATOR INCIDENT: read the category and constraint from the controller receipt; '
                'invalid_forced_argument is NOT an incomplete stream or provider outage. A missing constraint '
                'means the specific cause remains UNKNOWN: return escalate_cto with the exact evidence or '
@@ -524,7 +538,18 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'tests-only remedy via your independent decision; it never waives calibration, Red or review. '
                'Identical constraints under new task/call IDs do not rearm diagnosis; size counts alone '
                'are not changed evidence. No technical escalation to the CEO.'
-               if qualified_tool_incident and not qualified_prospective_capacity else '')
+               if qualified_tool_incident and not qualified_prospective_capacity
+               and not verified_tool_incident.measured_fact(diagnostic) else '')
+            + ('\nMEASURED ARGUMENT CONSTRAINT (controller fact, NOT missing): '
+               +json.dumps(verified_tool_incident.measured_fact(diagnostic),sort_keys=True)+'. '
+               'Use the explicit field, constraint and meaning above. Do not describe an existing '
+               'constraint as UNKNOWN or request raw model payloads to discover it. This fact only '
+               'explains this exact rejected response, not older failures. Decide one concrete '
+               'tests-only remedy or escalate with a genuinely different missing requirement. '
+               'No identical retry, file-limit increase, skipped tests, automatic Red or delivery '
+               'approval. Preserve every assertion and all product/baseline files. '
+               if qualified_tool_incident and not qualified_prospective_capacity
+               and verified_tool_incident.measured_fact(diagnostic) else '')
             + ('\nUNCHANGED SEED INSPECTION: a NEW fixed offline job verified the entire failed snapshot against '
                'the approved seed manifest, not merely the test hash. All bytes remain unchanged and the actual '
                'native tool history contains only paired read_file calls. The author executed no patch or suite; no Red receipt exists. '

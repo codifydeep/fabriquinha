@@ -7,6 +7,50 @@ from broker import verified_tool_incident as incident
 
 
 class VerifiedToolIncidentTests(unittest.TestCase):
+    def test_measured_constraint_is_explicit_and_never_exposes_payload(self):
+        self.assertIsNone(incident.measured_fact(self.d))
+        diagnostic=dict(self.d,structure=dict(schema='forced-argument-constraint-v1',field='new_string',constraint='no_change'))
+        fact=incident.measured_fact(diagnostic)
+        self.assertTrue(fact['constraint_known'])
+        self.assertEqual(fact['constraint'],'no_change')
+        self.assertIn('changes no bytes',fact['meaning'])
+        self.assertEqual(fact['scope'],'this exact rejected response only')
+        self.assertFalse(fact['write_executed'])
+        self.assertFalse(fact['delivery_approval'])
+        with self.assertRaises(ValueError):
+            incident.measured_fact(dict(diagnostic,structure=dict(diagnostic['structure'],payload='PRIVATE')))
+
+    def test_changed_presentation_is_once_per_issue_and_requires_exact_proof(self):
+        self.c.row_factory=sqlite3.Row;c=self.c
+        c.executescript('''CREATE TABLE delivery_handoffs(issue_id TEXT,source_task TEXT,stage TEXT,data TEXT,updated REAL);
+CREATE TABLE delivery_routes(issue_id TEXT,config TEXT);
+CREATE TABLE failed_execution_snapshots(task_id TEXT,status TEXT);
+CREATE TABLE leases(status TEXT);
+CREATE TABLE test_first_red(issue_id TEXT);''')
+        diagnostic=dict(self.d,structure=dict(schema='forced-argument-constraint-v1',field='new_string',constraint='no_change'))
+        receipt=incident.claim(c,'issue','source',diagnostic)
+        data=dict(error='test_first_cto_requires_replanning',decision={'action':'escalate_cto'},
+            cto_task='completed-cto',diagnostic=diagnostic,verified_tool_incident=receipt)
+        c.execute('INSERT INTO delivery_handoffs VALUES(?,?,?,?,?)',('issue','source','test_first_blocked',json.dumps(data),1))
+        c.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps(dict(enabled=True,test_first=True,author='a',cto='c'))))
+        c.execute('INSERT INTO failed_execution_snapshots VALUES(?,?)',('source','complete'))
+        class B:
+            @contextmanager
+            def db(inner):
+                with c:yield c
+        c.execute('INSERT INTO leases VALUES(?)',('running',))
+        self.assertIsNone(incident.presentation_capture(B(),'issue','source'))
+        c.execute('DELETE FROM leases')
+        proof=incident.presentation_capture(B(),'issue','source')
+        self.assertFalse(proof['author_retry_authorized'])
+        self.assertEqual(proof,incident.presentation_capture(B(),'issue','source'))
+        data['constraint_presentation_replay']={'certificate':proof}
+        self.assertTrue(incident.presentation_qualified(c,'issue','source',data))
+        data['diagnostic']=dict(diagnostic,call_number=7777)
+        self.assertFalse(incident.presentation_qualified(c,'issue','source',data))
+        c.execute('UPDATE delivery_handoffs SET data=?',(json.dumps(data),))
+        self.assertIsNone(incident.presentation_capture(B(),'issue','source'))
+
     def setUp(self):
         self.c=sqlite3.connect(':memory:')
         self.addCleanup(self.c.close)

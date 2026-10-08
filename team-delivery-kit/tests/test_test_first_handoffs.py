@@ -70,6 +70,47 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_known_constraint_reanalysis_changes_prompt_and_cannot_dispatch_author_without_cto(self):
+        from broker import verified_tool_incident as incident
+        diagnostic=dict(kind='rejected_forced_tool_response',issue_id='issue',task_id='tests',
+            operation='rejected_forced_tool_response_v1',category='invalid_forced_argument',tool='patch',
+            provenance='owned_proxy_validator_log',proxy_image='sha256:'+'a'*64,
+            execution_id='eb720780-398c-4809-aa34-8c4848b279bf',call_number=5213,
+            write_executed=False,tests_executed=False,red_verified=False,delivery_approval=False,
+            structure=dict(schema='forced-argument-constraint-v1',field='new_string',constraint='no_change'))
+        with self.broker.db() as c:
+            receipt=incident.claim(c,'issue','tests',diagnostic)
+            c.execute('CREATE TABLE constraint_presentations(issue_id TEXT PRIMARY KEY,source_task TEXT,receipt TEXT)')
+            proof=dict(operation='measured_constraint_presentation_v1',issue_id='issue',source_task='tests',
+                previous_cto_task='old-cto',diagnostic_sha256=incident.digest(diagnostic),
+                measured_fact=incident.measured_fact(diagnostic),author_retry_authorized=False,delivery_approval=False)
+            c.execute('INSERT INTO constraint_presentations VALUES(?,?,?)',('issue','tests',json.dumps(proof)))
+            data=dict(error='test_first_cto_requires_replanning',diagnostic=diagnostic,
+                verified_tool_incident=receipt,cto_task='old-cto',decision={'action':'escalate_cto'},
+                test_first_cto_wakeup='old')
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',data,1);prior=handoffs.load(c,'tests')
+        self.effects.constraint_presentation=lambda *_:proof
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        self.assertEqual(prior['stage'],'technical_decision_required')
+        self.assertEqual(self.effects.wakeups,[])
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        self.assertEqual(self.effects.wakeups[-1][0][1],'cto')
+        instruction=self.effects.wakeups[-1][0][4]
+        self.assertIn('MEASURED ARGUMENT CONSTRAINT',instruction)
+        self.assertIn('old_string equals new_string',instruction)
+        self.assertIn('NOT missing',instruction)
+        self.assertNotIn('A missing constraint means',instruction)
+        self.assertNotIn('PROXY PATCH RESPONSE REJECTION',instruction)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        saved=json.loads(prior['data'])
+        saved.update(error='test_first_cto_requires_replanning',decision={'action':'escalate_cto'})
+        with self.broker.db() as c:
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',saved,2);prior=handoffs.load(c,'tests')
+        count=len(self.effects.wakeups)
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        self.assertEqual(len(self.effects.wakeups),count)
+
     def test_capacity_experiment_wakes_cto_once_not_author_and_preserves_unknown_cause(self):
         from broker import prospective_capacity as capacity
         proof=dict(issue_id='issue',source_task='tests',probe_sha256='a'*64,
