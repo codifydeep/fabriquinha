@@ -90,6 +90,10 @@ fixture descartável sem rede, credenciais ou socket Docker; essa fixture não
 reautentica as decisões nativas e leituras antes/depois do job, usa imagem fixa,
 reconcilia o mesmo volume/job e guarda o recibo sem liberar o autor. Recibos
 inválidos viram incidentes persistentes, sem execuções idênticas. Ainda falta
-instalar os componentes, registrar o contrato como base autorizada da próxima
-execução e qualificar o despacho e a recuperação reais dos agentes.
+instalar os componentes e qualificar o despacho e a recuperação reais dos
+agentes. `product_scope_base_verify.py` e sua imagem verificam a base revisada
+novamente, com os dois volumes somente leitura. `product_scope_registration.py`
+registra o resultado atomicamente em uma tabela própria; não muda a base global,
+não aplica o contrato retroativamente nem emite ferramentas. A vinculação desse
+registro a uma tarefa específica ainda precisa ser implementada e qualificada.
 Aprovar o plano não equivale a conceder escrita ou homologar.
