@@ -163,3 +163,9 @@ linhagem ACP anterior ao prompt, sponsor revalidado e apresentação corrigida
 ensaiada em banco isolado. Cria outro plano com referência e prova da tentativa
 anterior, que permanece inalterada. Não despacha agentes nem concede escrita;
 o loop regular deve conduzir a nova proposta e sua revisão independente.
+`scope_runtime_inventory.py` confere, em contêiner descartável sem rede,
+os hashes de código dos adaptadores e de seus pontos de integração, incluindo
+o resolver de mounts. A imagem do broker e a do proxy têm inventários distintos.
+Essa verificação deve preceder a instalação dos overlays; importações isoladas
+não provam que todos os módulos atualizados estão presentes na imagem.
+Mesmo um inventário correto não qualifica mounts reais ou a entrega completa.
