@@ -448,7 +448,7 @@ ou manter um impedimento técnico explícito. Essa retomada não autoriza ediç�
 testes, repetição do experimento ou aprovação. O caminho possui testes offline;
 sua recuperação ponta a ponta ainda precisa ser comprovada com os agentes reais.
 
-A candidata de manutenção adiciona uma barreira administrativa persistente,
+A barreira de manutenção instalada adiciona controle administrativo persistente,
 sem endpoint para os workers. `drain` suspende novas reconciliações; tarefas já
 existentes podem concluir normalmente. `seal` exige inventário nativo completo,
 ausência de leases ativos/fechando, ciclos de reconciliação e grants consumidos
@@ -457,10 +457,22 @@ Os ciclos são registrados em SQLite, não em um contador invisível a outro pro
 O estado permanece fechado após reinício; `release` exige o mesmo identificador
 da operação e conserva seu histórico, sem reaproveitar grants ou aprovações.
 Inventário indisponível e ciclos de resultado desconhecido não autorizam atualização.
-Esses contratos passaram pela validação offline; a candidata ainda não está instalada
-nem sua janela de manutenção foi validada no ambiente real.
+Esses contratos passaram pela validação offline. Na instância de avaliação,
+a imagem final foi instalada após backup SQLite íntegro e confirmação de ausência
+de tarefas nativas e leases ativos. O controlador preservou `sealed` após a troca;
+uma requisição HTTP autenticada foi recusada sem criar grants, e a admissão de
+novos ciclos permaneceu bloqueada. Isso qualifica a atualização **ociosa**, não
+a drenagem sob carga nem a recuperação de um ciclo interrompido.
 
-Depois de instalar e qualificar essa candidata, o procedimento de atualização será:
+Para migrar um controlador antigo sem essa barreira, o operador pode usar
+`bootstrap_controller_maintenance.py`. Ele exige IDs imutáveis, propriedade
+Compose, inventário nativo completo e ausência de leases ativos; cria um backup
+exclusivo, verifica sua integridade, para exatamente o controlador selecionado
+e sela o estado com um helper descartável agrupado. O helper não recebe socket
+Docker ou chave do modelo. Esse bootstrap não inicia a nova imagem e não pode
+ser repetido cegamente após resultado desconhecido.
+
+O procedimento de atualização dos controladores com essa barreira será:
 
 1. Suspender os serviços host de despacho da instância, preservando seus registros.
 2. Executar `controller_maintenance_cli.py --namespace <instância> --action drain --operation <UUID>`.
