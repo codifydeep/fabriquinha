@@ -107,6 +107,68 @@ def recover_proposal_lineage(b,config,run,effects=None):
     return after_run
 
 
+def recover_unstarted_mount_observation(b,config,run,effects=None):
+    """Observe an existing, unstarted fixed job after false-mount normalization.
+
+    The job's identity, deadline and create intent are never replaced. Only a
+    proven Docker omission of ReadOnly=false qualifies; no other drift or
+    executed job can use this path.
+    """
+    with b.db() as con:state=ledger.load(con,run['plan_key'])
+    held=state.get('materialization') or {}
+    if (config.get('enabled') is not True or run.get('stage')!='blocked'
+            or run.get('incident',{}).get('category')!='scope_pipeline_precondition_rejected'
+            or state['stage']!='plan_approved' or state.get('author_blocked') is not True
+            or state.get('delivery_approval') is not False or state.get('mount_observation_recovery')
+            or held.get('stage')!='blocked' or held.get('incident',{}).get('category')!='scope_materialization_rejected'
+            or set(held)!={'stage','incident','image','base','volume','deadline'}
+            or state['context']['issue_id']!=config['issue_id']
+            or state['context']['contract_sha256']!=config['contract_sha256']
+            or state['context']['source_task']!=run.get('source_task')):return run
+    fx=effects or execution.NativeEffects(b);reauthenticate(state,fx)
+    if held['image']!=IMAGE or held['deadline']<=time.time():
+        raise ValueError('same unexpired fixed materialization intent required')
+    registered=b.issue_base(config['issue_id']);base={k:registered[k] for k in ('volume','base_sha','manifest_sha256')}
+    volume=b.PREFIX+'-scope-contract-'+state['key'][:24]
+    if held['base']!=base or held['volume']!=volume:raise ValueError('unchanged original base required')
+    prepared=validation_job.grouped_create('POST','/containers/create?name=validation',payload(state,base,volume,b),b.PREFIX)
+    task=state['review_task']['id'];key=validation_job.digest(dict(task=task,kind='scope_materialize',payload=prepared))
+    name=b.PREFIX+'-validation-job-'+task+'-'+key[:12]
+    expected=dict(prepared,Labels=dict(prepared['Labels'],**{
+        'delivery-kit.owner':b.OWNER,'delivery-kit.source-task':task,'delivery-kit.validation-job':key}))
+    identity=dict(task=task,kind='scope_materialize',name=name,payload=expected)
+    with b.db() as con:row=con.execute('SELECT identity,state FROM validation_jobs WHERE job_key=?',(key,)).fetchone()
+    if not row or json.loads(row[0])!=identity:raise ValueError('same registered fixed validation job required')
+    job=json.loads(row[1])
+    if (job.get('stage')!='create_intent' or job.get('approval') is not False
+            or job.get('deadline',0)<=time.time() or set(job)!={'stage','deadline','approval'}):
+        raise ValueError('unexpired unstarted create intent required')
+    info=b.docker('GET','/containers/'+name+'/json')
+    if not info or info.get('State',{}).get('Status')!='created':raise ValueError('same unstarted container required')
+    expected_mounts=expected['HostConfig']['Mounts'];actual_mounts=info.get('HostConfig',{}).get('Mounts')
+    if expected_mounts==actual_mounts:raise ValueError('verified false mount omission required')
+    validation_job.verify(b,info,expected)
+    owned_volume=b.docker('GET','/volumes/'+volume)
+    if not owned_volume or owned_volume.get('Labels')!={'delivery-kit.owner':b.OWNER,'delivery-kit.scope-plan':state['key']}:
+        raise ValueError('same owned materialization volume required')
+    proof=dict(operation='qualified_unstarted_scope_mount_observation_v1',job_key=key,container_id=info['Id'],
+        identity_sha256=ledger.policy.digest(identity),previous_materialization=held,
+        previous_run_incident=run['incident'],delivery_approval=False,write_grant_issued=False)
+    after_plan=dict(state,mount_observation_recovery=proof,materialization=dict(held,stage='observe_existing_job'))
+    after_plan['materialization'].pop('incident')
+    after_run=dict(run,stage='scope_plan',mount_observation_recovery=proof);after_run.pop('incident')
+    with b.LOCK,b.db() as con:
+        current=con.execute('SELECT config,state FROM product_scope_runs WHERE issue_id=?',(config['issue_id'],)).fetchone()
+        job_now=con.execute('SELECT identity,state FROM validation_jobs WHERE job_key=?',(key,)).fetchone()
+        if (not current or json.loads(current[0])!=config or json.loads(current[1])!=run
+                or not job_now or tuple(job_now)!=tuple(row)):
+            raise ValueError('fixed job recovery sponsor changed')
+        ledger.save_transition(con,state,after_plan)
+        con.execute('UPDATE product_scope_runs SET state=? WHERE issue_id=? AND state=?',
+                    (ledger.encoded(after_run),config['issue_id'],current[1]))
+    return after_run
+
+
 def validate_receipt(state,base,receipt):
     expected=ledger.policy.candidate_contract(state['original_contract'],state['context'],state['proposal'])
     keys={'operation','issue_id','source_task','proposal_sha256','review_task','base_sha',

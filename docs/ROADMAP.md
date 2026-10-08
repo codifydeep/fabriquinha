@@ -185,3 +185,9 @@ esse vínculo era a única pré-condição ausente, não existe job ou volume cr
 e as decisões reautenticam. Preserva a rejeição no recibo da recuperação e
 atualiza plano e coordenador em uma única transação. Jobs iniciados, intenções
 mais completas, decisões alteradas ou qualificações rejeitadas não são resetados.
+A inspeção de montagens trata apenas a omissão Docker de `ReadOnly: false`
+como equivalente; fontes, destinos, flags true, ordem, tipos e outras opções
+continuam exatos. Uma recuperação separada pode observar o mesmo job registrado
+quando essa era a única diferença, o contêiner ainda está `created`, os prazos
+originais não expiraram e todas as identidades reautenticam. Não recria o job,
+não altera seu prazo nem repete a criação; jobs já iniciados não são elegíveis.

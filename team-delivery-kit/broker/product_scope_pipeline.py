@@ -128,7 +128,10 @@ def step(b,config,state):
 
 def recover_proposal_lineage(b,config,state):
     if state.get('lineage_recovery_attempt',{}).get('stage')=='rejected':return state
-    try:return materialization.recover_proposal_lineage(b,config,state)
+    try:
+        result=materialization.recover_proposal_lineage(b,config,state)
+        if result!=state:return result
+        return materialization.recover_unstarted_mount_observation(b,config,state)
     except (ValueError,KeyError,TypeError,OSError) as error:
         return save(b,config['issue_id'],state,dict(state,lineage_recovery_attempt=dict(
             stage='rejected',error_type=type(error).__name__,owner=state['owner'],

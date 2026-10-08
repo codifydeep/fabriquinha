@@ -1,4 +1,6 @@
 import hashlib
+import copy
+import time
 import json
 import unittest
 from unittest.mock import Mock,patch
@@ -136,6 +138,62 @@ class ProductScopeJobTests(unittest.TestCase):
             ledger.save_transition(con,state,dict(state,materialization=dict(state['materialization'],volume='existing-intent')))
         self.assertEqual(job.recover_proposal_lineage(self.b,config,run,self.fx),run)
         self.fx.verify_binding.assert_not_called();self.b.docker.assert_not_called()
+
+    def held_mount_observation(self):
+        config,run,state=self.held_lineage()
+        volume=self.b.PREFIX+'-scope-contract-'+state['key'][:24]
+        state=dict(state,materialization=dict(state['materialization'],base=self.base,image=job.IMAGE,
+                                             volume=volume,deadline=time.time()+600))
+        with self.b.db() as con:
+            before=ledger.load(con,self.key);ledger.save_transition(con,before,state)
+        prepared=job.validation_job.grouped_create('POST','/containers/create?name=validation',job.payload(state,self.base,volume,self.b),self.b.PREFIX)
+        key=job.validation_job.digest(dict(task=state['review_task']['id'],kind='scope_materialize',payload=prepared))
+        name=self.b.PREFIX+'-validation-job-'+state['review_task']['id']+'-'+key[:12]
+        expected=dict(prepared,Labels=dict(prepared['Labels'],**{
+            'delivery-kit.owner':self.b.OWNER,'delivery-kit.source-task':state['review_task']['id'],'delivery-kit.validation-job':key}))
+        identity=dict(task=state['review_task']['id'],kind='scope_materialize',name=name,payload=expected)
+        job_state=dict(stage='create_intent',approval=False,deadline=time.time()+600)
+        with self.b.db() as con:
+            con.execute('DROP TABLE validation_jobs')
+            con.execute('CREATE TABLE validation_jobs(job_key TEXT,identity TEXT,state TEXT)')
+            con.execute('INSERT INTO validation_jobs VALUES (?,?,?)',(key,json.dumps(identity),json.dumps(job_state)))
+        info=dict(Id='exact-existing',Image=job.IMAGE,Config=copy.deepcopy(expected),
+                  HostConfig=copy.deepcopy(expected['HostConfig']),State=dict(Status='created'))
+        info['HostConfig']['Mounts'][1].pop('ReadOnly')
+        owned=dict(Name=volume,Labels={'delivery-kit.owner':self.b.OWNER,'delivery-kit.scope-plan':state['key']})
+        def docker(method,path,payload=None):
+            if method!='GET':raise AssertionError('recovery cannot mutate Docker')
+            if path.startswith('/images/'):return dict(Id=job.IMAGE,Config=dict(Env=[]))
+            if path.startswith('/volumes/'):return owned
+            return info
+        self.b.docker.side_effect=docker
+        return config,run,state,key,job_state,info
+
+    def test_mount_normalization_recovery_preserves_exact_job_and_container_without_post(self):
+        config,run,state,key,job_state,info=self.held_mount_observation()
+        after=job.recover_unstarted_mount_observation(self.b,config,run,self.fx)
+        self.assertEqual(after['stage'],'scope_plan')
+        self.assertEqual(after['mount_observation_recovery']['container_id'],info['Id'])
+        with self.b.db() as con:
+            current=ledger.load(con,self.key)
+            self.assertEqual(json.loads(con.execute('SELECT state FROM validation_jobs').fetchone()[0]),job_state)
+        self.assertEqual(current['materialization']['stage'],'observe_existing_job')
+        self.assertEqual(current['mount_observation_recovery']['previous_materialization'],state['materialization'])
+        self.assertTrue(all(c.args[0]=='GET' for c in self.b.docker.call_args_list))
+
+    def test_started_container_or_actual_isolation_drift_cannot_resume(self):
+        config,run,state,key,job_state,info=self.held_mount_observation()
+        info['State']['Status']='running'
+        with self.assertRaises(ValueError):job.recover_unstarted_mount_observation(self.b,config,run,self.fx)
+        info['State']['Status']='created';info['HostConfig']['Mounts'][0]['ReadOnly']=False
+        with self.assertRaises(ValueError):job.recover_unstarted_mount_observation(self.b,config,run,self.fx)
+        with self.b.db() as con:self.assertEqual(ledger.load(con,self.key),state)
+
+    def test_expired_job_cannot_reset_deadline_or_execute_again(self):
+        config,run,state,key,job_state,info=self.held_mount_observation()
+        with self.b.db() as con:con.execute('UPDATE validation_jobs SET state=?',(json.dumps(dict(job_state,deadline=1)),))
+        with self.assertRaises(ValueError):job.recover_unstarted_mount_observation(self.b,config,run,self.fx)
+        self.b.docker.assert_not_called()
 
     def test_pending_job_reuses_same_payload_and_volume(self):
         with patch.object(job.validation_job,'run',side_effect=[job.validation_job.Pending('live'),self.result]) as run:

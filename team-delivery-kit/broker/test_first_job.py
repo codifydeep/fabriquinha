@@ -15,6 +15,17 @@ def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS test_first_jobs(job_key TEXT PRIMARY KEY,identity TEXT,state TEXT)')
 
 
+def normalized_mounts(mounts):
+    """Docker omits false ReadOnly; no other mount fields may be normalized."""
+    if not isinstance(mounts,list):raise ValueError('fixed mount list required')
+    result=[]
+    for mount in mounts:
+        if not isinstance(mount,dict) or type(mount.get('ReadOnly',False)) is not bool:
+            raise ValueError('boolean mount isolation required')
+        result.append(dict(mount,ReadOnly=mount.get('ReadOnly',False)))
+    return result
+
+
 def verify(b,info,expected):
     config=info.get('Config',{});host=info.get('HostConfig',{})
     image=b.docker('GET','/images/'+expected['Image']+'/json') or {}
@@ -23,7 +34,8 @@ def verify(b,info,expected):
             any(config.get(k)!=expected[k] for k in ('User','Entrypoint','Cmd'))
             or ('WorkingDir' in expected and config.get('WorkingDir')!=expected['WorkingDir'])
             or any(config.get('Labels',{}).get(k)!=v for k,v in expected['Labels'].items())
-            or any(host.get(k)!=v for k,v in expected['HostConfig'].items())
+            or any((normalized_mounts(host.get(k))!=normalized_mounts(v) if k=='Mounts'
+                    else host.get(k)!=v) for k,v in expected['HostConfig'].items())
             or config.get('NetworkDisabled') not in (True,False)
             or host.get('NetworkMode')!='none'):
         raise ValueError('fixed test-first job isolation drift')

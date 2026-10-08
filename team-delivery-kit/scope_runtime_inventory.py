@@ -13,7 +13,7 @@ from docker_grouping import args as group_args
 
 ROOT=Path(__file__).resolve().parent
 BROKER=['server','native','native_scope_note','handoff_runtime','adapted_test_review',
-        'test_revision_review','validation_job','review_context_recovery',
+        'test_revision_review','validation_job','test_first_job','review_context_recovery',
         'product_scope_revision','product_scope_ledger','product_scope_execution',
         'product_scope_materialize','product_scope_job','product_scope_base_verify',
         'product_scope_registration','product_scope_task_binding','product_scope_worker',

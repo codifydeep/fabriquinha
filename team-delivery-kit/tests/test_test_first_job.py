@@ -3,7 +3,7 @@ import json
 import sqlite3
 import unittest
 from types import SimpleNamespace
-from broker.test_first_job import run
+from broker.test_first_job import run,verify
 
 TASK='22222222-2222-4222-8222-222222222222'
 
@@ -81,3 +81,16 @@ class TestFirstJobTests(unittest.TestCase):
         with self.assertRaises(TimeoutError):self.call()
         self.info['Image']='sha256:'+'b'*64
         with self.assertRaises(ValueError):self.call(now=2)
+
+    def test_docker_omission_of_false_readonly_is_equivalent_but_true_is_not(self):
+        self.payload['HostConfig']['Mounts']=[dict(Type='volume',Source='owned',Target='/revision',ReadOnly=False)]
+        self.timeout_create=True
+        with self.assertRaises(TimeoutError):self.call()
+        self.info['HostConfig']=copy.deepcopy(self.payload['HostConfig'])
+        self.info['HostConfig']['Mounts'][0].pop('ReadOnly')
+        expected=copy.deepcopy(self.info['Config']);expected['HostConfig']=self.payload['HostConfig']
+        verify(self.b,self.info,expected)
+        for mutation in ({'ReadOnly':True},{'Source':'other'},{'Target':'/other'},{'ReadOnly':'false'}):
+            with self.subTest(mutation=mutation):
+                self.info['HostConfig']['Mounts'][0]=dict(dict(Type='volume',Source='owned',Target='/revision'),**mutation)
+                with self.assertRaises(ValueError):verify(self.b,self.info,expected)
