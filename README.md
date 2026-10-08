@@ -261,6 +261,18 @@ worker ativo e nenhum Red aprovado. O incidente anterior é arquivado antes da
 troca; ambos os pareceres produzem somente um plano de experimento em cópia
 descartável, sem nova execução do autor, reset de limites ou aprovação de entrega.
 
+O experimento fixo de atribuição de timers por escritas no indicador roda sobre
+uma cópia descartável, sem rede, credenciais ou socket. Ele altera somente a
+constante literal do harness, verifica a identidade da AST restante e os hashes
+do snapshot antes e depois, e calibra os 16 controles com polling legítimo.
+Também registra separadamente a observação do produto original: referência
+positiva verde não implica produto verde. O ensaio real sustentou essa hipótese,
+mas não constitui submissão do autor, Red/Green válido ou aprovação de entrega.
+Resumos de planejamento podem compactar listas históricas de nomes de métodos;
+contagens, controles inválidos e evidência integral permanecem disponíveis. Uma
+recuperação por excesso de contexto retoma apenas a revisão pendente, uma vez,
+sem repetir o parecer técnico ou patrocinar implementação.
+
 O gate verifica compilação, referência correta e 12 defeitos controlados (respostas indevidas,
 requisições duplicadas, estado pendente, timers e interferência). O job usa o
 snapshot somente leitura, sem rede, credenciais ou socket Docker. Erros de runtime,

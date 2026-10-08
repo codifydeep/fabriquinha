@@ -3,7 +3,7 @@ import sqlite3,json,threading
 from contextlib import contextmanager
 from unittest.mock import patch
 from types import SimpleNamespace
-from broker.calibration_rework import advance,decide,instruction,recover_format,marker,recover_technical_escalation
+from broker.calibration_rework import advance,decide,instruction,recover_format,marker,recover_technical_escalation,recover_post_execution_context
 
 
 class CalibrationReworkTests(unittest.TestCase):
@@ -73,6 +73,24 @@ class CalibrationReworkTests(unittest.TestCase):
         self.assertFalse(held['delivery_approval'])
         self.assertEqual(held['required_action'],'execute_read_only_experiment_for_exact_calibration_plan')
         self.assertEqual(self.calls,[])
+
+    def test_oversized_historical_summary_recovers_peer_only_once(self):
+        config={**self.config,'post_execution_diagnosis':dict(previous_diagnostic=dict(
+            positive=dict(tests=15,failures=15,failed_methods=['test_'+str(i)+'_'+'x'*100 for i in range(15)]))),
+            'diagnostic':dict(phase='background_timer_control',positive=dict(tests=15,failures=0),negative_controls={})}
+        state=dict(stage='blocked',category='calibration_rework_rejected',error_type='ValueError',
+            cto_task='cto-task',cto_decision=dict(action='request_test_revision',reason='Concrete experiment. '+'x'*1080,optional_files=[]))
+        result=recover_post_execution_context(config,state)
+        self.assertEqual(result['stage'],'peer_pending')
+        self.assertEqual(result['cto_task'],state['cto_task'])
+        receipt=result['post_execution_context_recovery']
+        self.assertEqual(receipt['previous_state'],state)
+        self.assertGreater(receipt['previous_note_characters']+100,4000)
+        self.assertLessEqual(receipt['note_characters']+100,4000)
+        self.assertFalse(receipt['author_retry_authorized'])
+        self.assertIsNone(recover_post_execution_context(config,result))
+        self.assertIsNone(recover_post_execution_context(config,{**state,'peer_wakeup':'existing'}))
+        self.assertIsNone(recover_post_execution_context(config,{**state,'cto_decision':{'action':'escalate_cto'}}))
 
     def test_restart_after_ambiguous_intent_only_observes_never_reposts(self):
         state=dict(stage='cto_intent',intent_at=1)

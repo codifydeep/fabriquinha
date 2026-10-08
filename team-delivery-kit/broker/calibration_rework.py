@@ -31,8 +31,8 @@ def instruction(config,state):
             'test method/assertion, baseline byte and acceptance criterion. Both decisions retain a plan only; '
             'execution still requires an evidence-bound qualified experiment and all existing gates. '
             'Return ONLY JSON action=request_test_revision or escalate_cto, reason<=1200 characters, optional_files=[].\n'
-            'Previous calibration: '+json.dumps(config['post_execution_diagnosis']['previous_diagnostic'],sort_keys=True)+
-            '\nCurrent calibration: '+json.dumps(diagnostic_index(config['diagnostic']),sort_keys=True)+
+            'Previous calibration: '+json.dumps(compact_index(config['post_execution_diagnosis']['previous_diagnostic']),sort_keys=True)+
+            '\nCurrent calibration: '+json.dumps(compact_index(diagnostic_index(config['diagnostic'])),sort_keys=True)+
             ('\nCTO proposal: '+json.dumps(state['cto_decision'],sort_keys=True) if peer else '')+
             '\nUnchanged acceptance IDs: '+','.join(sorted(config['criteria']))+'\n'+
             ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in config['paths']))
@@ -186,6 +186,37 @@ def diagnostic_index(diagnostic):
         result.update(negative_controls_total=len(required),negative_controls_detected=len(required)-len(failed),
             undetected_or_invalid_controls=failed)
     return result
+
+
+def compact_index(index):
+    """Keep all numeric/control facts; method names stay in durable evidence."""
+    result=dict(index)
+    if isinstance(result.get('positive'),dict):
+        result['positive']=dict(result['positive'])
+        for key in ('failed_methods','errored_methods'):
+            names=result['positive'].pop(key,None)
+            if isinstance(names,list):result['positive'][key+'_count']=len(names)
+    return result
+
+
+def recover_post_execution_context(config,state):
+    if (not config.get('post_execution_diagnosis') or state.get('post_execution_context_recovery')
+            or state.get('stage')!='blocked' or state.get('category')!='calibration_rework_rejected'
+            or state.get('error_type')!='ValueError' or not state.get('cto_task')
+            or state.get('cto_decision',{}).get('action')!='request_test_revision'
+            or state.get('peer_wakeup') or state.get('executor') or state.get('binding_recovery')):
+        return None
+    note=instruction(config,{**state,'stage':'peer_pending'})
+    before=config['post_execution_diagnosis']['previous_diagnostic'];current=diagnostic_index(config['diagnostic'])
+    old_length=len(note)+sum(len(json.dumps(i,sort_keys=True))-len(json.dumps(compact_index(i),sort_keys=True)) for i in (before,current))
+    if old_length+100<=4000:return None
+    new={**state,'stage':'peer_pending','post_execution_context_recovery':dict(
+        operation='bounded_calibration_summary_v1',previous_state=state,
+        previous_note_characters=old_length,note_characters=len(note),
+        note_sha256=hashlib.sha256(note.encode()).hexdigest(),
+        author_retry_authorized=False,delivery_approval=False)}
+    for key in ('category','error_type','owner'):new.pop(key,None)
+    return new
 
 
 def marker(config,role):
@@ -423,6 +454,11 @@ def _handle(b,route,runs,source,prior,effects):
                 foreign_source=False
             else:con.execute('INSERT INTO calibration_reworks VALUES(?,?,?,?)',(issue,key,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
     else:config,state=map(json.loads,existing[1:])
+    recovered=recover_post_execution_context(config,state)
+    if recovered:
+        state=recovered
+        with b.db() as con:
+            con.execute('UPDATE calibration_reworks SET state=? WHERE issue_id=?',(json.dumps(state,sort_keys=True),issue))
     if state.get('stage')=='blocked' and not config.get('format_revision'):
         role='peer' if state.get('peer_wakeup') else 'cto'
         candidates=[t for t in runs if t.get('wakeup_id')==state.get(role+'_wakeup') and t.get('agent_id')==config[role]]

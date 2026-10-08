@@ -1,0 +1,3 @@
+FROM delivery-kit-timer-background-qualification:20261008.4
+COPY service_mode_indicator_write_hypothesis.py /service_mode_indicator_write_hypothesis.py
+RUN PYTHONPATH=/ python -c "import service_mode_indicator_write_hypothesis"
