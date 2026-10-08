@@ -134,6 +134,15 @@ uma decisão de repetir o trabalho do autor é bloqueada: o CTO deve especificar
 qual evidência ou experimento diagnóstico falta. Isso não constitui recuperação
 ponta a ponta, aprovação de entrega ou autorização para enfraquecer testes.
 
+O experimento `probe_frozen_patch_provider.py` pode solicitar uma proposta ao
+modelo usando código de um snapshot verificado e montado somente para leitura.
+Os frames de leitura são explicitamente sintéticos: não contam como leituras
+nativas ou execução do autor. Nenhum patch retornado é executado. Intenção e
+identidade do experimento são persistidas antes da chamada; resultado incerto
+não rearma a solicitação. O recibo distingue proposta válida, rejeição do proxy
+e falha do contrato da fixture. Mesmo um resultado positivo não prova a causa
+histórica, calibração, Red, revisão, implantação ou recuperação autônoma.
+
 O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
 de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo
 válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise não
