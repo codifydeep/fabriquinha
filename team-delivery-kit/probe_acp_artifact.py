@@ -21,10 +21,11 @@ def valid_artifact(record):
             and record.get('syntax_valid') is True)
 
 
-def seeded_tool_receipts(notifications):
+def seeded_tool_receipts(notifications, allow_syntax_recovery=False):
     """Measure the actual pinned ACP stream, not the review-only read extractor."""
     starts = {}
     completed = set()
+    syntax_rejected = set()
     invalid = False
     for frame in notifications:
         if not isinstance(frame, dict) or frame.get('method') != 'session/update':
@@ -45,15 +46,27 @@ def seeded_tool_receipts(notifications):
                 invalid = True
             starts[identifier] = tool
         elif update.get('sessionUpdate') == 'tool_call_update' and update.get('status') == 'completed':
-            if identifier not in starts or identifier in completed:
+            if identifier not in starts or identifier in completed or identifier in syntax_rejected:
                 invalid = True
             completed.add(identifier)
+        elif update.get('sessionUpdate') == 'tool_call_update' and update.get('status') == 'failed':
+            text='\n'.join(c.get('content',{}).get('text','') for c in update.get('content',[])
+                if isinstance(c,dict) and c.get('type')=='content' and isinstance(c.get('content'),dict))
+            if (not allow_syntax_recovery or starts.get(identifier)!='patch'
+                    or identifier in completed or identifier in syntax_rejected
+                    or 'fenced Python syntax rejected' not in text or 'No bytes were changed.' not in text):
+                invalid=True
+            else:syntax_rejected.add(identifier)
     patches = {key for key, tool in starts.items() if tool == 'patch'}
-    return dict(actual_patch_calls=len(patches),
+    result=dict(actual_patch_calls=len(patches),
                 actual_read_calls=sum(tool == 'read_file' for tool in starts.values()),
                 paired_patch_results=len(patches & completed),
-                tool_protocol_valid=not invalid and set(starts) == completed
+                tool_protocol_valid=not invalid and set(starts) == completed | syntax_rejected
                     and all(tool != 'forbidden' for tool in starts.values()))
+    if allow_syntax_recovery:
+        result['syntax_rejected_patch_calls']=len(syntax_rejected)
+        if len(syntax_rejected)>1:result['tool_protocol_valid']=False
+    return result
 
 
 def remote_probe(decomposition=False,unterminated=False,allocation=False,deterministic=False,seeded_patch=False):
@@ -249,10 +262,11 @@ print(json.dumps({'uid':os.getuid(),'bytes':len(raw),'sha256':hashlib.sha256(raw
         else:
             result['status'] = 'passed' if valid_artifact(record) and record['uid'] == 10000 else 'failed'
             if seeded_patch:
-                receipts=seeded_tool_receipts(response.get('_broker_notifications',[]))
+                receipts=seeded_tool_receipts(response.get('_broker_notifications',[]),allow_syntax_recovery=True)
                 result.update(synthetic_fixture=True,historical_failure_cause_proven=False,
                     **receipts,red_verified=False)
-                if (record.get('expected_patch_applied') is not True or receipts['actual_patch_calls']!=1
+                if (record.get('expected_patch_applied') is not True
+                        or receipts['actual_patch_calls']!=1+receipts['syntax_rejected_patch_calls']
                         or receipts['paired_patch_results']!=1 or receipts['actual_read_calls']<2
                         or not receipts['tool_protocol_valid']):
                     result['status']='failed'

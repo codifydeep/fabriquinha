@@ -9,6 +9,45 @@ from broker.fenced_file_write import write_fenced
 
 
 class FencedFileWriteTests(unittest.TestCase):
+    def test_invalid_python_quote_patch_preserves_last_good_bytes_before_open(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'test_new.py'
+            original=b"QUERY = 'calls.length'\n";target.write_bytes(original)
+            invalid=b"QUERY = 'calls.filter(c => c.url === '/service-mode').length'\n"
+            with patch('broker.fenced_file_write.os.open') as opened:
+                with self.assertRaisesRegex(ValueError,'Python syntax rejected.*No bytes were changed') as error:
+                    write_fenced(target,invalid,root)
+                opened.assert_not_called()
+            self.assertEqual(target.read_bytes(),original)
+            self.assertNotIn('/service-mode',str(error.exception))
+            self.assertIsNone(error.exception.__cause__)
+
+    def test_invalid_encoding_and_null_bytes_do_not_truncate_python(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'code.py';target.write_bytes(b'VALUE = 0\n')
+            for content in (b'VALUE = \x00\n',b'# coding: utf-8\nVALUE = "\xff"\n'):
+                with self.assertRaisesRegex(ValueError,'Python syntax rejected'):
+                    write_fenced(target,content,root)
+                self.assertEqual(target.read_bytes(),b'VALUE = 0\n')
+
+    def test_valid_python_is_parsed_without_import_or_execution(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'code.py';target.write_bytes(b'VALUE = 0\n')
+            marker=root/'must-not-exist'
+            source=('from pathlib import Path\nPath('+repr(str(marker))+').touch()\n').encode()
+            with patch('broker.fenced_file_write.os.fstat',return_value=SimpleNamespace(
+                    st_mode=stat.S_IFREG|0o666,st_uid=0,st_nlink=1)):
+                write_fenced(target,source,root)
+            self.assertEqual(target.read_bytes(),source);self.assertFalse(marker.exists())
+
+    def test_other_file_types_remain_under_original_write_contract(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'fixture.txt';target.write_bytes(b'old')
+            with patch('broker.fenced_file_write.os.fstat',return_value=SimpleNamespace(
+                    st_mode=stat.S_IFREG|0o666,st_uid=0,st_nlink=1)):
+                write_fenced(target,b'not Python: {',root)
+            self.assertEqual(target.read_bytes(),b'not Python: {')
+
     def test_oversized_write_is_rejected_before_changing_existing_bytes(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()

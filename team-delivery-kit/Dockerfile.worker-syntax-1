@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261007.330
+COPY broker/fenced_file_write.py /fenced_file_write.py

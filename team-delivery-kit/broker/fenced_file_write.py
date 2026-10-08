@@ -1,5 +1,6 @@
 """In-place write to one precreated phase-writable file in the fenced workspace."""
 import os
+import ast
 from pathlib import Path
 import stat
 import sys
@@ -17,6 +18,14 @@ def write_fenced(path, content, root=Path('/workspace')):
         raise ValueError('fenced write size exceeds '+str(MAX_BYTES)+' bytes; received at least '+str(len(content))+
             ' bytes. Reduce duplicate comments/scaffolding in the declared NEW test before adding code; '
             'preserve all test methods, assertions and acceptance. No bytes were changed.')
+    if target.suffix == '.py':
+        try:
+            # Parse proposed bytes only: never import, compile to disk or execute.
+            ast.parse(content)
+        except (SyntaxError, ValueError, UnicodeError):
+            # Do not leak the source line through SyntaxError's traceback.
+            raise ValueError('fenced Python syntax rejected. Correct the proposed patch using '
+                'the existing file; preserve assertions and baseline. No bytes were changed.') from None
     descriptor = os.open(target, os.O_WRONLY | os.O_NOFOLLOW)
     try:
         info = os.fstat(descriptor)

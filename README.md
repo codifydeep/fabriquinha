@@ -117,6 +117,12 @@ chamadas rejeitadas é encaminhada; o modelo precisa propor uma nova chamada ún
 validada pelo contrato original. Leituras e patches compartilham o mesmo limite;
 reinícios, uma segunda falha ou resposta incompleta não rearmam a correção.
 
+O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
+de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo
+válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise não
+importa nem executa código e não comprova comportamento, cobertura ou TDD; Red,
+Green, suíte completa e revisão independente continuam obrigatórios.
+
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
 O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,

@@ -32,6 +32,19 @@ class AcpArtifactProbeTests(unittest.TestCase):
             self.assertFalse(receipt['tool_protocol_valid'])
             self.assertEqual(receipt['actual_patch_calls'],0)
 
+    def test_one_identified_syntax_rejection_then_valid_patch_is_not_a_failed_delivery_approval(self):
+        frames=self.frames();failed=frames[-1]['params']['update']
+        failed.update(status='failed',content=[dict(type='content',content=dict(type='text',
+            text='fenced Python syntax rejected. No bytes were changed.'))])
+        retry=self.frames()[-2:]
+        for frame in retry:frame['params']['update']['toolCallId']='corrected'
+        receipt=seeded_tool_receipts(frames+retry,allow_syntax_recovery=True)
+        self.assertTrue(receipt['tool_protocol_valid']);self.assertEqual(receipt['syntax_rejected_patch_calls'],1)
+        self.assertEqual(receipt['actual_patch_calls'],2);self.assertEqual(receipt['paired_patch_results'],1)
+        self.assertFalse(seeded_tool_receipts(frames+retry)['tool_protocol_valid'])
+        failed['content'][0]['content']['text']='permission denied'
+        self.assertFalse(seeded_tool_receipts(frames+retry,allow_syntax_recovery=True)['tool_protocol_valid'])
+
     def test_seeded_probe_uses_real_transport_and_only_narrow_fixture_patch(self):
         import inspect
         import ast
