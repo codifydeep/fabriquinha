@@ -427,6 +427,22 @@ def reconcile(con, route, runs, effects, *, now=None):
     if data['contract_sha256'] != route['contract_sha256']:
         raise ValueError('handoff contract revision drift')
     stage = prior['stage'] if prior else 'observed'
+    # A native completion precedes lease finalization. Recover only the exact
+    # historical admission race, never a functional validation failure or an
+    # active diagnosis. Preserve the old intervention as history.
+    if (stage in ('diagnose','diagnose_cto','technical_decision_required','awaiting_acceptance','accepted')
+            and source.get('status')=='completed' and data.get('error')=='no completed implementation lease'
+            and not data.get('snapshot') and not data.get('evidence') and not data.get('validation_failure')
+            and not data.get('lease_finalization_recovery')
+            and not any(r.get('status') in ('queued','dispatched','running') for r in runs)
+            and hasattr(effects,'test_source_finalization')
+            and effects.test_source_finalization(issue,key)=='ready'):
+        data['lease_finalization_recovery']=dict(operation='same_completed_lease_validation_v1',
+            prior_stage=stage,prior_data=json.loads(json.dumps(data)),approval=False,author_restarted=False)
+        for field in ('error','error_type','control_error','control_error_count','wakeup_id','recipient_task',
+                      'dispatch_stage','dispatch_marker','instruction','target','trigger_task','dispatched_at','decision'):
+            data.pop(field,None)
+        stage=save(con,key,issue,'validation_pending',route['reviewer'],data,now)
     if (stage=='technical_decision_required' and not route.get('test_first')
             and data.get('control_error')=='ValueError:test revision requires executed test-first failure evidence'
             and data.get('recipient_task') and data.get('target')==route['cto']
@@ -610,6 +626,14 @@ def reconcile(con, route, runs, effects, *, now=None):
                 stage = save(con, key, issue, 'diagnose', route['techlead'], data, now)
         else:
             try:
+                if source.get('status')=='completed' and hasattr(effects,'test_source_finalization'):
+                    readiness=effects.test_source_finalization(issue,key)
+                    if readiness=='pending':
+                        wait=data.setdefault('lease_finalization_wait',dict(first_seen=now,task_id=key,approval=False))
+                        if wait['task_id']!=key:raise ValueError('finalization task identity drift')
+                        if now-wait['first_seen']>=600:
+                            raise ValueError('implementation lease finalization observation deadline')
+                        return save(con,key,issue,'validation_pending',route['reviewer'],data,now)
                 if hasattr(effects, 'phase_evidence'):
                     data['phase_evidence'] = effects.phase_evidence(key)
                 if source['status'] != 'completed':

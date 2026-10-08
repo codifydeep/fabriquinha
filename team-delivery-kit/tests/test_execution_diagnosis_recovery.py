@@ -69,7 +69,9 @@ class ExecutionDiagnosisRecoveryTests(unittest.TestCase):
                 with self.assertRaises(ValueError): self.register()
 
     def test_pin_drift_and_other_native_failure_are_rejected(self):
-        with patch.object(recovery, 'FIXED_SOURCE_SHA', '0' * 64):
+        # Simulate actual source drift, independent of which historical pin is
+        # currently installed. Every explicitly qualified revision stays pinned.
+        with patch.object(recovery.Path, 'read_bytes', return_value=b'unapproved controller source'):
             with self.assertRaises(ValueError): self.register()
         self.runs[1]['error'] = 'functional error'
         with self.assertRaises(ValueError): self.register()

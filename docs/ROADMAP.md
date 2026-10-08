@@ -45,3 +45,10 @@ identidade do revisor, a lease encerrada, a leitura integral e o mesmo snapshot.
 O histórico da falha fica preservado e o novo handoff tem identidade distinta.
 Essa recuperação é única: outro erro não reinicia o contador nem libera o autor.
 Seu parecer ainda precisa passar pelos controles normais e não homologa a release.
+
+Conclusão de task e fechamento de lease são observações distintas. A validação
+aguarda a finalização da mesma lease, com identidade e prazo persistentes, antes
+de congelar arquivos. Um atraso de fechamento não é falha funcional, não autoriza
+correção pelo autor e não constitui entrega. Incidentes históricos dessa corrida
+só retornam à validação se a lease estiver fechada, não houver diagnósticos ativos
+e nenhuma falha funcional tiver sido produzida; o histórico permanece preservado.
