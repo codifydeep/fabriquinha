@@ -110,9 +110,10 @@ class NativeEffects:
         if source.get('status')!='completed' or source.get('issue_id')!=c['issue_id']:
             raise ValueError('completed original author task required')
 
-    def wake(self,state,phase,marker,note):
+    def wake(self,state,phase,marker,note,*,allow_create=True):
         c=state['context'];actor=c['cto'] if phase=='proposal' else c['reviewer']
-        return native.ensure_planning_start(self.settings,c['issue_id'],actor,c['source_task'],marker,note)
+        return native.ensure_planning_start(self.settings,c['issue_id'],actor,c['source_task'],marker,note,
+                                           allow_create=allow_create)
 
     def task(self,identifier,actor):return native.task_record(self.settings,identifier,actor)
 
@@ -127,6 +128,74 @@ def save(b,before,after):
     with b.LOCK,b.db() as con:return ledger.save_transition(con,before,after)
 
 
+def dispatch_note(state,phase):
+    if phase not in ('proposal','review'):raise ValueError('known scope dispatch phase required')
+    c=state['context']
+    marker=ledger.policy.digest(dict(plan=state['key'],phase=phase,proposal=state.get('proposal_sha256')))
+    wire_context={k:c[k] for k in ('issue_id','source_task','contract_sha256','snapshot_sha256',
+        'failure_output_sha256','eligible_code_sha256','frozen_test_sha256')}
+    note=instruction(phase,wire_context,state.get('proposal_sha256') if phase=='review' else None)
+    if phase=='review':note+='\nExact proposal data: '+ledger.encoded(state['proposal'])
+    if len(note)>3800:raise ValueError('bounded scope planning instruction required')
+    return marker,note
+
+
+def mounts(b,request_id,effects=None):
+    """A native request sees only its registered immutable sponsor, read-only.
+
+    Wakeup observation uses allow_create=False: worker construction may never
+    create planning tasks. A persisted dispatch intent handles lost POST acks.
+    """
+    with b.db() as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='product_scope_plans'").fetchone():
+            return []
+        plans=[json.loads(r[0]) for r in con.execute('SELECT data FROM product_scope_plans')]
+        if not plans:return []
+        binding=con.execute('SELECT task_id,issue_id,agent_id FROM native_bindings WHERE request_id=?',
+                            (request_id,)).fetchone()
+        if not binding:return []
+    task_id,issue,actor=tuple(binding)
+    plans=[s for s in plans if s['context']['issue_id']==issue and actor in
+           (s['context']['cto'],s['context']['reviewer'])]
+    if not plans:return []
+    fx=effects or NativeEffects(b)
+    task=fx.task(task_id,actor)
+    if task.get('id')!=task_id or task.get('issue_id')!=issue or task.get('agent_id')!=actor:
+        raise ValueError('scope mount native task identity drift')
+    note=task.get('handoff_note') or ''
+    if 'DELIVERY_PRODUCT_SCOPE_V1:' not in note:
+        # An older independent technical diagnosis for the same actor is not
+        # implicitly a scope-plan execution. Keep its own mount mechanism.
+        return []
+    matches=[]
+    for state in plans:
+        phase='proposal' if actor==state['context']['cto'] else 'review'
+        if state['stage']!=('awaiting_proposal' if phase=='proposal' else 'awaiting_review'):continue
+        dispatch=state.get('dispatch',{}).get(phase)
+        if not dispatch:continue
+        marker,instruction_text=dispatch_note(state,phase)
+        exact='DELIVERY_PLANNING_START '+marker+'\nSource: '+state['context']['source_task']+'\n'+instruction_text
+        if dispatch['marker']==marker and note==exact:matches.append((state,phase,marker,instruction_text))
+    if len(matches)!=1 or task.get('status') not in ('queued','running'):
+        raise ValueError('one active exact scope mount registration required')
+    state,phase,marker,instruction_text=matches[0]
+    fx.verify_binding(state)
+    wake=fx.wake(state,phase,marker,instruction_text,allow_create=False)
+    if (not wake or task.get('wakeup_id')!=wake.get('id')
+            or state['dispatch'][phase].get('wakeup_id') not in (None,wake.get('id'))):
+        raise ValueError('scope mount wakeup identity drift')
+    with b.db() as con:
+        if ledger.load(con,state['key'])!=state:raise ValueError('scope mount registration changed')
+        snapshot=con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',
+                             (state['context']['source_task'],)).fetchone()
+    if not snapshot or snapshot[1]!='complete':raise ValueError('complete scope sponsor snapshot required')
+    volume=b.docker('GET','/volumes/'+snapshot[0]);labels=(volume or {}).get('Labels',{})
+    if (labels.get('delivery-kit.owner')!=b.OWNER
+            or labels.get('delivery-kit.source-task')!=state['context']['source_task']):
+        raise ValueError('scope mount volume ownership drift')
+    return [dict(Type='volume',Source=snapshot[0],Target='/evidence/candidate',ReadOnly=True)]
+
+
 def tick(b,key,effects=None):
     fx=effects or NativeEffects(b)
     with b.LOCK,b.db() as con:state=ledger.load(con,key)
@@ -136,12 +205,7 @@ def tick(b,key,effects=None):
     fx.verify_binding(state)
     phase='proposal' if state['stage']=='awaiting_proposal' else 'review'
     c=state['context'];actor=c['cto'] if phase=='proposal' else c['reviewer']
-    marker=ledger.policy.digest(dict(plan=key,phase=phase,proposal=state.get('proposal_sha256')))
-    wire_context={k:c[k] for k in ('issue_id','source_task','contract_sha256','snapshot_sha256',
-        'failure_output_sha256','eligible_code_sha256','frozen_test_sha256')}
-    note=instruction(phase,wire_context,state.get('proposal_sha256') if phase=='review' else None)
-    if phase=='review':note+='\nExact proposal data: '+ledger.encoded(state['proposal'])
-    if len(note)>3800:raise ValueError('bounded scope planning instruction required')
+    marker,note=dispatch_note(state,phase)
     dispatch=state.get('dispatch',{}).get(phase)
     if not dispatch:
         state=save(b,state,dict(state,dispatch={**state.get('dispatch',{}),phase:dict(stage='intent',marker=marker)}))

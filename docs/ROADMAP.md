@@ -74,6 +74,10 @@ recibos do validador; verifica os bytes efetivamente lidos; reconcilia despachos
 com confirmação perdida sem repetir intervenções. Resultados textuais ou falhas
 terminais mantêm um impedimento visível, sem reiniciar o autor. Esses componentes
 estão cobertos por testes offline, mas o adaptador ainda não está habilitado no
-runtime. Montagens exatas de leitura, materialização do contrato revisado e
-despacho da implementação ainda precisam de integração e qualificação real.
+runtime. A seleção das montagens já está integrada ao código do broker:
+confere tarefa, instrução, wakeup e snapshot exatos; é somente leitura e não
+cria wakeups durante a construção do worker. Diagnósticos antigos não herdam
+esse acesso e planos encerrados não reutilizam o snapshot como plano ativo.
+A materialização do contrato revisado, instalação dos componentes e despacho
+da implementação ainda precisam de integração e qualificação real.
 Aprovar o plano não equivale a conceder escrita ou homologar.

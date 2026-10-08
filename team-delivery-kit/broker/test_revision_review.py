@@ -1216,6 +1216,10 @@ def _save(broker, route, state):
 
 def planning_mounts(broker, request_id):
     """Only controller-selected immutable artifacts, never agent-provided paths."""
+    try:import product_scope_execution
+    except ImportError:from broker import product_scope_execution
+    scope=product_scope_execution.mounts(broker,request_id)
+    if scope:return scope
     with broker.db() as con:
         initialize(con)
         binding = con.execute('SELECT issue_id,agent_id FROM native_bindings WHERE request_id=?',
