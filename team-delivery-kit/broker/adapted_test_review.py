@@ -239,12 +239,13 @@ def mounts(broker, binding):
     return found
 
 
-def tick(broker):
+def tick(broker, excluded_issues=()):
     with broker.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='adapted_test_reviews'").fetchone():return
         rows=con.execute('SELECT config,state FROM adapted_test_reviews').fetchall()
     for row in rows:
         config,state=map(json.loads,row)
+        if config['issue_id'] in excluded_issues:continue
         technical=state.get('status')=='changes_requested' and state.get('replan',{}).get('status') in ('pending','awaiting_replan')
         author=config.get('author_revision_enabled') is True and state.get('replan',{}).get('status')=='test_revision_requested' and state.get('author_revision',{}).get('status','pending') in ('pending','awaiting_author')
         if not technical and not author and state.get('status') not in ('pending','awaiting_review'):continue

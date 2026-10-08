@@ -557,14 +557,23 @@ def error_stage(previous, data, cto, count):
 
 
 def tick(broker):
+    try:import product_scope_pipeline
+    except ImportError:from broker import product_scope_pipeline
+    scope_owned=product_scope_pipeline.tick(broker)
     try: import adapted_test_review
     except ImportError: from broker import adapted_test_review
-    adapted_test_review.tick(broker)
+    adapted_test_review.tick(broker, excluded_issues=scope_owned)
     settings = json.loads((broker.STATE / 'native.json').read_text())
     effects = Effects(broker, settings)
     with broker.db() as con:
         routes = [json.loads(r[0]) for r in con.execute('SELECT config FROM delivery_routes')]
     for route in routes:
+        if route['issue_id'] in scope_owned:
+            with broker.db() as con:
+                state=con.execute('SELECT * FROM delivery_handoffs WHERE issue_id=? ORDER BY updated DESC LIMIT 1',
+                                  (route['issue_id'],)).fetchone()
+            safe_publish(broker,route,dict(state) if state else None)
+            continue
         try:import incremental_dispatch
         except ImportError:from broker import incremental_dispatch
         with broker.db() as con:

@@ -129,8 +129,14 @@ prepara o plano persistente a partir dessa leitura, do snapshot de falha e do
 inventário do validador qualificado, com Red e revisão de testes preservados.
 Não transforma a recomendação textual do CTO em permissão. O leitor também
 foi executado sobre a base real do ensaio em volume somente leitura; isso
-qualifica a leitura, não o fluxo autônomo completo. Ainda falta conectar a
-orquestração desses adaptadores ao loop com roteamento explícito e instalá-los.
+qualifica a leitura, não o fluxo autônomo completo. `product_scope_pipeline.py`
+conecta os adaptadores ao loop com registro explícito por issue, seleção
+persistente do impedimento e propriedade exclusiva até a admissão do autor.
+O fluxo legado de handoffs e revisão de testes não disputa issues selecionadas.
+Pausa e manutenção preservam essa propriedade; jobs pendentes e confirmações
+incertas são observados novamente sem apagar suas intenções. Rejeições mantêm
+incidente técnico visível, sem concluir entrega ou repetir a mesma ação.
+Ainda falta instalar e qualificar essa coordenação no ciclo real dos agentes.
 Os prompts de proposta/revisão de escopo também são isolados pelo controlador:
 exigem a nota registrada e o wakeup/tarefa exatos, sem carregar protocolos
 históricos conflitantes da descrição da issue e sem criar trabalho ao consultar.
