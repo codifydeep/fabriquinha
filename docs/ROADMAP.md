@@ -67,7 +67,13 @@ demais campos do contrato preservados. É uma política pura, não uma concessã
 de ferramentas. `product_scope_contract.py` adiciona submissão tipada e leitura
 obrigatória das dependências antes de propor ou revisar; `product_scope_ledger.py`
 persiste intenção, proposta e qualificação, com identidade imutável, retomada
-idempotente e autor ainda bloqueado após aprovação do plano. Esses componentes
-estão cobertos por testes offline, mas a integração instalada com tarefas reais,
-recibos autenticados, materialização de contratos e despacho ainda não está
-qualificada. Aprovar o plano não equivale a conceder escrita ou homologar.
+idempotente e autor ainda bloqueado após aprovação do plano.
+`product_scope_execution.py` implementa o adaptador nativo: confere o responsável,
+wakeup e tarefa concluída; autentica o patrocinador no estado persistente e nos
+recibos do validador; verifica os bytes efetivamente lidos; reconcilia despachos
+com confirmação perdida sem repetir intervenções. Resultados textuais ou falhas
+terminais mantêm um impedimento visível, sem reiniciar o autor. Esses componentes
+estão cobertos por testes offline, mas o adaptador ainda não está habilitado no
+runtime. Montagens exatas de leitura, materialização do contrato revisado e
+despacho da implementação ainda precisam de integração e qualificação real.
+Aprovar o plano não equivale a conceder escrita ou homologar.
