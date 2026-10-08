@@ -41,3 +41,12 @@ class PortableSuiteDiagnosticsTests(unittest.TestCase):
         self.assertEqual(failure['diagnostic_read_files'], ['tests/test_detail.py'])
         self.assertEqual(failure['tests_executed'], 3)
         self.assertEqual(con.execute('SELECT count(*) FROM frozen_suite_failures').fetchone()[0], 1)
+        specification['diagnostic_file_sha256'] = {'app/db.py': 'a' * 64,
+            'app/store.py': 'b' * 64, 'other/secret.py': 'c' * 64}
+        with patch('broker.validation_job.run', return_value=dict(exit_code=1, output=output)):
+            with self.assertRaises(FrozenSuiteFailure) as enriched:
+                namespace['run_portable_suite']('other-volume', str(uuid.uuid4()), specification)
+        self.assertEqual(enriched.exception.validation_failure['diagnostic_read_files'],
+                         ['app/db.py', 'app/store.py', 'tests/test_detail.py'])
+        self.assertEqual(enriched.exception.validation_failure['diagnostic_source_hashes'],
+                         {'app/db.py': 'a' * 64, 'app/store.py': 'b' * 64})

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import re
 
-from portable_contract import MAX_FILE_BYTES, validate, validate_delivery_files
+from portable_contract import MAX_FILE_BYTES, validate, validate_delivery_files, is_test_path
 
 
 BASE = Path('/base')
@@ -83,6 +83,10 @@ def verify():
                                     for name in contract['test_files'] if name in base_manifest['files']},
             'new_test_sha256': {name: manifest['files'][name]['sha256'] for name in new_tests},
             'manifest_sha256': hashlib.sha256(manifest_bytes).hexdigest(),
+            'diagnostic_file_sha256': {name: manifest['files'][name]['sha256']
+                for name in names if name.endswith('.py') and not any(
+                    is_test_path(name, root, contract['test_command'][0])
+                    for root in contract['test_roots'])},
             'baseline_tests_intact': True,
             'test_image': contract['test_image'],
             'test_command': contract['test_command'],

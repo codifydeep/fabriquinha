@@ -1,0 +1,2 @@
+FROM delivery-kit-offline-validator:20261003.28
+COPY broker/portable_snapshot_validate.py /portable_snapshot_validate.py

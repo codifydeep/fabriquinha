@@ -119,6 +119,10 @@ class PortableBrokerFilesTests(unittest.TestCase):
                 result = validate_snapshot.verify()
             self.assertEqual(result['mode'], 'portable')
             self.assertTrue(result['baseline_tests_intact'])
+            self.assertEqual(result['diagnostic_file_sha256'],
+                {'app.py': hashlib.sha256((snapshot / 'app.py').read_bytes()).hexdigest()})
+            self.assertNotIn('tests/test_old.py', result['diagnostic_file_sha256'])
+            self.assertNotIn('tests/test_new.py', result['diagnostic_file_sha256'])
             if os.environ.get('RUN_PORTABLE_DOCKER_TEST') == '1':
                 run = subprocess.run([
                     'docker', 'run', '--rm', '--network', 'none', '--read-only',

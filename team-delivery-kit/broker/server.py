@@ -1168,7 +1168,10 @@ def run_portable_suite(volume, source_task_id, specification, *, suite_evidence=
                             for row in paths if row[0].startswith('/workspace/')]
                         receipt['diagnostic_read_files'] = sorted(set(receipt['diagnostic_read_files']) |
                             set(failing_source_files(receipt, specification['test_files'])) |
-                            set(dependency_read_files(receipt, specification.get('files', []))))
+                            set(dependency_read_files(receipt, specification.get('diagnostic_file_sha256', {}))))
+                        receipt['diagnostic_source_hashes'] = {
+                            path: sha for path, sha in specification.get('diagnostic_file_sha256', {}).items()
+                            if path in receipt['diagnostic_read_files']}
                         con.execute('CREATE TABLE IF NOT EXISTS frozen_suite_failures('
                                     'task_id TEXT, output_sha256 TEXT, receipt TEXT, output TEXT, '
                                     'PRIMARY KEY(task_id,output_sha256))')
@@ -1260,7 +1263,14 @@ def validate_frozen_delivery(volume, source_task_id, required_tests=(), *, suite
                                         'test_image', 'test_command', 'test_success_pattern',
                                         'test_count_pattern', 'test_files', 'minimum_tests'}
                     checkpoint_keys = {'base_manifest_sha256','baseline_test_sha256','new_test_sha256'}
-                    if (set(result) not in (legacy_keys,legacy_keys | checkpoint_keys)
+                    diagnostic_inventory = result.get('diagnostic_file_sha256', {})
+                    if (not isinstance(diagnostic_inventory, dict) or len(diagnostic_inventory) > 128
+                            or any(not re.fullmatch(r'[A-Za-z0-9_/-]+\.py', path)
+                                or '..' in path.split('/') or path.startswith('/')
+                                or not isinstance(sha, str) or not re.fullmatch(r'[a-f0-9]{64}', sha)
+                                for path, sha in diagnostic_inventory.items())):
+                        raise ValueError('invalid immutable diagnostic inventory')
+                    if (set(result) - {'diagnostic_file_sha256'} not in (legacy_keys,legacy_keys | checkpoint_keys)
                             or not re.fullmatch(r'[0-9a-f]{64}', result['manifest_sha256'])
                             or result['baseline_tests_intact'] is not True
                             or type(result['minimum_tests']) is not int

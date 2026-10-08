@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.386
+COPY broker/server.py /broker.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY broker/dependency_inventory_recovery.py /dependency_inventory_recovery.py
