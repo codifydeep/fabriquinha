@@ -1,0 +1,2 @@
+FROM delivery-kit-request-scope-probe:20261007.1
+COPY service_mode_harness_observation.py /service_mode_harness_observation.py

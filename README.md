@@ -496,6 +496,17 @@ do implementador não são reaproveitados ou autorizados por essa operação.
 O registro real e sua idempotência foram validados; o diagnóstico pelos agentes
 e a posterior entrega ainda não são evidências de sucesso concluídas.
 
+A operação fixa `service_mode_harness_observation.py` mede a suíte original e
+acrescenta, somente a uma cópia em memória do template, a origem dos timers.
+Todos os campos originais do relatório precisam permanecer iguais; código,
+assertions e manifesto do snapshot são conferidos antes e depois. O sandbox
+não tem rede, credenciais ou socket, e monta a entrega somente para leitura.
+A observação real reproduziu as duas falhas e localizou o intervalo contabilizado
+no polling preexistente do board, não no probe de ambiente. Essa evidência
+diagnóstica foi preservada, mas **não** aprova uma mudança do harness nem Green:
+uma correção ainda exige autoria separada, controles positivos/negativos,
+revisão independente e as etapas normais de entrega.
+
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
 instrução real após leituras completas contra schema e adaptador do proxy. Uma
