@@ -10,6 +10,10 @@ registros sem truncamento e guarda um recibo de apresentação; referências ant
 ou de outro agente são rejeitadas. Os limites de handoff e transporte permanecem
 inalterados. Essa melhoria de contexto não concede aprovação nem qualifica, por
 si só, a entrega autônoma.
+O fluxo de diagnóstico de timers também verifica equivalência integral entre
+cópias da base original antes de provisionar a correção. Falhas semânticas dessa
+continuação são persistidas com responsável técnico e próxima ação, sem repetir
+indefinidamente a mesma operação ou converter o plano aprovado em entrega aprovada.
 
 O encaminhamento de falhas anteriores ao início do worker possui uma extensão
 instalada, ainda em validação ponta a ponta: exige capability consumida, execução nativa falha, erro persistido

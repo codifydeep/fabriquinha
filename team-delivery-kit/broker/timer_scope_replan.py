@@ -152,12 +152,30 @@ def tick(b):
                 handoffs.save(con,source,current['issue_id'],current['stage'],current['owner'],data,time.time())
     with b.db() as con:
         plans.initialize(con)
+        con.execute('CREATE TABLE IF NOT EXISTS timer_plan_continuations(source_task TEXT PRIMARY KEY,state TEXT)')
         ready=con.execute('SELECT p.source_task,p.config,p.state,o.receipt FROM technical_remediation_plans p '
             'JOIN frozen_harness_observations o USING(source_task)').fetchall()
     for row in ready:
         candidate,state,value=map(json.loads,(row['config'],row['state'],row['receipt']))
         if candidate.get('amendment',{}).get('kind')!='timer_provenance' or state.get('stage')!='plan_approved':continue
-        observation(value)
+        with b.db() as con:
+            prior=con.execute('SELECT state FROM timer_plan_continuations WHERE source_task=?',(row['source_task'],)).fetchone()
+            if prior and json.loads(prior[0]).get('stage')=='blocked':continue
         try:import request_scope_replan
         except ImportError:from broker import request_scope_replan
-        request_scope_replan.continue_approved(b,row['source_task'],value['result'],kind='timer_provenance')
+        try:
+            observation(value)
+            request_scope_replan.continue_approved(b,row['source_task'],value['result'],kind='timer_provenance')
+        except TimeoutError:
+            continue  # The fixed base probe observes its existing intent; no repeated create/start.
+        except Exception as error:
+            held=dict(stage='blocked',category=type(error).__name__,plan_sha256=state['plan_sha256'],
+                owner=candidate['cto'],required_action='CTO diagnose timer-plan continuation; no identical retry',
+                execution_authorized=False,release_homologated=False)
+            with b.db() as con:
+                con.execute('INSERT OR REPLACE INTO timer_plan_continuations VALUES(?,?)',
+                    (row['source_task'],json.dumps(held,sort_keys=True)))
+                current=handoffs.load(con,row['source_task'])
+                if current:
+                    data=json.loads(current['data']);data.update(timer_plan_continuation=held,required_action=held['required_action'])
+                    handoffs.save(con,row['source_task'],current['issue_id'],current['stage'],candidate['cto'],data,time.time())

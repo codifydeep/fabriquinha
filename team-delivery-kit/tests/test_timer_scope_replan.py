@@ -108,3 +108,25 @@ class TimerPlanTests(unittest.TestCase):
         with patch.object(module,'register',return_value=dict(stage='issue_intent',execution_authorized=False)) as register:
             module.tick(b);module.tick(b);register.assert_called_once_with(b,'source')
         self.assertEqual(con.execute('SELECT count(*) FROM timer_plan_intakes').fetchone()[0],1)
+
+    def test_semantic_continuation_failure_is_visible_and_not_repeated(self):
+        from broker import request_scope_replan
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
+        handoffs.initialize(con);module.plans.initialize(con)
+        con.execute('CREATE TABLE leases(status TEXT)')
+        con.execute('CREATE TABLE frozen_harness_observations(source_task TEXT PRIMARY KEY,receipt TEXT)')
+        con.execute('INSERT INTO frozen_harness_observations VALUES (?,?)',('source',json.dumps(measured())))
+        handoffs.save(con,'source','r2','inherited_replan_required','cto',dict(source_task='source'),0)
+        cfg=dict(amendment=dict(kind='timer_provenance'),cto='cto')
+        state=dict(stage='plan_approved',plan_sha256='a'*64)
+        con.execute('INSERT INTO technical_remediation_plans VALUES (?,?,?)',('source',json.dumps(cfg),json.dumps(state)))
+        @contextmanager
+        def db():yield con
+        b=SimpleNamespace(db=db,LOCK=threading.RLock())
+        with patch.object(request_scope_replan,'continue_approved',side_effect=ValueError('semantic failure')) as proceed:
+            module.tick(b);module.tick(b);proceed.assert_called_once()
+        data=json.loads(handoffs.load(con,'source')['data'])
+        self.assertEqual(data['timer_plan_continuation']['stage'],'blocked')
+        self.assertEqual(data['timer_plan_continuation']['owner'],'cto')
+        self.assertFalse(data['timer_plan_continuation']['execution_authorized'])
+        self.assertIn('no identical retry',data['required_action'])

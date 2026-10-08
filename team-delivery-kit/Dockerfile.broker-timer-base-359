@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.358
+COPY broker/base_equivalence.py /base_equivalence.py
+COPY broker/timer_scope_replan.py /timer_scope_replan.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import base_equivalence, timer_scope_replan"

@@ -18,6 +18,17 @@ class BaseEquivalenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):validate_bindings({**cfg,'amendment':{}},current)
         with self.assertRaises(ValueError):validate_bindings(cfg,{**current,'extra':'unreviewed'})
 
+    def test_timer_amendment_requires_the_same_exact_original_base(self):
+        approved=dict(issue_id='old',volume='old-volume',base_sha='a'*40,manifest_sha256='b'*64)
+        cfg=dict(base=approved,source_issue='new',amendment=dict(kind='timer_provenance'),
+            diagnostic_snapshot_kind='completed_frozen_validation')
+        current={**approved,'issue_id':'new','volume':'new-volume'}
+        validate_bindings(cfg,current)
+        for changes in (dict(base_sha='changed'),dict(manifest_sha256='changed'),
+                        dict(issue_id='foreign'),dict(volume='old-volume')):
+            with self.assertRaises(ValueError):validate_bindings(cfg,{**current,**changes})
+        with self.assertRaises(ValueError):validate_bindings({**cfg,'amendment':dict(kind='unapproved')},current)
+
     def test_complete_bytes_match_and_one_changed_file_is_rejected(self):
         import shutil
         from test_revision_seed import RevisionSeedTests
