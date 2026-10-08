@@ -43,6 +43,7 @@ def payload(b,task,volume,manifest,*,background=False,timers=False):
 
 
 def verify_job(info,expected):
+    if not isinstance(info,dict):raise ValueError('harness observation handle unavailable')
     c=info.get('Config',{});h=info.get('HostConfig',{})
     if (any(c.get(k)!=expected[k] for k in ('Image','User','Entrypoint','Cmd'))
             or sorted(c.get('Env',[]))!=sorted(expected['Env'])
@@ -128,6 +129,19 @@ def rejection_state(con,issue,info,raw):
     return state
 
 
+def retain_missing(con,identity,state):
+    route=con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(identity['issue_id'],)).fetchone()
+    owner=json.loads(route[0]).get('cto') if route else None
+    if not owner:raise ValueError('missing calibration requires persistent CTO owner')
+    result={**state,'stage':'blocked','category':'harness_observation_handle_missing','owner':owner,
+        'prior_observation':dict(state),'expected_manifest_sha256':identity['manifest_sha256'],
+        'required_action':'diagnose missing recorded calibration handle; never recreate identical job',
+        'delivery_approval':False}
+    con.execute('UPDATE harness_qualifications SET state=? WHERE task_id=?',
+        (json.dumps(result,sort_keys=True),identity['task_id']))
+    con.commit();return result
+
+
 def reconcile_rejected(b,con,task):
     """Observe an existing failed job only; no create/start/retry or approval."""
     row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(task,)).fetchone()
@@ -146,7 +160,9 @@ def reconcile_rejected(b,con,task):
     if timers and pinned!=TIMER_BACKGROUND_IMAGE:raise ValueError('pinned timer calibration image required')
     expected=payload(original,task,identity['volume'],identity['manifest_sha256'],background=background,timers=timers)
     if identity['payload']!=expected:raise ValueError('recorded harness policy drift')
-    info=b.docker('GET','/containers/'+state['container_id']+'/json');verify_job(info,expected)
+    info=b.docker('GET','/containers/'+state['container_id']+'/json')
+    if info is None:return retain_missing(con,identity,state)
+    verify_job(info,expected)
     if info['State']['Running'] or info['State']['Status']!='exited' or info['State']['ExitCode']==0:
         raise ValueError('existing terminal failed harness job required')
     raw=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
@@ -192,13 +208,21 @@ def capture(b,con,issue,task,volume,prepared):
         # only on the next call: never issue a second create from the same intent.
         b.docker('POST','/containers/create?name='+name,expected)
     info=b.docker('GET','/containers/'+name+'/json')
-    if not info:raise ValueError('uncertain harness create; observe exact handle, never repeat POST')
+    if not info:
+        if state.get('stage')=='observing' and state.get('container_id'):
+            retain_missing(con,identity,state)
+            raise ValueError('recorded harness observation handle missing; CTO diagnosis required')
+        raise ValueError('uncertain harness create; observe exact handle, never repeat POST')
     verify_job(info,expected)
     if info['State']['Status']=='created':b.docker('POST','/containers/'+info['Id']+'/start')
-    save({**state,'stage':'observing','container_id':info['Id']})
+    state=save({**state,'stage':'observing','container_id':info['Id']})
     deadline=time.time()+55
     while time.time()<deadline:
-        info=b.docker('GET','/containers/'+name+'/json');verify_job(info,expected)
+        info=b.docker('GET','/containers/'+name+'/json')
+        if info is None:
+            retain_missing(con,identity,state)
+            raise ValueError('recorded harness observation handle missing; CTO diagnosis required')
+        verify_job(info,expected)
         if not info['State']['Running']:
             raw=b.docker_stdout(info['Id'],include_stderr=False,limit=32768)
             try:

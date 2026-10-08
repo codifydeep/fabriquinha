@@ -41,6 +41,32 @@ class HarnessJobTests(unittest.TestCase):
             bad=copy.deepcopy(value);mutate(bad)
             with self.assertRaises(ValueError):job.validate_result(bad,self.prepared)
 
+    def test_missing_recorded_handle_is_retained_once_without_recreating_job(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE delivery_routes(issue_id TEXT,config TEXT)')
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps({'cto':'actual-cto'})))
+        con.execute('CREATE TABLE harness_qualifications(task_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+        expected=job.payload(self.b,'task','volume','b'*64)
+        identity=dict(issue_id='issue',task_id='task',volume='volume',manifest_sha256='b'*64,payload=expected)
+        original=dict(stage='observing',container_id='missing-original-job')
+        con.execute('INSERT INTO harness_qualifications VALUES(?,?,?)',('task',json.dumps(identity),json.dumps(original)))
+        calls=[]
+        def docker(method,path,body=None):
+            calls.append((method,path))
+            return dict(Id=self.b.IMAGE,Config=dict(Env=['PATH=/usr/bin'])) if path.startswith('/images/') else None
+        self.b.docker=docker
+        state=job.reconcile_rejected(self.b,con,'task')
+        self.assertEqual(state['category'],'harness_observation_handle_missing')
+        self.assertEqual(state['owner'],'actual-cto')
+        self.assertEqual(state['prior_observation'],original)
+        self.assertFalse(state['delivery_approval'])
+        count=len(calls);self.assertEqual(job.reconcile_rejected(self.b,con,'task'),state)
+        self.assertEqual(len(calls),count)
+        self.assertTrue(all(method=='GET' for method,path in calls))
+
+    def test_missing_inspection_is_not_an_attribute_error_or_proof(self):
+        with self.assertRaises(ValueError):job.verify_job(None,job.payload(self.b,'task','volume','b'*64))
+
     def test_new_scope_amendment_requires_background_proof_without_upgrading_old_receipts(self):
         from service_mode_background_qualification import BACKGROUND
         value=self.result();job.validate_result(value,self.prepared)

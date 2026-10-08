@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261008.382
+COPY broker/harness_qualification.py /harness_qualification.py

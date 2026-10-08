@@ -24,6 +24,14 @@ Multica apresenta issues, atribuições e sessões. Os controladores mantêm led
 
 Sessões são contexto de conversa, não a única memória de um projeto. Decisões, critérios, evidências e incidentes devem ser recuperáveis por identidade durável. Contexto ou memória não concedem novas permissões. A recuperação entre perfis e projetos continua sendo uma dimensão de qualificação, não uma garantia universal.
 
+O watchdog exporta classe, localização e hash de erros, nunca o texto privado da
+exceção ou variáveis locais. Um handle de calibração anteriormente observado e
+comprovadamente ausente fica bloqueado com responsável técnico, identidade e
+observação anteriores preservadas. Não é recriado nem convertido em calibração
+aprovada. Ausência confirmada não equivale a timeout de inspeção: resultados
+incertos continuam sob observação. Esse tratamento não comprova resiliência
+universal; a continuidade entre cards ainda exige evidência ponta a ponta.
+
 ### Contexto integral sem truncamento
 
 `execution_context.py` permite registrar conjuntamente o contexto de implementação e as instruções de revisão, com hash SHA-256 e limite explícito de 12.000 caracteres por conteúdo. A issue pode transportar apenas uma referência. O broker resolve a referência a partir da rota imutável do controlador, verifica issue, perfil e modo e registra um recibo por execução antes de apresentar o conteúdo integral ao agente. Não há leitura de URLs arbitrárias nem concessão de ferramentas por essa referência. Uma alteração de conteúdo invalida o hash; uma referência não registrada é rejeitada.
