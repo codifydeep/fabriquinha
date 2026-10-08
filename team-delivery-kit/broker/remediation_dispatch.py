@@ -196,7 +196,20 @@ def tick(b):
         rows=con.execute('SELECT source_task,state FROM remediation_executions').fetchall()
     for source,raw in rows:
         parent=json.loads(raw)
+        if (parent.get('r1_gate') and parent.get('remediation_dispatch_holds',{}).get('R1',{}).get('category')=='author_execution_failed'):
+            # Fresh live verification retires only the superseded source hold.
+            # The author session remains failed and all R2 admission gates run.
+            try:
+                with b.db() as con:
+                    r1=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
+                        (parent['r1_gate']['red']['issue_id'],)).fetchone()[0])
+                review.record_gate(b,r1,parent['r1_gate']['red'],Effects(b).native)
+                with b.db() as con:
+                    parent=json.loads(con.execute('SELECT state FROM remediation_executions WHERE source_task=?',(source,)).fetchone()[0])
+            except (ValueError,KeyError,TypeError,TimeoutError,ConnectionError,urllib.error.URLError):
+                continue  # Keep the exact hold; no unverified resolution.
         for step in ('R1','R2'):
+            if step=='R1' and parent.get('r1_gate'):continue
             if not parent.get(step.lower()+'_runtime') or parent.get('remediation_dispatch_holds',{}).get(step):continue
             with b.db() as con:
                 issue=parent[step.lower()+'_runtime']['issue_id']

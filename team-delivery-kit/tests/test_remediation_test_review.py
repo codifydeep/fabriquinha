@@ -175,5 +175,33 @@ class RemediationTestReviewTests(unittest.TestCase):
         self.assertFalse(route['enabled'])
         self.assertEqual(state['steps']['R1']['stage'],'approved')
 
+    def test_verified_source_hold_resolution_preserves_history_and_other_phase(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE remediation_dispatch_holds(source_task TEXT,step TEXT,data TEXT)')
+        hold=dict(step='R1',issue_id='r1',stage='blocked',category='author_execution_failed')
+        con.execute('INSERT INTO remediation_dispatch_holds VALUES(?,?,?)',('source','R1',json.dumps(hold)))
+        other=dict(step='R2',stage='blocked',category='different_failure')
+        state=dict(remediation_dispatch_holds={'R1':hold,'R2':other})
+        gate=dict(red={'issue_id':'r1'},review_task='independent',product_execution_authorized=False,release_homologated=False)
+        adapter.resolve_source_failure(con,'source',state,gate)
+        self.assertEqual(state['remediation_dispatch_holds'],{'R2':other})
+        receipt=state['resolved_dispatch_holds'][0]
+        self.assertEqual(receipt['previous_hold'],hold)
+        self.assertFalse(receipt['author_restarted']);self.assertFalse(receipt['phase_activated'])
+        self.assertEqual(json.loads(con.execute('SELECT data FROM remediation_dispatch_holds').fetchone()[0])['stage'],'resolved')
+        adapter.resolve_source_failure(con,'source',state,gate)
+        self.assertEqual(len(state['resolved_dispatch_holds']),1)
+
+    def test_wrong_source_or_hold_ledger_cannot_clear_failure(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE remediation_dispatch_holds(source_task TEXT,step TEXT,data TEXT)')
+        hold=dict(step='R1',issue_id='other',stage='blocked',category='author_execution_failed')
+        state=dict(remediation_dispatch_holds={'R1':hold})
+        gate=dict(red={'issue_id':'r1'},review_task='independent',product_execution_authorized=False,release_homologated=False)
+        with self.assertRaises(ValueError):adapter.resolve_source_failure(con,'source',state,gate)
+        hold['issue_id']='r1'
+        with self.assertRaises(ValueError):adapter.resolve_source_failure(con,'source',state,gate)
+        self.assertIn('R1',state['remediation_dispatch_holds'])
+
 
 if __name__=='__main__':unittest.main()

@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.366
+COPY broker/remediation_test_review.py /remediation_test_review.py
+COPY broker/remediation_dispatch.py /remediation_dispatch.py
+RUN PYTHONPATH=/ python -c "import remediation_test_review,remediation_dispatch"

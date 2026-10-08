@@ -323,9 +323,10 @@ independentemente uma correção pelo autor original. Há uma entrada por card, 
 reset de profundidade ou limites, e todas as validações continuam obrigatórias.
 Envios incertos são somente observados, nunca repetidos. Na instalação de
 referência, CTO e Tech Lead concluíram decisões independentes e o controlador
-acionou o autor original. Essa colaboração foi observada; a correção do autor
-ainda não passou pela referência positiva, portanto não existe novo Red válido
-nem qualificação do ciclo integral. Uma execução patrocinada que falha transfere
+acionou o autor original. A entrega mais recente passou pela calibração completa
+(15 casos positivos e 16 controles negativos), produziu Red na suíte completa
+de 323 testes sobre o produto-base e recebeu revisão independente do Tech Lead.
+Isso qualifica R1, não o ciclo integral. Uma execução patrocinada que falha transfere
 o impedimento ao CTO, preservando as decisões e sem novo despacho automático.
 
 Na fase R1, o autor corrige e inspeciona somente o harness. O controlador executa
@@ -334,6 +335,14 @@ no produto-base é Red esperado, não motivo para implementar o produto dentro d
 harness ou perseguir Green. Orientação no proxy não substitui controles de acesso
 nem comprova correção; o snapshot, as validações e a revisão independente continuam
 sendo as evidências obrigatórias.
+
+Quando uma entrega R1 preservada recebe esse gate verificado, o controlador
+resolve somente o impedimento `author_execution_failed` correspondente. A sessão
+original continua registrada como falha; o impedimento e sua resolução permanecem
+no histórico. Não há reinício do autor nem autorização automática de R2: preparação,
+admissão, capacidade e revisão do produto continuam obrigatórias. Outros impedimentos
+não são apagados. A resolução exige conferir novamente as evidências reais do gate,
+inclusive a leitura completa dos dois snapshots pelo revisor.
 
 Para uma falha posterior do autor, um SPIKE fixo pode testar uma hipótese de
 observação assíncrona numa cópia descartável, sem modificar a entrega original.

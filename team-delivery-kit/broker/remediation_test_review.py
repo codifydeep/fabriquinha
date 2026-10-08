@@ -158,6 +158,7 @@ def record_gate(b, route, red, effects):
         state.update(r1_gate=receipt,required_action='qualify_dependent_R2_runtime_on_frozen_R1_delivery')
         state['steps']={**state.get('steps',{}),'R1':dict(stage='approved',issue_id=issue,
                        manifest_sha256=red['red']['manifest_sha256'],review_task=review['review_task'])}
+        resolve_source_failure(con,source,state,receipt)
         con.execute('UPDATE remediation_executions SET state=? WHERE source_task=?', (json.dumps(state,sort_keys=True),source))
         # Keep this card immutable and prevent normal test-first re-dispatch.
         paused={**route,'enabled':False}
@@ -169,6 +170,26 @@ def record_gate(b, route, red, effects):
         import time
         handoffs.save(con,red['task_id'],issue,'remediation_r1_approved',route['techlead'],receipt,time.time())
     return True
+
+
+def resolve_source_failure(con,source,state,gate):
+    """Called only after live independent gate verification; no task resurrection."""
+    hold=state.get('remediation_dispatch_holds',{}).get('R1')
+    if not hold or hold.get('category')!='author_execution_failed':return
+    issue=gate['red']['issue_id']
+    if (hold.get('step')!='R1' or hold.get('issue_id')!=issue or hold.get('stage')!='blocked'
+            or gate.get('product_execution_authorized') is not False or gate.get('release_homologated') is not False):
+        raise ValueError('exact resolved R1 source failure required')
+    row=con.execute('SELECT data FROM remediation_dispatch_holds WHERE source_task=? AND step=?',(source,'R1')).fetchone()
+    if not row or json.loads(row[0])!=hold:raise ValueError('R1 dispatch hold ledger drift')
+    import time
+    resolved=dict(operation='verified_r1_source_failure_resolution_v1',previous_hold=hold,
+        r1_gate_sha256=digest(gate),review_task=gate['review_task'],resolved_at=time.time(),
+        author_restarted=False,phase_activated=False,release_homologated=False)
+    con.execute('UPDATE remediation_dispatch_holds SET data=? WHERE source_task=? AND step=?',
+        (json.dumps({**hold,'stage':'resolved','resolution':resolved},sort_keys=True),source,'R1'))
+    state['resolved_dispatch_holds']=[*state.get('resolved_dispatch_holds',[]),resolved]
+    state['remediation_dispatch_holds']={k:v for k,v in state['remediation_dispatch_holds'].items() if k!='R1'}
 
 
 def preserve_coverage(decision, summary):
