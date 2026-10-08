@@ -4,6 +4,13 @@ Uma equipe de agentes de IA para transformar um brief de produto em software rev
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+Correções de planos rejeitados usam referências a registros completos do controlador,
+vinculadas ao card, CTO, wakeup ativo e hash da revisão. O gateway expande esses
+registros sem truncamento e guarda um recibo de apresentação; referências antigas
+ou de outro agente são rejeitadas. Os limites de handoff e transporte permanecem
+inalterados. Essa melhoria de contexto não concede aprovação nem qualifica, por
+si só, a entrega autônoma.
+
 O encaminhamento de falhas anteriores ao início do worker possui uma extensão
 instalada, ainda em validação ponta a ponta: exige capability consumida, execução nativa falha, erro persistido
 de criação e o contêiner original identificado, nunca iniciado, sem eventos ACP

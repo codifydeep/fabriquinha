@@ -10,6 +10,12 @@ from decision_schema import apply
 
 
 class TechnicalRemediationPlanTests(unittest.TestCase):
+    def expanded_instruction(self, state):
+        from broker.planning_revision_context import expand
+        probe={**state,'stage':'awaiting_plan','wakeup_id':'probe'}
+        return expand(instruction(self.config,state),state['issue_id'],dict(agent_id='cto',wakeup_id='probe'),
+            lambda _:dict(config=json.dumps(self.config),state=json.dumps(probe)))
+
     def setUp(self):
         self.config=dict(source_task='source',cto='cto',reviewer='lead',criteria={'A01':'criterion','A02':'other'},
                          required_paths=['/evidence/candidate/tests/test_new.py'],original_depth=2)
@@ -88,7 +94,7 @@ class TechnicalRemediationPlanTests(unittest.TestCase):
         self.assertEqual(result['plan_revisions'][0]['review'],value)
         self.assertFalse(result['execution_authorized'])
         self.assertNotIn('wakeup_id',result)
-        self.assertIn(value['reason'],instruction(self.config,result))
+        self.assertIn(value['reason'],self.expanded_instruction(result))
         self.assertEqual(self.config['original_depth'],2)
 
     def test_context_repair_preserves_exact_rejection_and_rejects_foreign_or_busy_review(self):
@@ -120,8 +126,9 @@ class TechnicalRemediationPlanTests(unittest.TestCase):
             self.assertFalse(proof['implementation_authorized'])
             self.assertFalse(proof['limits_increased'])
             self.assertEqual(result['plan_revisions'],pending['plan_revisions'])
-            self.assertIn(json.dumps(self.plan,separators=(',',':')),instruction(self.config,result))
-            self.assertIn(json.dumps(value,separators=(',',':')),instruction(self.config,result))
+            expanded=self.expanded_instruction(result)
+            self.assertIn(json.dumps(self.plan,sort_keys=True,separators=(',',':')),expanded)
+            self.assertIn(json.dumps(value,sort_keys=True,separators=(',',':')),expanded)
             self.assertEqual(module.reconcile_correction_context(b,'source'),result)
 
     def test_rejected_plan_correction_is_bounded_and_not_an_identical_retry(self):

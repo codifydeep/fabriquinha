@@ -179,15 +179,15 @@ def instruction(config,state):
             ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria'])))
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)
         if state.get('plan_revisions'):
-            last=state['plan_revisions'][-1]
             note=('CTO: inspect source and correct the rejected plan. Preserve ALL criteria, immutable baseline/snapshots, '
                   'Red, independent reviews and same-SHA PR/CI/deploy/QA. R1 tests; R2 product; R3 controller, strictly dependent. '
                   'Distinct proposal or retain_hold; no edits, reset or execution. reason<=600, objective<=240. '
                   '\nDELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
                   ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria']))+
                   'DELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)+'\n')
-            note+='Prior plan: '+json.dumps(last['plan'],separators=(',',':'))
-            note+=' Independent review: '+json.dumps(last['review'],separators=(',',':'))
+            try:import planning_revision_context
+            except ImportError:from broker import planning_revision_context
+            note+=planning_revision_context.reference(config,state)
     else:
         note=('INDEPENDENT TECH LEAD: review this EXACT CTO plan against ALL approved acceptance and immutable source. '
             'Reject weakened/removal of tests, omitted criteria, permission to edit frozen files, depth reset, bypassed Red/reviews/CI/QA, '
@@ -446,8 +446,8 @@ def reconcile_plan_length_failure(b,source,rejection):
 def reconcile_correction_context(b,source):
     """Restore an undispatched correction from the SAME valid rejected review.
 
-    Only boilerplate changes. Both full model artifacts remain in the note and
-    storage; no criteria, schema or framework limit is increased.
+    The full rejected revision remains in storage and is presented through an
+    exact dispatch-bound reference; no criteria or framework limit is increased.
     """
     with b.LOCK:
         with b.db() as con:
@@ -467,10 +467,16 @@ def reconcile_correction_context(b,source):
                 or any(t['status'] in ('queued','dispatched','running') for t in native.issue_task_runs(fx.settings,s['issue_id']))):
             raise ValueError('same exact independent rejection required')
         candidate={**s,'stage':'plan_dispatch','owner':c['cto']};note=instruction(c,candidate)
-        if any(json.dumps(last[k],separators=(',',':')) not in note for k in ('plan','review')):
+        try:import planning_revision_context
+        except ImportError:from broker import planning_revision_context
+        probe={**candidate,'stage':'awaiting_plan','wakeup_id':'local-qualification-only'}
+        expanded=planning_revision_context.expand(note,s['issue_id'],dict(agent_id=c['cto'],wakeup_id=probe['wakeup_id']),
+            lambda _:dict(config=json.dumps(c),state=json.dumps(probe)))
+        if json.dumps(last,sort_keys=True,separators=(',',':')) not in expanded:
             raise ValueError('lossless exact plan/review presentation required')
-        candidate['correction_context_recovery']=dict(previous=s,operation='lossless_correction_boilerplate_repair_v1',
+        candidate['correction_context_recovery']=dict(previous=s,operation='registered_correction_context_repair_v1',
             review_task=task['id'],instruction_sha256=hashlib.sha256(note.encode()).hexdigest(),
+            context_sha256=planning_revision_context.digest(last),expanded_note_characters=len(expanded),
             note_characters=len(note),framework_limit=4000,limits_increased=False,implementation_authorized=False)
         candidate.pop('category',None)
         candidate['required_action']='CTO correct exact independently rejected plan; complete artifacts preserved'

@@ -1,0 +1,7 @@
+FROM delivery-kit-execution-broker:20261008.357
+COPY broker/server.py /broker.py
+COPY broker/planning_revision_context.py /planning_revision_context.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY broker/diagnostic_maintenance_recovery.py /diagnostic_maintenance_recovery.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import planning_revision_context, technical_remediation_plan"

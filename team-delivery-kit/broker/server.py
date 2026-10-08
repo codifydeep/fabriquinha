@@ -2059,6 +2059,22 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         with db() as con:
             note=bound_failure_context.expand(note,issue['id'],task,
                 lambda source:con.execute('SELECT issue_id,data FROM delivery_handoffs WHERE source_task=?',(source,)).fetchone())
+    if mode=='planning' and 'DELIVERY_REGISTERED_PLAN_REVISION_V1:' in note:
+        import planning_revision_context
+        with db() as con:
+            original_note=note
+            note=planning_revision_context.expand(note,issue['id'],task,
+                lambda source:con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone())
+            receipt=json.dumps(dict(issue_id=issue['id'],agent_id=task['agent_id'],wakeup_id=task['wakeup_id'],
+                original_sha256=hashlib.sha256(original_note.encode()).hexdigest(),
+                expanded_sha256=hashlib.sha256(note.encode()).hexdigest(),
+                original_characters=len(original_note),expanded_characters=len(note),approval=False),sort_keys=True)
+            con.execute('CREATE TABLE IF NOT EXISTS planning_revision_presentations(task_id TEXT PRIMARY KEY,receipt TEXT NOT NULL)')
+            task_id=task.get('task_id') or task.get('id')
+            if not task_id:raise ValueError('planning presentation task identity required')
+            prior=con.execute('SELECT receipt FROM planning_revision_presentations WHERE task_id=?',(task_id,)).fetchone()
+            if prior and prior['receipt']!=receipt:raise ValueError('planning presentation changed')
+            con.execute('INSERT OR IGNORE INTO planning_revision_presentations VALUES (?,?)',(task_id,receipt))
     if mode=='planning':
         compact=compact_diagnosis_note(issue,task,note)
         if compact is not None:
