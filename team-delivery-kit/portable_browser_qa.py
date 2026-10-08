@@ -15,6 +15,7 @@ import uuid
 from docker_grouping import args as docker_group_args
 
 from release_eval import save_receipt
+from browser_qa_recipes import LEGACY_SCENARIOS, recipe_for
 
 SCRIPT = Path(__file__).with_name('browser_feedback_acceptance.py')
 SHA = re.compile(r'[a-f0-9]{40}\Z')
@@ -23,20 +24,17 @@ IMAGE = re.compile(r'sha256:[a-f0-9]{64}\Z')
 
 def validate(config):
     if (not isinstance(config, dict) or set(config) != {'scenario', 'browser_image'}
-            or config['scenario'] not in ('feedback-board-v1', 'feedback-board-pending-v1',
-                                         'feedback-board-pending-accessibility-v1',
-                                         'feedback-board-keyboard-dismiss-v1',
-                                         'feedback-board-status-filter-api-v1',
-                                         'feedback-board-filter-v1', 'feedback-board-sort-v1',
-                                         'feedback-board-search-api-v1', 'feedback-board-search-v1',
-                                         'feedback-board-search-generation-v1',
-                                         'feedback-board-service-status-api-v1',
-                                         'feedback-board-service-status-ui-v1',
-                                         'feedback-board-demo-mode-api-v1', 'feedback-board-demo-mode-ui-v1')
+            or config['scenario'] not in LEGACY_SCENARIOS
             or not isinstance(config['browser_image'], str)
             or not IMAGE.fullmatch(config['browser_image'])):
         raise ValueError('invalid pinned browser QA configuration')
     return config
+
+
+def script_for(config):
+    validate(config)
+    recipe = recipe_for(config['scenario'])
+    return SCRIPT if recipe.name == 'browser_feedback_acceptance.py' else recipe
 
 
 def _resolution_evidence(private, incident, failed_path, passed_path, *, require_current=True):
@@ -60,7 +58,7 @@ def _resolution_evidence(private, incident, failed_path, passed_path, *, require
             or not old_id.get('scenario_sha256')
             or old_id.get('scenario_sha256') == new_id.get('scenario_sha256')
             or not re.fullmatch(r'[a-f0-9]{64}', new_id.get('scenario_sha256', ''))
-            or (require_current and new_id.get('scenario_sha256') != hashlib.sha256(SCRIPT.read_bytes()).hexdigest())
+            or (require_current and new_id.get('scenario_sha256') != hashlib.sha256(script_for(new_id['config']).read_bytes()).hexdigest())
             or {k:v for k,v in old_id.items() if k != 'scenario_sha256'} !=
                {k:v for k,v in new_id.items() if k != 'scenario_sha256'}):
         raise ValueError('scenario resolution requires unchanged product and new verified browser evidence')
@@ -152,7 +150,7 @@ def cleanup(resources, owner):
 
 
 def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env):
-    validate(config)
+    script = script_for(config)
     if runtime_env != {'FEEDBACK_DB_PATH': '/tmp/feedback.db'}:
         raise ValueError('browser QA requires fixed temporary database environment')
     if not SHA.fullmatch(source_sha):
@@ -164,7 +162,7 @@ def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env
         raise ValueError('browser QA deployment identity mismatch')
     identity = {'source_sha': source_sha, 'deployed_container_id': deployed['Id'],
                 'application_image': image, 'config': config,
-                'scenario_sha256': hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),
+                'scenario_sha256': hashlib.sha256(script.read_bytes()).hexdigest(),
                 'runtime_env': runtime_env}
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     directory = Path(evidence_dir)
@@ -218,7 +216,7 @@ def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env
                         '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m',
                         '--env', 'HOME=/tmp', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
                         '--memory', '768m', '--cpus', '1', '--pids-limit', '256',
-                        '--shm-size', '128m', '--mount', 'type=bind,source=' + str(SCRIPT) +
+                        '--shm-size', '128m', '--mount', 'type=bind,source=' + str(script) +
                         ',target=/scenario.py,readonly', '--entrypoint', 'python',
                         config['browser_image'], '/scenario.py', config['scenario'],
                         check=False, timeout=120)

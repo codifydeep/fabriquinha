@@ -1,9 +1,19 @@
 import copy
 import unittest
-from cleanup_port2_history import eligible
+from cleanup_port2_history import eligible, selected_target
 
 
 class RetiredContainerSelectionTests(unittest.TestCase):
+    def test_tests_only_cannot_retire_any_homologation(self):
+        c=self.fixture()
+        self.assertTrue(selected_target(c,tests_only=True))
+        c['Name']='/delivery-kit-port2-testrev123abc-1-qa'
+        c['Config']['Labels']={'com.docker.compose.project':'delivery-kit-port2-homologation',
+            'delivery-kit.source-sha':'a'*40}
+        c['State']['Status']='running'
+        self.assertTrue(selected_target(c))
+        self.assertFalse(selected_target(c,tests_only=True))
+
     def fixture(self):return {'Name':'/delivery-kit-port2-old-probe','Config':{'Labels':{
         'com.docker.compose.project':'delivery-kit-port2-tests'}},
         'HostConfig':{'ReadonlyRootfs':True},'State':{'Status':'exited'},'Mounts':[]}

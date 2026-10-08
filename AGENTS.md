@@ -1,5 +1,22 @@
 # Docker operating contract
 
+## Test-cycle retirement
+
+- At the boundary of every new test cycle, inventory and retire obsolete owned
+  test containers and image tags. Repeat after completion or failure once all
+  leases and pending Docker effects are settled. Cleanup is not a delivery gate
+  waiver and must never interrupt an active worker or recovery.
+- Use `team-delivery-kit/cleanup_port2_history.py --tests-only` to preview stopped
+  read-only port2 helpers, and `--tests-only --apply` only after confirming idle
+  leases. Archive logs/metadata privately before exact-ID removal; retain mounts,
+  volumes, snapshots and current/required deployments. Other instances need
+  separately qualified ownership rules, not a broader name prefix.
+- Follow container retirement with a preview from
+  `team-delivery-kit/cleanup_obsolete_images.py`; apply only its verified scoped
+  plan. Preserve source references, used images, protected aliases and two recent
+  versions per owned family. Unknown ownership or uncertain deletion stays
+  visible and is observed, never resolved by prune, force or blind repetition.
+
 ## Source control and public distribution
 
 - The automation source is versioned at `https://github.com/codifydeep/fabriquinha`.

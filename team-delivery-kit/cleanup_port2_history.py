@@ -35,14 +35,22 @@ def eligible(c):
                 for m in c.get('Mounts',[])))
 
 
+def selected_target(c, *, tests_only=False):
+    return eligible(c) and (not tests_only or
+        (c['Config'].get('Labels') or {}).get('com.docker.compose.project') == 'delivery-kit-port2-tests')
+
+
 def main():
     import argparse
-    parser=argparse.ArgumentParser();parser.add_argument('--apply',action='store_true');args=parser.parse_args()
-    before=inventory();selected=[c for c in before if eligible(c)]
+    parser=argparse.ArgumentParser();parser.add_argument('--apply',action='store_true')
+    parser.add_argument('--tests-only',action='store_true',help='Preserve every deployed candidate and all core services')
+    args=parser.parse_args()
+    before=inventory();selected=[c for c in before if selected_target(c,tests_only=args.tests_only)]
     print(json.dumps({'selected':len(selected),'names':[c['Name'].lstrip('/') for c in selected],
         'volumes_deleted':0,'images_deleted':0}),flush=True)
     if not args.apply:return
-    for broker in ('delivery-kit-port2-execution-broker-1','delivery-kit-eval-execution-broker-1'):
+    brokers=('delivery-kit-port2-execution-broker-1',) if args.tests_only else ('delivery-kit-port2-execution-broker-1','delivery-kit-eval-execution-broker-1')
+    for broker in brokers:
         code='import sqlite3;c=sqlite3.connect("/broker-state/leases.sqlite");print(c.execute("SELECT count(*) FROM leases WHERE status IN (?,?,?,?)",("creating","starting","running","closing")).fetchone()[0]);c.close()'
         if docker('exec',broker,'python','-c',code).stdout.strip()!=b'0':raise ValueError('active worker; cleanup deferred')
     archive=ROOT/'.local-port2/backups'/('retired-containers-'+time.strftime('%Y%m%d-%H%M%S'))
@@ -52,7 +60,7 @@ def main():
     save('inventory.json',json.dumps(before).encode())  # Private; may contain environment credentials.
     def retire(original):
         c=json.loads(docker('inspect',original['Id']).stdout)[0];name=c['Name'].lstrip('/')
-        if not eligible(c) or c['Id']!=original['Id']:raise ValueError('target drift')
+        if not selected_target(c,tests_only=args.tests_only) or c['Id']!=original['Id']:raise ValueError('target drift')
         log=docker('logs','--timestamps',c['Id'],check=False);save(name+'.log',log.stdout+log.stderr)
         # Selected roots are readonly. Docker diff can hang mounting historical
         # overlay roots; persistent mounts are retained and live tmpfs DBs saved.

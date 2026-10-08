@@ -98,12 +98,9 @@ class QaArtifactTests(unittest.TestCase):
             copy.assert_called_once()
 
     def test_every_supported_browser_scenario_can_register_diagnostic_evidence(self):
-        import ast
         import portable_browser_qa
-        tree=ast.parse(Path(portable_browser_qa.__file__).read_text())
-        validate=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='validate')
-        scenarios={n.value for n in ast.walk(validate) if isinstance(n,ast.Constant)
-                   and isinstance(n.value,str) and n.value.startswith('feedback-board-')}
+        from browser_qa_recipes import LEGACY_SCENARIOS
+        scenarios=set(LEGACY_SCENARIOS)
         self.assertEqual(len(scenarios),14)
         script=portable_browser_qa.SCRIPT.read_bytes()
         self.assertLessEqual(len(script),32768)
@@ -112,6 +109,7 @@ class QaArtifactTests(unittest.TestCase):
         config=self.payload['browser_receipt']['identity']['config']
         for scenario in scenarios:
             config['scenario']=scenario
+            self.assertEqual(portable_browser_qa.validate(config),config)
             with self.subTest(scenario=scenario):self.assertIn('scenario.py',qa.unpack(self.payload))
         config['scenario']='arbitrary-agent-command'
         with self.assertRaises(ValueError):qa.unpack(self.payload)

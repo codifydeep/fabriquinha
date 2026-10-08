@@ -21,7 +21,8 @@ class ScenarioResolutionTests(unittest.TestCase):
         self.old = folder / ('c' * 64 + '.json')
         self.new = folder / ('d' * 64 + '.json')
         identity = {'source_sha': 'b' * 40, 'application_image': 'image',
-                    'deployed_container_id': 'container', 'config': {'scenario': 'filter'},
+                    'deployed_container_id': 'container', 'config': {
+                        'scenario': 'feedback-board-filter-v1', 'browser_image': 'sha256:'+'f'*64},
                     'runtime_env': {}, 'scenario_sha256': 'old'}
         self.old.write_text(json.dumps({'identity': identity, 'status': 'failed', 'cleanup': 'passed'}))
         self.new.with_suffix('.png').write_bytes(b'png')

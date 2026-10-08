@@ -806,14 +806,34 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 
 ## Situação das validações
 
-Referência em 6 de outubro de 2026:
+Referência em 8 de outubro de 2026:
 
 - `BRIEFSTATUS-1` percorreu dois cards dependentes, PRs, CI e QA HTTP/browser em dois contextos; reparos anteriores do operador impedem classificá-lo como prova integral sem intervenção.
-- `BRIEFDEMO-2` é um novo ciclo; a clarificação de negócio foi respondida pelo CEO e a retomada está em validação. Não foi entregue.
+- `BRIEFDEMO-2` concluiu os cards dependentes, PR/CI e homologação com QA no mesmo SHA. Exigiu reparos do operador: não prova uma execução integral sem intervenção.
+- `BRIEFDETAIL-1` está em preparação. O registro de receitas de QA é fechado; seus novos cenários continuam bloqueados até qualificação. A receita de regressão anterior permanece intacta, sem ampliar o limite dos artefatos.
 - O Truco continua fora dos ensaios de qualificação. Não confundir a aplicação descartável com o produto final.
 - Instalação limpa, configuração portátil, recuperação totalmente autônoma e entrega de um produto completo ainda são lacunas.
 
 Resumo público e limites: [VALIDATION.md](docs/VALIDATION.md). O diário completo do operador permanece privado. Estado vivo, conversas e recibos privados não são publicados. Veja [ROADMAP.md](docs/ROADMAP.md).
+
+## Retirada de recursos de teste
+
+Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
+terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.
+Os serviços são agrupados por Compose; homologação atual, evidências, volumes e
+projetos externos são preservados. Não utilizar `prune` global ou remoção forçada.
+
+Na instalação de referência port2, os previews são:
+
+```bash
+python3 team-delivery-kit/cleanup_port2_history.py --tests-only
+python3 team-delivery-kit/cleanup_obsolete_images.py
+```
+
+`--apply` executa o plano com arquivamento privado e revalidação dos IDs. A seleção
+de imagens preserva tags `toso-*` e seus aliases, imagens em uso, referências de
+fonte e duas versões recentes por família. Uma exclusão sem confirmação deve ser
+observada, não repetida. As regras port2 não autorizam limpar outra instalação.
 
 ## Contribuir e reutilizar
 
