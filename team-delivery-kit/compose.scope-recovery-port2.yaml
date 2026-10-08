@@ -1,0 +1,8 @@
+# Qualification overlay for the existing port2 installation. Keep the maintenance
+# barrier sealed until state backup, image identities and native idle state pass.
+# No scope route is enabled merely by installing these images.
+services:
+  execution-broker:
+    image: sha256:a206525604fa712bbf73b0cd636f0f9358a7cc404c89da5863607cb03d30601f
+  model-proxy:
+    image: sha256:1da17e0a514fc3c957a42b96a4641d03ac1c59dbc5dbf8e7fb20c9b6d28f991c
