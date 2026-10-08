@@ -440,6 +440,14 @@ criou, preparou e despachou o card dependente de implementação sem intervenç�
 manual nessas transições. Isso valida essa recuperação e o handoff R1→R2,
 **não** Green, revisão da implementação ou entrega ponta a ponta.
 
+Um experimento de correção do harness que termina com erro não comprova defeito
+nos testes. Seu contêiner e recibos são preservados, e o controlador encaminha
+uma única reavaliação ao CTO, com o resultado verificado e a mesma entrega congelada.
+O CTO só pode pedir uma correção de produto sustentada pelas leituras completas
+ou manter um impedimento técnico explícito. Essa retomada não autoriza edição de
+testes, repetição do experimento ou aprovação. O caminho possui testes offline;
+sua recuperação ponta a ponta ainda precisa ser comprovada com os agentes reais.
+
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
 instrução real após leituras completas contra schema e adaptador do proxy. Uma
@@ -470,6 +478,9 @@ flowchart TD
     CP -->|Patrocínio válido| F
     F -->|Retrabalho falhou| CF[SPIKE offline: hipótese sobre cópia descartável]
     CF --> DP[CTO + Tech Lead: proposta baseada no recibo verificado]
+    CF -->|Experimento termina com erro| EF[CTO: uma reavaliação da mesma entrega; sem editar testes]
+    EF -->|Defeito de produto comprovado| F
+    EF -->|Evidência insuficiente| RB
     DP --> QE[Qualificar executor limitado; sem retry ou aprovação implícitos]
     G --> H[Snapshot durável da entrega]
     H --> I[Revisor independente: leitura e validações permitidas]

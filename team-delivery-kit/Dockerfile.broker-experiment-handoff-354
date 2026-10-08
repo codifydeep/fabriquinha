@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261008.353
+COPY broker/request_scope_replan.py /request_scope_replan.py
+COPY broker/handoffs.py /handoffs.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py

@@ -118,6 +118,53 @@ def continue_approved(b,source,result):
         if not exists:admission.request(b,source)
 
 
+def failed_experiment_handoff(data, state, peer_task):
+    """One different diagnostic action; never repeat the experiment or edit tests."""
+    if (state.get('stage') != 'blocked' or type(state.get('exit_code')) is not int
+            or state['exit_code'] == 0 or not state.get('container_id')
+            or not data.get('artifact_diagnosis') or not data.get('validation_failure')):
+        raise ValueError('verified failed frozen experiment required')
+    if data.get('unsupported_experiment_recovery'):
+        raise ValueError('unsupported experiment diagnostic already consumed')
+    result = json.loads(json.dumps(data))
+    result['unsupported_experiment_recovery'] = dict(
+        operation='failed_frozen_experiment_diagnosis_v1', attempt_limit=1,
+        container_id=state['container_id'], exit_code=state['exit_code'],
+        output_sha256=state['output_sha256'], cause='unknown',
+        test_edits_authorized=False, delivery_approval=False, author_restarted=False)
+    result.update(request_scope_experiment_state=state, trigger_task=peer_task,
+        required_action='CTO reassess failed experiment: supported product correction or explicit technical hold; no test edits')
+    result['diagnostic_revision'] = result.get('diagnostic_revision', '') + ':failed-experiment:' + state['container_id']
+    for key in ('wakeup_id', 'recipient_task', 'dispatch_marker', 'dispatch_stage', 'dispatched_at', 'instruction', 'decision'):
+        result.pop(key, None)
+    return result
+
+
+def publish_failed_experiment(b, proposal, peer, state, expected):
+    """Observe the exact owned exited job. No start, replay or verdict authority."""
+    source = proposal['source_task']
+    info = b.docker('GET', '/containers/' + state['container_id'] + '/json')
+    jobs.verify_job(info, expected)
+    if info['Id'] != state['container_id'] or info['State']['Status'] != 'exited' or info['State']['ExitCode'] == 0:
+        return
+    raw = b.docker_stdout(info['Id'], include_stderr=True, limit=32768)
+    observed = {**state, 'exit_code': info['State']['ExitCode'], 'output_sha256': plans.digest(raw)}
+    with b.LOCK, b.db() as con:
+        current = handoffs.load(con, source)
+        if not current or current['stage'] != 'inherited_replan_required': return
+        data = json.loads(current['data'])
+        if data.get('unsupported_experiment_recovery'): return
+        if data.get('inherited_test_replan') != proposal or data.get('inherited_peer_review') != peer:
+            raise ValueError('exact independent failed-experiment lineage required')
+        route = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
+                                      (proposal['issue_id'],)).fetchone()[0])
+        updated = failed_experiment_handoff(data, observed, peer['task_id'])
+        updated['target'] = route['cto']
+        con.execute('UPDATE request_scope_experiments SET state=? WHERE source_task=?',
+                    (json.dumps(observed, sort_keys=True), source))
+        handoffs.save(con, source, proposal['issue_id'], 'diagnose_cto', route['cto'], updated, time.time())
+
+
 def tick_one(b,proposal,peer):
     try:return advance(b,proposal,peer)
     except (ValueError,TypeError,KeyError) as error:
@@ -164,7 +211,10 @@ def advance(b,proposal,peer):
     if row:
         stored,state=map(json.loads,row)
         if stored!=identity:raise ValueError('request-scope job identity drift')
-        if state['stage']=='blocked':return
+        if state['stage']=='blocked':
+            if state.get('container_id'):
+                publish_failed_experiment(b,proposal,peer,state,expected)
+            return
         if state['stage']=='plan_registered':
             continue_approved(b,source,state['result'])
             return

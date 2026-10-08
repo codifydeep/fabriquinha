@@ -937,6 +937,13 @@ def reconcile(con, route, runs, effects, *, now=None):
                         instruction += 'DELIVERY_REVIEW_READ_PATH:/evidence/candidate/' + path + '\n'
                     if len('DELIVERY_HANDOFF ' + marker + '\n' + instruction) > 4000:
                         raise ValueError('capture diagnosis exceeds bounded context; split experiment')
+        if stage in ('diagnose','diagnose_cto') and data.get('unsupported_experiment_recovery'):
+            instruction += ('\nCONTROLLER FAILED EXPERIMENT: the proposed request-scope experiment exited nonzero. '
+                'Cause remains UNKNOWN; this does not prove a test defect. No test change is authorized. '
+                'Inspect the SAME frozen product and tests. Return request_correction only for a '
+                'source-supported product fix, or escalate_cto with a precise next evidence action. '
+                'Do not repeat the experiment, propose the same test rewrite, or claim Green. '
+                'Only one changed-evidence diagnosis is permitted.\n')
         if stage in ('diagnose','diagnose_cto') and data.get('error')=='correction_returned_unchanged_rejected_delivery':
             instruction=unchanged_correction_instruction(data)
         if stage in ('diagnose','diagnose_cto') and data.get('concise_diagnosis_retry'):
@@ -1041,6 +1048,17 @@ def reconcile(con, route, runs, effects, *, now=None):
         if data['dispatch_stage'] == 'correct_author':
             return save(con, key, issue, 'superseded', route['author'], data, now)
         decision = effects.decision(recipient)
+        if data.get('unsupported_experiment_recovery'):
+            paths = {'/evidence/candidate/' + p for p in data['validation_failure']['diagnostic_read_files']}
+            reads = effects.read_evidence(recipient)
+            if (data['target'] != route['cto'] or decision['action'] not in ('request_correction', 'escalate_cto')
+                    or decision['optional_files'] or not paths
+                    or any(reads.get(p, {}).get('lines', 0) <= 0
+                        or reads[p]['lines'] != reads[p].get('total_lines') for p in paths)):
+                data.update(decision=decision, required_action='CTO resolve unsupported experiment without test edits or identical retries')
+                return save(con, key, issue, 'technical_decision_required', route['cto'], data, now)
+            data['unsupported_experiment_recovery']['decision_task'] = recipient['id']
+            data['unsupported_experiment_recovery']['read_paths'] = sorted(paths)
         if data.get('harness_diagnosis'):
             harness_diagnosis_instruction(data, route)
             try:
