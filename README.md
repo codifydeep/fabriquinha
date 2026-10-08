@@ -123,6 +123,13 @@ válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise n
 importa nem executa código e não comprova comportamento, cobertura ou TDD; Red,
 Green, suíte completa e revisão independente continuam obrigatórios.
 
+O probe nativo de patch usa argumentos fixos com `LocalEnvironment` e
+`ShellFileOperations` reais, como usuário sem privilégios, em contêiner sem rede,
+credenciais ou socket Docker. Ele verifica rejeição de sintaxe sem perda dos bytes
+anteriores e preservação exata das aspas em um patch válido. Não chama modelo,
+não qualifica a serialização ACP nem aprova autoria, TDD ou entrega; o ensaio com
+modelo continua sendo uma validação separada.
+
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
 O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,
