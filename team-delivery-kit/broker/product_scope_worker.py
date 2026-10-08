@@ -56,3 +56,54 @@ def selection(b,issue_id,task_id):
                   selection={k:facts[k] for k in ('manifest_sha256','test_sha256')}),
         provenance=dict(red_task=red['task_id'],review_task=review['review_task'],
                         red_manifest_sha256=facts['manifest_sha256'],historical_red_recreated=False))
+
+
+def red_reference(b,task_id):
+    """Explicitly bridge the original Red across the NEW task workspace scope."""
+    with b.db() as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='product_scope_task_bases'").fetchone():return None
+        row=con.execute('SELECT receipt FROM product_scope_task_bases WHERE task_id=?',(task_id,)).fetchone()
+        if not row:return None
+        selected=json.loads(row[0])
+        current=con.execute('SELECT issue_id,agent_id,scope FROM native_bindings WHERE task_id=? ORDER BY rowid DESC LIMIT 1',
+                            (task_id,)).fetchone()
+    if (not current or current[0]!=selected['issue_id'] or current[1]!=selected['author']
+            or not current[2].endswith(':'+selected['author']+':implementation:'+task_id)):
+        raise ValueError('scope Red reference requires exact new author workspace identity')
+    selection(b,selected['issue_id'],task_id)
+    with b.db() as con:
+        receipt=json.loads(con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',
+                                      (selected['issue_id'],)).fetchone()[0])
+    # Return the original receipt unchanged. In particular its scope and base
+    # manifest remain the HISTORICAL origin, never rewritten to the new task.
+    return receipt
+
+
+def green_transition(b,task_id,result,red,*,tests_unchanged):
+    """Qualify the fixed validator outputs, not an agent's claim of Green."""
+    with b.db() as con:
+        row=con.execute('SELECT receipt FROM product_scope_task_bases WHERE task_id=?',(task_id,)).fetchone() \
+            if con.execute("SELECT 1 FROM sqlite_master WHERE name='product_scope_task_bases'").fetchone() else None
+    if not row:return None
+    selected=json.loads(row[0]);configuration=selection(b,selected['issue_id'],task_id)
+    historical=red_reference(b,task_id)
+    checkpoint=result.get('checkpoint_evidence') or {}
+    if (red!=historical or tests_unchanged is not True or result.get('baseline_tests_intact') is not True
+            or result.get('portable') is not True or type(result.get('tests')) is not int
+            or result['tests']<red['red']['test_count']
+            or not isinstance(result.get('manifest_sha256'),str)
+            or not re.fullmatch(r'[a-f0-9]{64}',result['manifest_sha256'])
+            or checkpoint.get('base_manifest_sha256')!=selected['manifest_sha256']
+            or not red['red'].get('baseline_test_sha256')
+            or checkpoint.get('baseline_test_sha256')!=red['red']['baseline_test_sha256']
+            or checkpoint.get('new_test_sha256')!=selected['frozen_test_sha256']):
+        raise ValueError('exact scope Green with unchanged original Red and all baseline tests required')
+    return dict(operation='qualified_scope_tdd_transition_v1',plan_key=selected['plan_key'],
+        author=selected['author'],implementation_task=task_id,
+        original_base_manifest_sha256=selected['original_base_manifest_sha256'],
+        revised_base_manifest_sha256=selected['manifest_sha256'],
+        revised_contract_sha256=selected['contract_sha256'],
+        verification_output_sha256=selected['verification_output_sha256'],
+        delivery_manifest_sha256=result['manifest_sha256'],**configuration['provenance'],
+        frozen_test_sha256=selected['frozen_test_sha256'],baseline_test_sha256=red['red']['baseline_test_sha256'],
+        delivery_approval=False)

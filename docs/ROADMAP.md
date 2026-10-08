@@ -110,7 +110,12 @@ marcador. A admissão confere wakeup/tarefa, vincula a base antes dos grants e
 confere o Red; falhas ficam bloqueadas com responsável e próxima ação. A nova
 execução usa workspace por tarefa, sem reaproveitar o workspace da base antiga,
 e recebe somente a instrução registrada em vez de diretivas históricas.
-Esse adaptador ainda não está habilitado no loop instalado. Falta qualificar a
-transição de evidências no Green e a coordenação completa do ciclo real antes
-de habilitar o despacho e considerar o impedimento resolvido.
+Esse adaptador ainda não está habilitado no loop instalado. A transição de TDD
+agora referencia explicitamente o Red original através do novo workspace,
+exige a suíte completa sem redução do número de testes e confere os hashes dos
+testes preexistentes e congelados contra a base revisada. O recibo durável liga
+as duas bases e o manifesto da entrega sem reescrever a evidência original nem
+aprovar a entrega. Falta qualificar a coordenação completa do ciclo real antes
+de habilitar o despacho e considerar o impedimento resolvido, incluindo o uso
+do contrato revisado nos gates posteriores de publicação e integração.
 Aprovar o plano não equivale a conceder escrita ou homologar.

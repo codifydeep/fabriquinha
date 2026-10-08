@@ -244,7 +244,7 @@ class Effects:
         red = self.test_first_red(task)
         if red:
             result = self.b.validate_frozen_delivery(snapshot['volume'], task)
-            self.b.verify_test_first_green(snapshot['volume'], task, red)
+            unchanged=self.b.verify_test_first_green(snapshot['volume'], task, red)
             receipt = {'mode': 'controller_test_first', 'red': red['red'],
                        'green': {'manifest_sha256': result['manifest_sha256'],
                                  'tests': result['tests'], 'executed_by_controller': True},
@@ -252,15 +252,26 @@ class Effects:
             if red.get('issue_id'):
                 receipt['red_origin_issue'] = red['issue_id']
                 receipt['red_origin_scope'] = red['scope']
+            try:import product_scope_worker
+            except ImportError:from broker import product_scope_worker
+            transition=product_scope_worker.green_transition(self.b,task,result,red,tests_unchanged=unchanged)
+            if transition is not None:receipt['scope_transition']=transition
             with self.b.db() as con:
                 con.execute('INSERT OR IGNORE INTO delivery_tdd VALUES (?,?)',
                             (task, json.dumps(receipt, sort_keys=True)))
+                if transition is not None:
+                    stored=json.loads(con.execute('SELECT receipt FROM delivery_tdd WHERE task_id=?',(task,)).fetchone()[0])
+                    if stored!=receipt:raise ValueError('immutable scope TDD receipt changed')
             return {**result, 'tdd': receipt}
         receipt = self.tdd_receipt(task)
         result = self.b.validate_frozen_delivery(snapshot['volume'], task)
         return {**result, 'tdd': receipt}
 
     def test_first_red(self, task, *, diagnostic=False):
+        try:import product_scope_worker
+        except ImportError:from broker import product_scope_worker
+        scoped=product_scope_worker.red_reference(self.b,task)
+        if scoped is not None:return scoped
         try:
             import remediation_red_reference
         except ImportError:
