@@ -94,6 +94,12 @@ instalar os componentes e qualificar o despacho e a recuperação reais dos
 agentes. `product_scope_base_verify.py` e sua imagem verificam a base revisada
 novamente, com os dois volumes somente leitura. `product_scope_registration.py`
 registra o resultado atomicamente em uma tabela própria; não muda a base global,
-não aplica o contrato retroativamente nem emite ferramentas. A vinculação desse
-registro a uma tarefa específica ainda precisa ser implementada e qualificada.
+não aplica o contrato retroativamente nem emite ferramentas.
+`product_scope_task_binding.py` adiciona um vínculo explícito e imutável com a
+nova tarefa nativa do autor: exige despacho persistido e decisões reautenticadas,
+recusa tarefas que já receberam grants ou contratos anteriores e não seleciona
+automaticamente a revisão mais recente para outras tarefas. O vínculo não
+desbloqueia o autor nem concede escrita. Ainda falta integrar essa seleção às
+permissões e à base efetivamente usadas pelo worker, preservar a proveniência
+do Red nessa transição e qualificar o ciclo real instalado.
 Aprovar o plano não equivale a conceder escrita ou homologar.
