@@ -208,6 +208,15 @@ o recibo anterior. A suíte offline e uma sonda isolada no Docker real foram
 validadas; isso não comprova Red legítimo do artefato, revisão independente ou
 entrega autônoma. Outros caminhos Docker não recebem implicitamente essa garantia.
 
+A identidade da imagem confere o ID canônico resolvido pelo Docker para a
+referência imutável solicitada: `repositório@sha256:...` não é comparado
+textualmente ao ID do contêiner. Todos os demais campos continuam obrigatórios.
+Uma rejeição histórica causada apenas por essa comparação pode ser recuperada
+em manutenção selada somente com calibração aprovada, autor terminal, snapshot
+íntegro e o mesmo job Red comprovadamente nunca iniciado. A recuperação preserva
+o recibo anterior e observa o job existente; não recria contêiner, reinicia autor,
+dispensa testes ou renova seu orçamento de iterações.
+
 O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
 de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo
 válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise não

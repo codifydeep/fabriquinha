@@ -1,6 +1,7 @@
 """Durable controller-only copy/Red jobs; uncertain effects are never replayed."""
 import hashlib
 import json
+import re
 import time
 import uuid
 from docker_grouping import grouped_create
@@ -16,7 +17,9 @@ def initialize(con):
 
 def verify(b,info,expected):
     config=info.get('Config',{});host=info.get('HostConfig',{})
-    if (info.get('Image')!=expected['Image'] or
+    image=b.docker('GET','/images/'+expected['Image']+'/json') or {}
+    if (not re.fullmatch(r'sha256:[a-f0-9]{64}',image.get('Id',''))
+            or info.get('Image')!=image['Id'] or
             any(config.get(k)!=expected[k] for k in ('User','Entrypoint','Cmd'))
             or ('WorkingDir' in expected and config.get('WorkingDir')!=expected['WorkingDir'])
             or any(config.get('Labels',{}).get(k)!=v for k,v in expected['Labels'].items())
@@ -24,7 +27,7 @@ def verify(b,info,expected):
             or config.get('NetworkDisabled') not in (True,False)
             or host.get('NetworkMode')!='none'):
         raise ValueError('fixed test-first job isolation drift')
-    inherited=(b.docker('GET','/images/'+expected['Image']+'/json') or {}).get('Config',{}).get('Env',[])
+    inherited=image.get('Config',{}).get('Env',[])
     env={v.split('=',1)[0]:v for v in inherited}
     env.update({v.split('=',1)[0]:v for v in expected['Env']})
     if sorted(config.get('Env',[]))!=sorted(env.values()):raise ValueError('fixed test-first job environment drift')

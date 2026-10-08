@@ -17,7 +17,7 @@ class TestFirstJobTests(unittest.TestCase):
             NetworkDisabled=True,HostConfig=dict(NetworkMode='none',ReadonlyRootfs=True))
         def docker(method,path,payload=None):
             self.calls.append((method,path))
-            if path.startswith('/images/'):return dict(Config=dict(Env=[]))
+            if path.startswith('/images/'):return dict(Id='sha256:'+'a'*64,Config=dict(Env=[]))
             if method=='POST' and path.startswith('/containers/create'):
                 self.info=dict(Id='id',Image=payload['Image'],Config=copy.deepcopy(payload),
                     HostConfig=payload['HostConfig'],State=dict(Status='created',ExitCode=0))
@@ -64,4 +64,20 @@ class TestFirstJobTests(unittest.TestCase):
     def test_wrong_container_cannot_produce_receipt(self):
         with self.assertRaises(TimeoutError):self.call()
         self.info['HostConfig']['NetworkMode']='bridge'
+        with self.assertRaises(ValueError):self.call(now=2)
+
+    def test_repository_digest_matches_only_resolved_immutable_image_id(self):
+        payload={**self.payload,'Image':'delivery-kit-runtime@sha256:'+'a'*64}
+        # The actual Engine returns a canonical ID, not the requested reference.
+        self.timeout_create=True
+        with self.assertRaises(TimeoutError):self.call(payload=payload)
+        self.info['Image']='sha256:'+'a'*64;self.timeout_create=False
+        with self.assertRaises(TimeoutError):self.call(now=2,payload=payload)
+        self.info['State']['Status']='exited'
+        self.assertEqual(self.call(now=3,payload=payload)['exit_code'],0)
+        self.assertEqual(sum(m=='POST' and '/create' in p for m,p in self.calls),1)
+
+    def test_unrelated_canonical_image_is_rejected(self):
+        with self.assertRaises(TimeoutError):self.call()
+        self.info['Image']='sha256:'+'b'*64
         with self.assertRaises(ValueError):self.call(now=2)

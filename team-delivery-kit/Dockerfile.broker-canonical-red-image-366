@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.365
+COPY broker/test_first_job.py /test_first_job.py
+COPY broker/test_first_image_recovery.py /test_first_image_recovery.py
+RUN PYTHONPATH=/ python -c "import test_first_job,test_first_image_recovery"
