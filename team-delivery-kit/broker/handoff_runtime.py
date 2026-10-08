@@ -350,6 +350,11 @@ class Effects:
         except ImportError:from broker import verified_tool_incident
         return verified_tool_incident.capture(self.b,issue_id,task_id)
 
+    def prospective_capacity(self, issue_id, task_id):
+        try:import prospective_capacity
+        except ImportError:from broker import prospective_capacity
+        return prospective_capacity.capture(self.b,issue_id,task_id)
+
     def test_first_failure(self, issue_id, task_id):
         import uuid
         if str(uuid.UUID(task_id)) != task_id:

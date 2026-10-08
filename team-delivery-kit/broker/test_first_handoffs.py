@@ -224,6 +224,18 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         if now-data['bootstrap_dispatched_at']>=1800:block('bootstrap_repair_not_started')
         return
     if prior['stage'] == 'test_first_blocked':
+        if (data.get('error')=='test_first_cto_requires_replanning'
+                and data.get('decision',{}).get('action')=='escalate_cto'
+                and not data.get('prospective_capacity_replay')):
+            certificate=getattr(effects,'prospective_capacity',lambda *_:None)(issue,key)
+            if certificate:
+                data['prospective_capacity_replay']=dict(certificate=certificate,
+                    previous_cto_task=data.get('cto_task'),previous_decision=data.get('decision'),
+                    author_retry_authorized=False,delivery_approval=False)
+                for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):data.pop(field,None)
+                data['error']='prospective_capacity_experiment_requires_independent_decision'
+                save('technical_decision_required',route['cto'])
+                return
         if not data.get('diagnostic'):
             diagnostic = effects.test_first_failure(issue, key)
             if diagnostic:
@@ -400,18 +412,23 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import verified_tool_incident
         with broker.db() as con:
             qualified_tool_incident=verified_tool_incident.qualified(con,issue,key,data)
+        try:import prospective_capacity
+        except ImportError:from broker import prospective_capacity
+        with broker.db() as con:
+            qualified_prospective_capacity=prospective_capacity.qualified(con,issue,key,data)
         qualified_framework=(framework.get('kind')=='unpinned_pytest_cto_replan_v1'
             and framework.get('request',{}).get('issue_id')==issue
             and framework.get('request',{}).get('source_task')==key
             and framework.get('proof',{}).get('verified') is True
             and framework.get('proof',{}).get('framework_mismatch') is True
             and framework.get('diagnostic_sha256')==hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest())
-        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport or qualified_tool_incident):
+        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport or qualified_tool_incident or qualified_prospective_capacity):
             block('test_first_correction_failed_after_cto_diagnosis')
             return
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
         if qualified_byte_budget:suffix+=':preserved-seed-byte-budget-v1'
         if qualified_tool_incident:suffix+=':verified-tool-incident-v1:'+data['verified_tool_incident']['fingerprint']
+        if qualified_prospective_capacity:suffix+=':prospective-capacity-v1:'+data['prospective_capacity_replay']['certificate']['probe_sha256']
         if data.get('artifact_diagnosis_replay'):
             suffix+=':proxy-artifact-evidence-v1'
         if data.get('forced_tool_diagnosis_replay'):
@@ -434,6 +451,9 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             suffix += ':bounded-format-1'
         marker = hashlib.sha256((issue + ':' + key + ':test-first-cto' + suffix).encode()).hexdigest()
         technical_evidence=diagnostic_presentation(data)
+        if qualified_prospective_capacity:
+            technical_evidence=dict(source_task=key,qualification=data['prospective_capacity_replay']['certificate'],
+                historical_native_argument_constraint='UNKNOWN')
         if qualified_transport:
             technical_evidence=dict(source_task=key,manifest_sha256=diagnostic.get('manifest_sha256'),
                 qualification=data['transport_qualification_replay']['certificate'])
@@ -468,7 +488,14 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             'retains quoted string values and all assertions. Syntax-valid Python alone does not validate '
             'embedded JavaScript: controller harness calibration, behavioral Red and independent review '
             'remain mandatory. No retry budget/depth reset or product permission. '
-            if qualified_transport else 'If the failure lacks a concrete cause, escalate '
+            if qualified_transport else 'The frozen prospective experiment measured artifact_size rejection, '
+            'not the historical native cause. You may prescribe ONE concrete tests-only changed-precondition '
+            'capacity recovery: reduce COMMENT-only overhead before additions, preserving Python/JavaScript '
+            'semantics, every assertion, discovery and acceptance coverage. No file limit increase, '
+            'no test removal, no skip, no product edit or depth reset. If safe compaction cannot be established, '
+            'escalate with the specific missing evidence. Calibration, behavioral Red and independent review '
+            'remain mandatory. Do not claim the original invalid argument cause is known. '
+            if qualified_prospective_capacity else 'If the failure lacks a concrete cause, escalate '
             'for controller diagnostics rather than prescribing an identical retry. ')+
             'Return only JSON with action (request_correction or escalate_cto), reason '
             'and optional_files ([]). request_correction must give the original author '
@@ -497,7 +524,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'tests-only remedy via your independent decision; it never waives calibration, Red or review. '
                'Identical constraints under new task/call IDs do not rearm diagnosis; size counts alone '
                'are not changed evidence. No technical escalation to the CEO.'
-               if qualified_tool_incident else '')
+               if qualified_tool_incident and not qualified_prospective_capacity else '')
             + ('\nUNCHANGED SEED INSPECTION: a NEW fixed offline job verified the entire failed snapshot against '
                'the approved seed manifest, not merely the test hash. All bytes remain unchanged and the actual '
                'native tool history contains only paired read_file calls. The author executed no patch or suite; no Red receipt exists. '
@@ -579,8 +606,13 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             block('test_first_cto_invalid_decision:' + type(error).__name__)
             return
         data.update(cto_task=recipient['id'], decision=decision)
+        try:import prospective_capacity
+        except ImportError:from broker import prospective_capacity
+        with broker.db() as con:
+            capacity_experiment_qualified=prospective_capacity.qualified(con,issue,key,data)
         if (data.get('verified_tool_incident') and decision['action']=='request_correction'
-                and data['verified_tool_incident'].get('cause_known') is not True):
+                and data['verified_tool_incident'].get('cause_known') is not True
+                and not capacity_experiment_qualified):
             block('test_first_unknown_argument_constraint_requires_diagnostic')
             return
         if decision['action'] != 'request_correction' or decision['optional_files']:

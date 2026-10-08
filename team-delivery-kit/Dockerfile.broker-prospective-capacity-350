@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261007.349
+COPY broker/prospective_capacity.py /prospective_capacity.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py

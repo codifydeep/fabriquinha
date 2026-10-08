@@ -150,6 +150,12 @@ Uma sucessora de instrumentação exige um recibo terminal falho sem classifica�
 os mesmos inputs e imagem do proxy, código diagnóstico diferente e uma intenção
 única vinculada ao experimento anterior. Um resultado já classificado não permite
 essa sucessora; ela não rearma o worker nem concede aprovação de produto.
+Um experimento congelado com rejeição de tamanho pode alimentar uma única decisão
+independente do CTO por card, mediante arquivo privado administrado pelo
+controlador, identidade/hash conferidos, snapshot completo e ausência de workers
+ou Red. O handoff mantém a causa histórica desconhecida e não muda limites.
+Somente uma decisão técnica independente pode propor uma recuperação tests-only;
+calibração, Red, revisão e homologação permanecem obrigatórios.
 Para essa proposta estreita, o validador também preserva a forma estática de
 descoberta, decorators, assinaturas, escopo das assertions e transferências de
 controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de

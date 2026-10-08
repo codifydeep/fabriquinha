@@ -70,6 +70,37 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_capacity_experiment_wakes_cto_once_not_author_and_preserves_unknown_cause(self):
+        from broker import prospective_capacity as capacity
+        proof=dict(issue_id='issue',source_task='tests',probe_sha256='a'*64,
+            kind='prospective_capacity_experiment_v1',historical_failure_cause_proven=False,
+            author_retry_authorized=False,delivery_approval=False,test_bytes=32671,available_growth_bytes=97)
+        data=dict(error='test_first_cto_requires_replanning',diagnostic={'kind':'prior_native_failure'},
+            verified_tool_incident={'cause_known':False},cto_task='old-cto',
+            decision={'action':'escalate_cto'},test_first_cto_wakeup='old')
+        with self.broker.db() as c:
+            capacity.claim(c,proof)
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',data,1)
+            prior=handoffs.load(c,'tests')
+        self.effects.prospective_capacity=lambda *_:proof
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        self.assertEqual(prior['stage'],'technical_decision_required')
+        self.assertEqual(self.effects.wakeups,[])
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        self.assertEqual(self.effects.wakeups[-1][0][1],'cto')
+        instruction=self.effects.wakeups[-1][0][4]
+        self.assertIn('not the historical native cause',instruction)
+        self.assertIn('reduce COMMENT-only overhead',instruction)
+        self.assertIn('Calibration, behavioral Red and independent review',instruction)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        cto=dict(id='new-cto',agent_id='cto',status='completed',wakeup_id='wakeup')
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task,cto],self.test_task,prior,self.effects)
+        with self.broker.db() as c:prior=handoffs.load(c,'tests')
+        self.assertEqual(prior['stage'],'test_first_cto_correction')
+        self.assertFalse(json.loads(prior['data'])['verified_tool_incident']['cause_known'])
+        self.assertEqual(len(self.effects.wakeups),1)
+
     def test_verified_new_tool_incident_routes_cto_but_unknown_cannot_retry_author(self):
         from broker import verified_tool_incident as incidents
         diagnostic=dict(kind='rejected_forced_tool_response',issue_id='issue',task_id='tests',
