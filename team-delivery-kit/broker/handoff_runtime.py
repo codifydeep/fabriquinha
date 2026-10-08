@@ -340,6 +340,11 @@ class Effects:
             from broker import failed_test_checkpoint
         return failed_test_checkpoint.capture(self.b, issue, task)
 
+    def transport_qualification(self, issue_id, task_id):
+        try:import transport_qualification
+        except ImportError:from broker import transport_qualification
+        return transport_qualification.capture(self.b,issue_id,task_id)
+
     def test_first_failure(self, issue_id, task_id):
         import uuid
         if str(uuid.UUID(task_id)) != task_id:

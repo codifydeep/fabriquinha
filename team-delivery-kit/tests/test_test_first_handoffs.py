@@ -70,6 +70,40 @@ class Effects:
 
 
 class TestFirstHandoffTests(unittest.TestCase):
+    def test_transport_qualification_reopens_only_cto_once_without_author_grant(self):
+        import hashlib
+        self.broker.IMAGE='sha256:'+'a'*64
+        diagnostic=dict(kind='unchanged_seed_read_only_failure',issue_id='issue',task_id='tests',
+            manifest_sha256='b'*64,proxy_failure_cause_proven=False,write_executed=False,
+            tests_executed=False,red_verified=False,delivery_approval=False)
+        certificate=dict(issue_id='issue',source_task='tests',worker_image=self.broker.IMAGE,
+            diagnostic_sha256=hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest(),
+            config_sha256='c'*64,historical_cause_proven=False,model_authorship=False,
+            author_retry_authorized=False,delivery_approval=False)
+        data=dict(error='test_first_cto_requires_replanning',diagnostic=diagnostic,
+            unchanged_seed_diagnosis_replay={'previous_cto_task':'older'},cto_task='prior-cto',
+            decision=dict(action='escalate_cto',optional_files=[]),test_first_cto_wakeup='old')
+        with self.broker.db() as c:
+            c.execute('CREATE TABLE transport_qualifications(source_task TEXT PRIMARY KEY,receipt TEXT)')
+            c.execute('INSERT INTO transport_qualifications VALUES(?,?)',('tests',json.dumps(certificate)))
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',data,1);prior=handoffs.load(c,'tests')
+        self.effects.transport_qualification=lambda *_:certificate
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:state=handoffs.load(c,'tests')
+        saved=json.loads(state['data']);self.assertEqual(state['stage'],'technical_decision_required')
+        replay=saved['transport_qualification_replay'];self.assertEqual(replay['previous_cto_task'],'prior-cto')
+        self.assertFalse(replay['author_retry_authorized']);self.assertEqual(self.effects.wakeups,[])
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,state,self.effects)
+        args=self.effects.wakeups[-1][0];self.assertEqual(args[1],'cto')
+        self.assertIn('historical upstream cause remains UNKNOWN',args[4])
+        self.assertIn('No retry budget/depth reset',args[4])
+        saved.update(error='test_first_cto_requires_replanning',decision=dict(action='escalate_cto',optional_files=[]))
+        with self.broker.db() as c:
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',saved,2);prior=handoffs.load(c,'tests')
+        count=len(self.effects.wakeups)
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        self.assertEqual(len(self.effects.wakeups),count)
+
     def test_failed_checkpoint_still_requires_independent_test_review(self):
         from unittest.mock import patch
         from broker import failed_test_checkpoint as checkpoint

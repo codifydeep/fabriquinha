@@ -137,6 +137,14 @@ eventos ACP e o conteúdo final exato. Essa fixture não chama o provedor, não
 comprova autoria pelo modelo e não substitui uma entrega autônoma com TDD,
 revisão independente, PR, CI e QA do mesmo commit.
 
+Qualificações offline podem reabrir uma análise técnica bloqueada somente quando
+o controlador as vincula ao worker/writer atualmente instalados e ao mesmo
+snapshot integralmente preservado. O certificado registra que a causa histórica
+continua desconhecida e não concede retry ao autor. O CTO decide independentemente
+se há um experimento corretivo concreto sustentado pelas condições novas; outro
+impasse não rearma o mesmo certificado. A decisão anterior permanece registrada,
+e calibração, Red e revisão continuam necessários antes de implementar o produto.
+
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
 O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,

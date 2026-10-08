@@ -230,6 +230,18 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                 data['diagnostic'] = diagnostic
                 save('test_first_blocked', route['cto'])
         diagnostic=data.get('diagnostic') or {}
+        if (data.get('error')=='test_first_cto_requires_replanning'
+                and data.get('unchanged_seed_diagnosis_replay') and not data.get('transport_qualification_replay')
+                and data.get('decision',{}).get('action')=='escalate_cto'):
+            certificate=getattr(effects,'transport_qualification',lambda *_:None)(issue,key)
+            if certificate:
+                data['transport_qualification_replay']=dict(certificate=certificate,
+                    previous_cto_task=data.get('cto_task'),previous_decision=data.get('decision'),
+                    author_retry_authorized=False,delivery_approval=False)
+                for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):data.pop(field,None)
+                data['error']='qualified_changed_transport_requires_independent_decision'
+                save('technical_decision_required',route['cto'])
+                return
         if (data.get('error')=='test_first_cto_execution_failed'
                 and diagnostic and not data.get('decision_format_retry')
                 and not data.get('pre_red_format_checked')):
@@ -373,13 +385,17 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import seeded_byte_budget_replan
         with broker.db() as con:
             qualified_byte_budget=seeded_byte_budget_replan.qualified(con,issue,key,data)
+        try:import transport_qualification
+        except ImportError:from broker import transport_qualification
+        with broker.db() as con:
+            qualified_transport=transport_qualification.qualified(con,issue,key,data,getattr(broker,'IMAGE',None))
         qualified_framework=(framework.get('kind')=='unpinned_pytest_cto_replan_v1'
             and framework.get('request',{}).get('issue_id')==issue
             and framework.get('request',{}).get('source_task')==key
             and framework.get('proof',{}).get('verified') is True
             and framework.get('proof',{}).get('framework_mismatch') is True
             and framework.get('diagnostic_sha256')==hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest())
-        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget):
+        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport):
             block('test_first_correction_failed_after_cto_diagnosis')
             return
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
@@ -390,6 +406,8 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             suffix+=':proxy-forced-patch-evidence-v1'
         if data.get('unchanged_seed_diagnosis_replay'):
             suffix+=':unchanged-seed-read-only-evidence-v1'
+        if qualified_transport:
+            suffix+=':qualified-transport-v1:'+data['transport_qualification_replay']['certificate']['config_sha256']
         if qualified_structure:
             suffix += ':nonempty-no-methods-replan-v1'
         if qualified_framework:
@@ -404,6 +422,9 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             suffix += ':bounded-format-1'
         marker = hashlib.sha256((issue + ':' + key + ':test-first-cto' + suffix).encode()).hexdigest()
         technical_evidence=diagnostic_presentation(data)
+        if qualified_transport:
+            technical_evidence=dict(source_task=key,manifest_sha256=diagnostic.get('manifest_sha256'),
+                qualification=data['transport_qualification_replay']['certificate'])
         if qualified_restart:
             technical_evidence=dict(source_task=key, diagnostic=diagnostic,
                 proof=data['host_restart_recovery']['proof'],
@@ -427,8 +448,16 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             'Diagnose the failed tests-only execution; product code and all existing '
             'tests must remain unchanged. Evidence: ' + json.dumps(technical_evidence, sort_keys=True)
             + '. Do not infer a stale lease, file defect or successful execution '
-            'without evidence. If the failure lacks a concrete cause, escalate '
-            'for controller diagnostics rather than prescribing an identical retry. '
+            'without evidence. '+('The historical upstream cause remains UNKNOWN. New installed safeguards have '
+            'passed native and integrated offline ACP negative/positive controls on the current worker. '
+            'You may prescribe ONE concrete bounded tests-only experiment based on these changed conditions, '
+            'or escalate with a specific missing evidence requirement. Do not claim the old cause is proven '
+            'or replay an identical instruction. Inspect the preserved NEW test; use a narrow patch that '
+            'retains quoted string values and all assertions. Syntax-valid Python alone does not validate '
+            'embedded JavaScript: controller harness calibration, behavioral Red and independent review '
+            'remain mandatory. No retry budget/depth reset or product permission. '
+            if qualified_transport else 'If the failure lacks a concrete cause, escalate '
+            'for controller diagnostics rather than prescribing an identical retry. ')+
             'Return only JSON with action (request_correction or escalate_cto), reason '
             'and optional_files ([]). request_correction must give the original author '
             'a concrete tests-only recovery action. Do not change files or weaken TDD.'
@@ -457,7 +486,7 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'correction is appropriate: inspect the unchanged harness and use one narrow patch call at a time, '
                'preserving every assertion and behavior. Name additional evidence if insufficient. '
                'Do not replay an identical instruction, waive calibration/Red/review, reset depth or approve delivery.'
-               if diagnostic.get('kind')=='unchanged_seed_read_only_failure' else '')
+               if diagnostic.get('kind')=='unchanged_seed_read_only_failure' and not qualified_transport else '')
             +
             '\nOutput reason in one complete sentence, aim below 900 characters; '
             '1200 characters is the output-contract maximum. Target420characters on format recovery. No preface or Markdown. '
