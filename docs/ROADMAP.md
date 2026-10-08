@@ -86,6 +86,10 @@ atômica e retoma cópias parciais exatas. O resultado não instala permissões.
 `Dockerfile.scope-materializer` fornece a imagem dedicada, validada com uma
 fixture descartável sem rede, credenciais ou socket Docker; essa fixture não
 é uma revisão real dos agentes nem uma aprovação da entrega em andamento.
-A associação desse resultado ao controlador, instalação dos componentes e
-despacho da implementação ainda precisam de integração e qualificação real.
+`product_scope_job.py` associa a materialização ao registro persistente:
+reautentica as decisões nativas e leituras antes/depois do job, usa imagem fixa,
+reconcilia o mesmo volume/job e guarda o recibo sem liberar o autor. Recibos
+inválidos viram incidentes persistentes, sem execuções idênticas. Ainda falta
+instalar os componentes, registrar o contrato como base autorizada da próxima
+execução e qualificar o despacho e a recuperação reais dos agentes.
 Aprovar o plano não equivale a conceder escrita ou homologar.
