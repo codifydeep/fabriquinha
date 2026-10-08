@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.354
+COPY broker/controller_maintenance.py /controller_maintenance.py
+COPY broker/server.py /broker.py
+COPY broker/review_context_recovery.py /review_context_recovery.py

@@ -448,6 +448,29 @@ ou manter um impedimento técnico explícito. Essa retomada não autoriza ediç�
 testes, repetição do experimento ou aprovação. O caminho possui testes offline;
 sua recuperação ponta a ponta ainda precisa ser comprovada com os agentes reais.
 
+A candidata de manutenção adiciona uma barreira administrativa persistente,
+sem endpoint para os workers. `drain` suspende novas reconciliações; tarefas já
+existentes podem concluir normalmente. `seal` exige inventário nativo completo,
+ausência de leases ativos/fechando, ciclos de reconciliação e grants consumidos
+ainda sem lease. Somente então novos grants e execuções ficam bloqueados.
+Os ciclos são registrados em SQLite, não em um contador invisível a outro processo.
+O estado permanece fechado após reinício; `release` exige o mesmo identificador
+da operação e conserva seu histórico, sem reaproveitar grants ou aprovações.
+Inventário indisponível e ciclos de resultado desconhecido não autorizam atualização.
+Esses contratos passaram pela validação offline; a candidata ainda não está instalada
+nem sua janela de manutenção foi validada no ambiente real.
+
+Depois de instalar e qualificar essa candidata, o procedimento de atualização será:
+
+1. Suspender os serviços host de despacho da instância, preservando seus registros.
+2. Executar `controller_maintenance_cli.py --namespace <instância> --action drain --operation <UUID>`.
+3. Consultar `seal` com o mesmo UUID até obter `stage=sealed` e `drained=true`.
+4. Construir **e aguardar** a imagem final, atualizar somente o controlador e conferir seu ID imutável.
+5. Validar o controlador, executar `release` com o mesmo UUID e restaurar os serviços host.
+
+Um estado `draining` não permite trocar a imagem. Não interromper workers para
+forçar a drenagem; resolver o impedimento com seus arquivos e recibos preservados.
+
 A trilha usa um marcador próprio de calibração e o contrato técnico simples, não
 o diagnóstico especializado que exige `findings`. O teste integrado verifica a
 instrução real após leituras completas contra schema e adaptador do proxy. Uma

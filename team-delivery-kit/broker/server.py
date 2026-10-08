@@ -22,6 +22,10 @@ try:
     import handoff_runtime
 except ImportError:
     from broker import handoff_runtime
+try:
+    import controller_maintenance
+except ImportError:
+    from broker import controller_maintenance
 
 
 def handoff_context():
@@ -685,6 +689,7 @@ def issue_grant(payload):
     if payload['mode'] not in ('implementation', 'review', 'planning'):
         raise ValueError('invalid mode')
     with LOCK, db() as con:
+        controller_maintenance.require_admission(con)
         previous = con.execute('SELECT * FROM grants WHERE task_id=? ORDER BY attempt DESC LIMIT 1', (payload['task_id'],)).fetchone()
         if previous and payload['attempt'] <= previous['attempt']:
             raise ValueError('attempt must advance')
@@ -1644,6 +1649,7 @@ def execute_grant(token, payload, streaming=False, defer_transport=False):
     if payload != {}:
         raise ValueError('execution parameters are controller-owned')
     with LOCK, db() as con:
+        controller_maintenance.require_admission(con)
         row = con.execute('SELECT * FROM grants WHERE digest=?',
                           (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
         if not row or row['deadline'] < time.time():
@@ -2512,34 +2518,39 @@ def main():
                 tick()
                 cycle += 1
                 if cycle % 10 == 0:
-                    reconcile_review_outcomes()
-                    reconcile_review_retries()
-                    reconcile_change_requests()
-                    import candidate_qualification
-                    candidate_qualification.tick(handoff_context())
-                    import assertion_replan
-                    assertion_replan.tick(handoff_context())
-                    import technical_remediation_plan
-                    technical_remediation_plan.tick(handoff_context())
-                    import test_decomposition
-                    test_decomposition.tick(handoff_context())
-                    import u3_controls_execution
-                    u3_controls_execution.tick(handoff_context())
-                    import u3_product_intake
-                    u3_product_intake.tick(handoff_context())
-                    import u3_coverage_integration
-                    u3_coverage_integration.tick(handoff_context())
-                    import u3_delivery_review
-                    u3_delivery_review.tick(handoff_context())
-                    import harness_prerequisite
-                    harness_prerequisite.tick(handoff_context())
-                    import harness_repair_task
-                    harness_repair_task.tick(handoff_context())
-                    import incremental_supervisor
-                    incremental_supervisor.tick(handoff_context())
-                    handoff_runtime.tick(handoff_context())
-                    import inherited_test_replan
-                    inherited_test_replan.tick(handoff_context())
+                    context = handoff_context()
+                    if controller_maintenance.begin_cycle(context):
+                        try:
+                            reconcile_review_outcomes()
+                            reconcile_review_retries()
+                            reconcile_change_requests()
+                            import candidate_qualification
+                            candidate_qualification.tick(context)
+                            import assertion_replan
+                            assertion_replan.tick(context)
+                            import technical_remediation_plan
+                            technical_remediation_plan.tick(context)
+                            import test_decomposition
+                            test_decomposition.tick(context)
+                            import u3_controls_execution
+                            u3_controls_execution.tick(context)
+                            import u3_product_intake
+                            u3_product_intake.tick(context)
+                            import u3_coverage_integration
+                            u3_coverage_integration.tick(context)
+                            import u3_delivery_review
+                            u3_delivery_review.tick(context)
+                            import harness_prerequisite
+                            harness_prerequisite.tick(context)
+                            import harness_repair_task
+                            harness_repair_task.tick(context)
+                            import incremental_supervisor
+                            incremental_supervisor.tick(context)
+                            handoff_runtime.tick(context)
+                            import inherited_test_replan
+                            inherited_test_replan.tick(context)
+                        finally:
+                            controller_maintenance.end_cycle(context)
             except Exception:
                 print('watchdog reconciliation failed; leases remain visible', flush=True)
             time.sleep(1)
