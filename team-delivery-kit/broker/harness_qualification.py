@@ -83,21 +83,30 @@ def rejection_state(con,issue,info,raw):
         value=json.loads(raw);facts=value['facts'];phase=value['phase']
         expected=info['Config']['Labels']['delivery-kit.harness-manifest']
         if (value.get('status')!='rejected' or value.get('delivery_approval') is not False
-                or phase not in ('compile','positive_reference','behavioral_controls')
+                or phase not in ('compile','positive_reference','behavioral_controls','background_control')
                 or facts.get('manifest_sha256')!=expected
                 or not re.fullmatch(r'[a-f0-9]{64}',facts.get('test_sha256',''))):return state
         diagnostic=dict(phase=phase,manifest_sha256=expected,test_sha256=facts['test_sha256'])
-        positive=facts.get('positive')
         counts=('tests','failures','errors','skipped','unexpected_successes','expected_failures')
-        if isinstance(positive,dict) and all(type(positive.get(k)) is int and 0<=positive[k]<=10000 for k in counts):
-            summary={k:positive[k] for k in counts}
+        def summarize(observed):
+            if not isinstance(observed,dict) or not all(type(observed.get(k)) is int and 0<=observed[k]<=10000 for k in counts):return None
+            summary={k:observed[k] for k in counts}
             for key in ('failed_methods','errored_methods'):
-                names=positive.get(key,[])
+                names=observed.get(key,[])
                 if (isinstance(names,list) and len(names)<=1000 and all(isinstance(n,str)
                         and re.fullmatch(r'(?:test_[A-Za-z0-9_]{1,120}|__fixture__)',n) for n in names)):
                     summary[key]=names
-            if re.fullmatch(r'[a-f0-9]{64}',positive.get('output_sha256','')):summary['output_sha256']=positive['output_sha256']
-            diagnostic['positive']=summary
+            if re.fullmatch(r'[a-f0-9]{64}',observed.get('output_sha256','')):summary['output_sha256']=observed['output_sha256']
+            return summary
+        for key in ('positive','background'):
+            summary=summarize(facts.get(key))
+            if summary is not None:diagnostic[key]=summary
+        negatives=facts.get('negative_controls')
+        if isinstance(negatives,dict):
+            from service_mode_harness_qualification import CASES
+            if set(negatives)<=set(CASES):
+                summaries={key:summarize(value) for key,value in negatives.items()}
+                if all(value is not None for value in summaries.values()):diagnostic['negative_controls']=summaries
         state['diagnostic']=diagnostic
     except (ValueError,TypeError,KeyError):pass
     return state

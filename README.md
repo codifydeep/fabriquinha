@@ -161,6 +161,14 @@ allowlisted e significado explícito. Um diagnóstico com `no_change` não receb
 o roteiro de causa desconhecida. Após escalonamento terminal, há no máximo uma
 reanálise por card com essa apresentação corrigida, preservando a decisão
 anterior e sem conceder autorização ao autor. Repetir IDs não rearma esse caminho.
+O wrapper de calibração com tráfego de fundo preserva rejeições estruturadas
+(fase e fatos) em vez de reduzi-las à classe da exceção. Para recibos antigos que
+perderam esses dados, `run_calibration_diagnostic.py` permite uma única observação
+offline do snapshot congelado com imagem diagnóstica identificada: sem rede,
+credenciais, escrita no snapshot ou repetição da tarefa nativa. O resultado novo
+é separado do original e não concede Red, retry do autor ou aprovação de entrega.
+Essa correção está validada na imagem diagnóstica; sua ativação na imagem de
+calibração do fluxo normal ainda é pendente. Recibos históricos continuam intactos.
 Para essa proposta estreita, o validador também preserva a forma estática de
 descoberta, decorators, assinaturas, escopo das assertions e transferências de
 controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de

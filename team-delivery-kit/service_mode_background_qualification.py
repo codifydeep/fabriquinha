@@ -33,13 +33,24 @@ def run(root,manifest):
             facts=calibration.observed(cls)
     finally:
         module.APP_JS_PATH=original;verify_snapshot(root,manifest)
-    validate(facts,result['positive'])
+    try:validate(facts,result['positive'])
+    except ValueError:
+        raise calibration.CalibrationRejected('background_control',dict(manifest_sha256=manifest,
+            test_sha256=result['test_sha256'],positive=result['positive'],background=facts)) from None
     return {**result,'background_control':facts,'background_fixture_sha256':hashlib.sha256(fixture.encode()).hexdigest()}
+
+
+def rejection(error):
+    """Preserve controller calibration facts, never arbitrary exception text."""
+    result=dict(status='rejected',category=type(error).__name__,delivery_approval=False)
+    if isinstance(error,calibration.CalibrationRejected):
+        result.update(phase=error.phase,facts=error.facts)
+    return result
 
 
 if __name__=='__main__':
     import sys
     try:print(json.dumps(run(*sys.argv[1:]),sort_keys=True))
     except Exception as error:
-        print(json.dumps(dict(status='rejected',category=type(error).__name__,delivery_approval=False)))
+        print(json.dumps(rejection(error),sort_keys=True))
         sys.exit(1)
