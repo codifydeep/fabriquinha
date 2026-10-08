@@ -32,12 +32,27 @@ with b.db() as c:
 
 def pending(state):
     if not state or not state.get('configuration_sha256'):return False
+    if diagnosis_pending(state):return True
     receipt=state.get('source_review') or {}
     if (state.get('stage')=='blocked_awaiting_ceo' and receipt.get('stage')=='verified'
             and not receipt.get('transport') and not state.get('prior_unqualified_source_review')):return True
     return state.get('stage')=='reviewing_brief_sources' or (
         state.get('stage')=='blocked_awaiting_ceo' and state.get('brief_clarification_product')==1
         and not state.get('source_review') and bool(state.get('questions')))
+
+
+def diagnosis_pending(state):
+    receipt=(state or {}).get('source_review') or {}
+    prior=(state or {}).get('prior_invalid_source_review') or {}
+    return bool(state and state.get('stage')=='blocked' and state.get('active')=='source_review'
+        and not state.get('source_review_diagnosis')
+        and state.get('category')=='ValueError:unresolved answer cannot claim explicit brief support'
+        and receipt.get('stage')=='blocked' and prior.get('stage')=='verified'
+        and receipt.get('transport',{}).get('version')=='source-review-transport-v1'
+        and receipt.get('task_id')==prior.get('task_id') and receipt.get('task_id')
+        and receipt.get('output_sha256')==prior.get('output_sha256')
+        and receipt.get('brief_sha256')==state.get('brief_sha256')
+        and receipt.get('configuration_sha256')==state.get('configuration_sha256'))
 
 
 def validate(answer,brief,questions):
@@ -82,6 +97,12 @@ def run(state,brief,registry,path):
     from planning_intake import issue_for,completed_output
     from release_eval import save_receipt
     if not pending(state):return state
+    if diagnosis_pending(state):
+        prior=state['source_review']
+        state={**state,'source_review_diagnosis':{'stage':'intent','prior_review':prior,
+            'category':state['category'],'scope_approval_created':False}}
+        state.pop('source_review')
+        state['questions']=prior['questions']
     if state.get('source_review',{}).get('stage')=='verified' and not state['source_review'].get('transport'):
         state={**state,'prior_unqualified_source_review':state['source_review']}
         state.pop('source_review')
@@ -104,9 +125,20 @@ def run(state,brief,registry,path):
         'Return ONLY {"role":"cto","resolutions":[{"index":0,"classification":'
         '"explicit_brief","quote":"literal source","answer":"faithful reading"}]}. '
         'Cover every question in exact index order.\nQuestions: '+json.dumps(questions)+'\nORIGINAL BRIEF:\n'+brief)
+    if state.get('source_review_diagnosis'):
+        context += ('\nDIAGNOSE THE REJECTED REVIEW, not an identical retry. '
+            'Rejected source review: '+json.dumps(state['source_review_diagnosis']['prior_review'])+
+            '\nYour prior classification claimed explicit support while the answer claimed missing information. '
+            'Inspect ALL interaction constraints in the brief, not just its first sentence. '
+            'Distinguish a requested interaction from hypothetical additional features. '
+            'An optional feature not requested is not a prerequisite for delivery. '
+            'Use only a directly relevant literal quote and a conclusive supported answer. '
+            'If support is genuinely absent, requires_ceo must have empty quote and answer. '
+            'Never invent a CEO decision or widen scope.')
     try:
         issue=issue_for('cto',context,registry['agents']['cto'],run_name=state['name']+
-            ('-SOURCE-REVIEW-STRICT' if state.get('prior_unqualified_source_review') else '-SOURCE-REVIEW'))
+            ('-SOURCE-REVIEW-DIAGNOSIS' if state.get('source_review_diagnosis') else
+             '-SOURCE-REVIEW-STRICT' if state.get('prior_unqualified_source_review') else '-SOURCE-REVIEW'))
         receipt.update(stage='working',issue_id=issue);save_receipt(path,state)
         task,text=completed_output(issue,registry['agents']['cto'])
         wire=transport(task)
@@ -119,8 +151,12 @@ def run(state,brief,registry,path):
         else:
             state.update(stage='product_source_reconciliation',owner='product',active='product',
                 prior_source_review_product={'output':state['outputs']['product'],
-                    'issue_id':state['issues']['product'],'questions':questions},outputs={},source_review_product=1)
+                    'issue_id':state['issues']['product'],'questions':questions},outputs={},source_review_product=1,
+                source_review_product_attempt=2 if state.get('source_review_diagnosis') else 1)
             state.pop('questions',None)
+        if state.get('source_review_diagnosis'):
+            state['source_review_diagnosis']={**state['source_review_diagnosis'],'stage':'decision_verified',
+                'task_id':task,'issue_id':issue,'output_sha256':receipt['output_sha256']}
         save_receipt(path,state);return state
     except Exception as error:
         receipt.update(stage='blocked',category=(type(error).__name__+':'+str(error))[:180])

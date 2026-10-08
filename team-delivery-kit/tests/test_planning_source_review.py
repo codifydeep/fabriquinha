@@ -50,6 +50,35 @@ class SourceReviewTests(unittest.TestCase):
         self.assertEqual(result['outputs'],before['outputs'])
         self.assertIsNone(revalidate(result,brief))
 
+    def test_contradictory_source_review_dispatches_one_changed_cto_diagnosis(self):
+        brief='No page navigation.';state=self.state(brief)
+        bad=self.answer();bad['resolutions'][0]['answer']='Direct navigation is not addressed.'
+        receipt={'stage':'verified','brief_sha256':state['brief_sha256'],
+            'configuration_sha256':state['configuration_sha256'],
+            'resolutions':bad['resolutions'],'questions':['Navigate?'],'task_id':'old',
+            'output_sha256':'b'*64,'transport':{'version':'source-review-transport-v1'}}
+        state['source_review']=receipt
+        state=revalidate(state,brief)
+        state.pop('questions',None)
+        self.assertTrue(pending(state))
+        with tempfile.TemporaryDirectory() as directory,patch('planning_intake.issue_for',return_value='diagnosis') as issue,patch('planning_intake.completed_output',return_value=('new-task',json.dumps(self.answer()))):
+            result=run(state,brief,{'agents':{'cto':'cto'}},Path(directory)/'receipt.json')
+            self.assertEqual(issue.call_args.kwargs['run_name'],'TEST-SOURCE-REVIEW-DIAGNOSIS')
+            self.assertIn('Rejected source review',issue.call_args.args[1])
+            self.assertEqual(result['source_review_diagnosis']['prior_review'],state['source_review'])
+            self.assertEqual(result['stage'],'product_source_reconciliation')
+            self.assertEqual(result['source_review_product_attempt'],2)
+            result.update(stage='blocked',active='source_review',category=state['category'])
+            result['source_review']['stage']='blocked'
+            self.assertFalse(pending(result))
+
+    def test_diagnosis_does_not_retry_unknown_review_or_transport_errors(self):
+        state=self.state('No page navigation.')
+        for category in ('RuntimeError:agent failed','ValueError:strict transport not proven'):
+            state.update(stage='blocked',active='source_review',category=category,
+                source_review={'stage':'blocked','category':category})
+            self.assertFalse(pending(state))
+
     def test_coverage_order_types_and_unknown_fields_fail_closed(self):
         for index in (1,True):
             bad=self.answer();bad['resolutions'][0]['index']=index

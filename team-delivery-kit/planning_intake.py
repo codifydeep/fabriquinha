@@ -225,7 +225,9 @@ def capability_context(selection):
 
 def issue_for(role, description, agent_id, *, retry=False, recovery=False, schema=False, run_name=NAME, wire=False, capability=False, clarification=False, ceo_answer=False, source_review=False):
     suffix = ('-capability1' if capability else '-wire1' if wire else '-schema1' if schema else '-recovery1' if recovery else '-retry1' if retry else '')
-    title = run_name + ' — ' + role + ('-source-reviewed1' + suffix if source_review else '-ceoanswer1' + suffix if ceo_answer else '-briefclarification1' if clarification else suffix)
+    if type(source_review) not in (bool,int) or source_review not in (False,True,1,2):
+        raise ValueError('bounded source review attempt required')
+    title = run_name + ' — ' + role + ('-source-reviewed'+str(int(source_review)) + suffix if source_review else '-ceoanswer1' + suffix if ceo_answer else '-briefclarification1' if clarification else suffix)
     if len(description) > 8000:
         raise ValueError('planning context exceeds issue limit')
     matches = [card for card in cli('list')['issues'] if card['title'] == title]
@@ -605,7 +607,8 @@ def main():
         try:
             issue_id = issue_for(role, context, registry['agents'][role],
                                  retry=retry, recovery=recovery, schema=schema, run_name=name, wire=wire, capability=capability,
-                                 clarification=clarification, ceo_answer=ceo_answer,source_review=reviewed)
+                                 clarification=clarification, ceo_answer=ceo_answer,
+                                 source_review=ledger.get('source_review_product_attempt',1) if reviewed else False)
             ledger['issues'][role] = issue_id
             mark_working(ledger, role)
             save_receipt(ledger_path, ledger)
