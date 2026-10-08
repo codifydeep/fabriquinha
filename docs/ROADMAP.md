@@ -157,3 +157,9 @@ metadados conhecidos, continuam obrigatórias a identidade nativa da tarefa,
 o wakeup autenticado e a igualdade integral com a instrução registrada.
 Falhas anteriores permanecem bloqueadas: instalar o decoder não reabre planos,
 não dispensa revisão e não autoriza retentativas idênticas.
+`product_scope_envelope_recovery.py` permite recuperação administrativa apenas
+da falha pré-modelo comprovada: tarefa nativa falha, envelope verificado,
+linhagem ACP anterior ao prompt, sponsor revalidado e apresentação corrigida
+ensaiada em banco isolado. Cria outro plano com referência e prova da tentativa
+anterior, que permanece inalterada. Não despacha agentes nem concede escrita;
+o loop regular deve conduzir a nova proposta e sua revisão independente.

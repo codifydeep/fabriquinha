@@ -133,6 +133,7 @@ COPY broker/product_scope_author.py /product_scope_author.py
 COPY broker/product_scope_delivery.py /product_scope_delivery.py
 COPY broker/product_scope_bootstrap.py /product_scope_bootstrap.py
 COPY broker/product_scope_pipeline.py /product_scope_pipeline.py
+COPY broker/product_scope_envelope_recovery.py /product_scope_envelope_recovery.py
 COPY remediation_plan_contract.py /remediation_plan_contract.py
 COPY r3_incident_contract.py /r3_incident_contract.py
 COPY r3_decision_revision.py /r3_decision_revision.py

@@ -159,7 +159,10 @@ def task_record(settings, task_id, agent_id):
             or 'DELIVERY_SCOPE_AUTHOR_START ' in (task.get('handoff_note') or '')):
         try:import native_scope_note
         except ImportError:from broker import native_scope_note
-        task={**task,'handoff_note':native_scope_note.canonical(task['handoff_note'],task.get('wakeup_id'))}
+        raw=task['handoff_note'];canonical=native_scope_note.canonical(raw,task.get('wakeup_id'))
+        task={**task,'handoff_note':canonical,
+              'scope_note_envelope_verified':raw!=canonical,
+              'scope_note_envelope_sha256':__import__('hashlib').sha256(raw.encode()).hexdigest()}
     return task
 
 
