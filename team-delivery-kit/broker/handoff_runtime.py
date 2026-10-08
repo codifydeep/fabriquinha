@@ -348,7 +348,11 @@ class Effects:
         if not path.exists():
             try:import artifact_rejection_evidence
             except ImportError:from broker import artifact_rejection_evidence
-            return artifact_rejection_evidence.fetch(self.b,issue_id,task_id)
+            diagnostic=artifact_rejection_evidence.fetch(self.b,issue_id,task_id)
+            if diagnostic:return diagnostic
+            try:import unchanged_seed_diagnosis
+            except ImportError:from broker import unchanged_seed_diagnosis
+            return unchanged_seed_diagnosis.capture(self.b,issue_id,task_id)
         diagnostic = json.loads(path.read_text())
         if (diagnostic.get('kind') not in ('rejected_red','rejected_snapshot')
                 or diagnostic.get('issue_id') != issue_id or diagnostic.get('task_id') != task_id):

@@ -161,6 +161,7 @@ COPY broker/qa_artifacts.py /qa_artifacts.py
 COPY browser_runtime_probe.py /qa_runtime_probe.py
 COPY broker/candidate_correction.py /candidate_correction.py
 COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/unchanged_seed_diagnosis.py /unchanged_seed_diagnosis.py
 COPY broker/postwrite_diagnosis.py /postwrite_diagnosis.py
 COPY broker/read_capacity_diagnosis.py /read_capacity_diagnosis.py
 COPY broker/contract_revision.py /contract_revision.py

@@ -291,6 +291,22 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             data['error']='proxy_rejected_forced_patch_response'
             save('technical_decision_required',route['cto'])
             return
+        if (data.get('error')=='test_first_cto_requires_replanning'
+                and not data.get('unchanged_seed_diagnosis_replay')
+                and data.get('decision',{}).get('action')=='escalate_cto'
+                and diagnostic.get('kind')=='unchanged_seed_read_only_failure'
+                and diagnostic.get('operation')=='unchanged_seed_read_only_failure_v1'
+                and diagnostic.get('issue_id')==issue and diagnostic.get('task_id')==key
+                and all(diagnostic.get(k) is False for k in
+                    ('proxy_failure_cause_proven','write_executed','tests_executed','red_verified','delivery_approval'))):
+            data['unchanged_seed_diagnosis_replay']=dict(previous_cto_task=data.get('cto_task'),
+                previous_decision=data.get('decision'),
+                diagnostic_sha256=hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest(),
+                author_retry_authorized=False,delivery_approval=False)
+            for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):data.pop(field,None)
+            data['error']='unchanged_seed_after_read_only_failure'
+            save('technical_decision_required',route['cto'])
+            return
         # One changed, explicitly bounded output contract, never a blind author
         # retry or reinterpretation of the rejected technical decision.
         if (data.get('error') == 'test_first_cto_invalid_decision:ValueError'
@@ -372,6 +388,8 @@ def technical_recovery(broker, route, runs, source, prior, effects):
             suffix+=':proxy-artifact-evidence-v1'
         if data.get('forced_tool_diagnosis_replay'):
             suffix+=':proxy-forced-patch-evidence-v1'
+        if data.get('unchanged_seed_diagnosis_replay'):
+            suffix+=':unchanged-seed-read-only-evidence-v1'
         if qualified_structure:
             suffix += ':nonempty-no-methods-replan-v1'
         if qualified_framework:
@@ -430,6 +448,16 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'Decide whether a concrete tests-only correction is warranted, or name the remaining diagnostic. '
                'Never disable the gate, approve Red or ask the CEO to decide a technical issue.'
                if diagnostic.get('kind')=='rejected_forced_tool_response' else '')
+            + ('\nUNCHANGED SEED INSPECTION: a NEW fixed offline job verified the entire failed snapshot against '
+               'the approved seed manifest, not merely the test hash. All bytes remain unchanged and the actual '
+               'native tool history contains only paired read_file calls. The author executed no patch or suite; no Red receipt exists. '
+               'This proves preserved state, NOT the lost upstream response shape or provider root cause. '
+               'The proxy now measures forced-response shape and permits only one unforwarded format correction '
+               'when multiple complete pinned patches are measured. Decide whether ONE concrete tests-only '
+               'correction is appropriate: inspect the unchanged harness and use one narrow patch call at a time, '
+               'preserving every assertion and behavior. Name additional evidence if insufficient. '
+               'Do not replay an identical instruction, waive calibration/Red/review, reset depth or approve delivery.'
+               if diagnostic.get('kind')=='unchanged_seed_read_only_failure' else '')
             +
             '\nOutput reason in one complete sentence, aim below 900 characters; '
             '1200 characters is the output-contract maximum. Target420characters on format recovery. No preface or Markdown. '

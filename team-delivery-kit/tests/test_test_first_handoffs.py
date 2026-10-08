@@ -231,6 +231,29 @@ class TestFirstHandoffTests(unittest.TestCase):
         self.assertEqual(self.effects.calls,0)
         self.assertEqual(self.effects.wakeups,[])
 
+    def test_new_unchanged_seed_evidence_reopens_diagnosis_not_author_once(self):
+        diagnostic=dict(kind='unchanged_seed_read_only_failure',operation='unchanged_seed_read_only_failure_v1',
+            issue_id='issue',task_id='tests',proxy_failure_cause_proven=False,
+            write_executed=False,tests_executed=False,red_verified=False,delivery_approval=False)
+        data=dict(phase='test_first',error='test_first_cto_requires_replanning',diagnostic=diagnostic,
+            cto_task='old-cto',decision=dict(action='escalate_cto',optional_files=[]),test_first_cto_wakeup='old')
+        with self.broker.db() as c:
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',data,1);prior=handoffs.load(c,'tests')
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:state=handoffs.load(c,'tests')
+        saved=json.loads(state['data']);self.assertEqual(state['stage'],'technical_decision_required')
+        self.assertFalse(saved['unchanged_seed_diagnosis_replay']['author_retry_authorized'])
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,state,self.effects)
+        args=self.effects.wakeups[-1][0];self.assertEqual(args[1],'cto');self.assertIn('UNCHANGED SEED INSPECTION',args[4])
+        self.assertIn('NOT the lost upstream response shape',args[4])
+        saved.update(error='test_first_cto_requires_replanning',decision=dict(action='escalate_cto',optional_files=[]))
+        with self.broker.db() as c:
+            handoffs.save(c,'tests','issue','test_first_blocked','cto',saved,2);prior=handoffs.load(c,'tests')
+        count=len(self.effects.wakeups)
+        test_first_handoffs.technical_recovery(self.broker,self.route,[self.test_task],self.test_task,prior,self.effects)
+        with self.broker.db() as c:self.assertEqual(handoffs.load(c,'tests')['stage'],'test_first_blocked')
+        self.assertEqual(len(self.effects.wakeups),count)
+
     def test_oversized_cto_decision_gets_one_changed_contract_not_author_retry(self):
         data = {'phase': 'test_first', 'error': 'test_first_cto_invalid_decision:ValueError',
                 'diagnostic': {'kind': 'rejected_snapshot', 'category': 'empty_new_test'},

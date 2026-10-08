@@ -723,3 +723,24 @@ The installed candidate passed the fixed offline HTTP/ledger probe without
 network or credentials; the complete suite covers 2,304 tests with seven existing
 skips. Real-model feedback, recovery of the blocked release and end-to-end
 autonomous delivery remain unqualified.
+
+### Fresh unchanged-seed diagnostics when old response evidence is missing
+
+`unchanged_seed_diagnosis` does not reconstruct a lost proxy response. It requires
+the latest failed tests-only R1 with a closed lease, an independent completed CTO
+diagnosis requesting more evidence, no active tasks/leases and no Red receipt.
+Its native history must contain only complete paired `read_file` operations.
+The qualified R1 contract and controller-owned frozen snapshot remain mandatory.
+
+A fixed networkless, read-only job checks the entire snapshot against the
+approved seed manifest. Equal test hashes alone cannot qualify it. The durable
+job identity, create/start intents and bounded output survive controller restart;
+uncertain operations are observed, not repeated. A changed candidate or rejected
+inspection remains held. Successful inspection records preserved bytes and reads,
+explicitly leaving the upstream failure cause unproven.
+
+This fresh evidence reopens only the independent CTO diagnosis once, preserving
+the prior decision. It grants no author retry, Red approval, increased depth or
+delivery authority. A concrete CTO correction must still pass every existing
+calibration, TDD and independent review gate. Real-model recovery and delivery
+remain to be demonstrated; this is not retroactive qualification of old logs.
