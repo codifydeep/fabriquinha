@@ -1,9 +1,25 @@
 import json
 import unittest
-from broker.suite_failure import evidence, FrozenSuiteFailure, failing_source_files
+from broker.suite_failure import evidence, FrozenSuiteFailure, failing_source_files, dependency_read_files
 
 
 class SuiteFailureTests(unittest.TestCase):
+    def test_missing_attribute_preserves_identifiers_not_freeform_error_data(self):
+        receipt = evidence(1, "AttributeError: module 'app.db' has no attribute 'get_item'\n"
+            "AttributeError: module '../secrets' has no attribute 'token'\n"
+            "AttributeError: private-user-content\nRan 3 tests\n", 'task', 'volume')
+        self.assertEqual(receipt['missing_module_attributes'], [dict(module='app.db', attribute='get_item')])
+        self.assertNotIn('private-user-content', json.dumps(receipt))
+        self.assertNotIn('secrets', json.dumps(receipt))
+
+    def test_dependency_inspection_is_declared_bounded_package_source_only(self):
+        receipt = {'missing_module_attributes': [dict(module='app.db', attribute='get_item')]}
+        declared = ['app/db.py', 'app/store.py', 'app/server.py', 'app/test_secret.py',
+                    'app/private.json', 'outside/secret.py', 'app/nested/secret.py']
+        self.assertEqual(dependency_read_files(receipt, declared), ['app/db.py', 'app/server.py', 'app/store.py'])
+        self.assertEqual(dependency_read_files(receipt, ['app/store.py']), [])
+        self.assertEqual(dependency_read_files(receipt, ['app/db.py'] + ['app/f%d.py' % n for n in range(17)]), [])
+
     def test_failed_baseline_files_are_bound_to_known_manifest_for_diagnosis(self):
         receipt = {'failures': [{'qualified_name': 'tests.test_old.Cases.test_keep'},
                                 {'qualified_name': 'tests.test_new.Cases.test_change'},

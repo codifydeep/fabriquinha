@@ -4,6 +4,38 @@ import re
 import ast
 
 
+def missing_module_attributes(output):
+    """Bounded Python identifiers only; never expose arbitrary exception text."""
+    pairs = re.findall(r"(?m)^AttributeError: module '([A-Za-z_][A-Za-z0-9_.]{0,119})' has no attribute '([A-Za-z_][A-Za-z0-9_]{0,79})'$", output)
+    return [dict(module=module, attribute=attribute)
+            for module, attribute in sorted(set(pairs))[:16]
+            if all(part.isidentifier() for part in module.split('.'))]
+
+
+def dependency_read_files(receipt, manifest_files):
+    """Inspect declared Python package peers, never grant implementation writes.
+
+    A facade's missing attribute may be implemented in a sibling module. Only
+    exact source paths already declared in the immutable contract qualify.
+    Oversized packages require an explicit replan rather than broad access.
+    """
+    declared = set(manifest_files)
+    result = set()
+    for fact in receipt.get('missing_module_attributes', []):
+        module = fact.get('module', '')
+        if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+', module):
+            continue
+        path = module.replace('.', '/') + '.py'
+        if path not in declared:
+            continue
+        parent = path.rsplit('/', 1)[0] + '/'
+        peers = {p for p in declared if p.startswith(parent) and p.endswith('.py')
+                 and '/' not in p[len(parent):] and not p[len(parent):].startswith('test_')}
+        if len(peers) <= 16:
+            result.update(peers)
+    return sorted(result) if len(result) <= 16 else []
+
+
 def safe_assertion_details(output):
     """Expose numeric witnesses, never arbitrary assertion strings/user data."""
     details = []
@@ -44,6 +76,7 @@ def evidence(exit_code, output, source_task, volume):
             'exception_types': sorted(set(re.findall(
                 r'(?m)^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception)):', output)))[:16],
             'numeric_assertion_details': safe_assertion_details(output),
+            'missing_module_attributes': missing_module_attributes(output),
             'missing_metadata_keys': sorted(set(re.findall(
                 r"(?m)^KeyError: '(filename|sha256|executed)'$", output))),
             'output_sha256': hashlib.sha256(output.encode()).hexdigest()}

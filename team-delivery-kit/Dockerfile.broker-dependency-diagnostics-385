@@ -1,0 +1,7 @@
+FROM delivery-kit-execution-broker:20261008.384
+COPY broker/suite_failure.py /suite_failure.py
+COPY broker/server.py /broker.py
+COPY broker/handoffs.py /handoffs.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py

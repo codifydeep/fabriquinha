@@ -771,7 +771,8 @@ def reconcile(con, route, runs, effects, *, now=None):
                 # a new frozen test from a pre-existing regression.
                 summary['validation_failure'] = {k: failure[k] for k in (
                     'category', 'exit_code', 'exception_types', 'tests_executed',
-                    'output_sha256', 'numeric_assertion_details', 'missing_metadata_keys') if k in failure}
+                    'output_sha256', 'numeric_assertion_details', 'missing_metadata_keys',
+                    'missing_module_attributes') if k in failure}
                 summary['validation_failure']['failures'] = []
                 summary['validation_failure']['test_module_origins'] = {}
                 for item in failure.get('failures', []):
@@ -896,7 +897,7 @@ def reconcile(con, route, runs, effects, *, now=None):
                     'new_frozen_test means newly authored then frozen, NOT baseline. '
                     'Compare actual assertions and mock state transitions with product '
                     'code. Classify test defect vs product defect from source, not names. '
-                    'request_correction requires a concrete product-code fix; '
+                    'Fix within edit scope; else escalate_cto. Reads grant no writes; '
                     'request_test_revision proposes correction of a defective NEW test '
                     'only, sponsored by CTO and independently reviewed with a fresh '
                     'immutable Red revision. Baseline tests remain unchanged. '
