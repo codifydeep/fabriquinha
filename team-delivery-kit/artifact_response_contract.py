@@ -128,10 +128,11 @@ def validate(body, data, media_type):
                     or specification.get('type') == 'string' and (not isinstance(value,str)
                         or len(value) < specification.get('minLength', 0)
                         or len(value) > specification.get('maxLength', 2**31))):
-                if additive:
-                    diagnostic={'field':key if key in ('path','content','offset','limit') else 'other',
+                if additive or selected in ('patch','read_file'):
+                    diagnostic={'field':key if key in ('path','content','offset','limit','old_string','new_string') else 'other',
                         'constraint':('enum' if 'enum' in specification and value not in specification['enum']
                             else 'length' if isinstance(value,str) else 'type')}
+                    if not additive:diagnostic['schema']='forced-argument-constraint-v1'
                     if isinstance(value,str):diagnostic.update(characters=len(value),utf8_bytes=len(value.encode()))
                 raise ValueError('invalid forced argument')
         if additive and selected=='write_file' and len(args['content'].encode())>6144:
@@ -139,9 +140,15 @@ def validate(body, data, media_type):
             raise ValueError('invalid forced content size')
         if selected == 'write_file' and not 0 < len(args['content'].encode()) <= 32768:
             raise ValueError('invalid forced content size')
-        if selected == 'patch' and (args['old_string'] == args['new_string']
-                or any(len(args[k].encode()) > 4096 for k in ('old_string','new_string'))):
-            raise ValueError('invalid forced argument')
+        if selected == 'patch':
+            if args['old_string'] == args['new_string']:
+                diagnostic=dict(schema='forced-argument-constraint-v1',field='new_string',constraint='no_change')
+                raise ValueError('invalid forced argument')
+            for key in ('old_string','new_string'):
+                if len(args[key].encode()) > 4096:
+                    diagnostic=dict(schema='forced-argument-constraint-v1',field=key,constraint='utf8_length',
+                        characters=len(args[key]),utf8_bytes=len(args[key].encode()))
+                    raise ValueError('invalid forced argument')
         surgical=marker_config(body)
         if selected=='write_file' and surgical:
             if args['path']!=surgical['path']:raise ValueError('invalid surgical response')

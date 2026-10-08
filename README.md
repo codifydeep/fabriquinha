@@ -117,6 +117,13 @@ chamadas rejeitadas é encaminhada; o modelo precisa propor uma nova chamada ún
 validada pelo contrato original. Leituras e patches compartilham o mesmo limite;
 reinícios, uma segunda falha ou resposta incompleta não rearmam a correção.
 
+Rejeições de argumentos forçados de leitura/patch podem registrar o campo e a
+restrição violada (enum, tipo, tamanho, bytes UTF-8 ou patch sem alteração), sem
+armazenar caminhos ou conteúdo propostos. O recibo é vinculado à execução e à
+chamada, não comprova execução de ferramenta e não autoriza retentativa. Eventos
+antigos sem essa informação permanecem com causa específica desconhecida; não
+se pode inferir o argumento errado apenas pela categoria genérica da rejeição.
+
 O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
 de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo
 válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise não

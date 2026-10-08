@@ -21,6 +21,27 @@ CATEGORIES={'artifact_test_methods_missing','artifact_test_syntax_invalid'}
 
 def from_event(event):
     if (event.get('event')=='model_proxy_request' and event.get('status')==502
+            and event.get('artifact_selected_tool') in ('patch','read_file')
+            and event.get('artifact_contract_present') is True
+            and event.get('artifact_rejection_category')=='invalid_forced_argument'):
+        execution=event.get('execution_id');call=event.get('call_number')
+        if not isinstance(execution,str) or str(uuid.UUID(execution))!=execution:return None
+        if type(call) is not int or call<1:return None
+        result=dict(operation='rejected_forced_tool_response_v1',execution_id=execution,call_number=call,
+            category='invalid_forced_argument',tool=event['artifact_selected_tool'],write_executed=False,
+            tests_executed=False,red_verified=False,delivery_approval=False)
+        shape=event.get('artifact_rejection_diagnostic')
+        if shape:
+            if (not isinstance(shape,dict) or set(shape)-{'schema','field','constraint','characters','utf8_bytes'}
+                    or shape.get('schema')!='forced-argument-constraint-v1'
+                    or shape.get('field') not in ('path','offset','limit','old_string','new_string','other')
+                    or shape.get('constraint') not in ('enum','type','length','no_change','utf8_length')
+                    or any(type(shape[k]) is not int or not 0<=shape[k]<=2**24
+                        for k in ('characters','utf8_bytes') if k in shape)):
+                raise ValueError('invalid forced-argument receipt')
+            result['structure']=shape
+        return result  # Legacy absence of a constraint remains unknown.
+    if (event.get('event')=='model_proxy_request' and event.get('status')==502
             and event.get('artifact_selected_tool') in ('patch','read_file') and event.get('artifact_contract_present') is True
             and event.get('artifact_rejection_category')=='incomplete_forced_tool_response'):
         execution=event.get('execution_id');call=event.get('call_number')
