@@ -146,6 +146,10 @@ Rejeições locais novas registram a restrição allowlisted (fragmento, sintaxe
 tamanho, assertions ou descoberta), tamanho e hash da resposta, sem gravar seu
 conteúdo no recibo público. Erros desconhecidos permanecem não classificados;
 recibos anteriores não recebem causas inferidas retroativamente.
+Uma sucessora de instrumentação exige um recibo terminal falho sem classificação,
+os mesmos inputs e imagem do proxy, código diagnóstico diferente e uma intenção
+única vinculada ao experimento anterior. Um resultado já classificado não permite
+essa sucessora; ela não rearma o worker nem concede aprovação de produto.
 Para essa proposta estreita, o validador também preserva a forma estática de
 descoberta, decorators, assinaturas, escopo das assertions e transferências de
 controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de

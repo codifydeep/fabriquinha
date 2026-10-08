@@ -6,6 +6,17 @@ import probe_frozen_patch_provider as p
 
 
 class FrozenPatchProviderTests(unittest.TestCase):
+    def test_successor_requires_unclassified_terminal_parent_and_changed_instrumentation(self):
+        identity=dict(input_sha256='a'*64,proxy_image='sha256:'+'b'*64,probe_source_sha256='c'*64)
+        parent=dict(status='failed',failure_category='fixture_protocol_rejected',issue_id='issue',
+            source_task='source',input_sha256='a'*64,proxy_image='sha256:'+'b'*64,
+            probe_source_sha256='d'*64,tools_executed=False,candidate_files_written=False)
+        p.validate_diagnostic_parent(parent,identity,'issue','source')
+        for change in (dict(status='passed'),dict(input_sha256='wrong'),dict(tools_executed=True),
+                dict(local_rejection={'constraint':'artifact_size'}),dict(probe_source_sha256='c'*64),
+                dict(issue_id='other'),dict(candidate_files_written=True)):
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                p.validate_diagnostic_parent(dict(parent,**change),identity,'issue','source')
     def setUp(self):
         self.target='/workspace/tests/test_new.py'
         self.inputs=dict(issue_id='11111111-1111-4111-8111-111111111111',

@@ -137,6 +137,19 @@ def remote_program(identifier,inputs):
     return source
 
 
+def validate_diagnostic_parent(parent, identity, issue, source):
+    """One instrumentation successor, never an identical retry or product grant."""
+    if (parent.get('status')!='failed' or parent.get('failure_category')!='fixture_protocol_rejected'
+            or parent.get('local_rejection') is not None
+            or parent.get('issue_id')!=issue or parent.get('source_task')!=source
+            or parent.get('input_sha256')!=identity['input_sha256']
+            or parent.get('proxy_image')!=identity['proxy_image']
+            or parent.get('probe_source_sha256')==identity['probe_source_sha256']
+            or parent.get('tools_executed') is not False
+            or parent.get('candidate_files_written') is not False):
+        raise ValueError('only unclassified unexecuted failed diagnostic with changed instrumentation can have a successor')
+
+
 def main():
     import argparse
     import subprocess
@@ -148,8 +161,11 @@ def main():
     parser.add_argument('--live',action='store_true')
     parser.add_argument('--issue',required=True);parser.add_argument('--source',required=True)
     parser.add_argument('--source-file',action='append',required=True)
+    parser.add_argument('--diagnostic-parent')
     args=parser.parse_args()
     if not args.live or PROJECT!='delivery-kit-port2':raise ValueError('explicit isolated diagnostic required')
+    if args.diagnostic_parent and str(uuid.UUID(args.diagnostic_parent))!=args.diagnostic_parent:
+        raise ValueError('canonical diagnostic parent required')
     for value in (args.issue,args.source):
         if str(uuid.UUID(value))!=value:raise ValueError('canonical blocked source required')
     for name in args.source_file:
@@ -219,12 +235,22 @@ print(json.dumps(dict(manifest_sha256=manifest,files=files)))
     if folder.is_symlink():raise ValueError('restricted private probe directory required')
     intent=folder/('frozen-patch-'+args.source+'.intent.json')
     identity=dict(input_sha256=hashlib.sha256(json.dumps(inputs,sort_keys=True).encode()).hexdigest(),
-        proxy_image=image,probe_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+        proxy_image=image,probe_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        shared_probe_source_sha256=hashlib.sha256(Path(base.__file__).read_bytes()).hexdigest())
+    if args.diagnostic_parent:
+        parent_path=folder/('frozen-patch-'+args.diagnostic_parent+'.json')
+        if (parent_path.is_symlink() or not parent_path.is_file() or parent_path.stat().st_mode&0o077):
+            raise ValueError('restricted terminal parent receipt required')
+        parent=json.loads(parent_path.read_text())
+        if parent.get('execution_id')!=args.diagnostic_parent:raise ValueError('parent receipt identity mismatch')
+        validate_diagnostic_parent(parent,identity,args.issue,args.source)
+        identity['diagnostic_parent']=args.diagnostic_parent
+        intent=folder/('frozen-patch-successor-'+args.diagnostic_parent+'.intent.json')
     if intent.exists():
         if intent.is_symlink() or not intent.is_file() or intent.stat().st_mode&0o077:
             raise ValueError('restricted regular intent required')
         old=json.loads(intent.read_text())
-        if {k:old[k] for k in identity}!=identity:raise ValueError('frozen diagnostic identity drift')
+        if {k:old.get(k) for k in identity}!=identity:raise ValueError('frozen diagnostic identity drift')
         identifier=old['execution_id']
     else:
         identifier=str(uuid.uuid4())
