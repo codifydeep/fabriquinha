@@ -110,6 +110,16 @@ flowchart TB
 
 Multica é o plano de colaboração; Hermes executa os agentes; os controladores e o broker implementam as restrições e a recuperação que não podem depender apenas de prompts. **Temporal foi estudado, mas não está integrado ao runtime atual.** Telegram pertence à instalação Hermes anterior, não é requisito deste caminho de avaliação.
 
+O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
+wakeup do Multica, sem tratá-lo como outro contrato ou autorização. Quando Tech
+Lead e CTO falharam por essa incompatibilidade local, recibos ACP e rejeições
+persistentes do proxy permitem qualificar o transporte corrigido com os dois
+envelopes reais, sem chamada ao modelo. A nova evidência abre outro ciclo de
+diagnóstico e revisão independente; não reabre tarefas falhas, aprova entrega
+ou reinicia a publicação por si só. Falhas contra essa nova evidência continuam
+visíveis, sem repetição automática idêntica. A qualificação do transporte não
+substitui a recuperação ponta a ponta.
+
 O transporte ACP distingue prompts de cliente (até 12.000 caracteres) de contextos completos registrados, construídos e qualificados pelo broker (até 32.000). A qualificação é interna: JSON, marcadores de texto e declarações do agente não ampliam o limite nem concedem ferramentas. Isso preserva o contexto dos handoffs, mas não substitui a qualificação de recuperação e entrega ponta a ponta.
 
 Uma falha comprovada do diagnóstico do CTO antes de `session/prompt`, causada pelo antigo limite de contexto, admite uma única recuperação após validar a condição corrigida. O controlador preserva a tentativa anterior, registra a intenção antes do wakeup e apenas observa um envio de resultado incerto; não repete o POST. Essa recuperação não reinicia o autor, não produz Red e não aprova a entrega. Nova falha permanece visível e bloqueada para diagnóstico técnico.

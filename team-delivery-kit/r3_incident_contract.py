@@ -1,6 +1,7 @@
 """Bounded technical incident submissions; never execution authorization."""
 import re
 import json
+import uuid
 
 NAME = 'submit_r3_incident_request'
 
@@ -73,6 +74,20 @@ def request_contract(body):
         return None
     if len(markers) != 1:
         raise ValueError('one R3 incident contract required')
+    # Native wakeups prepend transport identity, not another work contract.
+    # Accept only that exact envelope; it grants no execution authority.
+    envelopes = [i for i,line in enumerate(lines) if line.startswith('DELIVERY_PLANNING_START')]
+    if envelopes:
+        if len(envelopes) != 1:
+            raise ValueError('one native planning envelope required')
+        index = envelopes[0]
+        if (not re.fullmatch(r'DELIVERY_PLANNING_START [a-f0-9]{64}', lines[index])
+                or index+1 >= len(lines) or not lines[index+1].startswith('Source: ')):
+            raise ValueError('exact native planning envelope required')
+        source = lines[index+1].removeprefix('Source: ')
+        if str(uuid.UUID(source)) != source:
+            raise ValueError('canonical native planning source required')
+        lines = lines[:index] + lines[index+2:]
     match = re.fullmatch(r'DELIVERY_R3_INCIDENT_V1:(diagnose|review):([a-f0-9]{64})', markers[0])
     allowed = ('DELIVERY_R3_INCIDENT_V1:', 'DELIVERY_R3_FACT:', 'DELIVERY_R3_PROPOSAL_V1:')
     if not match or any(line.startswith('DELIVERY_') and not line.startswith(allowed) for line in lines):

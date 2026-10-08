@@ -28,6 +28,22 @@ class R3IncidentContractTests(unittest.TestCase):
                        dict(fact_ids=['F01','F01']),dict(experiment='arbitrary_command'),dict(evidence_sha256='b'*64)):
             self.assertFalse(Draft202012Validator(spec).is_valid({**self.decision(),**change}))
 
+    def test_actual_native_planning_envelope_preserves_exact_nonexecuting_schema(self):
+        body=self.body()
+        note=body['messages'][0]['content']
+        envelope='DELIVERY_PLANNING_START '+'0'*64+'\nSource: 11111111-1111-4111-8111-111111111111\n'
+        body['messages'][0]['content']=envelope+note
+        self.assertEqual(request_contract(body),request_contract(self.body()))
+        adapted=typed(decision_schema(body))
+        self.assertEqual(adapted['tool_choice']['function']['name'],NAME)
+        self.assertEqual(adapted['tools'][0]['function']['parameters']['properties']['execution_authorized']['enum'],[False])
+        for bad in (envelope+envelope+note,envelope.replace('Source: ','SourceX: ')+note,
+                    envelope.replace('0'*64,'not-a-marker')+note,
+                    envelope.replace('11111111-1111-4111-8111-111111111111','invalid')+note,
+                    envelope+note+'\nDELIVERY_TYPED_REVIEW_V1:'+'b'*64):
+            with self.subTest(envelope=bad[:30]),self.assertRaises(ValueError):
+                request_contract({'messages':[{'role':'user','content':bad}]})
+
     def test_cto_review_is_bound_to_exact_proposal_without_execution_authority(self):
         body=self.body('review','b'*64);contract=request_contract(body)
         expected=schema('review','a'*64,['F01','F02'],'b'*64)

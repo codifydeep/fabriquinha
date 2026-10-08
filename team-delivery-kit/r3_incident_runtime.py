@@ -14,7 +14,8 @@ FACTS = {'controller_handle_missing','controller_identity_changed','controller_a
     'invalid_launch_handle','delivery_not_verified','experiment_controller_absent','experiment_controller_present',
     'experiment_controller_ambiguous','experiment_snapshot_intact','experiment_github_ci_exact_sha',
     'experiment_local_deployment_exact_sha','experiment_delivery_unavailable','experiment_verification_failed',
-    'experiment_review_obsolete','experiment_review_unobservable','experiment_result_unobservable'}
+    'experiment_review_obsolete','experiment_review_unobservable','experiment_result_unobservable',
+    'incident_envelope_transport_qualified'}
 
 CATEGORIES = dict(r3_controller_handle_missing='controller_handle_missing',
     r3_controller_identity_changed='controller_identity_changed',ambiguous_r3_controller='controller_ambiguous',
@@ -214,6 +215,12 @@ def supervise(private,parent,publication,*,instance='delivery-kit-port2',effects
         bundle_sha256=digest(value),r2_proof_sha256=digest(proof),category=category,
         facts={'F01':CATEGORIES[category],'F02':'delivery_not_verified'},execution_authorized=False,release_homologated=False)
     incident=reconcile(private,evidence,instance=instance,effects=effects)
+    if incident.get('stage')=='blocked' and effects is None:
+        from r3_incident_transport import recover_evidence
+        changed=recover_evidence(private,evidence,incident,instance=instance)
+        if changed:
+            evidence=validate_evidence(changed)
+            incident=reconcile(private,evidence,instance=instance)
     if incident.get('stage')=='experiment_pending':
         from r3_post_experiment import drive
         incident=drive(private,evidence,incident,value,instance=instance,effects=effects,contract=contract)
