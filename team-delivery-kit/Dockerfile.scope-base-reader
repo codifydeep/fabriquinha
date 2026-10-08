@@ -1,0 +1,8 @@
+FROM delivery-kit-hermes-runtime@sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf
+USER root
+COPY portable_contract.py test_runner_policy.py /
+COPY broker/product_scope_revision.py /product_scope_revision.py
+COPY broker/product_scope_materialize.py /product_scope_materialize.py
+COPY broker/product_scope_base_read.py /product_scope_base_read.py
+USER 10000:10000
+ENTRYPOINT ["python", "/product_scope_base_read.py"]

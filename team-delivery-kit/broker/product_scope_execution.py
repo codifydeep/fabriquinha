@@ -140,6 +140,33 @@ def dispatch_note(state,phase):
     return marker,note
 
 
+def prompt(b,task,effects=None):
+    """Present only the authenticated scope protocol, not historical work notes."""
+    identifier=task.get('task_id') or task.get('id');actor=task.get('agent_id');issue=task.get('issue_id')
+    with b.db() as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='product_scope_plans'").fetchone():
+            raise ValueError('registered scope planning prompt required')
+        states=[json.loads(r[0]) for r in con.execute('SELECT data FROM product_scope_plans')]
+    matches=[]
+    for state in states:
+        if state['context']['issue_id']!=issue:continue
+        phase='proposal' if actor==state['context']['cto'] else 'review' if actor==state['context']['reviewer'] else None
+        if not phase or state['stage']!=('awaiting_proposal' if phase=='proposal' else 'awaiting_review'):continue
+        marker,note=dispatch_note(state,phase)
+        exact='DELIVERY_PLANNING_START '+marker+'\nSource: '+state['context']['source_task']+'\n'+note
+        if task.get('handoff_note')==exact:matches.append((state,phase,marker,note,exact))
+    if len(matches)!=1:raise ValueError('one exact active scope planning prompt required')
+    state,phase,marker,note,exact=matches[0];dispatch=state.get('dispatch',{}).get(phase)
+    if not dispatch or dispatch['marker']!=marker:raise ValueError('persisted scope prompt dispatch required')
+    fx=effects or NativeEffects(b)
+    fx.verify_binding(state)
+    wake=fx.wake(state,phase,marker,note,allow_create=False)
+    if (not wake or task.get('wakeup_id')!=wake.get('id') or wake.get('last_task_id')!=identifier
+            or dispatch.get('wakeup_id') not in (None,wake['id'])):
+        raise ValueError('exact existing scope prompt wakeup and task required')
+    return exact
+
+
 def mounts(b,request_id,effects=None):
     """A native request sees only its registered immutable sponsor, read-only.
 

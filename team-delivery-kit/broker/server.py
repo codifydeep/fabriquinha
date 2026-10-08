@@ -1943,6 +1943,11 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         raise ValueError('invalid native mode')
     if frame.get('method') != 'session/prompt':
         raise ValueError('prompt frame required')
+    if mode=='planning' and 'DELIVERY_PRODUCT_SCOPE_V1:' in (task.get('handoff_note') or ''):
+        try:import product_scope_execution
+        except ImportError:from broker import product_scope_execution
+        note=product_scope_execution.prompt(handoff_context(),task)
+        return {**frame,'params':{**frame['params'],'prompt':[{'type':'text','text':note}]}}
     if mode=='implementation' and (task.get('handoff_note') or '').startswith('DELIVERY_SCOPE_AUTHOR_START '):
         try:import product_scope_author
         except ImportError:from broker import product_scope_author

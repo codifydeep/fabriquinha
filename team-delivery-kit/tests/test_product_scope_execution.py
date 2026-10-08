@@ -87,6 +87,18 @@ class ProductScopeExecutionTests(unittest.TestCase):
         with self.assertRaises(ValueError):execution.tick(self.b,self.key,self.fx)
         self.fx.wake.assert_not_called()
 
+    def test_scope_prompt_uses_exact_registered_note_without_historical_protocol(self):
+        execution.tick(self.b,self.key,self.fx)
+        with self.b.db() as con:state=ledger.load(con,self.key)
+        marker,note=execution.dispatch_note(state,'proposal')
+        exact='DELIVERY_PLANNING_START '+marker+'\nSource: '+state['context']['source_task']+'\n'+note
+        task=dict(id='cto-task',agent_id='cto',issue_id='issue',status='running',wakeup_id='wake1',handoff_note=exact)
+        self.fx.wake.return_value=dict(id='wake1',last_task_id='cto-task')
+        self.assertEqual(execution.prompt(self.b,task,self.fx),exact)
+        self.assertFalse(self.fx.wake.call_args.kwargs['allow_create'])
+        for mutation in ({'agent_id':'backend'},{'wakeup_id':'stale'},{'id':'old'},{'handoff_note':exact+'\nDELIVERY_OLD'}):
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):execution.prompt(self.b,dict(task,**mutation),self.fx)
+
     def test_missing_proposal_reads_block_without_accepting_model_permission_request(self):
         self.fx.wake.return_value={'id':'wake','last_task_id':'task'}
         self.fx.task.return_value=self.task('cto','task','wake',self.proposal)

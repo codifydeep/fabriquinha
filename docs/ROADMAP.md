@@ -122,4 +122,16 @@ efetivo qualificado; ele é revalidado antes de merge e deploy. Não permite
 compor revisões diferentes implicitamente nem dispensar CI, QA ou revisão.
 Falta qualificar a coordenação completa do ciclo real e instalar os componentes
 antes de habilitar o despacho e considerar o impedimento resolvido.
+
+`product_scope_base_read.py` lê o contrato da base efetivamente registrada em
+job fixo, sem rede, escrita, credenciais ou socket. `product_scope_bootstrap.py`
+prepara o plano persistente a partir dessa leitura, do snapshot de falha e do
+inventário do validador qualificado, com Red e revisão de testes preservados.
+Não transforma a recomendação textual do CTO em permissão. O leitor também
+foi executado sobre a base real do ensaio em volume somente leitura; isso
+qualifica a leitura, não o fluxo autônomo completo. Ainda falta conectar a
+orquestração desses adaptadores ao loop com roteamento explícito e instalá-los.
+Os prompts de proposta/revisão de escopo também são isolados pelo controlador:
+exigem a nota registrada e o wakeup/tarefa exatos, sem carregar protocolos
+históricos conflitantes da descrição da issue e sem criar trabalho ao consultar.
 Aprovar o plano não equivale a conceder escrita ou homologar.
