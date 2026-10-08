@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261008.103
+COPY model_policy.py /model_policy.py

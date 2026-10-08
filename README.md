@@ -690,7 +690,13 @@ proxy à execução fechada do CTO, exige suas leituras completas e verifica o s
 simples corrigido. Ela preserva o hold anterior e registra uma única retomada de
 decisão; não reaproveita respostas, reinicia o autor ou dispensa nenhum gate.
 
-O provedor usado na instalação de referência é OpenRouter com DeepSeek. Modelos e custos não são gratuitos por definição: o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback pago automático.
+O provedor usado na instalação de referência é OpenRouter. A política compartilhada
+em `team-delivery-kit/model_policy.py` seleciona `anthropic/claude-haiku-5.5`.
+A migração do DeepSeek preserva recibos históricos e só admite a configuração
+anterior exata em workers. Modelos e custos não são gratuitos por definição:
+o teto de chamadas é uma proteção, não um orçamento monetário. Não há fallback
+automático para outro modelo. O canário de texto e chamada de ferramenta passou;
+isso qualifica transporte, não a entrega autônoma pelo novo modelo.
 
 ## Fluxo da equipe
 

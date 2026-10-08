@@ -3,6 +3,7 @@ import subprocess
 from docker_grouping import args as docker_group_args
 
 from evalctl import process_env
+from model_policy import MODEL
 
 PROBE = '''import json,urllib.request,urllib.error
 try:
@@ -10,7 +11,7 @@ try:
  raise SystemExit('direct Internet unexpectedly reachable')
 except (urllib.error.URLError,TimeoutError,OSError):
  pass
-body={'model':'deepseek/deepseek-v4.1-flash','messages':[{'role':'user','content':'Reply with only READY.'}],
+body={'model':__APPROVED_MODEL__,'messages':[{'role':'user','content':'Reply with only READY.'}],
       'max_tokens':16,'stream':False}
 request=urllib.request.Request('http://model-proxy:8080/api/v1/chat/completions',
  data=json.dumps(body).encode(),headers={'Authorization':'Bearer offline-placeholder-not-a-credential',
@@ -27,6 +28,7 @@ print(json.dumps({'direct_internet':False,'model_response':True,
                   'reply_nonempty':bool((choices[0].get('message') or {}).get('content')),
                   'key_in_worker':False}))
 '''
+PROBE = PROBE.replace('__APPROVED_MODEL__', repr(MODEL))
 
 
 def main():

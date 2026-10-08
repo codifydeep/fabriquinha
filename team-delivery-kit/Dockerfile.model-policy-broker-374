@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261008.373
+COPY model_policy.py /model_policy.py
+COPY broker/worker_model_config.py /worker_model_config.py

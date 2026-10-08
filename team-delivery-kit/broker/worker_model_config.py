@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 import tempfile
-from model_policy import MODEL, PROXY_BASE_URL, execution_base_url
+from model_policy import MODEL, PREVIOUS_MODEL, PROXY_BASE_URL, execution_base_url
 
 LEGACY_EXPECTED = ("model:\n"
             "  provider: openrouter\n"
@@ -29,8 +29,11 @@ def install_config(home, execution_id=None):
         import re
         normalized = re.sub(re.escape(PROXY_BASE_URL.replace('/api/v1', '/executions/'))
                             + r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}/api/v1', PROXY_BASE_URL, current)
-        if normalized not in (LEGACY_EXPECTED, LOW_REASONING_EXPECTED, PREVIOUS_EXPECTED,
-                           COMPLETE_READ_EXPECTED, EXPECTED):
+        accepted = (LEGACY_EXPECTED, LOW_REASONING_EXPECTED, PREVIOUS_EXPECTED,
+                    COMPLETE_READ_EXPECTED, EXPECTED)
+        previous = tuple(value.replace('  default: '+MODEL+'\n',
+                                      '  default: '+PREVIOUS_MODEL+'\n') for value in accepted)
+        if normalized not in accepted + previous:
             raise ValueError('worker model configuration drift')
         descriptor, temporary = tempfile.mkstemp(prefix='.config-migrate-', dir=home)
         try:

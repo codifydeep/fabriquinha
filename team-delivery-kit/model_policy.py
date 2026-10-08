@@ -1,6 +1,7 @@
 """Single versioned model policy for this evaluation installation."""
 
-MODEL = 'deepseek/deepseek-v4.1-flash'
+MODEL = 'anthropic/claude-haiku-5.5'
+PREVIOUS_MODEL = 'deepseek/deepseek-v4.1-flash'
 PROXY_BASE_URL = 'http://model-proxy:8080/api/v1'
 PLACEHOLDER_KEY = 'offline-placeholder-not-a-credential'
 

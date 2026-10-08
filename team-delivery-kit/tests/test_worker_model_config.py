@@ -11,6 +11,19 @@ spec.loader.exec_module(worker)
 
 
 class WorkerModelConfigTests(unittest.TestCase):
+    def test_authorized_model_change_migrates_only_exact_old_config(self):
+        from model_policy import MODEL, PREVIOUS_MODEL
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory); target=home/'config.yaml'
+            old=worker.EXPECTED.replace('  default: '+MODEL+'\n',
+                                        '  default: '+PREVIOUS_MODEL+'\n')
+            target.write_text(old)
+            worker.install_config(home)
+            self.assertEqual(target.read_text(),worker.EXPECTED)
+            target.write_text(old+'unknown_option: true\n')
+            with self.assertRaisesRegex(ValueError,'drift'):worker.install_config(home)
+            self.assertEqual(target.read_text(),old+'unknown_option: true\n')
+
     def test_execution_url_is_identity_scoped_and_known_config_can_migrate(self):
         first = '12345678-1234-1234-1234-123456789abc'
         second = '22345678-1234-1234-1234-123456789abc'
