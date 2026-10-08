@@ -68,7 +68,9 @@ class RemediationPublicationScheduleTests(unittest.TestCase):
 
     def test_real_delivery_projects_parent_without_new_launch(self):
         self.fx.receipt.return_value=self.f.receipt
-        self.assertEqual(self.invoke()['stage'],'parent_projected')
+        terminal=self.invoke()
+        self.assertEqual(terminal['stage'],'parent_projected')
+        self.assertNotIn('category',terminal)
         self.fx.launch.assert_not_called();self.fx.publish.assert_called_once()
 
     def test_live_controller_without_progress_is_bounded_and_never_called_delivered(self):
@@ -77,7 +79,10 @@ class RemediationPublicationScheduleTests(unittest.TestCase):
         self.assertEqual(result['category'],'r3_progress_deadline');self.fx.publish.assert_not_called()
         self.fx.launch.assert_called_once()
         self.fx.receipt.return_value=self.f.receipt
-        self.assertEqual(self.invoke()['stage'],'parent_projected')
+        terminal=self.invoke()
+        self.assertEqual(terminal['stage'],'parent_projected')
+        self.assertNotIn('category',terminal)
+        self.assertEqual(terminal['publication_incident_history'][-1]['category'],'r3_progress_deadline')
 
     def test_disappeared_dependency_remains_visible_without_another_launch(self):
         self.invoke();self.fx.candidate.return_value=None

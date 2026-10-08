@@ -105,7 +105,15 @@ def reconcile(private,stage,parent,project,*,instance='delivery-kit-port2',effec
         receipt=fx.receipt(private,label)
         if receipt and receipt.get('stage')=='deployed_qa_passed':
             result=fx.publish(paths,receipt,stage)
-            return save({**(state or {}),'identity':identity,'stage':result['stage'],
+            terminal=dict(state or {})
+            if terminal.get('category'):
+                prior={k:terminal[k] for k in ('stage','category','owner','next_action') if k in terminal}
+                history=list(terminal.get('publication_incident_history',[]))
+                if prior not in history:history.append(prior)
+                terminal['publication_incident_history']=history
+            for field in ('category','owner','next_action','attention_required'):
+                terminal.pop(field,None)
+            return save({**terminal,'identity':identity,'stage':result['stage'],
                 'parent_projection':result,'release_homologated':False})
         if state and state.get('stage')=='blocked':
             # Resolve only a false missing-handle observation, never relaunch.
