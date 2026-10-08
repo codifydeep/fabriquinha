@@ -59,3 +59,10 @@ decisão concluída do CTO pode receber, uma única vez, o escopo instalado que
 faltava no contexto; essa análise preserva o histórico e os limites de correção,
 não reinicia o autor nem autoriza uma revisão do contrato. Replanejamento de
 permissões e recuperação ponta a ponta ainda precisam de evidência própria.
+
+`broker/product_scope_revision.py` define a política inicial de replanejamento
+de edição de código Python: proposta vinculada ao contrato, snapshot e falha;
+dependências observadas; revisão por perfil independente; testes congelados e
+demais campos do contrato preservados. É uma política pura, não uma concessão
+de ferramentas. A integração com propostas reais dos agentes, recibos de leitura,
+contratos imutáveis e despacho ainda não está instalada nem qualificada.
