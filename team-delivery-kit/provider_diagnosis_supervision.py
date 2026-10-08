@@ -57,10 +57,12 @@ def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def resume(ledger,plan,private,*,query=read_proof):
+def resume(ledger,plan,private,*,query=read_proof,
+           category='RuntimeError:test_first_blocked:test_first_cto_execution_failed',
+           record_key='provider_diagnosis_supervision'):
     labels=[stage['spec']['label'] for stage in plan['stages']];label=ledger.get('active')
     if (ledger.get('stage')!='blocked' or label not in labels or ledger.get('plan_sha256')!=plan['sha256']
-            or ledger.get('category')!='RuntimeError:test_first_blocked:test_first_cto_execution_failed'
+            or ledger.get('category')!=category
             or ledger.get('completed')!=labels[:labels.index(label)]):return None
     stage=plan['stages'][labels.index(label)]
     path=Path(private)/('portable-context-'+label+'.json')
@@ -78,7 +80,7 @@ def resume(ledger,plan,private,*,query=read_proof):
             or proof.get('delivery_approval') is not False or proof.get('author_retry_authorized') is not False
             or not proof.get('task_id') or not re.fullmatch(r'[a-f0-9]{64}',str(proof.get('recovery_sha256','')))):
         return None
-    result=dict(ledger,stage='working',provider_diagnosis_supervision=dict(
-        category=ledger['category'],proof=proof,delivery_approval=False))
+    result=dict(ledger,stage='working')
+    result[record_key]=dict(category=ledger['category'],proof=proof,delivery_approval=False)
     for field in ('category','owner','next_action','board_notification_error'):result.pop(field,None)
     return result
