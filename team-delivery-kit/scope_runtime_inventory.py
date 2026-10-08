@@ -18,7 +18,7 @@ BROKER=['server','native','native_scope_note','handoff_runtime','adapted_test_re
         'product_scope_materialize','product_scope_job','product_scope_base_verify',
         'product_scope_registration','product_scope_task_binding','product_scope_worker',
         'product_scope_author','product_scope_delivery','product_scope_bootstrap',
-        'product_scope_pipeline','product_scope_envelope_recovery']
+        'product_scope_pipeline','product_scope_envelope_recovery','product_scope_mount_recovery']
 PROXY=['product_scope_contract','decision_schema','typed_decision_contract']
 PROGRAM='''import sys,json,hashlib
 from pathlib import Path

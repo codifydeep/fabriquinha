@@ -1214,11 +1214,11 @@ def _save(broker, route, state):
                       route['techlead'], state, time.time())
 
 
-def planning_mounts(broker, request_id):
+def planning_mounts(broker, request_id, *, scope_effects=None):
     """Only controller-selected immutable artifacts, never agent-provided paths."""
     try:import product_scope_execution
     except ImportError:from broker import product_scope_execution
-    scope=product_scope_execution.mounts(broker,request_id)
+    scope=product_scope_execution.mounts(broker,request_id) if scope_effects is None else product_scope_execution.mounts(broker,request_id,scope_effects)
     if scope:return scope
     with broker.db() as con:
         initialize(con)

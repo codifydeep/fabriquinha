@@ -80,7 +80,9 @@ def step(b,config,state):
         failure=json.loads(row[2]).get('validation_failure') or {}
         if failure.get('category')!='executed_test_failure' or failure.get('source_task')!=row[0]:return state
         return save(b,issue,state,dict(state,stage='bootstrap',source_task=row[0],failure_output_sha256=failure['output_sha256']))
-    if state['stage'] in ('blocked','author_admitted'):return state
+    if state['stage']=='blocked':
+        return recover_missing_mount(b,config,state)
+    if state['stage']=='author_admitted':return state
     if state['stage']=='bootstrap':
         with b.db() as con:
             row=con.execute('SELECT source_task,stage,data FROM delivery_handoffs WHERE issue_id=? AND stage<>? '
@@ -122,6 +124,27 @@ def step(b,config,state):
     return state
 
 
+def recover_missing_mount(b,config,state):
+    if ((state.get('scope_mount_recovery_attempt') or {}).get('stage')=='rejected' or state.get('mount_recovery')
+            or state.get('incident',{}).get('category')!='scope_plan_not_approved'):
+        return state
+    with b.db() as con:plan=ledger.load(con,state['plan_key'])
+    if plan.get('incident',{}).get('category')!='invalid_scope_review':return state
+    selected=state if state.get('scope_mount_recovery_attempt') else save(b,config['issue_id'],state,dict(state,scope_mount_recovery_attempt=dict(stage='qualifying')))
+    try:
+        try:import product_scope_mount_recovery
+        except ImportError:from broker import product_scope_mount_recovery
+        product_scope_mount_recovery.recover(b,config['issue_id'])
+    except (ValueError,KeyError,TypeError,OSError) as error:
+        with b.db() as con:
+            current=json.loads(con.execute('SELECT state FROM product_scope_runs WHERE issue_id=?',(config['issue_id'],)).fetchone()[0])
+        if current==selected:
+            return save(b,config['issue_id'],selected,dict(selected,scope_mount_recovery_attempt=dict(
+                stage='rejected',error_type=type(error).__name__,owner=plan['context']['cto'],
+                next_action='diagnose_fixed_mount_recovery_preconditions',automatic_retry=False)))
+    return selected
+
+
 def tick(b):
     with b.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='product_scope_runs'").fetchone():return set()
@@ -132,7 +155,7 @@ def tick(b):
     try:
         for raw_config,raw_state in rows:
             config,state=json.loads(raw_config),json.loads(raw_state)
-            if not config['enabled'] or state['stage'] in ('blocked','author_admitted'):continue
+            if not config['enabled'] or state['stage']=='author_admitted':continue
             try:step(b,config,state)
             except (validation_job.Pending,TimeoutError):
                 # Existing durable job/wakeup intent remains authoritative.

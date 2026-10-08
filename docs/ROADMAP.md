@@ -169,3 +169,11 @@ o resolver de mounts. A imagem do broker e a do proxy têm inventários distinto
 Essa verificação deve preceder a instalação dos overlays; importações isoladas
 não provam que todos os módulos atualizados estão presentes na imagem.
 Mesmo um inventário correto não qualifica mounts reais ou a entrega completa.
+`product_scope_mount_recovery.py` reautentica a proposta concluída, confere
+a política observada do worker falho e prova que o mount de evidência estava
+ausente. O resolver corrigido é ensaiado com estado histórico isolado, sem
+substituir globais do serviço, conceder capacidades ou recriar um worker.
+O loop pode criar uma nova linhagem apenas de revisão quando essa qualificação
+passa; mantém a tentativa falha e a proposta, e exige outro reviewer run real.
+Uma intenção interrompida é retomada; qualificação rejeitada não é repetida
+automaticamente. Esse caminho não recupera falhas funcionais ou aprovações.
