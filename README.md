@@ -130,6 +130,13 @@ anteriores e preservação exata das aspas em um patch válido. Não chama model
 não qualifica a serialização ACP nem aprova autoria, TDD ou entrega; o ensaio com
 modelo continua sendo uma validação separada.
 
+Há também um ensaio ACP integrado com respostas fixas servidas apenas no loopback
+de um contêiner sem rede. Ele percorre o SDK e o Hermes instalados, duas leituras,
+rejeição de um patch com sintaxe inválida e um patch corretivo, verificando os
+eventos ACP e o conteúdo final exato. Essa fixture não chama o provedor, não
+comprova autoria pelo modelo e não substitui uma entrega autônoma com TDD,
+revisão independente, PR, CI e QA do mesmo commit.
+
 Quando o CTO propõe corrigir testes de um Red herdado, a proposta mantém a origem, profundidade e critérios do contrato e segue para inspeção independente do Tech Lead. Essa inspeção não concede edição, cria uma terceira revisão recursiva ou aprova entrega. Um eventual ajuste exige experimento fundamentado e emenda do contrato independentemente revisada; o executor dessa emenda ainda é uma etapa de qualificação, não uma capacidade presumida.
 
 O experimento de sintaxe de harness verifica os hashes do snapshot antes e depois,
