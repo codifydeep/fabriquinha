@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261008.106
+COPY planning_schema.py /planning_schema.py

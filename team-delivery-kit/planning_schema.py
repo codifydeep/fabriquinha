@@ -16,7 +16,7 @@ def apply(body):
         if isinstance(content, str):
             # native_task_prompt prefixes the first issue-description line.
             # Match that verified wrapper as well as standalone marker lines.
-            roles.update(re.findall(r'^(?:Description: )?' + MARKER + r':(product|cto|techlead|contract_resolution)$', content, re.MULTILINE))
+            roles.update(re.findall(r'^(?:Description: )?' + MARKER + r':(product|cto|techlead|contract_resolution|source_review)$', content, re.MULTILINE))
     if not roles:
         return None
     if len(roles) != 1:
@@ -33,8 +33,12 @@ def apply(body):
         return {'type': 'object', 'properties': properties,
                 'required': list(properties), 'additionalProperties': False}
 
-    properties = {'role': {'type': 'string', 'enum': ['cto' if role == 'contract_resolution' else role]}}
-    if role == 'contract_resolution':
+    properties = {'role': {'type': 'string', 'enum': ['cto' if role in ('contract_resolution','source_review') else role]}}
+    if role == 'source_review':
+        properties.update(resolutions=array(obj({'index':{'type':'integer','minimum':0,'maximum':2},
+            'classification':{'type':'string','enum':['explicit_brief','requires_ceo']},
+            'quote':{'type':'string','maxLength':600},'answer':{'type':'string','maxLength':300}}),1,3))
+    elif role == 'contract_resolution':
         properties.update(parameter={'type': 'string', 'enum': ['status']},
             absent={'type': 'string', 'enum': ['all']},
             empty={'type': 'string', 'enum': ['all', '400']},
@@ -66,7 +70,8 @@ def apply(body):
     body['tool_choice'] = 'none'
     body['stream'] = False
     body['messages'].append({'role': 'system', 'content':
-        'PLANNING OUTPUT PHASE. Role=' + role + '. Return only the exact compact '
+        'PLANNING OUTPUT PHASE. Contract=' + role + '. Role=' +
+        ('cto' if role in ('source_review','contract_resolution') else role) + '. Return only the exact compact '
         'JSON proposal, under 6000 characters. No extra prose, tools, invented '
         'execution or role suffixes. Product defines user acceptance, not '
         'architecture; CTO decides technical choices; Tech Lead defines the '
@@ -91,7 +96,8 @@ def caller_response(body, data, media_type, requested_stream):
     spec = (body.get('response_format') or {}).get('json_schema') or {}
     if (not requested_stream or media_type != 'application/json'
             or spec.get('name') not in ('planning_product_v1', 'planning_cto_v1',
-                                      'planning_techlead_v1', 'planning_contract_resolution_v1')):
+                                      'planning_techlead_v1', 'planning_contract_resolution_v1',
+                                      'planning_source_review_v1')):
         return data, media_type
     record = json.loads(data)
     choices = record.get('choices') or []

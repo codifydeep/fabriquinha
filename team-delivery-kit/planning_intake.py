@@ -223,9 +223,9 @@ def capability_context(selection):
             'Never edit pre-existing tests. File scopes remain your proposal, not an executed change.')
 
 
-def issue_for(role, description, agent_id, *, retry=False, recovery=False, schema=False, run_name=NAME, wire=False, capability=False, clarification=False, ceo_answer=False):
+def issue_for(role, description, agent_id, *, retry=False, recovery=False, schema=False, run_name=NAME, wire=False, capability=False, clarification=False, ceo_answer=False, source_review=False):
     suffix = ('-capability1' if capability else '-wire1' if wire else '-schema1' if schema else '-recovery1' if recovery else '-retry1' if retry else '')
-    title = run_name + ' — ' + role + ('-ceoanswer1' + suffix if ceo_answer else '-briefclarification1' if clarification else suffix)
+    title = run_name + ' — ' + role + ('-source-reviewed1' + suffix if source_review else '-ceoanswer1' + suffix if ceo_answer else '-briefclarification1' if clarification else suffix)
     if len(description) > 8000:
         raise ValueError('planning context exceeds issue limit')
     matches = [card for card in cli('list')['issues'] if card['title'] == title]
@@ -398,6 +398,9 @@ def main():
     if clarified:
         existing = clarified
         save_receipt(ledger_path, existing)
+    from planning_source_review import pending as source_pending,run as source_review
+    if source_pending(existing):
+        existing=source_review(existing,brief,registry,ledger_path)
     if existing and existing.get('stage') == 'blocked':
         from planning_constraint_recovery import observe
         recovered=observe(existing,registry,cli)
@@ -537,6 +540,12 @@ def main():
                         'No Markdown, tool use, or explanations outside JSON.')
         ceo_answer = role == 'product' and bool(ledger.get('ceo_answer'))
         clarification = role == 'product' and bool(ledger.get('brief_clarification_product')) and not ceo_answer
+        reviewed = role == 'product' and bool(ledger.get('source_review_product'))
+        if reviewed:
+            context += ('\nCTO SOURCE REVIEW (not a CEO answer or new scope): '+
+                json.dumps(ledger['source_review']['resolutions'])+
+                '\nIncorporate these source-grounded answers into acceptance. '
+                'Do not repeat a resolved question or expand beyond the original brief.')
         if ceo_answer:
             context += ('\nThe CEO has answered the exact pending business question above. '
                         'Update the Product acceptance accordingly; do not ask that resolved '
@@ -592,7 +601,7 @@ def main():
         try:
             issue_id = issue_for(role, context, registry['agents'][role],
                                  retry=retry, recovery=recovery, schema=schema, run_name=name, wire=wire, capability=capability,
-                                 clarification=clarification, ceo_answer=ceo_answer)
+                                 clarification=clarification, ceo_answer=ceo_answer,source_review=reviewed)
             ledger['issues'][role] = issue_id
             mark_working(ledger, role)
             save_receipt(ledger_path, ledger)
@@ -605,6 +614,12 @@ def main():
             ledger['stage'] = 'completed_' + role
             save_receipt(ledger_path, ledger)
             if role == 'product' and proposal['business_questions']:
+                if reviewed:
+                    ledger.update(stage='blocked',owner='techlead',active='product',
+                        category='Product questions persisted after independent source review',
+                        next_action='Tech Lead diagnoses Product protocol; never fabricate a CEO answer')
+                    save_receipt(ledger_path,ledger)
+                    return 1
                 ledger.update(stage='blocked_awaiting_ceo', owner='ceo',
                               questions=proposal['business_questions'])
                 save_receipt(ledger_path, ledger)

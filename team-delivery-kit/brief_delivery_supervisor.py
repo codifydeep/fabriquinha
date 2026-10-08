@@ -126,6 +126,10 @@ def main():
             if planning_path.is_symlink() or not planning_path.is_file():
                 return False
             state = json.loads(planning_path.read_text())
+            from planning_source_review import pending as source_pending
+            if (state.get('configuration_sha256')==config['selection']['configuration_sha256']
+                    and source_pending(state)):
+                return True
             from planning_constraint_recovery import pending as constraint_pending
             from start_eval import cli
             registry=json.loads((PRIVATE/'planning-agents.json').read_text())

@@ -9,7 +9,7 @@ services:
       BROKER_QA_CLEANUP_OBSERVER: "1"
       BROKER_PROVISION_IMAGE: sha256:50101bd0a5dc5c30921208dadbc3023bf5e06ef157dff490d12ec57abe180b46
   model-proxy:
-    image: delivery-kit-model-proxy:20261008.105
+    image: delivery-kit-model-proxy:20261008.107
     environment:
       MODEL_PROXY_TECHNICAL_PADDING: "1"
       MODEL_PROXY_REVIEW_PADDING: "1"
