@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261008.364
+COPY broker/calibration_rework.py /calibration_rework.py
+COPY broker/indicator_experiment.py /indicator_experiment.py
+RUN PYTHONPATH=/ python -c "import indicator_experiment,calibration_rework"

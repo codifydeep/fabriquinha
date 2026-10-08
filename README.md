@@ -273,6 +273,14 @@ contagens, controles inválidos e evidência integral permanecem disponíveis. U
 recuperação por excesso de contexto retoma apenas a revisão pendente, uma vez,
 sem repetir o parecer técnico ou patrocinar implementação.
 
+Para a hipótese fixa de escritas no indicador, o controlador pode executar um
+job durável após as duas propostas independentes. Confere a nova calibração,
+controles comportamentais, limite de arquivo e observação separada do baseline;
+somente então registra a intenção de uma correção tests-only pelo autor original.
+Intenções ambíguas são observadas, nunca reenviadas. A cópia diagnóstica não é
+montada como entrega do autor. A submissão real ainda exige nova calibração,
+Red da suíte completa, revisão independente e todos os gates de PR, CI e QA.
+
 O gate verifica compilação, referência correta e 12 defeitos controlados (respostas indevidas,
 requisições duplicadas, estado pendente, timers e interferência). O job usa o
 snapshot somente leitura, sem rede, credenciais ou socket Docker. Erros de runtime,

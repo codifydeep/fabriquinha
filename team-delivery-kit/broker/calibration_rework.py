@@ -494,6 +494,11 @@ def _handle(b,route,runs,source,prior,effects):
             advance(config,state,runs,effects,persist)
         return False
     try:
+        if state.get('stage')=='plan_qualified' and config.get('post_execution_diagnosis'):
+            try:import indicator_experiment
+            except ImportError:from broker import indicator_experiment
+            indicator_experiment.advance(b,config,state,effects,persist)
+            return True
         repaired=recover_technical_escalation(config,state,runs,effects)
         if repaired:persist(repaired)
         else:advance(config,state,runs,effects,persist)
