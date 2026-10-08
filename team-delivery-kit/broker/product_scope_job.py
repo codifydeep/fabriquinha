@@ -17,12 +17,37 @@ except ImportError:
 IMAGE='sha256:64c265cf93432fa87492b0ba4271e113e49e04efa2b52ccc9ff3ea79ea84a62b'
 
 
+def proposal_wakeup(state,fx):
+    """Authenticate a reused proposal against its immutable failed-review parent.
+
+    A review-only recovery must not wake the CTO again. The original dispatch
+    remains authoritative, but only for the exact proposal and parent hash
+    qualified by the controller. Never inherit a review or an approval.
+    """
+    wake=state.get('dispatch',{}).get('proposal',{}).get('wakeup_id')
+    if wake:return wake
+    recovery=state.get('mount_recovery') or {}
+    if not recovery:return None
+    with fx.b.db() as con:parent=ledger.load(con,recovery['previous_plan'])
+    proof=recovery.get('proof') or {}
+    if (parent['stage']!='blocked' or parent.get('incident',{}).get('category')!='invalid_scope_review'
+            or proof.get('operation')!='qualified_scope_mount_recovery_v1'
+            or proof.get('original_plan_sha256')!=ledger.policy.digest(parent)
+            or proof.get('proposal_sha256')!=state['proposal_sha256']
+            or proof.get('failed_task')!=parent['incident'].get('task_id')
+            or proof.get('delivery_approval') is not False or proof.get('write_grant_issued') is not False
+            or any(parent.get(k)!=state.get(k) for k in
+                   ('context','original_contract','proposal','proposal_sha256','proposal_task'))):
+        raise ValueError('exact immutable reused proposal lineage required')
+    return parent.get('dispatch',{}).get('proposal',{}).get('wakeup_id')
+
+
 def reauthenticate(state,fx):
     fx.verify_binding(state)
     for phase,field,actor in (('proposal','proposal_task',state['context']['cto']),
                              ('review','review_task',state['context']['reviewer'])):
         task=fx.task(state[field]['id'],actor)
-        wake=state.get('dispatch',{}).get(phase,{}).get('wakeup_id')
+        wake=proposal_wakeup(state,fx) if phase=='proposal' else state.get('dispatch',{}).get(phase,{}).get('wakeup_id')
         if (ledger.task_identity(task)!=state[field] or not wake or task.get('wakeup_id')!=wake
                 or execution.terminal_output(task)!=state['proposal' if phase=='proposal' else 'review']
                 or fx.read_hashes(task,state['context']['eligible_code_sha256'])!=state['context']['eligible_code_sha256']):

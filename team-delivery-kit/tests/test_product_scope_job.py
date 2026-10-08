@@ -57,6 +57,42 @@ class ProductScopeJobTests(unittest.TestCase):
             self.assertEqual(payload['HostConfig']['NetworkMode'],'none')
             self.assertNotIn('installed_contract',state)
 
+    def recovered_review(self):
+        parent=dict(self.state,key='failed-parent',stage='blocked',
+                    incident=dict(category='invalid_scope_review',task_id='failed-review'))
+        parent.pop('review');parent.pop('review_task');parent.pop('qualification')
+        with self.b.db() as con:
+            con.execute('INSERT INTO product_scope_plans VALUES (?,?)',(parent['key'],ledger.encoded(parent)))
+        state=dict(self.state,dispatch={'review':self.state['dispatch']['review']},
+            mount_recovery=dict(previous_plan=parent['key'],proof=dict(
+                operation='qualified_scope_mount_recovery_v1',original_plan_sha256=policy.digest(parent),
+                proposal_sha256=self.state['proposal_sha256'],failed_task='failed-review',
+                delivery_approval=False,write_grant_issued=False)))
+        self.fx.b=self.b
+        return state,parent
+
+    def test_recovered_review_authenticates_original_proposal_without_replaying_cto(self):
+        state,parent=self.recovered_review()
+        job.reauthenticate(state,self.fx)
+        self.assertEqual(job.proposal_wakeup(state,self.fx),'cto-wake')
+        self.fx.wake.assert_not_called()
+        with self.b.db() as con:self.assertEqual(ledger.load(con,parent['key']),parent)
+
+    def test_reused_proposal_rejects_changed_parent_or_authorization(self):
+        state,parent=self.recovered_review()
+        for field,value in (('original_plan_sha256','0'*64),('proposal_sha256','0'*64),
+                            ('delivery_approval',True),('failed_task','other')):
+            with self.subTest(field=field):
+                proof=dict(state['mount_recovery']['proof'],**{field:value})
+                changed=dict(state,mount_recovery=dict(state['mount_recovery'],proof=proof))
+                with self.assertRaises(ValueError):job.reauthenticate(changed,self.fx)
+        changed=dict(state,proposal_task=dict(state['proposal_task'],id='other'))
+        with self.assertRaises(ValueError):job.reauthenticate(changed,self.fx)
+
+    def test_recovery_never_inherits_old_review_wakeup(self):
+        state,parent=self.recovered_review();state['dispatch']={}
+        with self.assertRaises(ValueError):job.reauthenticate(state,self.fx)
+
     def test_pending_job_reuses_same_payload_and_volume(self):
         with patch.object(job.validation_job,'run',side_effect=[job.validation_job.Pending('live'),self.result]) as run:
             with self.assertRaises(job.validation_job.Pending):job.tick(self.b,self.key,self.fx)
