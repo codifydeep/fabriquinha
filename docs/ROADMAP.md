@@ -177,3 +177,11 @@ O loop pode criar uma nova linhagem apenas de revisão quando essa qualificaçã
 passa; mantém a tentativa falha e a proposta, e exige outro reviewer run real.
 Uma intenção interrompida é retomada; qualificação rejeitada não é repetida
 automaticamente. Esse caminho não recupera falhas funcionais ou aprovações.
+Uma proposta reutilizada permanece ligada ao wakeup original por meio do hash
+do plano pai imutável. A reautenticação não herda a revisão anterior: confere
+as duas tarefas nativas, seus resultados e leituras completas. O loop também
+pode retomar uma rejeição comprovadamente anterior à materialização quando
+esse vínculo era a única pré-condição ausente, não existe job ou volume criado
+e as decisões reautenticam. Preserva a rejeição no recibo da recuperação e
+atualiza plano e coordenador em uma única transação. Jobs iniciados, intenções
+mais completas, decisões alteradas ou qualificações rejeitadas não são resetados.

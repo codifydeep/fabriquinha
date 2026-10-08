@@ -1,0 +1,5 @@
+# Local qualification overlay; verify this base ID before building.
+# Expected: sha256:23bc832650c88b9542b40f94c66d9dc12fcab5ec14f74d8168761bba63d9de89
+FROM delivery-kit-execution-broker:20261008.392
+COPY broker/product_scope_job.py /product_scope_job.py
+COPY broker/product_scope_pipeline.py /product_scope_pipeline.py

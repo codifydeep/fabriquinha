@@ -58,6 +58,55 @@ def reauthenticate(state,fx):
         raise ValueError('unchanged approved independent scope plan required')
 
 
+def recover_proposal_lineage(b,config,run,effects=None):
+    """Resume only a pre-effect rejection proven to lack a reused CTO wakeup.
+
+    This does not retry an executed job. Both native decisions and all reads
+    must reauthenticate before the atomic transition, and any prior job/volume
+    or richer materialization intent makes this recovery ineligible.
+    """
+    with b.db() as con:state=ledger.load(con,run['plan_key'])
+    held=state.get('materialization') or {}
+    if (config.get('enabled') is not True or run.get('stage')!='blocked'
+            or run.get('incident',{}).get('category')!='scope_pipeline_precondition_rejected'
+            or run['incident'].get('phase')!='scope_plan'
+            or state['stage']!='plan_approved' or state.get('author_blocked') is not True
+            or state.get('delivery_approval') is not False or state.get('reauthentication_recovery')
+            or not state.get('mount_recovery') or set(held)!={'stage','incident'}
+            or held['stage']!='blocked' or held['incident'].get('category')!='scope_materialization_rejected'
+            or state.get('dispatch',{}).get('proposal',{}).get('wakeup_id')
+            or state['context']['issue_id']!=config['issue_id']
+            or state['context']['contract_sha256']!=config['contract_sha256']
+            or state['context']['source_task']!=run.get('source_task')):
+        return run
+    fx=effects or execution.NativeEffects(b)
+    reauthenticate(state,fx)
+    with b.db() as con:
+        if any(json.loads(row[0]).get('task')==state['review_task']['id']
+               and json.loads(row[0]).get('kind')=='scope_materialize'
+               for row in con.execute('SELECT identity FROM validation_jobs')):
+            raise ValueError('existing scope materialization job must be observed, never reset')
+    volume=b.PREFIX+'-scope-contract-'+state['key'][:24]
+    if b.docker('GET','/volumes/'+volume):
+        raise ValueError('existing scope materialization volume cannot be recovered as pre-effect rejection')
+    proof=dict(operation='qualified_scope_proposal_lineage_recovery_v1',
+        rejected_plan_sha256=ledger.policy.digest(state),proposal_sha256=state['proposal_sha256'],
+        review_task=state['review_task']['id'],proposal_wakeup_id=proposal_wakeup(state,fx),
+        previous_materialization=held,previous_run_incident=run['incident'],
+        delivery_approval=False,write_grant_issued=False)
+    after_plan=dict(state,reauthentication_recovery=proof);after_plan.pop('materialization')
+    after_run=dict(run,stage='scope_plan',reauthentication_recovery=proof);after_run.pop('incident')
+    with b.LOCK,b.db() as con:
+        current=con.execute('SELECT config,state FROM product_scope_runs WHERE issue_id=?',(config['issue_id'],)).fetchone()
+        if not current or json.loads(current[0])!=config or json.loads(current[1])!=run:
+            raise ValueError('scope lineage recovery sponsor changed')
+        ledger.save_transition(con,state,after_plan)
+        changed=con.execute('UPDATE product_scope_runs SET state=? WHERE issue_id=? AND state=?',
+                            (ledger.encoded(after_run),config['issue_id'],current[1]))
+        if changed.rowcount!=1:raise ValueError('scope lineage recovery CAS failed')
+    return after_run
+
+
 def validate_receipt(state,base,receipt):
     expected=ledger.policy.candidate_contract(state['original_contract'],state['context'],state['proposal'])
     keys={'operation','issue_id','source_task','proposal_sha256','review_task','base_sha',

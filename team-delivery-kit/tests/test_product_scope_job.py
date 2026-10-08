@@ -93,6 +93,50 @@ class ProductScopeJobTests(unittest.TestCase):
         state,parent=self.recovered_review();state['dispatch']={}
         with self.assertRaises(ValueError):job.reauthenticate(state,self.fx)
 
+    def held_lineage(self):
+        state,parent=self.recovered_review()
+        held=dict(stage='blocked',incident=dict(category='scope_materialization_rejected',automatic_retry=False))
+        state=dict(state,materialization=held)
+        config=dict(issue_id=state['context']['issue_id'],contract_sha256=state['context']['contract_sha256'],enabled=True)
+        run=dict(stage='blocked',plan_key=self.key,source_task=state['context']['source_task'],
+                 delivery_approval=False,incident=dict(category='scope_pipeline_precondition_rejected',phase='scope_plan'))
+        with self.b.db() as con:
+            ledger.save_transition(con,self.state,state)
+            con.execute('CREATE TABLE product_scope_runs(issue_id TEXT,config TEXT,state TEXT)')
+            con.execute('INSERT INTO product_scope_runs VALUES (?,?,?)',(config['issue_id'],ledger.encoded(config),ledger.encoded(run)))
+            con.execute('CREATE TABLE validation_jobs(identity TEXT)')
+        return config,run,state
+
+    def test_pre_effect_lineage_recovery_reauthenticates_and_preserves_decisions(self):
+        config,run,state=self.held_lineage()
+        after=job.recover_proposal_lineage(self.b,config,run,self.fx)
+        self.assertEqual(after['stage'],'scope_plan');self.assertFalse(after['delivery_approval'])
+        with self.b.db() as con:current=ledger.load(con,self.key)
+        self.assertNotIn('materialization',current)
+        for field in ('proposal','proposal_task','review','review_task','qualification'):
+            self.assertEqual(current[field],state[field])
+        self.assertEqual(current['reauthentication_recovery']['previous_materialization'],state['materialization'])
+        self.fx.wake.assert_not_called()
+        self.assertEqual(self.b.docker.call_args.args[0],'GET')
+
+    def test_pre_effect_recovery_rejects_any_existing_job_or_volume(self):
+        config,run,state=self.held_lineage()
+        with self.b.db() as con:
+            con.execute('INSERT INTO validation_jobs VALUES (?)',(json.dumps(dict(task=state['review_task']['id'],kind='scope_materialize')),))
+        with self.assertRaises(ValueError):job.recover_proposal_lineage(self.b,config,run,self.fx)
+        self.b.docker.assert_not_called()
+        with self.b.db() as con:con.execute('DELETE FROM validation_jobs')
+        self.volume=dict(Name='already-created')
+        with self.assertRaises(ValueError):job.recover_proposal_lineage(self.b,config,run,self.fx)
+        with self.b.db() as con:self.assertEqual(ledger.load(con,self.key),state)
+
+    def test_richer_materialization_intent_or_unrelated_failure_is_not_reset(self):
+        config,run,state=self.held_lineage()
+        with self.b.db() as con:
+            ledger.save_transition(con,state,dict(state,materialization=dict(state['materialization'],volume='existing-intent')))
+        self.assertEqual(job.recover_proposal_lineage(self.b,config,run,self.fx),run)
+        self.fx.verify_binding.assert_not_called();self.b.docker.assert_not_called()
+
     def test_pending_job_reuses_same_payload_and_volume(self):
         with patch.object(job.validation_job,'run',side_effect=[job.validation_job.Pending('live'),self.result]) as run:
             with self.assertRaises(job.validation_job.Pending):job.tick(self.b,self.key,self.fx)

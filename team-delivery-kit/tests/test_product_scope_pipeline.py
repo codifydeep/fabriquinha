@@ -120,6 +120,24 @@ class ProductScopePipelineTests(unittest.TestCase):
             self.assertEqual(self.tick(),{self.issue});author.assert_not_called()
         self.assertEqual(self.state()['incident']['owner'],self.context['cto'])
 
+    def test_blocked_precondition_uses_controller_lineage_recovery_not_author_dispatch(self):
+        plan=self.plan_state();before=self.state()
+        held=dict(before,stage='blocked',incident=dict(category='scope_pipeline_precondition_rejected',phase='scope_plan'))
+        pipeline.save(self.b,self.issue,before,held)
+        with patch.object(pipeline.materialization,'recover_proposal_lineage',return_value=held) as recovery,\
+                patch.object(pipeline.author,'tick') as author:
+            self.tick();recovery.assert_called_once_with(self.b,self.config,held);author.assert_not_called()
+
+    def test_lineage_qualification_failure_is_visible_and_not_repeated(self):
+        self.plan_state();before=self.state()
+        held=dict(before,stage='blocked',incident=dict(category='scope_pipeline_precondition_rejected',phase='scope_plan'))
+        pipeline.save(self.b,self.issue,before,held)
+        with patch.object(pipeline.materialization,'recover_proposal_lineage',side_effect=ValueError('private detail')) as recovery:
+            self.tick();self.tick();recovery.assert_called_once()
+        attempt=self.state()['lineage_recovery_attempt']
+        self.assertEqual(attempt['stage'],'rejected');self.assertFalse(attempt['automatic_retry'])
+        self.assertNotIn('private',json.dumps(attempt))
+
     def test_external_failure_does_not_abort_other_issue_coordination_or_leak_error_text(self):
         pipeline.register(self.b,self.config);self.tick()
         other='00000000-0000-4000-8000-000000000002'

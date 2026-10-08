@@ -81,6 +81,8 @@ def step(b,config,state):
         if failure.get('category')!='executed_test_failure' or failure.get('source_task')!=row[0]:return state
         return save(b,issue,state,dict(state,stage='bootstrap',source_task=row[0],failure_output_sha256=failure['output_sha256']))
     if state['stage']=='blocked':
+        if state.get('incident',{}).get('category')=='scope_pipeline_precondition_rejected':
+            return recover_proposal_lineage(b,config,state)
         return recover_missing_mount(b,config,state)
     if state['stage']=='author_admitted':return state
     if state['stage']=='bootstrap':
@@ -122,6 +124,15 @@ def step(b,config,state):
         if current.get(phase,{}).get('stage')=='blocked':
             return save(b,issue,state,dict(state,stage='blocked',incident=current[phase]['incident']))
     return state
+
+
+def recover_proposal_lineage(b,config,state):
+    if state.get('lineage_recovery_attempt',{}).get('stage')=='rejected':return state
+    try:return materialization.recover_proposal_lineage(b,config,state)
+    except (ValueError,KeyError,TypeError,OSError) as error:
+        return save(b,config['issue_id'],state,dict(state,lineage_recovery_attempt=dict(
+            stage='rejected',error_type=type(error).__name__,owner=state['owner'],
+            next_action='diagnose_exact_proposal_lineage_and_materialization_intent',automatic_retry=False)))
 
 
 def recover_missing_mount(b,config,state):
