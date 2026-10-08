@@ -26,6 +26,8 @@ def identity_label(b,name,identity):
     import uuid
     try:valid=str(uuid.UUID(identity))==identity
     except (ValueError,TypeError):valid=False
+    if valid and name in (b.PREFIX+'-test-first-copy-v2-'+identity,b.PREFIX+'-test-first-red-v2-'+identity):
+        return 'delivery-kit.test-first-task'
     if valid and (name in (b.PREFIX+'-snapshot-job-'+identity,b.PREFIX+'-failed-snapshot-job-'+identity)
             or re.fullmatch(prefix+r'-controls-job-[a-f0-9]{12}',name)):
         return 'delivery-kit.source-task'

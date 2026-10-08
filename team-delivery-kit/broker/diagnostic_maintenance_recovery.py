@@ -14,7 +14,7 @@ try:
 except ImportError:
     from broker import controller_maintenance as maintenance, handoffs, native, test_revision_review
 
-SERVER_SHA = '50a202cacb44d5ba3a6cbaa590f026a134686d4b23875eaa36216baee3b8989f'
+SERVER_SHA = 'a8041213f82d7472a170f4206ebe90c312d6f22f0fc084fb5b40a6752d850e86'
 
 
 def qualify(e):

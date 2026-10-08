@@ -82,6 +82,36 @@ class FailedTestCheckpointTests(unittest.TestCase):
         with self.b.db() as con:
             self.assertFalse(checkpoint.qualified(con, ISSUE, TASK, self.red))
 
+    def test_transport_timeout_preserves_capturing_intent_not_semantic_rejection(self):
+        actual=self.red_capture
+        self.b.capture_test_first_red=lambda *a,**k:(_ for _ in ()).throw(TimeoutError('uncertain Docker acknowledgment'))
+        pending=self.call()
+        self.assertEqual(pending['status'],'capturing')
+        self.assertTrue(pending['observation_pending'])
+        self.assertFalse(pending['delivery_approved'])
+        self.b.capture_test_first_red=actual
+        self.assertEqual(self.call()['status'],'red_captured')
+
+    def test_legacy_timeout_migration_preserves_failure_without_author_retry(self):
+        from broker import controller_maintenance
+        self.b.capture_test_first_red=lambda *a,**k:(_ for _ in ()).throw(TimeoutError())
+        saved=self.call();saved.update(status='rejected',failure_type='DockerOperationTimeout')
+        with self.b.db() as con:
+            con.execute('UPDATE failed_test_checkpoint_executions SET receipt=?',(json.dumps(saved),))
+        self.b.PREFIX='delivery-kit-test'
+        self.b.docker=lambda method,path,*args:None if path.startswith('/containers/') else dict(
+            Labels={'delivery-kit.owner':'owner','delivery-kit.source-task':TASK})
+        with patch.object(controller_maintenance,'current',return_value=dict(stage='sealed',drained=True,operation_id='maintenance')), \
+             patch('broker.native.issue_task_runs',return_value=self.runs), \
+             patch('broker.native.task_record',return_value=self.task):
+            migrated=checkpoint.resume_timeout(self.b,TASK)
+            self.assertEqual(migrated['status'],'capturing')
+            self.assertEqual(migrated['timeout_observation_recovery']['previous'],saved)
+            self.assertFalse(migrated['timeout_observation_recovery']['author_restarted'])
+            self.assertEqual(checkpoint.resume_timeout(self.b,TASK),migrated)
+        with patch.object(controller_maintenance,'current',return_value=dict(stage='released')):
+            with self.assertRaises(ValueError):checkpoint.resume_timeout(self.b,TASK)
+
     def test_old_rejected_attempt_does_not_starve_latest_saved_execution(self):
         old = '33333333-3333-4333-8333-333333333333'
         legacy = dict(operation='failed_test_checkpoint_v1', status='rejected', source_task=old)

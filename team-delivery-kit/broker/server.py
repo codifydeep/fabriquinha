@@ -966,13 +966,8 @@ def capture_test_first_red(payload, *, _failed_checkpoint=None):
             raise ValueError('foreign test-first volume')
         if not existing:
             docker('POST', '/volumes/create', {'Name': volume, 'Labels': labels})
-        job = PREFIX + '-test-first-copy-' + task_id
-        old = docker('GET', '/containers/' + job + '/json')
-        if old:
-            if old['Config'].get('Labels', {}).get('delivery-kit.test-first-task') != task_id:
-                raise ValueError('foreign test-first copy job')
-            docker('DELETE', '/containers/' + old['Id'] + '?force=true')
-        docker('POST', '/containers/create?name=' + job, {
+        import test_first_job
+        copy_payload = {
             'Image': IMAGE if checkpoint_volume else OFFLINE_IMAGE,
             'User': '10000:10000', 'Entrypoint': ['python'],
             'Cmd': ['/failed_test_checkpoint_copy.py' if checkpoint_volume else '/test_first_copy.py'],
@@ -988,65 +983,38 @@ def capture_test_first_red(payload, *, _failed_checkpoint=None):
                                   {'Type': 'volume', 'Source': checkpoint_volume or work_volume,
                                        'Target': '/workspace', 'ReadOnly': True},
                                       {'Type': 'volume', 'Source': volume,
-                                       'Target': '/snapshot'}]}})
-        try:
-            docker('POST', '/containers/' + job + '/start')
-            deadline = time.time() + 25
-            while time.time() < deadline:
-                state = docker('GET', '/containers/' + job + '/json')['State']
-                if not state['Running']:
-                    if state['ExitCode']:
-                        from test_first_protocol import snapshot_rejection_error
-                        try:
-                            rejection=json.loads(docker_stdout(job))
-                        except (ValueError,TypeError):
-                            rejection={}
-                        message=snapshot_rejection_error(rejection)
-                        if rejection.get('kind')=='rejected_snapshot':
-                            diagnostic={**rejection,'issue_id':row['issue_id'],'task_id':task_id}
-                            if rejection.get('category') == 'empty_new_test' and len(rejection.get('files', {})) == 1:
-                                try:
-                                    from native import task_messages
-                                    from test_author_activity import summarize
-                                    name = next(iter(rejection['files']))
-                                    diagnostic['author_activity'] = summarize(
-                                        task_messages(settings, task_id), '/workspace/' + name)
-                                except Exception as error:
-                                    diagnostic['author_activity'] = {
-                                        'status': 'evidence_unavailable', 'category': type(error).__name__}
-                            directory=STATE/'test-first-incidents';directory.mkdir(exist_ok=True)
-                            path=directory/(task_id+'.json')
-                            if not path.exists():
-                                with path.open('x') as output:json.dump(diagnostic,output,sort_keys=True)
-                            elif json.loads(path.read_text()) != diagnostic:
-                                raise ValueError('test-first incident identity drift')
-                        raise ValueError(message)
-                    prepared = json.loads(docker_stdout(job))
-                    break
-                time.sleep(.2)
-            else:
-                raise TimeoutError('test-first copy deadline')
-        finally:
-            info = docker('GET', '/containers/' + job + '/json')
-            if info and info['Config'].get('Labels', {}).get('delivery-kit.test-first-task') == task_id:
-                docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+                                       'Target': '/snapshot'}]}}
+        copied=test_first_job.run(handoff_context(),con,task_id,'copy',copy_payload)
+        if copied['exit_code']:
+            from test_first_protocol import snapshot_rejection_error
+            try:rejection=json.loads(copied['output'])
+            except (ValueError,TypeError):rejection={}
+            if rejection.get('kind')=='rejected_snapshot':
+                diagnostic={**rejection,'issue_id':row['issue_id'],'task_id':task_id}
+                if rejection.get('category')=='empty_new_test' and len(rejection.get('files',{}))==1:
+                    try:
+                        from native import task_messages
+                        from test_author_activity import summarize
+                        name=next(iter(rejection['files']))
+                        diagnostic['author_activity']=summarize(task_messages(settings,task_id),'/workspace/'+name)
+                    except Exception as error:
+                        diagnostic['author_activity']={'status':'evidence_unavailable','category':type(error).__name__}
+                directory=STATE/'test-first-incidents';directory.mkdir(exist_ok=True)
+                path=directory/(task_id+'.json')
+                if not path.exists():
+                    with path.open('x') as output:json.dump(diagnostic,output,sort_keys=True)
+                elif json.loads(path.read_text())!=diagnostic:raise ValueError('test-first incident identity drift')
+            raise ValueError(snapshot_rejection_error(rejection))
+        prepared=json.loads(copied['output'])
         if (not isinstance(prepared, dict) or not re.fullmatch(r'[0-9a-f]{64}',
                 prepared.get('manifest_sha256', '')) or
                 not PINNED_IMAGE.fullmatch(prepared.get('test_image', ''))):
             raise ValueError('invalid test-first copy receipt')
-        runner = PREFIX + '-test-first-red-' + task_id
         import harness_qualification
         harness_qualification.capture(handoff_context(),con,row['issue_id'],task_id,volume,prepared)
         command = prepared['command']
         validate_argv(command, prepared['test_roots'])
-        old_runner = docker('GET', '/containers/' + runner + '/json')
-        if old_runner:
-            if old_runner['Config'].get('Labels', {}).get('delivery-kit.test-first-task') != task_id:
-                raise ValueError('foreign test-first Red runner')
-            # A retry is safe: frozen input is read-only and the runner has no
-            # network, credentials or side-effectful host mount.
-            docker('DELETE', '/containers/' + old_runner['Id'] + '?force=true')
-        docker('POST', '/containers/create?name=' + runner, {
+        red_payload = {
             'Image': prepared['test_image'], 'User': '10000:10000',
             'Entrypoint': [command[0]], 'Cmd': command[1:], 'WorkingDir': '/delivery',
             'NetworkDisabled': True, 'Env': ['PYTHONDONTWRITEBYTECODE=1'],
@@ -1056,43 +1024,26 @@ def capture_test_first_red(payload, *, _failed_checkpoint=None):
                            'Memory': 268435456, 'NanoCpus': 1000000000, 'PidsLimit': 96,
                            'Mounts': [{'Type': 'volume', 'Source': volume,
                                        'Target': '/delivery', 'ReadOnly': True}],
-                           'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=32m,mode=1777'}}})
-        try:
-            docker('POST', '/containers/' + runner + '/start')
-            deadline = time.time() + 120
-            while time.time() < deadline:
-                state = docker('GET', '/containers/' + runner + '/json')['State']
-                if not state['Running']:
-                    output = docker_stdout(runner, include_stderr=True, limit=65536)
-                    try:
-                        red = assess_red(state['ExitCode'], output, prepared)
-                    except ValueError as failure:
-                        save_red_rejection(STATE / 'test-first-incidents', row['issue_id'],
-                                           task_id, state['ExitCode'], output, prepared,
-                                           str(failure))
-                        raise
-                    trial_row = con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',
-                        (row['issue_id'],)).fetchone() if con.execute("SELECT 1 FROM sqlite_master WHERE name='test_revision_trials'").fetchone() else None
-                    trial = json.loads(trial_row[0]) if trial_row else {}
-                    if (trial.get('seed_previous_tests') is True
-                            and red['test_sha256'] == trial['old_red']['red']['test_sha256']):
-                        save_red_rejection(STATE / 'test-first-incidents', row['issue_id'],
-                            task_id, state['ExitCode'], output, prepared,
-                            'sponsored repair requires changed NEW-test snapshot')
-                        raise ValueError('sponsored repair requires changed NEW-test snapshot')
-                    receipt = {'issue_id': row['issue_id'], 'task_id': task_id,
-                               'scope': row['scope'], 'volume': volume,
-                               'red': red, 'captured_at': time.time()}
-                    con.execute('INSERT INTO test_first_red VALUES (?,?,?,?,?)',
-                                (row['issue_id'], task_id, row['scope'], volume,
-                                 json.dumps(receipt, sort_keys=True)))
-                    return receipt
-                time.sleep(.2)
-            raise TimeoutError('test-first Red deadline')
-        finally:
-            info = docker('GET', '/containers/' + runner + '/json')
-            if info and info['Config'].get('Labels', {}).get('delivery-kit.test-first-task') == task_id:
-                docker('DELETE', '/containers/' + info['Id'] + '?force=true')
+                           'Tmpfs': {'/tmp': 'rw,nosuid,nodev,size=32m,mode=1777'}}}
+        observed=test_first_job.run(handoff_context(),con,task_id,'red',red_payload)
+        output=observed['output'];exit_code=observed['exit_code']
+        try:red=assess_red(exit_code,output,prepared)
+        except ValueError as failure:
+            save_red_rejection(STATE/'test-first-incidents',row['issue_id'],task_id,
+                exit_code,output,prepared,str(failure))
+            raise
+        trial_row=con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(row['issue_id'],)).fetchone() \
+            if con.execute("SELECT 1 FROM sqlite_master WHERE name='test_revision_trials'").fetchone() else None
+        trial=json.loads(trial_row[0]) if trial_row else {}
+        if trial.get('seed_previous_tests') is True and red['test_sha256']==trial['old_red']['red']['test_sha256']:
+            save_red_rejection(STATE/'test-first-incidents',row['issue_id'],task_id,exit_code,output,prepared,
+                'sponsored repair requires changed NEW-test snapshot')
+            raise ValueError('sponsored repair requires changed NEW-test snapshot')
+        receipt={'issue_id':row['issue_id'],'task_id':task_id,'scope':row['scope'],
+            'volume':volume,'red':red,'captured_at':time.time()}
+        con.execute('INSERT INTO test_first_red VALUES (?,?,?,?,?)',
+            (row['issue_id'],task_id,row['scope'],volume,json.dumps(receipt,sort_keys=True)))
+        return receipt
 
 
 def verify_test_first_green(volume, task_id, red_receipt):

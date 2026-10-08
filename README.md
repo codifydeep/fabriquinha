@@ -197,6 +197,17 @@ controle; rejeita `skip`, renomeação ou sobrescrita de métodos, remoção de
 de enfraquecimento semântico: calibração e revisão independente continuam
 necessárias. Nenhum resultado desse experimento concede permissão de escrita.
 
+A cópia test-first e a execução de Red usam jobs duráveis do controlador:
+intenções de criação e início são registradas antes das chamadas Docker. Um
+timeout mantém a observação do mesmo contêiner, sem repetir criação ou início;
+o resultado e seu hash são guardados antes da retirada do job parado. A identidade
+inclui imagem, comando, ambiente e isolamento. O limite de observação gera um
+impedimento visível, não aprovação nem retry do autor. A migração de um timeout
+legado exige manutenção selada, ausência de workers e snapshot íntegro, preservando
+o recibo anterior. A suíte offline e uma sonda isolada no Docker real foram
+validadas; isso não comprova Red legítimo do artefato, revisão independente ou
+entrega autônoma. Outros caminhos Docker não recebem implicitamente essa garantia.
+
 O writer isolado analisa a sintaxe dos bytes propostos para arquivos Python antes
 de abrir ou truncar o arquivo existente. Uma rejeição preserva o último conteúdo
 válido e retorna uma mensagem fixa sem expor a linha submetida. Essa análise não

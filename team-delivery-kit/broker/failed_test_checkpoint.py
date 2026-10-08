@@ -127,6 +127,11 @@ def capture(b, issue, task):
                 con.execute('UPDATE failed_test_checkpoint_executions SET receipt=? WHERE issue_id=? AND source_task=?',
                             (json.dumps(saved, sort_keys=True), issue, task))
             red = b.capture_test_first_red({'task_id': task}, _failed_checkpoint=saved)
+        except TimeoutError as error:
+            # The durable copy/calibration/Red intent observes its exact job.
+            # A transport timeout is not a semantic rejection of the artifact.
+            saved.update(status='capturing',observation_pending=True,
+                         observation_category=type(error).__name__)
         except Exception as error:
             # No retry loop, raw exception/output, automatic approval or author wakeup.
             saved.update(status='rejected', failure_type=type(error).__name__,
@@ -137,3 +142,52 @@ def capture(b, issue, task):
             con.execute('UPDATE failed_test_checkpoint_executions SET receipt=? WHERE issue_id=? AND source_task=?',
                         (json.dumps(saved, sort_keys=True), issue, task))
         return saved
+
+
+def resume_timeout(b,task):
+    """Maintenance-only migration of a legacy rejected observation, not a worker retry."""
+    try:import controller_maintenance as maintenance
+    except ImportError:from broker import controller_maintenance as maintenance
+    with b.LOCK,b.db() as con:
+        barrier=maintenance.current(con)
+        if not barrier or barrier.get('stage')!='sealed' or barrier.get('drained') is not True:
+            raise ValueError('sealed drained maintenance required')
+        row=con.execute('SELECT issue_id,receipt FROM failed_test_checkpoint_executions WHERE source_task=?',(task,)).fetchone()
+        if not row:raise ValueError('exact failed checkpoint required')
+        issue,saved=row[0],json.loads(row[1])
+        if saved.get('timeout_observation_recovery'):return saved
+        route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()[0])
+        if (saved.get('status')!='rejected' or saved.get('failure_type') not in ('DockerOperationTimeout','TimeoutError')
+                or saved.get('route_sha256')!=digest(route) or not route.get('enabled')
+                or con.execute('SELECT 1 FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
+                or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
+            raise ValueError('idle exact legacy transport timeout required')
+        snap=con.execute('SELECT volume,status FROM failed_execution_snapshots WHERE task_id=?',(task,)).fetchone()
+        if not snap or snap['status']!='complete' or snap['volume']!=saved.get('snapshot_volume'):
+            raise ValueError('preserved failed snapshot required')
+        if con.execute("SELECT 1 FROM sqlite_master WHERE name='test_first_jobs'").fetchone() and \
+                con.execute('SELECT 1 FROM test_first_jobs WHERE job_key IN (?,?)',(task+':copy',task+':red')).fetchone():
+            raise ValueError('durable jobs must observe their existing intent, not migrate legacy state')
+    settings=json.loads((b.STATE/'native.json').read_text())
+    source=native.task_record(settings,task,route['author'])
+    if not eligible(route,source,native.issue_task_runs(settings,issue)):
+        raise ValueError('latest terminal native source required')
+    for role in ('copy','red'):
+        if b.docker('GET','/containers/'+b.PREFIX+'-test-first-'+role+'-'+task+'/json'):
+            raise ValueError('legacy job must be independently observed before migration')
+    frozen=b.docker('GET','/volumes/'+snap['volume'])
+    if any((frozen or {}).get('Labels',{}).get(k)!=v for k,v in
+            {'delivery-kit.owner':b.OWNER,'delivery-kit.source-task':task}.items()):
+        raise ValueError('owned immutable failed snapshot required')
+    # The new fixed copy validates every byte against the frozen snapshot and
+    # original base. Existing output is resumed, never erased or overwritten.
+    new={**saved,'status':'capturing','timeout_observation_recovery':dict(
+        operation='legacy_checkpoint_observation_migration_v1',previous=saved,
+        maintenance_operation=barrier['operation_id'],new_job_protocol='test-first-v2',
+        author_restarted=False,delivery_approved=False)}
+    with b.db() as con:
+        current=proof(con,issue,task)
+        if current!=saved:raise ValueError('checkpoint changed during migration')
+        con.execute('UPDATE failed_test_checkpoint_executions SET receipt=? WHERE source_task=?',
+            (json.dumps(new,sort_keys=True),task))
+    return new

@@ -1,0 +1,8 @@
+FROM delivery-kit-execution-broker:20261008.360
+COPY broker/server.py /broker.py
+COPY broker/test_first_job.py /test_first_job.py
+COPY broker/failed_test_checkpoint.py /failed_test_checkpoint.py
+COPY broker/helper_cleanup.py /helper_cleanup.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+COPY broker/diagnostic_maintenance_recovery.py /diagnostic_maintenance_recovery.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_first_job, failed_test_checkpoint"
