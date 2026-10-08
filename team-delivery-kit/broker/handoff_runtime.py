@@ -116,6 +116,16 @@ def task_base(broker, issue_id, task_id):
 
 
 class Effects:
+    def author_edit_scope(self, route):
+        """Read the controller-installed write contract; never infer it from prose."""
+        from portable_contract import safe_path
+        with self.b.db() as con:
+            paths = [row[0].removeprefix('/workspace/') for row in con.execute(
+                'SELECT path FROM issue_editables WHERE issue_id=? ORDER BY path', (route['issue_id'],))]
+        if not paths or len(paths) > 128: raise ValueError('bounded author edit contract required')
+        for path in paths: safe_path(path)
+        return sorted(set(paths) - set(route.get('test_first_files', [])))
+
     def test_source_finalization(self, issue, task):
         with self.b.db() as con:
             row=con.execute('SELECT n.issue_id,n.agent_id,g.mode,l.status FROM native_bindings n '

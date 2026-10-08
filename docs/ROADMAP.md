@@ -52,3 +52,10 @@ de congelar arquivos. Um atraso de fechamento não é falha funcional, não auto
 correção pelo autor e não constitui entrega. Incidentes históricos dessa corrida
 só retornam à validação se a lease estiver fechada, não houver diagnósticos ativos
 e nenhuma falha funcional tiver sido produzida; o histórico permanece preservado.
+
+Diagnóstico de dependências usa apenas caminhos e hashes emitidos pelo validador
+do snapshot. Leitura adicional não amplia o contrato de edição do autor. Uma
+decisão concluída do CTO pode receber, uma única vez, o escopo instalado que
+faltava no contexto; essa análise preserva o histórico e os limites de correção,
+não reinicia o autor nem autoriza uma revisão do contrato. Replanejamento de
+permissões e recuperação ponta a ponta ainda precisam de evidência própria.

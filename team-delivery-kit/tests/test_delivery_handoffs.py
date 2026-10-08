@@ -401,6 +401,37 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(handoffs.repeated_corrections(self.con, 'issue', changed), 0)
         self.assertEqual(handoffs.repeated_corrections(self.con, 'issue', dict(data, contract_sha256='c' * 64)), 0)
 
+    def test_cto_scope_inspection_is_once_only_not_an_author_retry(self):
+        failure = dict(category='executed_test_failure', source_task='source', volume='frozen',
+            output_sha256='a' * 64, tests_executed=3, failures=[dict(kind='ERROR', qualified_name='tests.C.test_get')],
+            missing_module_attributes=[dict(module='app.db', attribute='get_item')])
+        decision = dict(action='escalate_cto', reason='requires another file', optional_files=[])
+        data = dict(source_task='source', contract_sha256=self.route['contract_sha256'], attempts=2,
+            artifact_diagnosis=True, validation_failure=failure, diagnostic_revision='old',
+            diagnostic_inventory_recovery=dict(delivery_approval=False), target='cto',
+            recipient_task='scope-old', decision=decision, dispatch_marker='old',
+            wakeup_id='oldwake', instruction='old', error='portable frozen suite failed')
+        self.effects.author_edit_scope=lambda route: ['app/server.py']
+        task = dict(id='scope-old', issue_id='issue', agent_id='cto', status='completed', wakeup_id='oldwake')
+        for wrong in (dict(task, wakeup_id='different'), dict(task, agent_id='author'),
+                      dict(task, status='failed')):
+            handoffs.save(self.con, 'source', 'issue', 'technical_decision_required', 'cto', data, 100)
+            self.assertEqual(self.tick([wrong], now=110), 'technical_decision_required')
+            self.assertFalse(self.effects.created)
+        handoffs.save(self.con, 'source', 'issue', 'technical_decision_required', 'cto', data, 100)
+        self.tick([task], now=120)
+        result=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertEqual(result['author_edit_files'], ['app/server.py'])
+        self.assertEqual(result['attempts'], 2)
+        self.assertFalse(result['scope_inspection_recovery']['author_restarted'])
+        self.assertFalse(result['scope_inspection_recovery']['delivery_approval'])
+        self.assertEqual(result['scope_inspection_recovery']['previous_decision'], decision)
+        self.assertTrue(all(v['target']=='cto' for v in self.effects.created.values()))
+        count=len(self.effects.created)
+        handoffs.save(self.con, 'source', 'issue', 'technical_decision_required', 'cto', result, 130)
+        self.tick([task], now=140)
+        self.assertEqual(len(self.effects.created), count)
+
     def test_diagnosis_receives_existing_red_instead_of_inventing_missing_tests(self):
         self.effects.phase_evidence = lambda _: {'phase': 'implementation', 'red_manifest': 'a' * 64,
                                                 'independent_test_review': 'approved'}

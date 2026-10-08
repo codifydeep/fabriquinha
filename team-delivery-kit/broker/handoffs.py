@@ -442,6 +442,30 @@ def reconcile(con, route, runs, effects, *, now=None):
     if data['contract_sha256'] != route['contract_sha256']:
         raise ValueError('handoff contract revision drift')
     stage = prior['stage'] if prior else 'observed'
+    # A diagnosed dependency is not write authority. Once, expose the missing
+    # installed edit boundary to a completed CTO diagnostic; never replay the
+    # author, clear functional attempt counts, or broaden that boundary.
+    if (stage == 'technical_decision_required' and data.get('artifact_diagnosis')
+            and data.get('diagnostic_inventory_recovery')
+            and (data.get('validation_failure') or {}).get('category') == 'executed_test_failure'
+            and data['validation_failure'].get('source_task') == key
+            and not data.get('scope_inspection_recovery') and not data.get('author_edit_files')
+            and (data.get('decision') or {}).get('action') == 'escalate_cto'
+            and data.get('target') == route['cto'] and hasattr(effects, 'author_edit_scope')
+            and any(r.get('id') == data.get('recipient_task') and r.get('agent_id') == route['cto']
+                    and r.get('wakeup_id') == data.get('wakeup_id')
+                    and r.get('status') == 'completed' for r in runs)
+            and not any(r.get('status') in ('queued','dispatched','running') for r in runs)):
+        scope = effects.author_edit_scope(route)
+        if not scope: raise ValueError('author product edit scope is empty')
+        data['scope_inspection_recovery'] = dict(previous_decision=data['decision'],
+            previous_task=data['recipient_task'], author_restarted=False, delivery_approval=False)
+        data['author_edit_files'] = scope
+        data['diagnostic_revision'] += ':installed-edit-scope-v1'
+        for field in ('recipient_task','wakeup_id','dispatch_marker','dispatch_stage',
+                      'dispatched_at','target','instruction','decision','required_action'):
+            data.pop(field, None)
+        stage = save(con, key, issue, 'diagnose_cto', route['cto'], data, now)
     # A native completion precedes lease finalization. Recover only the exact
     # historical admission race, never a functional validation failure or an
     # active diagnosis. Preserve the old intervention as history.
@@ -770,7 +794,8 @@ def reconcile(con, route, runs, effects, *, now=None):
             summary = {k: data[k] for k in ('source_task', 'contract_sha256', 'error',
                        'error_type', 'attempts', 'evidence', 'failed_dispatch_stage',
                        'recipient_error', 'review_retries', 'source_status',
-                       'source_failure_reason', 'source_execution_error', 'phase_evidence') if k in data}
+                       'source_failure_reason', 'source_execution_error', 'phase_evidence',
+                       'author_edit_files') if k in data}
             if 'evidence' in summary:
                 summary['evidence'] = review_tdd_context(data['evidence'])
                 summary['evidence']['tests'] = data['evidence'].get('tests')
