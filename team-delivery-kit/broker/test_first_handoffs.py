@@ -774,6 +774,10 @@ def reconcile(broker, route, runs, effects):
             return None
         try:import cto_prompt_bound_recovery
         except ImportError:from broker import cto_prompt_bound_recovery
+        try:import provider_diagnosis_recovery
+        except ImportError:from broker import provider_diagnosis_recovery
+        if provider_diagnosis_recovery.recover(broker,route,runs,source,prior,effects):
+            return None
         if cto_prompt_bound_recovery.recover(broker,route,runs,source,prior,effects):
             return None
         failed_authors = [run for run in authors if run['status'] == 'failed']

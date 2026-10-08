@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261008.377
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+COPY broker/provider_diagnosis_recovery.py /provider_diagnosis_recovery.py
