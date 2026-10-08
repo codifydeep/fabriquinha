@@ -99,17 +99,18 @@ class QaArtifactTests(unittest.TestCase):
 
     def test_every_supported_browser_scenario_can_register_diagnostic_evidence(self):
         import portable_browser_qa
-        from browser_qa_recipes import LEGACY_SCENARIOS
-        scenarios=set(LEGACY_SCENARIOS)
-        self.assertEqual(len(scenarios),14)
-        script=portable_browser_qa.SCRIPT.read_bytes()
-        self.assertLessEqual(len(script),32768)
-        self.payload['scenario_zlib']=base64.b64encode(zlib.compress(script)).decode()
-        self.payload['browser_receipt']['identity']['scenario_sha256']=hashlib.sha256(script).hexdigest()
+        from browser_qa_recipes import SCENARIOS, LEGACY_SCENARIOS
+        scenarios=set(SCENARIOS)
+        self.assertEqual(len(LEGACY_SCENARIOS),14)
+        self.assertEqual(len(scenarios),16)
         config=self.payload['browser_receipt']['identity']['config']
         for scenario in scenarios:
             config['scenario']=scenario
             self.assertEqual(portable_browser_qa.validate(config),config)
+            script=portable_browser_qa.script_for(config).read_bytes()
+            self.assertLessEqual(len(script),32768)
+            self.payload['scenario_zlib']=base64.b64encode(zlib.compress(script)).decode()
+            self.payload['browser_receipt']['identity']['scenario_sha256']=hashlib.sha256(script).hexdigest()
             with self.subTest(scenario=scenario):self.assertIn('scenario.py',qa.unpack(self.payload))
         config['scenario']='arbitrary-agent-command'
         with self.assertRaises(ValueError):qa.unpack(self.payload)

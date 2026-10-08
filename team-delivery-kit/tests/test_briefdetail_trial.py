@@ -21,13 +21,11 @@ class DetailBriefTests(unittest.TestCase):
         tracked=set(template['files'])-{'tests/test_demo_mode_api_template.py'}
         tracked|={'tests/test_actual_demo_api.py','test_actual_demo_ui.py'}
         runs=[json.loads((folder/('descartavel2-briefdemo-2-'+k+'.qa.run.json')).read_text()) for k in ('api','ui')]
-        # Schema qualification is required before preparation can succeed.
-        with self.assertRaisesRegex(ValueError,'invalid pinned browser QA configuration'):
-            derive(tracked,template,runs)
         original=copy.deepcopy(template)
-        from unittest.mock import patch
-        with patch('portable_browser_qa.validate',side_effect=lambda x:x):
-            outputs=derive(tracked,template,runs)
+        outputs=derive(tracked,template,runs)
+        for kind in ('api','ui'):
+            self.assertEqual(outputs[PREFIX+'-'+kind+'.qa.run.json']['browser_qa']['scenario'],
+                             'feedback-board-detail-'+kind+'-v1')
         self.assertEqual(template,original)
         for kind in ('api','ui'):
             contract=outputs[PREFIX+'-'+kind+'.qa.contract.json']

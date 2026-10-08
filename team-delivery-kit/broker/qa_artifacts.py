@@ -8,6 +8,7 @@ import uuid
 import zlib
 from pathlib import Path
 from artifact_read_evidence import observations
+from browser_qa_recipes import SCENARIOS
 
 
 def initialize(con):
@@ -52,13 +53,7 @@ def unpack(payload):
         raise ValueError('safe exact browser fixture identity required')
     config = receipt['identity'].get('config')
     if (not isinstance(config, dict) or set(config) != {'scenario', 'browser_image'}
-            or config['scenario'] not in ('feedback-board-v1', 'feedback-board-pending-v1',
-                'feedback-board-pending-accessibility-v1', 'feedback-board-keyboard-dismiss-v1',
-                'feedback-board-status-filter-api-v1', 'feedback-board-filter-v1', 'feedback-board-sort-v1',
-                'feedback-board-search-api-v1', 'feedback-board-search-v1',
-                'feedback-board-search-generation-v1', 'feedback-board-service-status-api-v1',
-                'feedback-board-service-status-ui-v1', 'feedback-board-demo-mode-api-v1',
-                'feedback-board-demo-mode-ui-v1')
+            or config['scenario'] not in SCENARIOS
             or not re.fullmatch(r'sha256:[a-f0-9]{64}', config['browser_image'])):
         raise ValueError('fixed browser operation required')
     from portable_contract import safe_path

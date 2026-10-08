@@ -14,9 +14,18 @@ LEGACY_SCENARIOS = (
     'feedback-board-service-status-api-v1', 'feedback-board-service-status-ui-v1',
     'feedback-board-demo-mode-api-v1', 'feedback-board-demo-mode-ui-v1',
 )
+DETAIL_SCENARIOS = ('feedback-board-detail-api-v1', 'feedback-board-detail-ui-v1')
+SCENARIOS = LEGACY_SCENARIOS + DETAIL_SCENARIOS
 
 
 def recipe_for(scenario):
-    if not isinstance(scenario, str) or scenario not in LEGACY_SCENARIOS:
+    if not isinstance(scenario, str) or scenario not in SCENARIOS:
         raise ValueError('unqualified browser QA recipe')
-    return Path(__file__).with_name('browser_feedback_acceptance.py')
+    return Path(__file__).with_name('browser_feedback_detail.py' if scenario in DETAIL_SCENARIOS
+                                   else 'browser_feedback_acceptance.py')
+
+
+def baseline_for(scenario):
+    if scenario in DETAIL_SCENARIOS:
+        return 'feedback-board-demo-mode-ui-v1'
+    return None

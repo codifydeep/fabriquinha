@@ -22,7 +22,7 @@ def description(incident):
 def bind(private, incident, issue_id, agent_id):
     if incident.get('phase') != 'browser':
         return
-    from portable_browser_qa import SCRIPT
+    from portable_browser_qa import script_for
     from prepare_issue_base import broker_post
     root = Path(private)
     delivery = json.loads((root / 'release-receipts' / (incident['label'] + '.json')).read_text())
@@ -31,20 +31,22 @@ def bind(private, incident, issue_id, agent_id):
             or delivery['deployment']['source_sha'] != incident['source_sha']):
         raise ValueError('QA diagnosis delivery identity drift')
     folder = root / 'browser-acceptance' / incident['label']
-    script = SCRIPT.read_bytes()
     matches = []
     for path in folder.glob('*.json'):
         if path.is_symlink() or path.stat().st_size > 65536:
             raise ValueError('unsafe browser evidence')
         receipt = json.loads(path.read_text())
         identity = receipt.get('identity', {})
-        if (receipt.get('status') == 'failed' and identity.get('source_sha') == incident['source_sha']
+        if receipt.get('status') != 'failed' or identity.get('source_sha') != incident['source_sha']:
+            continue
+        script = script_for(identity['config']).read_bytes()
+        if (identity.get('source_sha') == incident['source_sha']
                 and identity.get('scenario_sha256') == hashlib.sha256(script).hexdigest()
                 and identity.get('application_image') == delivery['deployment']['image_id']):
-            matches.append(receipt)
+            matches.append((receipt, script))
     if len(matches) != 1:
         raise ValueError('exact failed browser artifact and current scenario required')
-    receipt = matches[0]
+    receipt, script = matches[0]
     safe = {k: receipt[k] for k in ('status','cleanup','automated','identity')}
     safe['error'] = receipt['error'][:1600]
     paths = delivery['preflight']['changed_code']

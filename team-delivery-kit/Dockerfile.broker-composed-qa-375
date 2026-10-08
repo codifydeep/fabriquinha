@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261008.374
+COPY broker/qa_artifacts.py /qa_artifacts.py
+COPY browser_qa_recipes.py /browser_qa_recipes.py

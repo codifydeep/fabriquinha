@@ -15,7 +15,8 @@ import uuid
 from docker_grouping import args as docker_group_args
 
 from release_eval import save_receipt
-from browser_qa_recipes import LEGACY_SCENARIOS, recipe_for
+from browser_qa_recipes import SCENARIOS, recipe_for, baseline_for
+import browser_qa_composition as composition
 
 SCRIPT = Path(__file__).with_name('browser_feedback_acceptance.py')
 SHA = re.compile(r'[a-f0-9]{40}\Z')
@@ -24,7 +25,7 @@ IMAGE = re.compile(r'sha256:[a-f0-9]{64}\Z')
 
 def validate(config):
     if (not isinstance(config, dict) or set(config) != {'scenario', 'browser_image'}
-            or config['scenario'] not in LEGACY_SCENARIOS
+            or config['scenario'] not in SCENARIOS
             or not isinstance(config['browser_image'], str)
             or not IMAGE.fullmatch(config['browser_image'])):
         raise ValueError('invalid pinned browser QA configuration')
@@ -150,6 +151,21 @@ def cleanup(resources, owner):
 
 
 def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env):
+    validate(config)
+    parameters = dict(deployed_container=deployed_container, source_sha=source_sha,
+                      evidence_dir=evidence_dir, runtime_env=runtime_env)
+    baseline = baseline_for(config['scenario'])
+    if not baseline:
+        return _qualify_one(config=config, **parameters)
+    baseline_config = {**config, 'scenario': baseline}
+    baseline_receipt = _qualify_one(config=baseline_config, **parameters)
+    proof = composition.reference(evidence_dir, baseline_receipt)
+    return _qualify_one(config=config, baseline_proof=proof,
+                        baseline_config=baseline_config, **parameters)
+
+
+def _qualify_one(*, config, deployed_container, source_sha, evidence_dir, runtime_env,
+                 baseline_proof=None, baseline_config=None):
     script = script_for(config)
     if runtime_env != {'FEEDBACK_DB_PATH': '/tmp/feedback.db'}:
         raise ValueError('browser QA requires fixed temporary database environment')
@@ -168,11 +184,20 @@ def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env
     directory = Path(evidence_dir)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / (key + '.json')
+    if baseline_config is not None:
+        composition.verify(directory, baseline_proof, identity, baseline_config,
+                           hashlib.sha256(script_for(baseline_config).read_bytes()).hexdigest())
+    elif baseline_proof is not None:
+        raise ValueError('baseline QA operation required')
     if path.exists():
+        if path.is_symlink() or path.stat().st_size > 65536:
+            raise ValueError('unsafe browser QA receipt')
         existing = json.loads(path.read_text())
         if existing.get('identity') != identity:
             raise ValueError('browser QA receipt identity drift')
         if existing['status'] == 'passed':
+            if existing.get('baseline_qa') != baseline_proof:
+                raise ValueError('browser QA baseline binding drift')
             if (existing.get('cleanup') != 'passed' or existing.get('automated') is not True
                     or existing.get('result', {}).get('source_sha') != source_sha
                     or existing.get('result', {}).get('status') != 'passed'):
@@ -189,6 +214,8 @@ def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env
     resources = [('network', owner), ('container', owner + '-app'), ('container', owner + '-browser')]
     receipt = {'status': 'running', 'identity': identity, 'owner': owner,
                'resources': resources, 'started_at': time.time(), 'automated': True}
+    if baseline_proof is not None:
+        receipt['baseline_qa'] = baseline_proof
     save_receipt(path, receipt)
     failure = None
     try:
@@ -226,6 +253,9 @@ def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env
         screenshot = base64.b64decode(result.pop('screenshot_base64'), validate=True)
         (directory / (key + '.png')).write_bytes(screenshot)
         receipt.update(result=result, screenshot_sha256=hashlib.sha256(screenshot).hexdigest())
+        if baseline_config is not None:
+            composition.verify(directory, baseline_proof, identity, baseline_config,
+                               hashlib.sha256(script_for(baseline_config).read_bytes()).hexdigest())
     except Exception as error:
         failure = type(error).__name__ + ': ' + str(error)
     finally:

@@ -816,7 +816,7 @@ Referência em 8 de outubro de 2026:
 
 - `BRIEFSTATUS-1` percorreu dois cards dependentes, PRs, CI e QA HTTP/browser em dois contextos; reparos anteriores do operador impedem classificá-lo como prova integral sem intervenção.
 - `BRIEFDEMO-2` concluiu os cards dependentes, PR/CI e homologação com QA no mesmo SHA. Exigiu reparos do operador: não prova uma execução integral sem intervenção.
-- `BRIEFDETAIL-1` está em preparação. O registro de receitas de QA é fechado; seus novos cenários continuam bloqueados até qualificação. A receita de regressão anterior permanece intacta, sem ampliar o limite dos artefatos.
+- `BRIEFDETAIL-1` utiliza QA independente de API/interface, com vínculo por hash à regressão existente no mesmo commit, imagem e implantação. O detector de interface passou na referência sintética e rejeitou nove defeitos intencionais. Isso não substitui a entrega do produto pelos agentes. A receita de regressão anterior permanece intacta, sem ampliar o limite dos artefatos.
 - O Truco continua fora dos ensaios de qualificação. Não confundir a aplicação descartável com o produto final.
 - Instalação limpa, configuração portátil, recuperação totalmente autônoma e entrega de um produto completo ainda são lacunas.
 
