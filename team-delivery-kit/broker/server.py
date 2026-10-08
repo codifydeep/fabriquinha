@@ -300,13 +300,13 @@ def register_issue_requirements(payload):
     return {'issue_id': issue_id, 'required_tests': sorted(names)}
 
 
-def seed_workspace(issue_id, scope, work_volume):
-    base = issue_base(issue_id)
+def seed_workspace(issue_id, scope, work_volume, *, scope_selection=None):
+    base = scope_selection['base'] if scope_selection else issue_base(issue_id)
     try:
         import test_revision_review
     except ImportError:
         from broker import test_revision_review
-    revision = test_revision_review.seed_source(handoff_context(), issue_id)
+    revision = scope_selection['seed'] if scope_selection else test_revision_review.seed_source(handoff_context(), issue_id)
     mounts = [{'Type': 'volume', 'Source': base['volume'], 'Target': '/base', 'ReadOnly': True},
               {'Type': 'volume', 'Source': work_volume, 'Target': '/workspace'}]
     env = ['BASE_MANIFEST_SHA256=' + base['manifest_sha256']]
@@ -342,13 +342,13 @@ def seed_workspace(issue_id, scope, work_volume):
         helper_cleanup.schedule(handoff_context(),name,issue_id)
 
 
-def lock_workspace(issue_id, scope, work_volume, editable_paths):
+def lock_workspace(issue_id, scope, work_volume, editable_paths, *, scope_selection=None):
     """Apply root-owned per-file permissions before any model prompt."""
     if not editable_paths or any(not path.startswith('/workspace/') for path in editable_paths):
         raise ValueError('workspace lockdown requires exact editable paths')
-    base = issue_base(issue_id)
+    base = scope_selection['base'] if scope_selection else issue_base(issue_id)
     import test_revision_review
-    revision=test_revision_review.seed_source(handoff_context(),issue_id)
+    revision=scope_selection['seed'] if scope_selection else test_revision_review.seed_source(handoff_context(),issue_id)
     repair={}
     if revision:
         selection=revision['selection']
@@ -448,7 +448,7 @@ def config(request_id, scenario):
         result['HostConfig']['Mounts'] = [{'Type': 'volume', 'Source': volume, 'Target': '/session-state'}]
         if native_mode(request_id) == 'implementation':
             with db() as con:
-                bound = con.execute('SELECT issue_id FROM native_bindings WHERE request_id=?', (request_id,)).fetchone()
+                bound = con.execute('SELECT issue_id,task_id FROM native_bindings WHERE request_id=?', (request_id,)).fetchone()
             if not bound or not bound['issue_id']:
                 raise ValueError('implementation issue identity missing')
             work_volume = PREFIX + '-work-' + hashlib.sha256(scope.encode()).hexdigest()[:32]
@@ -458,7 +458,12 @@ def config(request_id, scenario):
                 docker('POST', '/volumes/create', {'Name': work_volume, 'Labels': labels})
             elif any(existing.get('Labels', {}).get(k) != v for k, v in labels.items()):
                 raise ValueError('implementation volume identity mismatch')
-            seed_workspace(bound['issue_id'], scope, work_volume)
+            try:import product_scope_worker
+            except ImportError:from broker import product_scope_worker
+            scope_selection=product_scope_worker.selection(handoff_context(),bound['issue_id'],bound['task_id'])
+            if scope_selection:
+                seed_workspace(bound['issue_id'],scope,work_volume,scope_selection=scope_selection)
+            else:seed_workspace(bound['issue_id'], scope, work_volume)
             result['HostConfig']['Mounts'].append(
                 {'Type': 'volume', 'Source': work_volume, 'Target': '/workspace'})
             try:import u3_controls_execution
@@ -1648,10 +1653,18 @@ def open_granted_transport(row,result,scope):
                                        (binding['issue_id'],)).fetchone() if binding else None
             editables = phase_editables(editables,
                 json.loads(route_row[0]) if route_row else None, phase, row['mode'])
+        scope_selection=None
+        if row['mode']=='implementation' and binding:
+            try:import product_scope_worker
+            except ImportError:from broker import product_scope_worker
+            scope_selection=product_scope_worker.selection(handoff_context(),binding['issue_id'],binding['task_id'])
+            if scope_selection:editables=scope_selection['editable_paths']
         if row['mode'] == 'implementation' and route_row:
-            lock_workspace(binding['issue_id'], binding['scope'],
+            args=(binding['issue_id'],binding['scope'],
                            PREFIX + '-work-' + hashlib.sha256(binding['scope'].encode()).hexdigest()[:32],
                            editables)
+            if scope_selection:lock_workspace(*args,scope_selection=scope_selection)
+            else:lock_workspace(*args)
         if row['mode'] == 'implementation' and not editables:
             editables = ['/workspace/calc.py', '/workspace/test_calc.py']
         suite_capability = None

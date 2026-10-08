@@ -92,6 +92,9 @@ def register(broker, route):
 
 
 def bind_contract(broker, task_id, issue_id):
+    try:import product_scope_task_binding
+    except ImportError:from broker import product_scope_task_binding
+    if product_scope_task_binding.lookup(broker,issue_id,task_id) is not None:return
     with broker.db() as con:
         row = con.execute('SELECT decision_task FROM contract_revisions WHERE issue_id=? ORDER BY at DESC LIMIT 1',
                           (issue_id,)).fetchone()
@@ -101,6 +104,11 @@ def bind_contract(broker, task_id, issue_id):
 
 def task_base(broker, issue_id, task_id):
     original = broker.issue_base(issue_id)
+    try:import product_scope_task_binding
+    except ImportError:from broker import product_scope_task_binding
+    selected=product_scope_task_binding.lookup(broker,issue_id,task_id)
+    if selected is not None:
+        return {**original,**{k:selected[k] for k in ('volume','manifest_sha256','base_sha')}}
     with broker.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='task_contracts'").fetchone():
             return original

@@ -746,8 +746,8 @@ class BrokerTests(unittest.TestCase):
         issue_id = str(uuid.uuid4())
         with tempfile.TemporaryDirectory() as directory, patch.object(broker, 'STATE', Path(directory)):
             with broker.db() as con:
-                con.execute('CREATE TABLE native_bindings(request_id TEXT,issue_id TEXT)')
-                con.execute('INSERT INTO native_bindings VALUES (?,?)', (request_id, issue_id))
+                con.execute('CREATE TABLE native_bindings(request_id TEXT,issue_id TEXT,task_id TEXT)')
+                con.execute('INSERT INTO native_bindings VALUES (?,?,?)', (request_id, issue_id, str(uuid.uuid4())))
             with patch.object(broker, 'native_scope', return_value='eval-scope'), \
              patch.object(broker, 'native_mode', return_value='implementation'), \
              patch.object(broker, 'MODEL_NETWORK', 'delivery-kit-eval_model'), \

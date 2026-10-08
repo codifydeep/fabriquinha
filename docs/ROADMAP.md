@@ -99,7 +99,11 @@ não aplica o contrato retroativamente nem emite ferramentas.
 nova tarefa nativa do autor: exige despacho persistido e decisões reautenticadas,
 recusa tarefas que já receberam grants ou contratos anteriores e não seleciona
 automaticamente a revisão mais recente para outras tarefas. O vínculo não
-desbloqueia o autor nem concede escrita. Ainda falta integrar essa seleção às
-permissões e à base efetivamente usadas pelo worker, preservar a proveniência
-do Red nessa transição e qualificar o ciclo real instalado.
+desbloqueia o autor nem concede escrita. `product_scope_worker.py` integra a
+seleção à base de seed, ao lockdown de arquivos e à lista de ferramentas ACP:
+somente código recebe escrita, e o Red original deve continuar com os mesmos
+hashes, comando, falha observada e revisão independente aprovada. O job de seed
+confere os bytes dos testes congelados sem recriar o Red; tarefas antigas
+continuam usando a base anterior. Ainda falta integrar o despacho automático
+do autor e qualificar a transição de evidências no Green e o ciclo real instalado.
 Aprovar o plano não equivale a conceder escrita ou homologar.
