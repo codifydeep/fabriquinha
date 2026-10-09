@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261009.117
+COPY forced_tool_feedback.py /forced_tool_feedback.py

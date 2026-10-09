@@ -71,18 +71,23 @@ def preflight(counter_path,scope):
 
 
 def claim(counter_path,scope,error,body,first_call):
-    if not counter_path or scope is None or getattr(error,'category',None)!='incomplete_forced_tool_response':return None
+    if not counter_path or scope is None:return None
     diagnostic=getattr(error,'diagnostic',{})
-    if (set(diagnostic)!={'schema','response_sha256','streaming','stream_complete','finish_reason','tool_calls','all_selected_tools'}
-            or diagnostic['schema']!='forced-tool-shape-v1' or diagnostic['stream_complete'] is not True
+    selected=metrics(body).get('artifact_selected_tool')
+    no_change=(selected=='patch' and getattr(error,'category',None)=='invalid_forced_argument'
+        and diagnostic==dict(schema='forced-argument-constraint-v1',field='new_string',constraint='no_change'))
+    parallel=(getattr(error,'category',None)=='incomplete_forced_tool_response'
+        and set(diagnostic)=={'schema','response_sha256','streaming','stream_complete','finish_reason','tool_calls','all_selected_tools'})
+    if not no_change and not parallel:return None
+    if parallel and (diagnostic['schema']!='forced-tool-shape-v1' or diagnostic['stream_complete'] is not True
             or type(diagnostic['streaming']) is not bool or diagnostic['finish_reason']!='tool_calls'
             or type(diagnostic['tool_calls']) is not int or not 2<=diagnostic['tool_calls']<=64
             or diagnostic['all_selected_tools'] is not True
             or not re.fullmatch(r'[a-f0-9]{64}',str(diagnostic['response_sha256']))):return None
     if type(first_call) is not int or first_call<1 or identity(body,scope['execution_id'])!=scope:
         raise ValueError('exact rejected forced tool request required')
-    selected=metrics(body)['artifact_selected_tool']
-    receipt=dict(operation='unforwarded_parallel_patch_feedback_v1' if selected=='patch'
+    receipt=dict(operation='unforwarded_no_change_patch_feedback_v1' if no_change else
+        'unforwarded_parallel_patch_feedback_v1' if selected=='patch'
         else 'unforwarded_parallel_read_feedback_v1',**scope,
         first_call=first_call,diagnostic=diagnostic,worker_tool_executed=False,response_forwarded=False,
         attempt_limit=1,delivery_approval=False)
@@ -94,6 +99,13 @@ def claim(counter_path,scope,error,body,first_call):
             first_call,None,json.dumps(receipt,sort_keys=True),'claimed'))
     revised=copy.deepcopy(body)
     instruction=(
+        'FORMAT CORRECTION: the prior patch had identical old_string and new_string; it was rejected and NONE '
+        'was forwarded or executed. Return exactly ONE meaningful patch for the currently pinned NEW test, '
+        'using the observed existing text and a distinct replacement justified by the approved task. '
+        'Do not invent a cosmetic change merely to satisfy inequality. Preserve all assertions, existing tests '
+        'and product code. If no justified change is possible, do not fabricate one. The original schema and '
+        'tool guards still apply. This shares the one format-correction allowance, not delivery approval.'
+        if no_change else
         'FORMAT CORRECTION: the prior response contained multiple read_file calls and NONE was forwarded or executed. '
         'Return exactly ONE read_file call for the currently pinned path, offset and limit in the original schema. '
         'Do not batch, duplicate calls, change the page, or propose writes. '

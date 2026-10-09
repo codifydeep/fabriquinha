@@ -833,6 +833,15 @@ proxy à execução fechada do CTO, exige suas leituras completas e verifica o s
 simples corrigido. Ela preserva o hold anterior e registra uma única retomada de
 decisão; não reaproveita respostas, reinicia o autor ou dispensa nenhum gate.
 
+O proxy dispõe de uma única correção persistente de formato por execução para
+chamadas forçadas elegíveis. Propostas paralelas ou um patch com textos antigo e
+novo idênticos são rejeitados antes de encaminhamento. O feedback não escolhe,
+executa ou inventa uma edição: o modelo deve propor uma nova chamada, sujeita aos
+mesmos schemas e fences. Ambos os casos compartilham o mesmo limite; a chamada
+adicional conta no teto do provedor. Uma segunda proposta inválida permanece
+bloqueada, inclusive após reinício. Isso não aprova testes nem rearma um worker
+que já falhou; a recuperação técnica continua exigindo evidências próprias.
+
 O provedor usado na instalação de referência é OpenRouter. A política compartilhada
 em `team-delivery-kit/model_policy.py` seleciona `anthropic/claude-haiku-5.5`.
 A migração do DeepSeek preserva recibos históricos e só admite a configuração

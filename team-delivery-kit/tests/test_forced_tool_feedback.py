@@ -26,6 +26,9 @@ def response(count=1):
         path='/workspace/tests/test_new.py',old_string='PRIVATE_OLD',new_string='PRIVATE_NEW'))))
     return json.dumps(dict(choices=[dict(index=0,finish_reason='tool_calls',message=dict(tool_calls=[call]*count))])).encode()
 
+def no_change_response():
+    return response().replace(b'PRIVATE_NEW',b'PRIVATE_OLD')
+
 class ForcedFeedbackTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
@@ -97,6 +100,55 @@ class ForcedFeedbackTests(unittest.TestCase):
         bad=response().replace(b'/workspace/tests/test_new.py',b'/workspace/app.py')
         h,forward=self.run_handler([(200,response(2),'application/json'),(200,bad,'application/json')])
         self.assertEqual(h.status,502);self.assertEqual(forward.call_count,2)
+
+    def test_no_change_is_rejected_then_only_new_valid_proposal_forwarded(self):
+        original=body();h,forward=self.run_handler([(200,no_change_response(),'application/json'),
+            (200,response(),'application/json')])
+        self.assertEqual(h.status,200);self.assertEqual(forward.call_count,2)
+        revised=forward.call_args_list[-1].args[0]
+        self.assertEqual(revised['tools'],original['tools']);self.assertEqual(body(),original)
+        self.assertIn('identical old_string',revised['messages'][-1]['content'])
+        validate(original,h.wfile.getvalue(),'application/json')
+        with feedback.ledger(str(self.counter)) as con:
+            receipt,stage=con.execute('SELECT receipt,stage FROM feedback').fetchone()
+        self.assertEqual(stage,'passed')
+        self.assertEqual(json.loads(receipt)['operation'],'unforwarded_no_change_patch_feedback_v1')
+        self.assertFalse(json.loads(receipt)['worker_tool_executed'])
+
+    def test_no_change_second_invalid_or_wrong_path_cannot_get_third_call(self):
+        for second in (no_change_response(),response(2),response().replace(
+                b'/workspace/tests/test_new.py',b'/workspace/app.py')):
+            with tempfile.TemporaryDirectory() as folder:
+                self.counter=Path(folder)/'calls.json';self.counter.write_text('{"calls":0}')
+                h,forward=self.run_handler([(200,no_change_response(),'application/json'),
+                    (200,second,'application/json')])
+                self.assertEqual(h.status,502);self.assertEqual(forward.call_count,2)
+                with self.assertRaises(ValueError):feedback.preflight(str(self.counter),self.scope)
+
+    def test_no_change_feedback_shares_parallel_budget_and_requires_exact_diagnostic(self):
+        with self.assertRaises(ArtifactResponseRejected) as raised:
+            validate(body(),no_change_response(),'application/json')
+        error=raised.exception
+        altered=copy.copy(error);altered.diagnostic=dict(error.diagnostic,extra=True)
+        self.assertIsNone(feedback.claim(str(self.counter),self.scope,altered,body(),1))
+        self.assertIsNotNone(feedback.claim(str(self.counter),self.scope,error,body(),1))
+        self.assertIsNone(feedback.claim(str(self.counter),self.scope,self.rejected(),body(),2))
+        with self.assertRaises(ValueError):feedback.preflight(str(self.counter),self.scope)
+
+    def test_no_change_retry_obeys_global_call_cap(self):
+        reserve=proxy.reserve_call
+        with patch.object(proxy,'MAX_CALLS',1),patch.object(proxy,'CALLS',0),patch.object(proxy,'PROVIDER_PAUSE',None):
+            h,forward=self.run_handler([(200,no_change_response(),'application/json')],reserve_effect=reserve)
+        self.assertEqual(h.status,400);self.assertEqual(forward.call_count,1)
+        self.assertEqual(json.loads(self.counter.read_text())['calls'],1)
+        with self.assertRaises(ValueError):feedback.preflight(str(self.counter),self.scope)
+
+    def test_parallel_claim_cannot_rearm_as_no_change_after_restart(self):
+        feedback.claim(str(self.counter),self.scope,self.rejected(),body(),1)
+        with self.assertRaises(ArtifactResponseRejected) as raised:
+            validate(body(),no_change_response(),'application/json')
+        self.assertIsNone(feedback.claim(str(self.counter),self.scope,raised.exception,body(),2))
+        with self.assertRaises(ValueError):feedback.preflight(str(self.counter),self.scope)
 
 
 class ForcedReadFeedbackTests(unittest.TestCase):
