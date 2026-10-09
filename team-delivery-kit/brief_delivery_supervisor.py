@@ -124,6 +124,11 @@ def main():
         verify_registration(config, PRIVATE)
     if PROJECT != 'delivery-kit-port2' or BACKEND_PORT != '19081' or verify():
         raise ValueError('isolated healthy port2 control plane required')
+    from controller_dispatch_admission import maintenance_active
+    if maintenance_active(PROJECT):
+        print(json.dumps(dict(name=config['name'],stage='maintenance_deferred',
+            owner='devops',product_delivery_changed=False)))
+        return 0
     directory = PRIVATE / 'brief-delivery'
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / (config['name'] + '.json')

@@ -52,6 +52,7 @@ class PortableSupervisorTests(unittest.TestCase):
             with (folder/(LABEL+'.lock')).open('a+') as holder:
                 fcntl.flock(holder.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
                 with patch.object(portable_supervisor,'PRIVATE',root), \
+                        patch.object(portable_supervisor,'maintenance_active',return_value=False), \
                         patch.object(portable_supervisor,'verify_instance',return_value=[]), \
                         patch.object(portable_supervisor,'from_environment',return_value={}), \
                         patch.object(portable_supervisor,'load_run_spec',return_value={'label':LABEL}), \
@@ -109,6 +110,14 @@ class PortableSupervisorTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'instance ports'):
                 portable_supervisor.main()
         contract.assert_not_called()
+
+    def test_maintenance_defers_before_contract_or_worker(self):
+        with patch.object(portable_supervisor,'verify_instance',return_value=[]), \
+                patch.object(portable_supervisor,'maintenance_active',return_value=True), \
+                patch.object(portable_supervisor,'from_environment') as contract, \
+                patch.object(portable_supervisor,'run_delivery') as run:
+            self.assertEqual(portable_supervisor.main(),0)
+        contract.assert_not_called();run.assert_not_called()
 
     def test_waits_for_budget_then_resumes_once(self):
         with tempfile.TemporaryDirectory() as directory:

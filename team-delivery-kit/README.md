@@ -65,6 +65,11 @@ O limite atual continua sendo uma revisão adicional no segundo nível. Falhas
 além desse limite exigem outra estratégia de diagnóstico, ainda não uma
 retentativa idêntica ilimitada.
 
+Os supervisores de brief e de entrega adiam seu início enquanto o controlador
+está em manutenção. Essa consulta é um preflight conservador, não uma reserva
+distribuída de despacho: uma manutenção iniciada após a consulta ainda precisa
+ser cercada pelo broker. Uma recusa nessa janela não é falha funcional do autor.
+
 ## Convenções
 
 `broker/` concentra isolamento, autorização, handoffs e recuperação.

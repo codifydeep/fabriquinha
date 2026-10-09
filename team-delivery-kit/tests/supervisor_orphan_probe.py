@@ -54,6 +54,7 @@ def child(role, folder):
         return subprocess.run([sys.executable,str(Path(__file__).resolve()),
             '--role','controller','--folder',str(folder)],check=False).returncode
     with patch.object(supervisor,'verify_instance',return_value=[]), \
+            patch.object(supervisor,'maintenance_active',return_value=False), \
             patch.object(supervisor,'from_environment',return_value={'fixture':True}), \
             patch.object(supervisor,'load_run_spec',return_value={'label':LABEL}), \
             patch.object(supervisor,'run_delivery',side_effect=run), \

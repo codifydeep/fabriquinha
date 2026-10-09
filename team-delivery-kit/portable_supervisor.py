@@ -18,6 +18,7 @@ from portable_contract import from_environment
 from portable_run_spec import load as load_run_spec
 from release_eval import save_receipt
 from start_eval import check_model_budget
+from controller_dispatch_admission import maintenance_active
 
 
 ROOT = Path(__file__).resolve().parent
@@ -291,6 +292,10 @@ def main():
     # backend can authenticate against the wrong Multica and yield HTTP 401.
     if verify_instance():
         raise ValueError('supervisor instance ports or control plane do not match')
+    from evalctl import PROJECT
+    if maintenance_active(PROJECT):
+        print(json.dumps(dict(stage='maintenance_deferred',owner='devops',product_delivery_changed=False)))
+        return 0
     contract = from_environment()
     spec = load_run_spec(contract)
     if not spec:
