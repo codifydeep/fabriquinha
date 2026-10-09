@@ -15,6 +15,20 @@ def module(name):
 
 
 class IssueBaseTests(unittest.TestCase):
+    def test_seed_preserves_large_hash_bound_product_file(self):
+        seed=module('seed_workspace')
+        with tempfile.TemporaryDirectory() as base,tempfile.TemporaryDirectory() as work:
+            base,work=Path(base),Path(work);files={}
+            for name in seed.FILES:
+                content=(b'# product\n'+b' ' * 40000) if name=='calc.py' else name.encode()
+                (base/name).write_bytes(content);files[name]=hashlib.sha256(content).hexdigest()
+            manifest=json.dumps({'base_sha':'a'*40,'files':files}).encode()
+            (base/'manifest.json').write_bytes(manifest)
+            with patch.object(seed,'BASE',base),patch.object(seed,'WORK',work),patch.dict(
+                    'os.environ',{'BASE_MANIFEST_SHA256':hashlib.sha256(manifest).hexdigest()}):
+                seed.main()
+            self.assertEqual((work/'calc.py').read_bytes(),(base/'calc.py').read_bytes())
+
     def test_base_copy_recovers_partial_copy_without_overwrite(self):
         copy = module('base_copy')
         with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as target:

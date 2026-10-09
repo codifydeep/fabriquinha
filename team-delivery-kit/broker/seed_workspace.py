@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from portable_contract import validate, safe_path
+from portable_contract import validate, safe_path, MAX_FILE_BYTES
 
 BASE = Path('/base')
 WORK = Path('/workspace')
@@ -78,7 +78,7 @@ def main():
         if source.is_symlink() or not source.is_file():
             raise ValueError('invalid base file')
         content = source.read_bytes()
-        if len(content) > 32768 or hashlib.sha256(content).hexdigest() != manifest['files'][name]:
+        if len(content) > MAX_FILE_BYTES or hashlib.sha256(content).hexdigest() != manifest['files'][name]:
             raise ValueError('base hash mismatch')
     revised = revision_contents(contract, names)
     marker = WORK / '.delivery-kit-base.json'

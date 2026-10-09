@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from portable_contract import validate, required_files
+from portable_contract import validate, required_files, MAX_FILE_BYTES
 
 SOURCE = Path('/workspace')
 DESTINATION = Path('/snapshot')
@@ -36,7 +36,7 @@ def main():
             continue
         parents = list(source.parents)[:len(Path(name).parts) - 1]
         if (source.is_symlink() or any(parent.is_symlink() for parent in parents)
-                or not source.is_file() or source.stat().st_size > 32768):
+                or not source.is_file() or source.stat().st_size > MAX_FILE_BYTES):
             raise ValueError('invalid source artifact')
         content = source.read_bytes()
         manifest[name] = {'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content)}

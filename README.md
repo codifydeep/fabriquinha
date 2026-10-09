@@ -12,6 +12,13 @@ contagem; o próximo ciclo real ainda precisa passar por todos os gates.
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+O limite de novos testes continua em 32 KiB, aplicado também na captura de Red.
+Arquivos de código do produto, cópia da base, snapshots e preservação após reinício
+usam o limite de artefato do contrato (2 MiB). Isso evita que um código válido deixe
+de ser editável ao crescer além do tamanho reservado aos testes. A escrita continua
+restrita a arquivos precriados, pertencentes ao controlador e graváveis na fase atual;
+essa capacidade não amplia caminhos autorizados nem altera aprovação ou revisão.
+
 Uma recuperação de falha funcional detectada no navegador percorreu diagnóstico
 do Tech Lead, novo card TDD, revisão independente, PR/CI e QA no mesmo commit,
 sem edição manual do produto durante essa recuperação. O controlador preservou

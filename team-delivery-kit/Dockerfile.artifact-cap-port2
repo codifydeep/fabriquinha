@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261009.407
+COPY broker/fenced_file_write.py /fenced_file_write.py
+COPY broker/seed_workspace.py /seed_workspace.py
+COPY broker/snapshot_copy.py /snapshot_copy.py
+COPY broker/host_restart_snapshot.py /host_restart_snapshot.py

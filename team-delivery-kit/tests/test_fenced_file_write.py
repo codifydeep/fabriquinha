@@ -9,6 +9,35 @@ from broker.fenced_file_write import write_fenced
 
 
 class FencedFileWriteTests(unittest.TestCase):
+    def test_large_product_patch_matches_portable_artifact_limit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'app.js';target.write_bytes(b'old')
+            content=b'// implementation\n'+b' ' * 40000
+            with patch('broker.fenced_file_write.os.fstat',return_value=SimpleNamespace(
+                    st_mode=stat.S_IFREG|0o666,st_uid=0,st_nlink=1)):
+                write_fenced(target,content,root)
+            self.assertEqual(target.read_bytes(),content)
+
+    def test_large_javascript_test_still_rejected_without_write(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'client.test.js';target.write_bytes(b'old')
+            with self.assertRaisesRegex(ValueError,'size exceeds 32768'):
+                write_fenced(target,b' ' * 40000,root)
+            self.assertEqual(target.read_bytes(),b'old')
+
+    def test_product_cap_does_not_bypass_permissions_or_allow_unbounded_bytes(self):
+        from portable_contract import MAX_FILE_BYTES
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve();target=root/'app.js';target.write_bytes(b'old')
+            with self.assertRaisesRegex(ValueError,'size exceeds '+str(MAX_FILE_BYTES)):
+                write_fenced(target,b'x'*(MAX_FILE_BYTES+1),root)
+            with patch('broker.fenced_file_write.os.fstat',return_value=SimpleNamespace(
+                    st_mode=stat.S_IFREG|0o444,st_uid=0,st_nlink=1)):
+                with self.assertRaisesRegex(ValueError,'controller-owned writable'):
+                    write_fenced(target,b' '*40000,root)
+            self.assertEqual(target.read_bytes(),b'old')
+
+
     def test_invalid_python_quote_patch_preserves_last_good_bytes_before_open(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder).resolve();target=root/'test_new.py'

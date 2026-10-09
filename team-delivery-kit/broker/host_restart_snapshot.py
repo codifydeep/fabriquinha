@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from portable_contract import validate
+from portable_contract import validate, MAX_FILE_BYTES
 
 
 def preserve(base, workspace, snapshot):
@@ -20,7 +20,7 @@ def preserve(base, workspace, snapshot):
         source = workspace / name
         if source.is_symlink() or any(p.is_symlink() for p in list(source.parents)[:len(Path(name).parts)-1]):
             raise ValueError('restart workspace symlink')
-        if source.stat().st_size > 32768:
+        if source.stat().st_size > MAX_FILE_BYTES:
             raise ValueError('restart artifact too large')
         raw = source.read_bytes()
         sha = hashlib.sha256(raw).hexdigest()

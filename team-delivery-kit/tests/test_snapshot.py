@@ -11,6 +11,19 @@ spec.loader.exec_module(snapshot_copy)
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_large_product_snapshot_is_preserved_with_exact_hash(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            source,target=Path(directory)/'source',Path(directory)/'target'
+            source.mkdir();target.mkdir()
+            for name in snapshot_copy.FILES:(source/name).write_text(name)
+            content=b'# product\n'+b' ' * 40000;(source/'calc.py').write_bytes(content)
+            with patch.object(snapshot_copy,'SOURCE',source),patch.object(snapshot_copy,'DESTINATION',target):
+                snapshot_copy.main()
+            self.assertEqual((target/'calc.py').read_bytes(),content)
+            self.assertEqual(json.loads((target/'manifest.json').read_text())['files']['calc.py'],
+                {'bytes':len(content),'sha256':hashlib.sha256(content).hexdigest()})
+
     def test_copies_exact_files_with_hash_manifest(self):
         with tempfile.TemporaryDirectory() as directory:
             source, target = Path(directory) / 'source', Path(directory) / 'target'
