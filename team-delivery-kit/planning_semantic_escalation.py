@@ -103,7 +103,53 @@ def pending(state,selection,registry,cli,project_config=None):
             or state.get('base_sha')!=selection['base_sha']): return False
     if (state.get('stage')=='planning_technical_diagnosis'
             and state.get('semantic_escalation',{}).get('stage')=='diagnosing'): return True
+    if context_recovery(state,selection,registry,cli) is not None: return True
     return observe(state,selection,registry,cli,project_config) is not None
+
+
+def context_recovery(state,selection,registry,cli):
+    """One pre-dispatch transport repair; no model re-execution or invented evidence."""
+    record=(state or {}).get('semantic_escalation') or {}
+    if (not state or state.get('stage')!='blocked' or record.get('stage')!='blocked'
+            or record.get('error')!='ValueError:planning context exceeds issue limit'
+            or record.get('context_recovery') or not record.get('diagnosis')
+            or state.get('configuration_sha256')!=selection['configuration_sha256']
+            or state.get('base_sha')!=selection['base_sha']): return None
+    previous=record['previous_blocker'];diagnosis=record['diagnosis']
+    if (diagnosis.get('delivery_approval') is not False
+            or state['issues'].get('techlead')!=previous['issues']['techlead']): return None
+    title=state['name']+'-S1 — techlead'
+    if any(i['title'].startswith(title) for i in cli('list')['issues']): return None
+    runs=cli('runs',record['diagnosis_issue_id'])
+    if (len(runs)!=1 or runs[0].get('status')!='completed'
+            or runs[0].get('id')!=diagnosis['task_id']
+            or runs[0].get('agent_id')!=registry['agents']['cto']): return None
+    from planning_intake import completed_output,parse_proposal
+    task,answer=completed_output(record['diagnosis_issue_id'],registry['agents']['cto'])
+    if (task!=diagnosis['task_id'] or hashlib.sha256(answer.encode()).hexdigest()!=diagnosis['content_sha256']
+            or parse_proposal(answer,'cto')!=diagnosis['proposal']): return None
+    value=copy.deepcopy(previous);restored=copy.deepcopy(record)
+    restored.update(stage='awaiting_replan',context_recovery=dict(previous_failure=copy.deepcopy(state),
+        pre_dispatch=True,diagnosis_reexecuted=False,delivery_approval=False))
+    value.update(semantic_escalation=restored,stage='technical_replanning_techlead',active='techlead',owner='techlead')
+    value.pop('category',None)
+    return value
+
+
+def replan_prompt(state,body,capabilities):
+    record=state['semantic_escalation'];diagnosis=record['diagnosis']
+    if (record['stage']!='awaiting_replan' or diagnosis.get('delivery_approval') is not False
+            or state['outputs']!=record['previous_blocker']['outputs']):
+        raise ValueError('independent CTO diagnosis and unchanged accepted inputs required')
+    prompt=('DELIVERY_PLANNING_SCHEMA_V1:techlead\nNEW JSON plan only: '
+        'role,cards,integration_order. Every card has id,title,owner,depends_on,acceptance,files,test_command. '
+        'No tools, claims of executed work or approval.\n'+body)
+    for role in ('product','cto'):
+        prompt+='\nVerified '+role+' proposal: '+json.dumps(state['outputs'][role]['proposal'],ensure_ascii=False,separators=(',',':'))
+    guidance={key:diagnosis['proposal'][key] for key in ('technical_decisions','risks')}
+    return (prompt+'\nCTO diagnostic decisions/risks; full record preserved: '+
+        json.dumps(guidance,ensure_ascii=False,separators=(',',':'))+
+        '\nRejected constraint: '+record['proof']['constraint']+capabilities)
 
 
 def diagnosis_prompt(state,body,capabilities):

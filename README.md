@@ -12,6 +12,11 @@ inalterado. Ele não inventa testes, responde pelo CEO ou concede aprovação.
 O diagnóstico tem uma tentativa; uma nova falha permanece visível com o CTO.
 Um prazo de observação expirado retoma a mesma issue, sem reiniciar o agente.
 Essa recuperação ainda precisa de qualificação ponta a ponta por agentes reais.
+O replanejamento preserva integralmente o brief e as propostas aceitas de Produto
+e CTO; apresenta as decisões e riscos do diagnóstico adicional, cujo registro
+completo permanece preservado. Uma falha de tamanho anterior ao despacho admite
+uma recuperação de transporte após conferir a execução e o hash do diagnóstico
+e a ausência da nova issue. Não reexecuta o CTO nem converte o ensaio em autônomo.
 
 Correções de planos rejeitados usam referências a registros completos do controlador,
 vinculadas ao card, CTO, wakeup ativo e hash da revisão. O gateway expande esses

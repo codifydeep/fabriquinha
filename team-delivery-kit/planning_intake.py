@@ -203,24 +203,32 @@ def validate_execution_plan(proposal, tracked):
     return proposal
 
 
-def capability_context(selection):
+def capability_context(selection, *, compact=False):
     if not selection['configuration_sha256']:
         return ''
     tracked = tracked_base(selection)
     code = [p for p in tracked if not p.startswith('tests/') and not p.startswith('test_')]
     scope = ''
+    scope_data = {}
     profile = os.environ.get('DELIVERY_KIT_BRIEF_DELIVERY_CONFIG')
     if profile:
         from planned_delivery import load_configuration
         qualified = load_configuration(profile)
         if qualified['selection']['configuration_sha256'] != selection['configuration_sha256']:
             raise ValueError('brief capability planning identity drift')
-        scope = (' Preapproved product code scopes by card: ' + json.dumps({
+        scope_data = {
             'C' + str(index + 1): [p for p in stage['contract']['editable_files']
                                   if p.startswith('app/')]
-            for index, stage in enumerate(qualified['stages'])}) + '. '
+            for index, stage in enumerate(qualified['stages'])}
+        scope = (' Preapproved product code scopes by card: ' + json.dumps(scope_data) + '. '
             'Use exactly one NEW discoverable unittest file per card. '
             'Keep the current Python stdlib server and vanilla client; no new stack. ')
+    if compact:
+        return ('\nCONTROLLER CONTRACT: C1 backend_data; C2 frontend depends on C1. '
+                'No additional cards. Runner exactly '
+                '["python3","-m","unittest","discover","-s",".","-q"]. '
+                'Keep Python stdlib/vanilla. No existing-test edits. Each files array includes '
+                'one NEW unique tests/test_<name>.py plus product paths within: '+json.dumps(scope_data,separators=(',',':')))
     return ('\n\nCONTROLLER-VERIFIED CAPABILITIES: This qualification supports exactly '
             'two implementation cards, C1 backend_data then C2 frontend depending on C1. '
             'CI/deployment/QA are controller gates, not extra implementation cards. '
@@ -422,7 +430,11 @@ def main():
         if recovered:
             existing=recovered
             save_receipt(ledger_path,existing)
-    from planning_semantic_escalation import observe as observe_semantic,advance as diagnose_semantic
+    from planning_semantic_escalation import observe as observe_semantic,advance as diagnose_semantic,context_recovery,replan_prompt
+    resumed_context=context_recovery(existing,selection,registry,cli)
+    if resumed_context is not None:
+        existing=resumed_context
+        save_receipt(ledger_path,existing)
     escalation=observe_semantic(existing,selection,registry,cli)
     if escalation is not None:
         existing=escalation
@@ -433,6 +445,9 @@ def main():
         if existing.get('stage')=='planning_technical_diagnosis':
             print(json.dumps({'stage':existing['stage'],'owner':'cto','observation':'pending'}))
             return 1
+    if existing and existing.get('stage')=='blocked' and existing.get('semantic_escalation'):
+        print(json.dumps({'stage':'blocked','owner':'cto','category':existing.get('category')}))
+        return 1  # independent diagnosis must not enter generic role format retries
     if (existing and existing.get('stage') == 'blocked'
             and existing.get('active') in ROLES
             and existing.get('category', '').startswith(('JSONDecodeError:', 'ValueError:'))
@@ -625,14 +640,7 @@ def main():
         context += capabilities
         semantic=ledger.get('semantic_escalation') or {}
         if role=='techlead' and semantic.get('stage')=='awaiting_replan':
-            context += ('\nINDEPENDENT CTO DIAGNOSIS OF YOUR REJECTED PLAN: '+
-                json.dumps(semantic['diagnosis']['proposal'],separators=(',',':'))+
-                '\nActual rejected constraint: '+semantic['proof']['constraint']+
-                '. Return a NEW execution plan, not promises. Each card.files must include '
-                'its product path(s) AND exactly one uniquely named NEW discoverable '
-                'tests/test_<name>.py. Do not claim to have created those tests. '
-                'All unchanged compiler, frozen-test and TDD gates remain binding. '
-                'A repeated invalid plan remains a CTO incident, not a CEO question.')
+            context=replan_prompt(ledger,body,capability_context(selection,compact=True))
         answer = None
         try:
             issue_id = issue_for(role, context, registry['agents'][role],

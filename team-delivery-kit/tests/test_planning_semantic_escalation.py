@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from planning_semantic_escalation import qualify,advance,pending,diagnosis_prompt
+from planning_semantic_escalation import qualify,advance,pending,diagnosis_prompt,context_recovery,replan_prompt
 
 
 class PlanningSemanticEscalationTests(unittest.TestCase):
@@ -108,6 +108,36 @@ class PlanningSemanticEscalationTests(unittest.TestCase):
             self.assertEqual(result['semantic_escalation']['stage'],'diagnosing')
             self.assertEqual(result['semantic_escalation']['diagnosis_issue_id'],'diagnosis-issue')
             self.assertTrue(pending(result,{'configuration_sha256':'a'*64,'base_sha':'b'*40},{},None))
+
+    def test_pre_dispatch_context_recovery_requires_exact_native_diagnosis_and_no_lead_issue(self):
+        import hashlib
+        state,runs,bindings,plans,tracked=self.fixture();state['name']='TRIAL-1'
+        ready=qualify(state,runs,bindings,plans,tracked,'lead')
+        proposal=dict(role='cto',stack='Python',components=['stdlib API'],security=['No secrets'],technical_decisions=['Declare new tests'],risks=[])
+        answer=json.dumps(proposal);record=ready['semantic_escalation']
+        record.update(stage='blocked',error='ValueError:planning context exceeds issue limit',
+            diagnosis_issue_id='diagnosis-issue',diagnosis=dict(task_id='diagnosis-task',proposal=proposal,
+            content_sha256=hashlib.sha256(answer.encode()).hexdigest(),delivery_approval=False))
+        ready.update(stage='blocked',active='cto',outputs={'product':state['outputs']['product']})
+        selection=dict(configuration_sha256='a'*64,base_sha='b'*40)
+        def cli(action,*args):
+            return {'issues':[]} if action=='list' else [dict(id='diagnosis-task',status='completed',agent_id='cto')]
+        with patch('planning_intake.completed_output',return_value=('diagnosis-task',answer)):
+            result=context_recovery(ready,selection,{'agents':{'cto':'cto'}},cli)
+            self.assertEqual(result['outputs'],state['outputs'])
+            self.assertEqual(result['semantic_escalation']['context_recovery']['previous_failure'],ready)
+            self.assertFalse(result['semantic_escalation']['context_recovery']['diagnosis_reexecuted'])
+            prompt=replan_prompt(result,'COMPLETE ORIGINAL BRIEF','SCOPES')
+            self.assertIn('COMPLETE ORIGINAL BRIEF',prompt)
+            for role in ('product','cto'):
+                self.assertIn(json.dumps(state['outputs'][role]['proposal'],ensure_ascii=False,separators=(',',':')),prompt)
+            self.assertIn('Declare new tests',prompt)
+            self.assertIsNone(context_recovery(result,selection,{'agents':{'cto':'cto'}},cli))
+            def existing(action,*args):
+                return {'issues':[{'title':'TRIAL-1-S1 — techlead-retry1'}]} if action=='list' else cli(action,*args)
+            self.assertIsNone(context_recovery(ready,selection,{'agents':{'cto':'cto'}},existing))
+        with patch('planning_intake.completed_output',return_value=('diagnosis-task','different')):
+            self.assertIsNone(context_recovery(ready,selection,{'agents':{'cto':'cto'}},cli))
 
     def test_changed_proof_or_preserved_proposal_cannot_dispatch_diagnosis(self):
         state,runs,bindings,plans,tracked=self.fixture();ready=qualify(state,runs,bindings,plans,tracked,'lead')
