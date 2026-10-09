@@ -250,9 +250,17 @@ def resume_once(private, incident, parent_contract, parent_spec, project,
     if (metadata.get('qa_incident_key') != incident['key']
             or metadata.get('qa_source_sha') != incident['source_sha']):
         raise ValueError('QA diagnosis metadata drift')
-    runs = [run for run in cli('runs', child['id'])
-        if run.get('agent_id') == selected_agent_id
-            and run.get('status') == 'completed']
+    observed = cli('runs', child['id'])
+    if any(run.get('agent_id') != selected_agent_id for run in observed):
+        raise ValueError('QA diagnosis has foreign agent execution')
+    failed = [run for run in observed if run.get('status') == 'failed']
+    if failed:
+        if len(observed) != 1 or not failed[0].get('id'):
+            raise ValueError('QA failed diagnosis execution identity drift')
+        # A terminal execution is not a live wait. The caller owns one bounded
+        # diagnostic retry, then CTO escalation, never a product-author respawn.
+        raise DiagnosisRejected('QA diagnostic execution failed', task_id=failed[0]['id'])
+    runs = [run for run in observed if run.get('status') == 'completed']
     if not runs:
         return {'stage': 'waiting_techlead_diagnosis', 'incident_key': incident['key']}
     if len(runs) != 1:

@@ -181,6 +181,25 @@ class RepairTests(unittest.TestCase):
                             output_reader=lambda *_: ('task-1', json.dumps(bad)))
         self.assertEqual(rejected.exception.task_id, 'task-1')
 
+    def test_failed_diagnostic_is_not_waited_on_or_used_as_product_repair(self):
+        def cli(command, *args):
+            if command == 'get':
+                return {'id': CHILD, 'parent_issue_id': PARENT,
+                        'assignee_id': TECHLEAD, 'status': 'todo'}
+            if command == 'metadata':
+                return {'qa_incident_key': INCIDENT['key'], 'qa_source_sha': SHA}
+            if command == 'runs':
+                return [{'id':'failed-task','agent_id':TECHLEAD,'status':'failed'}]
+            self.fail('must not dispatch or change cards')
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(DiagnosisRejected) as rejected:
+                resume_once(directory, INCIDENT, CONTRACT, SPEC,
+                    {'repository':CONTRACT['repository'],'checkout':directory},
+                    cli=cli,verified_sha=lambda:SHA,
+                    budget_check=lambda:self.fail('no product dispatch'),
+                    output_reader=lambda *_:self.fail('failed task has no diagnosis'))
+            self.assertEqual(rejected.exception.task_id,'failed-task')
+
     def test_restart_accepts_only_exact_successful_repair_as_main_advance(self):
         merged = 'b' * 40
         repair_issue_id = '55555555-5555-4555-8555-555555555555'
