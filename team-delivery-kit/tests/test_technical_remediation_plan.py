@@ -55,6 +55,55 @@ class TechnicalRemediationPlanTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_result(self.config,self.state,self.task,p,self.reads)
 
+    def test_semantic_feedback_preserves_rejection_and_stops_identical_proposal(self):
+        bad=copy.deepcopy(self.plan);bad['steps'][0]['criteria']=['A01']
+        fx=SimpleNamespace(task=lambda *args:self.task,result=lambda _:bad,reads=lambda _:self.reads)
+        corrected=advance(self.config,self.state,[self.task],fx,now=120)
+        self.assertEqual(corrected['stage'],'plan_dispatch')
+        self.assertEqual(corrected['plan_validation_rejections'][0]['proposal'],bad)
+        self.assertEqual(corrected['plan_validation_feedback']['required_criteria_in_every_step'],['A01','A02'])
+        self.assertFalse(corrected['execution_authorized'])
+        self.assertNotIn('wakeup_id',corrected)
+        self.assertIn('CONTROLLER VALIDATION FEEDBACK',instruction(self.config,corrected))
+        pending={**corrected,'stage':'awaiting_plan','wakeup_id':'wake-plan','dispatched_at':120}
+        repeated=advance(self.config,pending,[self.task],fx,now=140)
+        self.assertEqual(repeated['stage'],'blocked')
+        self.assertEqual(repeated['category'],'PlanSemanticCorrectionExhausted')
+        fx.result=lambda _:self.plan
+        valid=advance(self.config,pending,[self.task],fx,now=140)
+        self.assertEqual(valid['stage'],'review_dispatch')
+        self.assertFalse(valid['execution_authorized'])
+
+    def test_semantic_feedback_never_recovers_foreign_task_or_schema_authority(self):
+        bad=copy.deepcopy(self.plan);bad['steps'][0]['criteria']=['A01']
+        fx=SimpleNamespace(task=lambda *args:{**self.task,'agent_id':'other'},result=lambda _:bad,reads=lambda _:self.reads)
+        with self.assertRaises(ValueError):advance(self.config,self.state,[self.task],fx,now=120)
+        fx.task=lambda *args:self.task;bad['execution_authorized']=True
+        with self.assertRaises(ValidationError):advance(self.config,self.state,[self.task],fx,now=120)
+
+    def test_legacy_semantic_hold_reconciles_same_completed_plan_once(self):
+        import sqlite3,threading
+        from contextlib import contextmanager
+        from unittest.mock import patch
+        from broker import technical_remediation_plan as module
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close);con.row_factory=sqlite3.Row
+        module.initialize(con);con.executescript('CREATE TABLE leases(request_id,status);CREATE TABLE native_bindings(request_id,task_id,agent_id,issue_id);')
+        con.execute("INSERT INTO leases VALUES('req','closed')")
+        con.execute("INSERT INTO native_bindings VALUES('req','plan-task','cto','plan-issue')")
+        held={**self.state,'stage':'blocked','category':'ValueError'}
+        con.execute('INSERT INTO technical_remediation_plans VALUES(?,?,?)',('source',json.dumps(self.config),json.dumps(held)))
+        @contextmanager
+        def db():yield con
+        b=SimpleNamespace(db=db,LOCK=threading.RLock())
+        bad=copy.deepcopy(self.plan);bad['steps'][0]['criteria']=['A01']
+        fx=SimpleNamespace(settings={},task=lambda *a:self.task,result=lambda _:bad,reads=lambda _:self.reads)
+        with patch.object(module,'Effects',return_value=fx),patch.object(module.native,'issue_task_runs',return_value=[self.task]):
+            result=module.reconcile_semantic_plan_failure(b,'source')
+            self.assertEqual(result['stage'],'plan_dispatch')
+            self.assertEqual(result['semantic_feedback_reconciliation']['previous'],held)
+            self.assertEqual(module.reconcile_semantic_plan_failure(b,'source'),result)
+        self.assertFalse(result['execution_authorized'])
+
     def test_incomplete_reads_or_other_task_cannot_create_contract(self):
         for field,value in [('agent_id','lead'),('wakeup_id','old'),('issue_id','other'),('status','failed')]:
             task={**self.task,field:value}

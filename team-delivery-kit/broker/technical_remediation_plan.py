@@ -251,7 +251,8 @@ def instruction(config,state):
             'Propose a fresh R1/R2/R3 plan; no recursive revision, depth reset or old approval reuse. '
             'R1 repairs the NEW tests only and requires fresh Red and independent review. '
             'R2 product-only follows approved exact tests; R3 requires full Green, independent review, '
-            'PR/CI/deploy/browser QA on the same SHA. Return compact schema JSON or retain_hold.\n'
+            'PR/CI/deploy/browser QA on the same SHA. Include ALL acceptance IDs in EACH step. '
+            'Return compact schema JSON or retain_hold.\n'
             'CTO correction claim (assess immutable source, not unquestionable truth): '+json.dumps(config['diagnostic_decision']['reason'])+'\n'+
             'DELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
             ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria']))+
@@ -265,6 +266,8 @@ def instruction(config,state):
         if marker not in result:
             result+='\n'+marker+'\n'
         result+='\nProse limits: reason<=600 characters; each objective<=240 characters. Preserve all gates and criteria.\n'
+        if state.get('plan_validation_feedback'):
+            result+='\nCONTROLLER VALIDATION FEEDBACK: '+json.dumps(state['plan_validation_feedback'],separators=(',',':'))+'\n'
     prefix='DELIVERY_PLANNING_START '+('0'*64)+'\nSource: '+config['source_task']+'\n'
     if len(result)+len(prefix)>4000:raise ValueError('split remediation context before dispatch')
     return result
@@ -320,7 +323,10 @@ def advance(config,state,runs,fx,now=None):
                     'required_action':'CTO inspect exact native planning/wakeup state; no identical restart'}
         return state
     task=fx.task(tasks[0]['id'],state['owner'])
-    body=fx.result(task);accepted=validate_result(config,state,task,body,fx.reads(task))
+    body=fx.result(task);reads=fx.reads(task)
+    correction=semantic_plan_correction(config,state,task,body,reads)
+    if correction is not None:return correction
+    accepted=validate_result(config,state,task,body,reads)
     if not accepted:
         if state['stage']=='awaiting_review':
             revisions=state.get('plan_revisions',[])+[dict(plan=state['plan'],plan_sha256=state['plan_sha256'],
@@ -342,6 +348,36 @@ def advance(config,state,runs,fx,now=None):
                 'plan_task':task['id'],'plan_wakeup':state['wakeup_id'],'owner':config['reviewer']}
     return {**state,'stage':'plan_approved','review':body,'review_task':task['id'],
             'owner':config['reviewer'],'required_action':'provision_exact_reviewed_remediation_contract_without_resetting_ancestry'}
+
+
+def semantic_plan_correction(config,state,task,body,reads):
+    """Return exact incomplete proposals to CTO twice, never approve or edit them."""
+    if state['stage']!='awaiting_plan':return None
+    try:validate_result(config,state,task,body,reads)
+    except ValueError as error:
+        if str(error) not in ('complete recovery chain required',
+                'unchanged full acceptance coverage and strict recovery dependencies required'):raise
+    else:return None
+    # validate_result already proved native identity, complete reads and schema.
+    history=state.get('plan_validation_rejections',[])
+    fingerprint=digest(body)
+    repeated=any(x['proposal_sha256']==fingerprint for x in history)
+    entry=dict(task_id=task['id'],wakeup_id=state['wakeup_id'],proposal=body,
+        proposal_sha256=fingerprint,execution_authorized=False)
+    updated={**state,'plan_validation_rejections':history+[entry],'owner':config['cto']}
+    if repeated or len(history)>=2:
+        return {**updated,'stage':'blocked','category':'PlanSemanticCorrectionExhausted',
+            'required_action':'CTO diagnose repeated or exhausted incomplete proposal; no identical retry'}
+    feedback=dict(category='incomplete_recovery_chain',rejected_proposal_sha256=fingerprint,
+        required_step_ids=['R1','R2','R3'],required_dependencies=[[],['R1'],['R2']],
+        required_scopes=['new_tests_only','product_only','controller_only'],
+        required_criteria_in_every_step=sorted(config['criteria']),attempt=len(history)+1,attempt_limit=2,
+        execution_authorized=False)
+    updated.update(stage='plan_dispatch',plan_validation_feedback=feedback,
+        review_protocol='typed-remediation-semantic-correction-'+digest(feedback),
+        required_action='CTO correct exact incomplete proposal; independent review still required')
+    for field in ('wakeup_id','dispatched_at','category'):updated.pop(field,None)
+    return updated
 
 
 class Effects:
@@ -447,6 +483,39 @@ def reconcile_review_changes(b,source):
         with b.db() as con:
             if json.loads(con.execute('SELECT state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()[0])!=s:
                 raise ValueError('review rejection changed')
+            con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
+        return new
+
+
+def reconcile_semantic_plan_failure(b,source):
+    """Consume the same legacy incomplete plan under the new bounded feedback.
+
+    No synthesized proposal, review or evidence. Dispatch remains supervisor-owned.
+    """
+    with b.LOCK:
+        with b.db() as con:
+            c,s=map(json.loads,con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone())
+            if s.get('semantic_feedback_reconciliation'):return s
+            if (s.get('stage')!='blocked' or s.get('category')!='ValueError' or s.get('plan')
+                    or s.get('execution_authorized') is not False
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()):
+                raise ValueError('idle legacy incomplete plan hold required')
+        fx=Effects(b);runs=native.issue_task_runs(fx.settings,s['issue_id'])
+        matches=[t for t in runs if t.get('wakeup_id')==s['wakeup_id']]
+        if len(matches)!=1 or any(t['status'] in ('queued','dispatched','running') for t in runs):
+            raise ValueError('one completed legacy planning wakeup required')
+        task=fx.task(matches[0]['id'],c['cto'])
+        with b.db() as con:
+            bound=con.execute('SELECT n.request_id,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',
+                (task['id'],c['cto'],s['issue_id'])).fetchall()
+        if len(bound)!=1 or bound[0]['status']!='closed':raise ValueError('closed exact completed plan required')
+        new=semantic_plan_correction(c,{**s,'stage':'awaiting_plan'},task,fx.result(task),fx.reads(task))
+        if new is None or new['stage']!='plan_dispatch':raise ValueError('changed bounded semantic correction required')
+        new['semantic_feedback_reconciliation']=dict(previous=s,task_id=task['id'],model_calls=0,
+            execution_authorized=False,revision_depth_reset=False)
+        with b.db() as con:
+            if json.loads(con.execute('SELECT state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()[0])!=s:
+                raise ValueError('semantic plan hold changed')
             con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',(json.dumps(new,sort_keys=True),source))
         return new
 
