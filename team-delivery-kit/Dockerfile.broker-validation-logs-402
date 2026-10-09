@@ -1,0 +1,4 @@
+# Local base must resolve to c06f8998b634df31c9aabef2b11e9c394a501105190e4c6308cafeadde61b7dd.
+FROM delivery-kit-execution-broker:20261009.401
+COPY broker/validation_job.py /validation_job.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import validation_job"
