@@ -1,0 +1,4 @@
+# Local qualified base: fba58f6e23c1e3d994341e46f89a8ca7431ea23575d1f5c2cf637690674c332e.
+FROM delivery-kit-model-proxy:20261009.114
+COPY planning_schema.py /planning_schema.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import planning_schema"

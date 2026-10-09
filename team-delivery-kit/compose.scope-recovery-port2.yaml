@@ -5,4 +5,4 @@ services:
   execution-broker:
     image: sha256:0a0cbefc1f2ca08012ac8a0bed6cd8d7f81d4ce906b8e1f22bd83ff1705255a7
   model-proxy:
-    image: sha256:fba58f6e23c1e3d994341e46f89a8ca7431ea23575d1f5c2cf637690674c332e
+    image: sha256:21c907277ddd08f31e11555f5edc9dc44f1cf8565ae51a5f3a5f16d21ac868eb

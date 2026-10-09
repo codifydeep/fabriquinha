@@ -27,8 +27,11 @@ Tech Lead sobre seu hash exato. Rejeição é terminal; substituição exige nov
 revisão, mesma identidade de assunto e preservação da versão anterior. Retomar
 uma indicação não renova sua validade. O adaptador confere o modo de planejamento,
 o agente e o lease encerrado diretamente no controlador. O contrato estruturado
-de curadoria ainda precisa ser instalado no proxy e testado com um revisor real;
-nenhuma indicação foi promovida automaticamente.
+foi instalado no proxy isolado, sem alterar modelo, chave ou medição. O primeiro
+curador real teve a resposta rejeitada por limite de comprimento; a indicação
+permaneceu privada e bloqueada, sem retentativa idêntica. Recuperação limitada
+de formato e curadoria concluída ainda precisam de qualificação; nenhuma
+indicação foi promovida automaticamente.
 
 No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
 formal comprovada podem abrir um diagnóstico independente do CTO. O controlador

@@ -24,6 +24,12 @@ CTO_INSTRUCTIONS = (LEGACY_CTO_INSTRUCTIONS +
     'Do not alter files, weaken QA, expand scope or ask the CEO to decide a '
     'technical matter. A recommendation is not an executed fix.')
 
+MEMORY_REVIEW_EXCEPTION = (
+    ' Exception: when the issue description begins DELIVERY_PLANNING_SCHEMA_V1:memory_review, '
+    'independently curate the exact historical nomination, not an implementation plan. '
+    'Return only role=techlead, decision=approve or reject, entry_sha256 and reason. '
+    'Follow the issue schema. This decision grants no tools, merge or release approval.')
+
 ROLES = {
     'product': (
         'Clarify user behavior and acceptance for the supplied CEO brief. '
@@ -40,7 +46,7 @@ ROLES = {
         '"test_command":["node","--test"]}],"integration_order":["C1"]}. '
         'At most five cards; allowed owners are backend_data, frontend, devops, '
         'quality_security. Put TDD and regression in acceptance. Make dependencies '
-        'explicit. Do not claim cards were created or tests executed.'),
+        'explicit. Do not claim cards were created or tests executed.' + MEMORY_REVIEW_EXCEPTION),
     'quality_security': (
         'Independently review one controller-frozen pull-request diff and the '
         'controller-supplied CI/test receipts. Do not edit files, approve GitHub '
@@ -70,12 +76,14 @@ def main():
                     'visibility': 'workspace'}
         if matches:
             agent = matches[0]
-            if (role == 'cto' and agent.get('instructions') == LEGACY_CTO_INSTRUCTIONS
+            old_instructions = (LEGACY_CTO_INSTRUCTIONS if role=='cto' else
+                                ROLES['techlead'].removesuffix(MEMORY_REVIEW_EXCEPTION) if role=='techlead' else None)
+            if (old_instructions is not None and agent.get('instructions') == old_instructions
                     and all(agent.get(key) == value for key, value in expected.items()
                             if key != 'instructions')):
                 path = '/api/agents/' + agent['id'] + '/'
                 call = urllib.request.Request(
-                    API + path, data=json.dumps({'instructions': CTO_INSTRUCTIONS}).encode(),
+                    API + path, data=json.dumps({'instructions': instructions}).encode(),
                     headers={'Authorization': 'Bearer ' + owner,
                              'X-Workspace-ID': workspace,
                              'Content-Type': 'application/json'}, method='PUT')
