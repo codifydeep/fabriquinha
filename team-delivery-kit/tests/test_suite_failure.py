@@ -1,9 +1,49 @@
 import json
 import unittest
-from broker.suite_failure import evidence, FrozenSuiteFailure, failing_source_files, dependency_read_files
+from broker.suite_failure import evidence, FrozenSuiteFailure, failing_source_files, dependency_read_files, derived_numeric_diagnostic
 
 
 class SuiteFailureTests(unittest.TestCase):
+    def test_derived_diagnostic_preserves_historical_receipt_and_grants_no_authority(self):
+        output = ('AssertionError: 2 not greater than or equal to 3\n'
+                  'FAIL: test_poll (tests.New.test_poll)\nRan 386 tests\n')
+        old = evidence(1, output, 'task', 'volume')
+        old['numeric_assertion_details'] = []  # Actual legacy parser output.
+        before = json.dumps(old, sort_keys=True)
+        diagnostic = derived_numeric_diagnostic(old, output)
+        self.assertEqual(json.dumps(old, sort_keys=True), before)
+        self.assertEqual(diagnostic['output_sha256'], old['output_sha256'])
+        self.assertEqual(diagnostic['numeric_assertion_details'], [dict(observed=2, expected=3, comparison='>=')])
+        for key in ('historical_receipt_modified', 'test_defect_proven', 'test_edits_authorized', 'delivery_approval'):
+            self.assertIs(diagnostic[key], False)
+        with self.assertRaises(ValueError):
+            derived_numeric_diagnostic(old, output + 'changed')
+        for field, value in [('category', 'runner_failure_unclassified'), ('phase', 'red'), ('exit_code', 0)]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                derived_numeric_diagnostic({**old, field: value}, output)
+
+    def test_numeric_inequalities_preserve_operator_without_private_messages(self):
+        output = ('AssertionError: 2 not greater than or equal to 3\n'
+                  'AssertionError: -4 not less than -5\n'
+                  'AssertionError: 3 not greater than 4\n'
+                  'AssertionError: 7 not less than or equal to 6\n'
+                  'AssertionError: 2 not greater than or equal to 3 : private\n'
+                  'AssertionError: 1000000000 not greater than 2\n'
+                  'AssertionError: True not greater than 2\n'
+                  'FAIL: test_poll (tests.New.test_poll)\nRan 386 tests\n')
+        receipt = evidence(1, output, 'task', 'volume')
+        self.assertEqual(receipt['numeric_assertion_details'], [
+            dict(observed=2, expected=3, comparison='>='),
+            dict(observed=-4, expected=-5, comparison='<'),
+            dict(observed=3, expected=4, comparison='>'),
+            dict(observed=7, expected=6, comparison='<='),
+        ])
+        self.assertNotIn('private', json.dumps(receipt))
+
+    def test_numeric_inequality_witnesses_are_bounded(self):
+        output = 'AssertionError: 2 not greater than or equal to 3\n' * 100
+        self.assertEqual(len(evidence(1, output, 'task', 'volume')['numeric_assertion_details']), 16)
+
     def test_missing_attribute_preserves_identifiers_not_freeform_error_data(self):
         receipt = evidence(1, "AttributeError: module 'app.db' has no attribute 'get_item'\n"
             "AttributeError: module '../secrets' has no attribute 'token'\n"

@@ -40,6 +40,17 @@ def safe_assertion_details(output):
     """Expose numeric witnesses, never arbitrary assertion strings/user data."""
     details = []
     for line in output.splitlines():
+        inequality = re.fullmatch(
+            r'AssertionError: (-?\d{1,9}) not (greater than or equal to|less than or equal to|greater than|less than) (-?\d{1,9})', line)
+        if inequality:
+            left, operator, right = inequality.groups()
+            details.append(dict(observed=int(left), expected=int(right), comparison={
+                'greater than or equal to': '>=', 'less than or equal to': '<=',
+                'greater than': '>', 'less than': '<',
+            }[operator]))
+            if len(details) >= 16:
+                break
+            continue
         if not line.startswith('AssertionError: ') or ' != ' not in line:
             continue
         left, right = line.removeprefix('AssertionError: ').split(' != ', 1)
@@ -59,6 +70,27 @@ def safe_assertion_details(output):
         if len(details) >= 16:
             break
     return details
+
+
+def derived_numeric_diagnostic(receipt, output):
+    """New diagnostic over archived output; never rewrite a historical receipt.
+
+    A numeric mismatch does not establish whether the product or test is wrong.
+    Independent source inspection and the existing revision gates remain required.
+    """
+    if (not isinstance(receipt, dict) or not isinstance(output, str)
+            or receipt.get('category') != 'executed_test_failure'
+            or receipt.get('phase') != 'frozen_green'
+            or type(receipt.get('exit_code')) is not int or receipt['exit_code'] == 0
+            or not receipt.get('source_task') or not receipt.get('volume')
+            or receipt.get('output_sha256') != hashlib.sha256(output.encode()).hexdigest()):
+        raise ValueError('exact archived executed failure required')
+    return dict(operation='archived_numeric_failure_diagnostic_v1',
+        source_task=receipt['source_task'], volume=receipt['volume'],
+        output_sha256=receipt['output_sha256'],
+        numeric_assertion_details=safe_assertion_details(output),
+        historical_receipt_modified=False, test_defect_proven=False,
+        test_edits_authorized=False, delivery_approval=False)
 
 
 def evidence(exit_code, output, source_task, volume):

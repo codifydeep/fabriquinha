@@ -4,6 +4,22 @@ An exhausted recovery chain must produce a new technical work contract, not
 another identical retry, an unbounded recursive child, weakened tests, or a CEO
 architecture question. Planning is separate from permission to execute.
 
+## Numeric failure diagnostics
+
+`suite_failure.derived_numeric_diagnostic` can extract bounded integer comparison
+witnesses from an archived failed-suite output only when its SHA matches the
+original receipt. It creates a separate diagnostic: historical receipts and
+snapshots remain unchanged. Arbitrary strings, appended assertion messages,
+booleans, oversized integers and more than sixteen witnesses are excluded.
+
+A numeric mismatch is not proof that a test is defective. The diagnostic grants
+no test-edit or delivery authority. An independent source/chronology inspection
+must distinguish a product regression from a contradictory NEW expectation;
+neither extra product requests nor weaker tests may be used to conceal failure.
+The existing baseline protection, original revision depth, independent review,
+fresh Red, full Green and same-SHA delivery gates continue to apply. This parser
+does not generalize the fixture-specific exhausted-remediation executor.
+
 ## Implemented path
 
 1. The controller recognizes an exact source-bound diagnostic experiment,
