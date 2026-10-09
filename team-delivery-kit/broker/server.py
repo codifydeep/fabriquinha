@@ -500,6 +500,10 @@ def config(request_id, scenario):
             except ImportError:from broker import product_scope_review
             scope_paths=product_scope_review.read_contract(handoff_context(),request_id)
             if scope_paths:read_paths=sorted(set(read_paths or [])|set(scope_paths))
+            try:import delivery_code_inspection
+            except ImportError:from broker import delivery_code_inspection
+            ordinary_paths=delivery_code_inspection.read_contract(handoff_context(),request_id)
+            if ordinary_paths:read_paths=sorted(set(read_paths or [])|set(ordinary_paths))
             if read_paths:
                 image=docker('GET','/containers/'+PREFIX+'-execution-broker-1/json')['Image']
                 if not re.fullmatch(r'sha256:[0-9a-f]{64}',image):
@@ -1392,6 +1396,14 @@ def record_review(payload):
             try:from handoff_runtime import Effects
             except ImportError:from broker.handoff_runtime import Effects
             u3_delivery_review.require_complete_reads(Effects(handoff_context(),settings).read_evidence(task))
+        try:import delivery_code_inspection
+        except ImportError:from broker import delivery_code_inspection
+        ordinary_paths=delivery_code_inspection.read_contract(handoff_context(),row['request_id'])
+        if ordinary_paths:
+            try:import product_scope_execution
+            except ImportError:from broker import product_scope_execution
+            delivery_code_inspection.require_complete(ordinary_paths,
+                product_scope_execution.NativeEffects(handoff_context()).delivery_reads(task))
         con.execute('INSERT INTO reviews VALUES (?,?,?,?,?)',
                     (review_task_id, assignment['source_task_id'], row['agent_id'],
                      validation['manifest_sha256'], 'approved'))

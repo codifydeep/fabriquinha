@@ -216,3 +216,9 @@ Quando coexistem, o leitor exige o vínculo persistente de revalidação do mesm
 snapshot e qualifica novamente a inspeção, a independência e o TDD. Divergências
 permanecem bloqueadas. Um handoff aprovado com seleção ambígua não fica em espera
 infinita: gera impedimento técnico explícito, sem alterar as aprovações antigas.
+`delivery_code_inspection.py` estende a inspeção obrigatória às entregas comuns
+com TDD controlado. A lista vem das permissões persistentes do autor e dos testes
+congelados, com identidades de tarefa, papel e snapshot conferidas. O handler
+nega a suíte antes da leitura completa; o registro da aprovação reconfere os
+recibos duráveis. Escopos revisados continuam sujeitos ao gate dedicado. Rotas
+legadas não são convertidas retroativamente em entregas qualificadas.
