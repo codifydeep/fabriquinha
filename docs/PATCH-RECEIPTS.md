@@ -16,7 +16,9 @@ Malformed/non-patch responses retain the original formatter. Source drift or a
 second installation fails closed.
 
 This adapter is qualified against the currently pinned Hermes formatter in an
-offline, credential-free disposable container. It is not yet activated in the
-production worker image. Activation requires the maintenance barrier, verified
-backup, pinned image build and installed-code qualification. It does not repair
-or retrospectively approve a previous failed delivery.
+offline, credential-free disposable container and activated in the port2 worker
+image by `Dockerfile.patch-receipts-420`. Activation used the maintenance barrier,
+verified backup, pinned image build and installed-code qualification. Both the
+controller and Hermes import paths carry the same source. It does not repair or
+retrospectively approve a previous failed delivery; the unchanged trial remains
+blocked. New real worker execution must still validate the ACP receipt end to end.

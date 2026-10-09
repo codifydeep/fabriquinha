@@ -1,0 +1,5 @@
+# Verified local base: sha256:af1c8b7fa7d1224aff57fa91a9459a0644d66cdf7e752f57ddaab90ecaa7c224
+FROM delivery-kit-execution-broker:20261009.419
+COPY broker/patch_receipt_contract.py /patch_receipt_contract.py
+COPY broker/patch_receipt_contract.py /opt/hermes/patch_receipt_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python /patch_receipt_contract.py
