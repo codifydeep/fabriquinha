@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261009.409
+COPY broker/suite_diagnosis_repair.py /suite_diagnosis_repair.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import suite_diagnosis_repair"

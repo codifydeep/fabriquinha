@@ -158,6 +158,49 @@ class SuiteDiagnosisRepairTests(unittest.TestCase):
             challenge(self.broker, {**payload, 'decision_task': 'new-decision'})
         self.broker.validate_frozen_delivery.assert_not_called()
 
+    def failed_challenge_setup(self):
+        payload = self.challenge_setup()
+        failure = dict(self.failure,phase='failed_execution_diagnostic',diagnostic_only=True,volume='failed-frozen')
+        receipt = dict(request=self.payload,issue_id='issue',volume='failed-frozen',
+                       failure=failure,status='diagnostic_only_not_approved')
+        with self.db() as con:
+            con.execute('DELETE FROM snapshots')
+            con.execute('CREATE TABLE failed_execution_snapshots(task_id TEXT,volume TEXT,status TEXT)')
+            con.execute('CREATE TABLE failed_execution_diagnoses(source_task TEXT PRIMARY KEY,receipt TEXT)')
+            con.execute('INSERT INTO failed_execution_snapshots VALUES(?,?,?)',(self.source,'failed-frozen','complete'))
+            con.execute('INSERT INTO failed_execution_diagnoses VALUES(?,?)',(self.source,json.dumps(receipt)))
+            row=handoffs.load(con,self.source);data=json.loads(row['data'])
+            data.update(validation_failure=failure,failed_execution_diagnostic=receipt,source_status='failed')
+            handoffs.save(con,self.source,'issue','test_revision_required','cto',data,400)
+        return payload
+
+    def test_failed_work_can_challenge_only_as_preserved_non_delivery_diagnosis(self):
+        payload=self.failed_challenge_setup()
+        runs=[dict(id='cto-decision',status='completed',agent_id='cto'),
+              dict(id=self.source,status='failed',agent_id='author')]
+        with patch('broker.native.issue_task_runs',return_value=runs):
+            result=challenge(self.broker,payload)
+            self.assertEqual(challenge(self.broker,payload),result)
+        with self.db() as con:
+            data=json.loads(handoffs.load(con,self.source)['data'])
+            self.assertTrue(data['validation_failure']['diagnostic_only'])
+            self.assertNotIn('evidence',data)
+            self.assertEqual(con.execute('SELECT count(*) FROM snapshots').fetchone()[0],0)
+        self.broker.validate_frozen_delivery.assert_not_called()
+
+    def test_failed_diagnostic_receipt_drift_is_not_challenge_authority(self):
+        payload=self.failed_challenge_setup()
+        with self.db() as con:
+            con.execute("UPDATE failed_execution_snapshots SET volume='different'")
+        with self.assertRaises(ValueError):challenge(self.broker,payload)
+
+    def test_failed_challenge_requires_latest_failed_author_and_idle_native_tasks(self):
+        payload=self.failed_challenge_setup()
+        runs=[dict(id='cto-decision',status='completed',agent_id='cto'),
+              dict(id=self.source,status='completed',agent_id='author')]
+        with patch('broker.native.issue_task_runs',return_value=runs):
+            with self.assertRaises(ValueError):challenge(self.broker,payload)
+
     def test_challenge_rejects_drift_active_tasks_and_unbounded_notes(self):
         payload = self.challenge_setup()
         for field, value in [('failure_signature', 'b' * 64),

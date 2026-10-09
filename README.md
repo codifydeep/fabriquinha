@@ -957,6 +957,10 @@ chamadas. A recuperação administrativa do broker exige manutenção selada e
 execuções inativas; preserva o incidente, o trabalho parcial e os testes Red,
 e encaminha evidências executadas ao CTO. Não aprova entrega, reinicia o autor
 às cegas, altera limites financeiros ou concede ferramentas aos agentes.
+Uma contradição no diagnóstico pode gerar uma única releitura pelo CTO, inclusive
+de trabalho interrompido, somente quando o snapshot diagnóstico e seu resultado
+executado correspondem ao recibo durável. Isso não transforma o snapshot parcial
+em entrega aprovada nem concede permissão para enfraquecer testes.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.

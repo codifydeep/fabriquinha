@@ -45,9 +45,31 @@ def challenge(broker, payload):
         route = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
                                        (row['issue_id'],)).fetchone()[0])
         snapshot = con.execute('SELECT status FROM snapshots WHERE task_id=?', (source,)).fetchone()
-        if (latest[0] != source or not snapshot or snapshot['status'] != 'complete'
+        failed_only = False
+        if snapshot is None and data.get('failed_execution_diagnostic'):
+            # A failed-work snapshot is never promoted into a normal delivery.
+            # Require the exact controller-created executed diagnostic receipt,
+            # including its volume and immutable test result, before a reread.
+            failed_snapshot = con.execute('SELECT volume,status FROM failed_execution_snapshots WHERE task_id=?',(source,)).fetchone()
+            stored = con.execute('SELECT receipt FROM failed_execution_diagnoses WHERE source_task=?',(source,)).fetchone()
+            proof = json.loads(stored[0]) if stored else {}
+            failure = proof.get('failure',{})
+            failed_only = bool(failed_snapshot and failed_snapshot['status']=='complete'
+                and proof==data['failed_execution_diagnostic']
+                and proof.get('status')=='diagnostic_only_not_approved'
+                and proof.get('volume')==failed_snapshot['volume']
+                and proof.get('request')=={'source_task':source,'failure_signature':payload['failure_signature']}
+                and failure==data.get('validation_failure')
+                and failure.get('volume')==failed_snapshot['volume']
+                and failure.get('source_task')==source
+                and failure.get('category')=='executed_test_failure'
+                and failure.get('diagnostic_only') is True
+                and failure.get('phase')=='failed_execution_diagnostic'
+                and data.get('source_status')=='failed'
+                and not data.get('evidence') and not data.get('review'))
+        if (latest[0] != source or not ((snapshot and snapshot['status']=='complete') or failed_only)
                 or route['enabled'] or data.get('target') != route['cto']
-                or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','running')").fetchone()):
+                or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()):
             raise ValueError('challenge requires current immutable source and paused idle route')
         try:
             import native, handoffs
@@ -56,9 +78,14 @@ def challenge(broker, payload):
         settings = json.loads((broker.STATE / 'native.json').read_text())
         runs = native.issue_task_runs(settings, row['issue_id'])
         decision = next((r for r in runs if r['id'] == payload['decision_task']), None)
+        if failed_only:
+            authors=[r for r in runs if r.get('agent_id')==route['author']]
+            if (not authors or max(authors,key=lambda r:(r.get('created_at') or '',r['id']))['id']!=source
+                    or next(r for r in authors if r['id']==source).get('status')!='failed'):
+                raise ValueError('latest failed author required for diagnostic-only challenge')
         if (not decision or decision.get('status') != 'completed'
                 or decision.get('agent_id') != route['cto']
-                or any(r.get('status') in ('queued', 'running') for r in runs)):
+                or any(r.get('status') in ('queued', 'dispatched', 'running') for r in runs)):
             raise ValueError('completed CTO decision and idle native tasks required')
         receipt = {'request': payload, 'prior_decision': data['decision'],
                    'issue_id': row['issue_id'], 'at': time.time(),
