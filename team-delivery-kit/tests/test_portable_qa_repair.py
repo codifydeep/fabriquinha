@@ -1,4 +1,5 @@
 import copy
+import os
 import json
 from pathlib import Path
 import subprocess
@@ -29,6 +30,21 @@ DIAGNOSIS = {'decision': 'repair', 'root_cause': 'wrong JavaScript MIME type',
 
 
 class RepairTests(unittest.TestCase):
+    def test_new_repair_does_not_inherit_parent_dispatch_or_fault_identity(self):
+        from portable_qa_repair import repair_environment
+        inherited = {name:'parent-context' for name in (
+            'DELIVERY_KIT_EXISTING_ISSUE_ID','DELIVERY_KIT_EXPECTED_PLAN_SHA',
+            'DELIVERY_KIT_CONTROLLED_WORKER_LOSS','DELIVERY_KIT_TEST_REVISION_PARENT',
+            'DELIVERY_KIT_TEST_REVISION_DEPTH')}
+        with patch.dict(os.environ,{**inherited,'DELIVERY_KIT_COMPOSE_PROJECT':'delivery-kit-port2'}):
+            env = repair_environment('repair.contract.json','repair.run.json')
+            self.assertFalse(set(inherited)&set(env))
+            self.assertEqual(env['DELIVERY_KIT_DELIVERY_CONTRACT'],'repair.contract.json')
+            self.assertEqual(env['DELIVERY_KIT_RUN_SPEC'],'repair.run.json')
+            self.assertEqual(env['DELIVERY_KIT_TEST_FIRST'],'1')
+            self.assertEqual(env['DELIVERY_KIT_COMPOSE_PROJECT'],'delivery-kit-port2')
+            self.assertEqual(os.environ['DELIVERY_KIT_EXISTING_ISSUE_ID'],'parent-context')
+
     def test_browser_repair_preserves_browser_gate_and_runtime(self):
         browser = {'scenario': 'feedback-board-filter-v1', 'browser_image': 'sha256:' + 'b' * 64}
         parent = {**SPEC, 'browser_qa': browser,
@@ -260,6 +276,8 @@ class RepairTests(unittest.TestCase):
             receipt = Path(directory) / 'parent.json'
             receipt.write_text('{}')
             with patch.object(portable_delivery, 'RUN_SPEC', {**SPEC, 'sha256': 'a' * 64}), \
+                    patch.dict(os.environ, {'DELIVERY_KIT_EXISTING_ISSUE_ID': PARENT,
+                                           'DELIVERY_KIT_EXPECTED_PLAN_SHA': 'parent-plan'}), \
                     patch.object(portable_delivery, 'RECEIPT', receipt), \
                     patch.object(portable_delivery, 'PRIVATE', Path(directory)), \
                     patch.object(portable_delivery, 'resume_qa_repair',
@@ -272,6 +290,8 @@ class RepairTests(unittest.TestCase):
             self.assertEqual(result['stage'], 'repair_incomplete')
             resume.assert_called_once()
             env = run.call_args.kwargs['env']
+            self.assertNotIn('DELIVERY_KIT_EXISTING_ISSUE_ID', env)
+            self.assertNotIn('DELIVERY_KIT_EXPECTED_PLAN_SHA', env)
             self.assertEqual(env['DELIVERY_KIT_TEST_FIRST'], '1')
             self.assertTrue(env['DELIVERY_KIT_RUN_SPEC'].endswith(
                 INCIDENT['key'] + '.run.json'))

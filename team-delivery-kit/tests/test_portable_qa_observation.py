@@ -11,6 +11,8 @@ from release_eval import save_receipt
 
 class ObservationRecoveryTests(unittest.TestCase):
     def setUp(self):
+        authority = patch('portable_qa_authority.recover', return_value=None)
+        authority.start(); self.addCleanup(authority.stop)
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.incident = {'key':'a'*16,'phase':'browser','label':'DETAIL-1',

@@ -51,6 +51,33 @@ not another identical execution. Existing diagnostic artifacts are never rebound
 once their card has a run. An `O1` repair proposal still passes through the normal
 TDD contract derivation, independent review, CI and QA gates.
 
+## Technical decision authority
+
+New CTO diagnosis cards use decision contract v2. A scoped repair proposal is
+not an executed implementation or a release approval. Controller-executed QA
+and actual code inspection can justify proposing a new regression test and
+repair; the CTO must not wait for authorization from its own role. Missing
+evidence, real infrastructure dependencies and changes outside the allowed
+scope can still block the decision. Existing cards retain their original
+contract version and immutable artifacts.
+
+For a verified completed `O1` decision that explicitly waits for CTO approval
+from the CTO itself, the supervisor may create one `D1` clarification. It binds
+the prior decision, verified reads, unchanged QA scenario, product commit and
+image, and the clarified contract hash. This is a protocol correction, not an
+automatic conversion of `blocked` to `repair`. The CTO must decide again. A
+failed or still-blocked clarification remains visible without repeated runs or
+an automatic request to the CEO. Any resulting proposal retains all normal
+TDD, independent review, CI and deployment gates.
+
+A repair is a new delivery card, not a continuation of the parent card's
+planned dispatch. Its subprocess environment removes the parent's existing
+issue ID, expected plan hash, test-revision ancestry and fault-injection flags.
+The new pinned contract and run spec define its identity. Repository, Docker
+instance and model-budget configuration remain inherited. Both bootstrap and
+delivery reconciliation use this same environment boundary; planned-card
+identity checks are not relaxed.
+
 ## Qualification boundary
 
 This mechanism is bounded provider recovery, not general zero-intervention

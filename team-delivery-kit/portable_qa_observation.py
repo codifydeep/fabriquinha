@@ -128,6 +128,13 @@ def recover(private, cli, *, incident, prior, parent_contract, budget_ready,
         save_receipt(path, proof)
     validate(private, incident, proof)
     from portable_qa_cto import record
-    return record(private, cli, incident=incident, parent_contract=parent_contract,
+    observed = record(private, cli, incident=incident, parent_contract=parent_contract,
                   cto_id=prior['cto_id'], reason='New failed QA observation after scenario correction',
                   budget_ready=True, observation_recovery=proof)
+    if observed.get('dispatch') == 'cto_started':
+        from portable_qa_authority import recover as clarify_authority
+        clarified = clarify_authority(private, cli, incident=incident, prior=observed,
+                                      parent_contract=parent_contract,budget_ready=budget_ready)
+        if clarified:
+            return clarified
+    return observed

@@ -279,10 +279,9 @@ def drive_qa_repair(incident, contract, *, stop_after_cto_dispatch=False):
         time.sleep(10)
     if result['stage'] == 'repair_dispatched':
         directory = PRIVATE / 'qa-repairs'
-        env = {**os.environ,
-               'DELIVERY_KIT_DELIVERY_CONTRACT': str(directory / (incident['key'] + '.contract.json')),
-               'DELIVERY_KIT_RUN_SPEC': str(directory / (incident['key'] + '.run.json')),
-               'DELIVERY_KIT_TEST_FIRST': '1'}
+        from portable_qa_repair import repair_environment
+        env = repair_environment(directory / (incident['key'] + '.contract.json'),
+                                 directory / (incident['key'] + '.run.json'))
         child_started_at = time.time()
         child_run = subprocess.run([sys.executable, str(Path(__file__).resolve())],
                                    env=env, check=False)

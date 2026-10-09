@@ -205,13 +205,22 @@ def dispatch_repair(prepared, *, verified_sha, budget_check, start=None,
     if not (port_available or _port_available)(spec['qa_host_port']):
         raise ValueError('QA repair host port is unavailable; requires replan')
     budget_check()
-    env = {**os.environ, 'DELIVERY_KIT_DELIVERY_CONTRACT': prepared['contract_path'],
-           'DELIVERY_KIT_RUN_SPEC': prepared['run_spec_path'],
-           'DELIVERY_KIT_TEST_FIRST': '1'}
+    env = repair_environment(prepared['contract_path'], prepared['run_spec_path'])
     runner = start or (lambda e: subprocess.run([sys.executable,
         str(Path(__file__).with_name('start_portable.py'))], env=e, check=True))
     runner(env)
     return {'stage': 'repair_dispatched', 'label': prepared['label']}
+
+
+def repair_environment(contract_path, spec_path):
+    """A new repair card cannot inherit a planned parent's dispatch identity."""
+    env = {**os.environ, 'DELIVERY_KIT_DELIVERY_CONTRACT': str(contract_path),
+           'DELIVERY_KIT_RUN_SPEC': str(spec_path), 'DELIVERY_KIT_TEST_FIRST': '1'}
+    for key in ('DELIVERY_KIT_EXISTING_ISSUE_ID', 'DELIVERY_KIT_EXPECTED_PLAN_SHA',
+                'DELIVERY_KIT_CONTROLLED_WORKER_LOSS',
+                'DELIVERY_KIT_TEST_REVISION_PARENT', 'DELIVERY_KIT_TEST_REVISION_DEPTH'):
+        env.pop(key, None)
+    return env
 
 
 def resume_once(private, incident, parent_contract, parent_spec, project,
