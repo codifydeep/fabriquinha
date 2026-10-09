@@ -105,4 +105,32 @@ class R1FeedbackTests(unittest.TestCase):
         self.assertIn('correction',instruction)
         self.assertIn('fresh R1/R2/R3',instruction)
         self.assertIn('no recursive revision',instruction)
+        self.assertEqual(instruction.count('DELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1'),1)
+        self.assertIn('reason<=600',instruction)
+        self.assertIn('objective<=240',instruction)
         self.assertLess(len(instruction),3900)
+
+    def test_fresh_intake_enables_only_prose_correction_not_authority(self):
+        import remediation_plan_contract as contract
+        import typed_decision_contract as typed
+        from structured_response_contract import StructuredResponseRejected
+        config=self.config();sha=plans.digest(config)
+        body=typed.apply(dict(messages=[dict(role='user',content=plans.instruction(config,dict(stage='plan_dispatch')))],
+            response_format=dict(type='json_schema',json_schema=dict(name='delivery_decision_v1',strict=True,
+                schema=contract.schema('plan',sha,['A01'])))))
+        value=dict(action='propose_remediation_plan',evidence_sha256=sha,reason='x'*601,
+            execution_authorized=False,release_homologated=False,steps=[dict(id='R'+str(i),
+                depends_on=[] if i==1 else ['R'+str(i-1)],edit_scope=scope,
+                objective='Preserve gates',criteria=['A01']) for i,scope in
+                enumerate(('new_tests_only','product_only','controller_only'),1)])
+        def wire():
+            return json.dumps(dict(choices=[dict(finish_reason='tool_calls',message=dict(content=None,
+                tool_calls=[dict(type='function',function=dict(name=typed.REMEDIATION_NAME,
+                    arguments=json.dumps(value)))]))])).encode()
+        with self.assertRaises(StructuredResponseRejected) as rejected:
+            typed.translate(body,wire(),'application/json')
+        self.assertTrue(getattr(rejected.exception,'length_feedback',None))
+        value['execution_authorized']=True
+        with self.assertRaises(StructuredResponseRejected) as forbidden:
+            typed.translate(body,wire(),'application/json')
+        self.assertFalse(getattr(forbidden.exception,'length_feedback',None))

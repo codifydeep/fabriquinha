@@ -257,6 +257,14 @@ def instruction(config,state):
             ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria']))+
             'DELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)+'\n') if state['stage']=='plan_dispatch' else note
         result=common+note
+    # Intake-specific notes replace the generic note above. Bind the bounded
+    # transport correction only AFTER that replacement, so every plan intake
+    # receives the same durable one-attempt policy without weakening its schema.
+    if state['stage']=='plan_dispatch':
+        marker='DELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1'
+        if marker not in result:
+            result+='\n'+marker+'\n'
+        result+='\nProse limits: reason<=600 characters; each objective<=240 characters. Preserve all gates and criteria.\n'
     prefix='DELIVERY_PLANNING_START '+('0'*64)+'\nSource: '+config['source_task']+'\n'
     if len(result)+len(prefix)>4000:raise ValueError('split remediation context before dispatch')
     return result
