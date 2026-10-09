@@ -25,16 +25,21 @@ def post_delivery_memory(config,private,namespace):
         if incident.is_symlink() or incident.stat().st_size>4096:raise ValueError('unsafe memory incident')
         state=json.loads(incident.read_text())
         if state.get('configuration_sha256')!=config['sha256']:raise ValueError('memory incident identity drift')
-        return state  # No identical automatic attempt after an unclassified failure.
-    try:
-        from release_memory_pipeline import run
-        return run(config,private,namespace)
-    except Exception as error:
-        state={'stage':'blocked','owner':'cto','category':type(error).__name__,
-               'configuration_sha256':config['sha256'],'delivery_approval':False,
-               'next_action':'Diagnose post-delivery memory provenance; do not replay delivery or waive its gates'}
-        save_receipt(incident,state)
-        return state
+    else:
+        try:
+            from release_memory_pipeline import run
+            state=run(config,private,namespace)
+        except Exception as error:
+            state={'stage':'blocked','owner':'cto','category':type(error).__name__,
+                   'configuration_sha256':config['sha256'],'delivery_approval':False,
+                   'next_action':'Diagnose post-delivery memory provenance; do not replay delivery or waive its gates'}
+            save_receipt(incident,state)
+    if state.get('stage')!='not_eligible':
+        from memory_flow_status import release_status
+        from start_eval import cli
+        try:state={**state,'board_publication':release_status(config,private,state,cli)}
+        except Exception:state={**state,'board_publication':'observation_pending'}
+    return state
 
 
 def verify_registration(config, private):
@@ -194,7 +199,7 @@ def main():
         memory=post_delivery_memory(config,PRIVATE,PROJECT)
     print(json.dumps({'name': config['name'], 'stage': ledger['stage'],
                       'active': ledger.get('active'), 'completed': ledger['completed'],
-                      'post_delivery_memory': {k:memory.get(k) for k in ('stage','owner','category')} if memory else None}))
+                      'post_delivery_memory': {k:memory.get(k) for k in ('stage','owner','category','board_publication')} if memory else None}))
     if os.environ.get('DELIVERY_KIT_BRIEF_SERVICE') == '1' and ledger['stage'] in ('qualified', 'blocked'):
         return 0
     return result

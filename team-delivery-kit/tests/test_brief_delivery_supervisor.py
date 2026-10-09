@@ -24,6 +24,14 @@ class BriefSupervisorTests(unittest.TestCase):
         self.assertEqual(first['owner'],'cto');self.assertFalse(first['delivery_approval'])
         self.assertEqual(first['stage'],'blocked')
 
+    def test_ineligible_memory_does_not_publish_auxiliary_status(self):
+        from brief_delivery_supervisor import post_delivery_memory
+        with patch('release_memory_pipeline.run',return_value={'stage':'not_eligible','delivery_approval':False}), \
+                patch('memory_flow_status.release_status') as publish:
+            result=post_delivery_memory({'name':'MEMORY-TEST','sha256':'a'*64},
+                                        Path(self.temp.name),'delivery-kit-one')
+            self.assertEqual(result['stage'],'not_eligible');publish.assert_not_called()
+
     def test_all_steps_are_automatic_and_durable(self):
         calls = []
         def run(step):

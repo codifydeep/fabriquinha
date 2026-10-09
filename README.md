@@ -56,6 +56,13 @@ vira retry. Reinícios observam a mesma curadoria. Falhas de memória ficam sepa
 com responsável técnico e próxima ação. A ligação automática ainda precisa ser
 comprovada no término de uma entrega real.
 
+O estado auxiliar pode aparecer no card final da sequência no campo
+`post_delivery_memory_status`: fase, responsável técnico, motivo de admissão
+adiada e referência à issue da curadoria. Esse campo não altera status, merge,
+homologação nem permissões do produto. A publicação usa intenção persistida e
+confirmação por leitura; uma resposta perdida não causa reenvio cego. Conversas,
+credenciais e justificativas livres do modelo não são publicadas nesse campo.
+
 Um contexto de planejamento acima do limite pode substituir somente a apresentação
 das políticas do controlador por uma versão concisa dos mesmos gates e escopos.
 Brief, propostas aceitas e memória histórica permanecem byte-idênticos, com hashes
