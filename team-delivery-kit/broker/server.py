@@ -1768,7 +1768,15 @@ def session_operation(token, payload, close=False, on_notification=None):
         issue = issue_record(settings, binding['issue_id'])
         correction = verified_correction(current, binding['issue_id']) if grant['mode'] == 'implementation' else None
         frame = native_task_prompt(frame, grant['mode'], issue, current, correction)
-    result = session.exchange(frame, on_notification=on_notification) if on_notification else session.exchange(frame)
+    try:
+        result = session.exchange(frame, on_notification=on_notification) if on_notification else session.exchange(frame)
+    except TimeoutError as error:
+        receipt=getattr(error,'transport_timeout_receipt',None)
+        if receipt is not None:
+            from acp_transport import record_timeout
+            with LOCK,db() as failed:
+                record_timeout(failed,grant['request_id'],frame,error)
+        raise
     with LOCK, db() as con:
         session_id = result.get('result', {}).get('sessionId') or frame.get('params', {}).get('sessionId')
         con.execute('INSERT INTO acp_events VALUES (?,?,?,?)', (grant['request_id'], frame['method'], session_id, int('result' in result and 'error' not in result)))

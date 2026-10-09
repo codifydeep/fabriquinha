@@ -13,6 +13,20 @@ from model_policy import MODEL, PROXY_BASE_URL, PLACEHOLDER_KEY, execution_base_
 FAILURE_OBSERVATION_VERSION = 'acp-failure-receipt-v1'
 
 
+def record_timeout(con,execution,frame,error):
+    receipt=getattr(error,'transport_timeout_receipt',None)
+    if receipt is None:return False
+    if receipt.get('execution_id')!=execution or receipt.get('retry_authorized') is not False:
+        raise ValueError('exact nonauthorizing transport observation required')
+    identity=hashlib.sha256(json.dumps(frame,sort_keys=True).encode()).hexdigest()
+    encoded=json.dumps(receipt,sort_keys=True)
+    con.execute('CREATE TABLE IF NOT EXISTS acp_transport_failures(request_id TEXT,frame_sha256 TEXT,receipt TEXT,PRIMARY KEY(request_id,frame_sha256))')
+    previous=con.execute('SELECT receipt FROM acp_transport_failures WHERE request_id=? AND frame_sha256=?',(execution,identity)).fetchone()
+    if previous and previous[0]!=encoded:raise ValueError('transport observation drift')
+    con.execute('INSERT OR IGNORE INTO acp_transport_failures VALUES(?,?,?)',(execution,identity,encoded))
+    return True
+
+
 def failure_receipt(frame, error, stderr):
     """Do not store messages, stderr, prompts, sessions, credentials or model text."""
     return {'version': FAILURE_OBSERVATION_VERSION, 'method': frame.get('method')
@@ -161,8 +175,19 @@ class Transport:
     def exchange(self, frame, on_notification=None):
         if not self.lock.acquire(blocking=False):
             raise ValueError('one outstanding ACP request per execution')
+        started=time.monotonic()
         try:
             return self._exchange(frame, on_notification)
+        except TimeoutError as error:
+            # Observation only: never extend the deadline or replay the frame.
+            stderr=getattr(self,'stderr_tail',b'')
+            receipt=failure_receipt(frame,{},stderr)
+            receipt.update(operation='acp_transport_timeout_v1',
+                phase='prompt' if receipt['method']=='session/prompt' else 'bootstrap',
+                elapsed_seconds=round(time.monotonic()-started,3),
+                retry_authorized=False,execution_id=self.execution_id)
+            error.transport_timeout_receipt=receipt
+            raise
         finally:
             self.lock.release()
 
