@@ -663,6 +663,9 @@ def reconcile_correction_context(b,source):
 
 
 def tick(b):
+    try:import planning_review_observation
+    except ImportError:from broker import planning_review_observation
+    planning_review_observation.tick(b)
     try:import remediation_r1_feedback
     except ImportError:from broker import remediation_r1_feedback
     remediation_r1_feedback.tick(b)

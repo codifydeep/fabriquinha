@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261009.429
+COPY broker/planning_review_observation.py /planning_review_observation.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+COPY tests/acp_initialize_probe.py /acp_initialize_probe.py

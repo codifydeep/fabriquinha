@@ -44,6 +44,8 @@ COPY broker/session_resume.py /session_resume.py
 COPY docker_grouping.py /docker_grouping.py
 COPY broker/acp_probe.py /acp_probe.py
 COPY broker/acp_transport.py /acp_transport.py
+COPY broker/planning_review_observation.py /planning_review_observation.py
+COPY tests/acp_initialize_probe.py /acp_initialize_probe.py
 COPY broker/worker_model_config.py /worker_model_config.py
 COPY model_policy.py /model_policy.py
 COPY browser_qa_recipes.py /browser_qa_recipes.py

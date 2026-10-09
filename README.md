@@ -858,6 +858,13 @@ são contabilizadas na linhagem; esgotamento ou falha semântica gera impediment
 persistente com CTO e exigência de novo experimento, não outra tentativa idêntica.
 Instalar esse caminho não comprova sua entrega ponta a ponta.
 
+Uma revisão de plano que falha no transporte sem leituras ou eventos ACP pode
+receber uma única observação adicional, após encerramento da lease e inicialização
+real isolada da imagem do worker. A causa histórica permanece desconhecida. O
+controlador preserva proposta, falha e experimento; uma nova tarefa precisa ler
+todas as evidências e produzir seu próprio parecer sobre o mesmo SHA. Essa
+observação não aprova o plano nem renova limites de implementação.
+
 O provedor usado na instalação de referência é OpenRouter. A política compartilhada
 em `team-delivery-kit/model_policy.py` seleciona `anthropic/claude-haiku-5.5`.
 A migração do DeepSeek preserva recibos históricos e só admite a configuração
@@ -895,6 +902,9 @@ flowchart TD
     I -->|Solicita mudanças| F
     I -->|Rejeita R1 e CTO confirma correção| RP[Plano de feedback R1: histórico e profundidade preservados]
     RP --> RT[Tech Lead revisa o plano exato]
+    RT -->|Timeout sem leituras; lease encerrada| RI[Inicialização offline: uma observação qualificada]
+    RI -->|Passa; nova revisão e leituras obrigatórias| RT
+    RI -->|Falha ou observação consumida| RB
     RT -->|Aprova; gates continuam obrigatórios| F
     RP -->|Rodadas esgotadas ou intake inválido| RB
     I -->|Aprova o snapshot exato| J[PR + checks + integração validada]
