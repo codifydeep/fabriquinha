@@ -49,3 +49,19 @@ The first failed task, wakeup and hold remain preserved; the recovery has its ow
 hash-bound marker and persistent state. A second failure remains a visible hold.
 Neither a diagnosis nor successful transport grants fresh Red, review approval,
 implementation permission or release completion.
+
+### Synthetic persistence controls
+
+`team-delivery-kit/run_patch_persistence_probe.py --image sha256:<local-image-id>`
+runs the installed Hermes patch handler and ACP formatter on a disposable sample.
+The container has no network, credentials, Docker socket or product mounts; its
+only write-safe root is a temporary tmpfs. Controls measure hashes before editing,
+immediately afterward and from a fresh process, including an actual reverse patch.
+
+An installed handler can report success with no diff and unchanged bytes without
+declaring `no_change`. The classifier therefore distinguishes explicit no-op,
+observed unchanged success, persistent change, later change and inconclusive
+evidence. It never turns a handler success into delivery proof. These controls
+qualify observation, not the historical cause of a failed product task, and grant
+no author retry. The next real correction still requires source-bound observation,
+fresh Red and independent review under the original contract.
