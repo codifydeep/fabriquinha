@@ -98,6 +98,10 @@ infrastructure.
 
 ## Qualification boundary
 
-This mechanism is bounded provider recovery, not general zero-intervention
-autonomous delivery. End-to-end product repair, deployment, QA, recovery under
-faults and memory across profiles still require their own execution evidence.
+This mechanism is bounded recovery, not general zero-intervention autonomous
+delivery. A disposable brief with two dependent cards has completed an actual
+TDD product repair, complete independent inspection and reviewer-owned suite,
+PR/CI integration, deployment and both baseline and feature browser QA on the
+same merged commit and image. The historical failures remain preserved. Operator
+infrastructure corrections were required during that cycle: it does not qualify
+a fresh uninterrupted brief, arbitrary fault recovery or memory across profiles.
