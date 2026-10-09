@@ -14,7 +14,7 @@ class Pending(TimeoutError):
 
 
 def run(b, task, kind, payload, *, now=None):
-    if str(uuid.UUID(task)) != task or kind not in ('structure', 'suite', 'green', 'scope_materialize','scope_base_verify','scope_base_read','candidate_inventory'):
+    if str(uuid.UUID(task)) != task or kind not in ('structure', 'suite', 'green', 'scope_materialize','scope_base_verify','scope_base_read','candidate_inventory','bootstrap_fence'):
         raise ValueError('fixed validation identity required')
     now = time.time() if now is None else now
     payload = grouped_create('POST', '/containers/create?name=validation', payload, b.PREFIX)
@@ -66,7 +66,7 @@ def run(b, task, kind, payload, *, now=None):
         if info['State']['Status'] != 'exited': raise Pending('validation running; observe same handle')
         # Assertion tracebacks may embed large source files. Preserve the complete
         # bounded log, never truncate it into seemingly valid evidence.
-        output = b.docker_stdout(info['Id'], include_stderr=kind=='suite',
+        output = b.docker_stdout(info['Id'], include_stderr=kind in ('suite','bootstrap_fence'),
                                  limit=1048576 if kind in ('suite', 'green') else 65536)
     except TimeoutError as error:
         raise Pending('validation pending: ' + str(error)) from error

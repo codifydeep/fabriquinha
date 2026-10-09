@@ -434,9 +434,9 @@ def reconcile(con, route, runs, effects, *, now=None):
     except ImportError:from broker import failed_candidate_execution
     grant=failed_candidate_execution.load(con,issue)
     recovery=None
-    if grant and grant['status'] in ('dispatch_intent','execution_bound') and key!=grant['source_task']:
+    if grant and grant['status'] in ('dispatch_intent','execution_bound') and key!=failed_candidate_execution.dispatch_source(grant):
         if not grant.get('wakeup_id'):
-            origin=load(con,grant['source_task']);original=json.loads(origin['data']) if origin else {}
+            origin=load(con,failed_candidate_execution.dispatch_source(grant));original=json.loads(origin['data']) if origin else {}
             wake=effects.ensure_wakeup(issue,route['author'],original['trigger_task'],
                 grant['dispatch_marker'],original['instruction'],allow_create=False)
             if wake is None:return 'recovery_wakeup_observation'
@@ -815,12 +815,12 @@ def reconcile(con, route, runs, effects, *, now=None):
     if stage == 'budget_paused':
         stage = data['resume_stage']
     if stage in ('ready_review', 'diagnose', 'correct_author', 'diagnose_cto'):
-        authorized_replan=(grant is not None and grant['source_task']==key
+        authorized_replan=(grant is not None and failed_candidate_execution.dispatch_source(grant)==key
             and grant['status'] in ('admitted_not_dispatched','dispatch_intent','execution_bound')
             and data.get('failed_candidate_execution',{}).get('grant_sha256')==grant['grant_sha256'])
         if data.get('failed_candidate_execution'):
             grant=failed_candidate_execution.load(con,issue)
-            authorized_replan=bool(grant and grant['source_task']==key
+            authorized_replan=bool(grant and failed_candidate_execution.dispatch_source(grant)==key
                 and grant['status'] in ('admitted_not_dispatched','dispatch_intent','execution_bound')
                 and data['failed_candidate_execution'].get('grant_sha256')==grant['grant_sha256'])
         if stage == 'correct_author' and repeated_corrections(con, issue, data) >= 2 and not authorized_replan:

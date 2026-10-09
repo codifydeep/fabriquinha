@@ -620,6 +620,9 @@ def error_stage(previous, data, cto, count):
 
 
 def tick(broker):
+    try:import failed_candidate_bootstrap
+    except ImportError:from broker import failed_candidate_bootstrap
+    failed_candidate_bootstrap.tick(broker)
     try:import product_scope_pipeline
     except ImportError:from broker import product_scope_pipeline
     scope_owned=product_scope_pipeline.tick(broker)

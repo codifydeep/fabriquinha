@@ -720,7 +720,17 @@ ou manter um impedimento técnico explícito. Essa retomada não autoriza ediç�
 testes, repetição do experimento ou aprovação. O caminho possui testes offline;
 sua recuperação ponta a ponta ainda precisa ser comprovada com os agentes reais.
 
-A barreira de manutenção instalada adiciona controle administrativo persistente,
+Uma recuperação de bootstrap pré-prompt exige ausência comprovada de eventos ACP
+e ferramentas, lease encerrado, identidade nativa exata, replan independente
+inalterado e imagem antiga auditada com incompatibilidade de limite de arquivo.
+Um job fixo, sem rede, credenciais ou socket, verifica o workspace real somente
+para leitura e ensaia seed/lockdown em tmpfs separado. O recibo precisa confirmar
+hashes e testes congelados intactos. Uma única retomada de infraestrutura conserva
+dispatch, falha, contadores e grant originais; não aprova entrega nem autoriza
+enfraquecer testes. Falha depois de um prompt, drift ou repetição ficam bloqueados.
+Esse caminho não substitui a qualificação ponta a ponta da autonomia.
+
+O controle de manutenção tem estado persistente,
 sem endpoint para os workers. `drain` suspende novas reconciliações; tarefas já
 existentes podem concluir normalmente. `seal` exige inventário nativo completo,
 ausência de leases ativos/fechando, ciclos de reconciliação e grants consumidos

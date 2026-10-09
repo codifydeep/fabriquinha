@@ -163,7 +163,7 @@ def record_wakeup(con,issue,marker,wakeup):
 
 def observe_author(con,route,source):
     state=load(con,route['issue_id'])
-    if not state or state['status'] not in ('dispatch_intent','execution_bound') or source['id']==state['source_task']:
+    if not state or state['status'] not in ('dispatch_intent','execution_bound') or source['id']==dispatch_source(state):
         return None
     if (source.get('agent_id')!=state['author'] or state['author']!=route['author']
             or source.get('issue_id')!=route['issue_id'] or not state.get('wakeup_id')
@@ -173,6 +173,10 @@ def observe_author(con,route,source):
     if source.get('status') in ('failed','completed'):
         state=finish(con,route['issue_id'],source['id'],source['status'],'native-task:'+source['id'])
     return state
+
+
+def dispatch_source(state):
+    return state.get('bootstrap_recovery',{}).get('failed_task',state['source_task'])
 
 
 def seed_source(b,issue):
@@ -188,10 +192,16 @@ def seed_source(b,issue):
         row=con.execute('SELECT data FROM delivery_handoffs WHERE source_task=?',(state['source_task'],)).fetchone()
         installed=con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
         data=json.loads(row[0]) if row else {};route=json.loads(installed[0]) if installed else {}
+        dispatch_data=data
+        if state.get('bootstrap_recovery'):
+            dispatch_row=con.execute('SELECT data FROM delivery_handoffs WHERE source_task=?',
+                (dispatch_source(state),)).fetchone()
+            dispatch_data=json.loads(dispatch_row[0]) if dispatch_row else {}
         if (route.get('enabled') is not True or route.get('author')!=state['author']
                 or route.get('contract_sha256')!=state['contract_sha256']
                 or data.get('failed_candidate_execution',{}).get('grant_sha256')!=state['grant_sha256']
-                or data.get('dispatch_marker')!=state.get('dispatch_marker')
+                or dispatch_data.get('failed_candidate_execution',{}).get('grant_sha256')!=state['grant_sha256']
+                or dispatch_data.get('dispatch_marker')!=state.get('dispatch_marker')
                 or not bound_failure_context.verified_failed_diagnostic(con,state['source_task'],data)):
             raise ValueError('current durable recovery seed binding required')
     labels=(b.docker('GET','/volumes/'+state['seed']['mount']['Source']) or {}).get('Labels',{})

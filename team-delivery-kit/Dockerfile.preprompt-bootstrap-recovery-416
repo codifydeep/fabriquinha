@@ -1,0 +1,11 @@
+# Verified local base: sha256:6cfcf500c6c3304b5aebe54b710111d0cfe3352e5320b0654db2aac42efdc5e5
+FROM delivery-kit-execution-broker:20261009.415
+COPY broker/bootstrap_fence_probe.py /bootstrap_fence_probe.py
+COPY broker/failed_candidate_bootstrap.py /failed_candidate_bootstrap.py
+COPY broker/failed_candidate_execution.py /failed_candidate_execution.py
+COPY broker/handoffs.py /handoffs.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/validation_job.py /validation_job.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import failed_candidate_bootstrap,bootstrap_fence_probe,failed_candidate_execution,handoffs,handoff_runtime"
