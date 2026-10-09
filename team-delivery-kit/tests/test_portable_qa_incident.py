@@ -66,6 +66,60 @@ class FakeCLI:
 
 
 class QualityIncidentTests(unittest.TestCase):
+    def dispatched_delivery(self, directory, cli):
+        cli.parent['metadata'].update({
+            'execution_gate': 'dispatched',
+            'delivery_handoff': json.dumps({'stage': 'approved',
+                'source_task': 'author-task', 'owner': TECHLEAD})})
+        receipt = {'issue_id': PARENT, 'label': 'QATEST-1', 'merge_sha': SHA,
+                   'head_sha': SHA, 'delivery': {'source_task': 'author-task',
+                   'author': PARENT, 'reviewer': TECHLEAD,
+                   'review_task': 'review-task', 'manifest_sha256': 'b' * 64}}
+        folder = Path(directory) / 'release-receipts'
+        folder.mkdir()
+        path = folder / 'QATEST-1.json'
+        path.write_text(json.dumps(receipt))
+        return path, receipt
+
+    def test_dispatched_delivery_transitions_with_exact_approved_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cli = FakeCLI()
+            self.dispatched_delivery(directory, cli)
+            record(directory, cli, **self.kwargs(), budget_ready=True)
+            record(directory, cli, **self.kwargs(), budget_ready=True)
+            self.assertEqual(cli.parent['metadata']['execution_gate'], 'blocked_deployed_qa')
+            self.assertEqual(cli.created, 1)
+            self.assertEqual(cli.started, 1)
+
+    def test_dispatched_gate_rejects_missing_stale_or_self_review_evidence(self):
+        for defect in ('missing', 'sha', 'issue', 'source', 'reviewer', 'stage'):
+            with self.subTest(defect=defect), tempfile.TemporaryDirectory() as directory:
+                cli = FakeCLI()
+                path, receipt = self.dispatched_delivery(directory, cli)
+                if defect == 'missing':
+                    path.unlink()
+                else:
+                    if defect == 'sha': receipt['merge_sha'] = 'c' * 40
+                    if defect == 'issue': receipt['issue_id'] = CHILD
+                    if defect == 'source': receipt['delivery']['source_task'] = 'stale-task'
+                    if defect == 'reviewer': receipt['delivery']['reviewer'] = PARENT
+                    if defect == 'stage':
+                        cli.parent['metadata']['delivery_handoff'] = json.dumps({
+                            'stage': 'running', 'source_task': 'author-task', 'owner': TECHLEAD})
+                    path.write_text(json.dumps(receipt))
+                with self.assertRaisesRegex(ValueError, 'QA gate'):
+                    record(directory, cli, **self.kwargs(), budget_ready=True)
+                self.assertEqual(cli.started, 0)
+                self.assertEqual(cli.parent['metadata']['execution_gate'], 'dispatched')
+
+    def test_unknown_parent_gate_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cli = FakeCLI()
+            cli.parent['metadata']['execution_gate'] = 'blocked_other_delivery'
+            with self.assertRaisesRegex(ValueError, 'parent gate drift'):
+                record(directory, cli, **self.kwargs(), budget_ready=True)
+            self.assertEqual(cli.started, 0)
+
     def test_browser_failure_has_durable_owner_without_http_case_fiction(self):
         from test_portable_contract import contract
         with tempfile.TemporaryDirectory() as directory:

@@ -64,6 +64,47 @@ def _advance_gate(cli, issue_id, target):
             '--value', target, '--type', 'string')
 
 
+def _block_delivery_gate(private, cli, incident):
+    """Transition execution state, never treating it as immutable identity.
+
+    A dispatched delivery may enter QA failure only with its exact durable
+    publication receipt and independently approved handoff. Unknown states and
+    stale deliveries fail closed; replay of the same incident is idempotent.
+    """
+    issue_id = incident['parent_issue_id']
+    metadata = cli('metadata', 'list', issue_id)
+    target = 'blocked_' + incident['phase'] + '_qa'
+    current = metadata.get('execution_gate')
+    if current == 'dispatched' or (current == target and 'delivery_handoff' in metadata):
+        path = Path(private) / 'release-receipts' / (incident['label'] + '.json')
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1048576:
+            raise ValueError('QA gate requires exact delivery receipt')
+        delivery = json.loads(path.read_text())
+        approved = delivery.get('delivery', {})
+        handoff = metadata.get('delivery_handoff')
+        if isinstance(handoff, str):
+            handoff = json.loads(handoff)
+        sha_field = 'head_sha' if incident['phase'] == 'candidate' else 'merge_sha'
+        if (delivery.get('issue_id') != issue_id
+                or delivery.get('label') != incident['label']
+                or delivery.get(sha_field) != incident['source_sha']
+                or not isinstance(handoff, dict)
+                or handoff.get('stage') != 'approved'
+                or not approved.get('source_task')
+                or handoff.get('source_task') != approved.get('source_task')
+                or not approved.get('author') or not approved.get('reviewer')
+                or approved['author'] == approved['reviewer']
+                or handoff.get('owner') != approved['reviewer']
+                or not approved.get('review_task')
+                or not re.fullmatch(r'[a-f0-9]{64}', approved.get('manifest_sha256', ''))):
+            raise ValueError('QA gate delivery evidence drift')
+    elif current not in (None, target):
+        raise ValueError('QA incident parent gate drift')
+    if current != target:
+        cli('metadata', 'set', issue_id, '--key', 'execution_gate',
+            '--value', target, '--type', 'string')
+
+
 def record(private, cli, *, context, label, phase, source_sha, error,
            techlead_id, budget_ready, parent_contract=None):
     """Create one child incident, bind ownership, and fail closed on drift.
@@ -162,7 +203,7 @@ def record(private, cli, *, context, label, phase, source_sha, error,
     _set_metadata(cli, child['id'], 'qa_incident_key', key)
     _set_metadata(cli, child['id'], 'qa_source_sha', source_sha)
     _set_metadata(cli, context['issue_id'], 'qa_incident_issue_id', child['id'])
-    _set_metadata(cli, context['issue_id'], 'execution_gate', 'blocked_' + phase + '_qa')
+    _block_delivery_gate(private, cli, incident)
     if parent['status'] != 'blocked':
         cli('status', context['issue_id'], 'blocked', '--no-start')
     if child.get('assignee_id') not in (None, techlead_id):
