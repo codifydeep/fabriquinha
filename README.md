@@ -990,6 +990,11 @@ A imagem de referência incorpora esse caminho e passou no canário real de
 preparação isolada. A retomada CTO → Tech Lead → autor e a entrega posterior ainda
 precisam de evidência ponta a ponta; instalação ou testes verdes não comprovam
 autonomia completa.
+Um helper separado de inventário do candidato valida os volumes somente leitura
+e calcula hashes dos arquivos de produto editáveis, inclusive JavaScript, HTML e
+CSS. Ele preserva os recibos diagnósticos Python existentes, não executa testes e
+não aprova entregas. Sua ligação à admissão exige recibos duráveis de execução;
+um canário ou metadados isolados não autorizam o autor.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.

@@ -1,0 +1,3 @@
+FROM delivery-kit-offline-validator:20261008.29
+COPY broker/candidate_inventory.py /candidate_inventory.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import candidate_inventory"
