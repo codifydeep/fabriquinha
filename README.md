@@ -848,6 +848,16 @@ quantidade de findings, arquivos opcionais e seleção de localização observad
 O diagnóstico não registra argumentos, citações, valores nem paths arbitrários.
 Uma categoria de diagnóstico não modifica a decisão e não autoriza retentativa.
 
+O retorno de mudanças em R1 possui intake próprio: rejeição independente e
+patrocínio observado do CTO alimentam um novo plano R1/R2/R3, que precisa de
+revisão independente do Tech Lead. O plano anterior e seu Red permanecem
+imutáveis; sua admissão fica bloqueada para impedir reativação concorrente.
+O novo contexto cita o brief original sem acumular instruções de fases antigas.
+Critérios, baseline e profundidade 2 são preservados. Até duas rodadas de feedback
+são contabilizadas na linhagem; esgotamento ou falha semântica gera impedimento
+persistente com CTO e exigência de novo experimento, não outra tentativa idêntica.
+Instalar esse caminho não comprova sua entrega ponta a ponta.
+
 O provedor usado na instalação de referência é OpenRouter. A política compartilhada
 em `team-delivery-kit/model_policy.py` seleciona `anthropic/claude-haiku-5.5`.
 A migração do DeepSeek preserva recibos históricos e só admite a configuração
@@ -883,6 +893,10 @@ flowchart TD
     RO -->|Nova execução com diagnóstico durável| I
     RO -->|Tentativa consumida e nova falha| RB[Impedimento visível: sem aprovação ou retry infinito]
     I -->|Solicita mudanças| F
+    I -->|Rejeita R1 e CTO confirma correção| RP[Plano de feedback R1: histórico e profundidade preservados]
+    RP --> RT[Tech Lead revisa o plano exato]
+    RT -->|Aprova; gates continuam obrigatórios| F
+    RP -->|Rodadas esgotadas ou intake inválido| RB
     I -->|Aprova o snapshot exato| J[PR + checks + integração validada]
     J --> K[DevOps: implantação local]
     K --> L[QA/SecOps: aceitação e regressão do mesmo SHA]

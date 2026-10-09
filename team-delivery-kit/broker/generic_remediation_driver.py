@@ -21,7 +21,13 @@ def initialize(con):
 
 
 def binding(config, plan):
-    if (config.get('intake_kind') != 'exhausted_frozen_suite_v1'
+    if config.get('intake_kind')=='rejected_remediation_r1_v1':
+        feedback=config.get('r1_feedback',{})
+        if (feedback.get('operation')!='remediation_r1_review_feedback_v1'
+                or type(feedback.get('round')) is not int or not 1<=feedback['round']<=2
+                or feedback.get('revision_depth_reset') is not False or feedback.get('execution_authorized') is not False):
+            raise ValueError('bounded original R1 feedback required')
+    if (config.get('intake_kind') not in ('exhausted_frozen_suite_v1','rejected_remediation_r1_v1')
             or config.get('original_depth') != 2 or len(config.get('revision_lineage', [])) != 2
             or plan.get('stage') != 'plan_approved' or plan.get('execution_authorized') is not False
             or plan.get('release_homologated') is not False
@@ -114,7 +120,7 @@ def tick(b):
     with b.db() as con:
         plans.initialize(con);initialize(con)
         candidates=[r['source_task'] for r in con.execute('SELECT source_task,config,state FROM technical_remediation_plans')
-            if json.loads(r['config']).get('intake_kind')=='exhausted_frozen_suite_v1'
+            if json.loads(r['config']).get('intake_kind') in ('exhausted_frozen_suite_v1','rejected_remediation_r1_v1')
             and json.loads(r['state']).get('stage')=='plan_approved']
     for source in candidates:
         try:advance(b,source)

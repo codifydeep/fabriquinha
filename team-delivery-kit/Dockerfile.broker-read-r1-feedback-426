@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261009.425
+COPY broker/remediation_r1_feedback.py /remediation_r1_feedback.py
+COPY broker/generic_remediation_driver.py /generic_remediation_driver.py
+COPY broker/remediation_execution.py /remediation_execution.py
+COPY broker/remediation_author_context.py /remediation_author_context.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py

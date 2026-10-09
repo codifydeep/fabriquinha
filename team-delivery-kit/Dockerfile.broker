@@ -286,4 +286,6 @@ COPY broker/u3_delivery_review.py /u3_delivery_review.py
 COPY broker/durable_review_job.py /durable_review_job.py
 COPY broker/review_precondition_recovery.py /review_precondition_recovery.py
 COPY tests/review_read_registry_canary.py /review_read_canary.py
+COPY broker/remediation_r1_feedback.py /remediation_r1_feedback.py
+COPY broker/generic_remediation_driver.py /generic_remediation_driver.py
 ENTRYPOINT ["python", "/broker.py"]

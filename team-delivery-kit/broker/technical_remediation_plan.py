@@ -245,6 +245,18 @@ def instruction(config,state):
     if state['stage']=='plan_dispatch':
         note+='\nDELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1\n'
     result=common+note
+    if config.get('intake_kind')=='rejected_remediation_r1_v1':
+        note=('R1 was rejected by independent review and CTO requested a correction. '
+            'Preserve all original criteria, base, test methods and assertions. '
+            'Propose a fresh R1/R2/R3 plan; no recursive revision, depth reset or old approval reuse. '
+            'R1 repairs the NEW tests only and requires fresh Red and independent review. '
+            'R2 product-only follows approved exact tests; R3 requires full Green, independent review, '
+            'PR/CI/deploy/browser QA on the same SHA. Return compact schema JSON or retain_hold.\n'
+            'CTO correction claim (assess immutable source, not unquestionable truth): '+json.dumps(config['diagnostic_decision']['reason'])+'\n'+
+            'DELIVERY_REMEDIATION_PLAN_V1:'+digest(config)+'\n'+
+            ''.join('DELIVERY_REMEDIATION_CRITERION:'+k+'\n' for k in sorted(config['criteria']))+
+            'DELIVERY_TYPED_REMEDIATION_V1:plan:'+digest(config)+'\n') if state['stage']=='plan_dispatch' else note
+        result=common+note
     prefix='DELIVERY_PLANNING_START '+('0'*64)+'\nSource: '+config['source_task']+'\n'
     if len(result)+len(prefix)>4000:raise ValueError('split remediation context before dispatch')
     return result
@@ -372,6 +384,14 @@ def mounts(b,binding):
     c,s=matches[0]
     if s['stage'] not in ('plan_dispatch','review_dispatch','observe_dispatch','awaiting_plan','awaiting_review') or s['owner']!=binding['agent_id']:
         raise ValueError('current readonly recovery role required')
+    if c.get('intake_kind')=='rejected_remediation_r1_v1':
+        try:import remediation_r1_feedback
+        except ImportError:from broker import remediation_r1_feedback
+        with b.db() as con:remediation_r1_feedback.validate_parent(con,c)
+        labels=(b.docker('GET','/volumes/'+c['volume']) or {}).get('Labels',{})
+        if labels.get('delivery-kit.owner')!=b.OWNER or labels.get('delivery-kit.test-first-task')!=c['source_task']:
+            raise ValueError('immutable rejected R1 evidence ownership drift')
+        return [dict(Type='volume',Source=c['volume'],Target='/evidence/candidate',ReadOnly=True)]
     labels=(b.docker('GET','/volumes/'+c['volume']) or {}).get('Labels',{})
     generic = c.get('intake_kind') == 'exhausted_frozen_suite_v1'
     completed=c.get('diagnostic_snapshot_kind')=='completed_frozen_validation' and (generic or c.get('amendment',{}).get('kind') in ('request_scope','timer_provenance'))
@@ -519,6 +539,9 @@ def reconcile_correction_context(b,source):
 
 
 def tick(b):
+    try:import remediation_r1_feedback
+    except ImportError:from broker import remediation_r1_feedback
+    remediation_r1_feedback.tick(b)
     try:import generic_remediation_driver
     except ImportError:from broker import generic_remediation_driver
     generic_remediation_driver.tick(b)

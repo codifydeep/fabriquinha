@@ -55,6 +55,15 @@ class RemediationAuthorContextTests(unittest.TestCase):
         self.value['context_sha256']=original['sha256']
         with self.assertRaises(ValueError):context.capsule(self.value,{**self.route,'execution_context':original})
 
+    def test_r1_feedback_unwraps_original_brief_without_recursive_prompt_growth(self):
+        first=context.capsule(self.value,self.route)
+        value={**self.value,'context_sha256':first['sha256'],'r1_feedback':{'round':1}}
+        capsule=context.capsule(value,{**self.route,'execution_context':first})
+        self.assertIn('Entire original product brief.',capsule['description'])
+        self.assertEqual(capsule['description'].count('CURRENT TASK: R1'),1)
+        self.assertEqual(capsule['description'].count('ORIGINAL BRIEF DATA:'),1)
+        self.assertIn(first['sha256'],capsule['description'])
+
     def test_amendment_unwraps_only_controller_phase_prose_preserving_full_original_brief(self):
         import json
         brief='Entire approved original brief. '+('detailed product scope '*300)

@@ -26,6 +26,15 @@ def capsule(value, source):
     criteria = '\n'.join(k + ': ' + text for k, text in sorted(value['criteria'].items()))
     brief=original['description']
     provenance=''
+    if value.get('r1_feedback'):
+        marker='ORIGINAL BRIEF DATA: '
+        if not brief.startswith('CURRENT TASK: R1 NEW-TEST HARNESS REPAIR ONLY.\n') or brief.count(marker)!=1:
+            raise ValueError('exact historical R1 context wrapper required')
+        tail=brief.split(marker,1)[1]
+        brief,end=json.JSONDecoder().raw_decode(tail)
+        if not isinstance(brief,str) or not brief.strip() or tail[end:].strip():
+            raise ValueError('lossless original R1 feedback brief required')
+        provenance='\nPreserved superseded R1 context SHA: '+original['sha256']+'.\n'
     if value.get('amendment'):
         # Known controller R2 wrapper only. Keep the complete underlying brief,
         # not recursively quoted superseded phase instructions. The entire R2

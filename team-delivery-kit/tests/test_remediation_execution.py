@@ -28,6 +28,23 @@ class RemediationExecutionContractTests(unittest.TestCase):
         self.assertFalse(result['release_homologated'])
         self.assertFalse(result['historical_snapshots_editable'])
 
+    def test_review_feedback_requires_independent_plan_and_preserves_gates(self):
+        c=copy.deepcopy(self.c);s=copy.deepcopy(self.s)
+        c.update(intake_kind='rejected_remediation_r1_v1',r1_feedback=dict(
+            operation='remediation_r1_review_feedback_v1',round=1,original_depth=2,attempt_limit=2,
+            revision_depth_reset=False,execution_authorized=False,previous_source='old-source',certificate={'verified':'binding'}))
+        s['plan']['evidence_sha256']=digest(c);sha=digest(s['plan']);s['plan_sha256']=sha
+        s['review'].update(plan_sha256=sha,evidence_sha256=sha)
+        value=contract(c,s,['tests/test_new.py'],['app.js'])
+        self.assertEqual(value['r1_feedback'],c['r1_feedback'])
+        self.assertEqual(value['revision_lineage'],self.c['revision_lineage'])
+        self.assertIn('independent_test_review',value['steps'][0]['gates'])
+        self.assertIn('browser_qa_exact_sha',value['steps'][2]['gates'])
+        c['r1_feedback']['round']=3
+        s['plan']['evidence_sha256']=digest(c);sha=digest(s['plan']);s['plan_sha256']=sha
+        s['review'].update(plan_sha256=sha,evidence_sha256=sha)
+        with self.assertRaises(ValueError):contract(c,s,['tests/test_new.py'],['app.js'])
+
     def test_stale_self_rejected_or_missing_approval_cannot_create_execution_contract(self):
         for mutate in (lambda s:s.update(stage='awaiting_review'),lambda s:s.update(review_task='plan'),
                        lambda s:s['review'].update(decision='request_changes'),lambda s:s.update(plan_sha256='a'*64),

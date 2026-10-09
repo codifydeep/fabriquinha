@@ -12,6 +12,8 @@ except ImportError:
 
 
 def contract(config,state,tests,products):
+    if config.get('intake_kind')=='rejected_remediation_r1_v1' and not config.get('r1_feedback'):
+        raise ValueError('R1 feedback lineage required')
     sha=planning.digest(state.get('plan'))
     if (state.get('stage')!='plan_approved' or state.get('plan_sha256')!=sha
             or not state.get('plan_task') or not state.get('review_task') or state['plan_task']==state['review_task']
@@ -55,6 +57,16 @@ def contract(config,state,tests,products):
                 or not amendment.get('seed_red') or not amendment.get('experiment_sha256')):
             raise ValueError('exact independently reviewed harness amendment required')
         value['amendment']=amendment
+    if config.get('r1_feedback'):
+        feedback=config['r1_feedback']
+        if (config.get('intake_kind')!='rejected_remediation_r1_v1'
+                or feedback.get('operation')!='remediation_r1_review_feedback_v1'
+                or type(feedback.get('round')) is not int or not 1<=feedback['round']<=2
+                or feedback.get('original_depth')!=2 or feedback.get('revision_depth_reset') is not False
+                or feedback.get('execution_authorized') is not False or feedback.get('attempt_limit')!=2
+                or not feedback.get('previous_source') or not feedback.get('certificate')):
+            raise ValueError('bounded independently sponsored R1 feedback required')
+        value['r1_feedback']=feedback
     return value
 
 
@@ -68,6 +80,10 @@ def register(b,source):
             initialize(con)
             row=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
             config,state=map(json.loads,row)
+            if config.get('r1_feedback'):
+                try:import remediation_r1_feedback
+                except ImportError:from broker import remediation_r1_feedback
+                remediation_r1_feedback.validate_parent(con,config)
             route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(config['source_issue'],)).fetchone()[0])
             if (route.get('author')!=config['original_author'] or route.get('cto')!=config['cto']
                     or route.get('techlead')!=config['reviewer'] or route.get('contract_sha256')!=config['contract_sha256']
