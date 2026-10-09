@@ -451,6 +451,52 @@ def reconcile_review_changes(b,source):
         return new
 
 
+def capture_plan_length_failure(b,source):
+    """Bind a durable proxy rejection to the exact closed native plan task.
+
+    Capturing evidence does not dispatch or accept a plan. Unknown failures
+    remain held; no conclusion is inferred from an ACP error alone.
+    """
+    try:import execution_diagnosis_recovery
+    except ImportError:from broker import execution_diagnosis_recovery
+    with b.LOCK:
+        with b.db() as con:
+            c,s=map(json.loads,con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone())
+            if s.get('format_diagnosis'):return s['format_diagnosis']
+            if (s.get('stage')!='blocked' or s.get('category')!='ValueError' or s.get('plan')
+                    or s.get('plan_length_recovery') or s.get('execution_authorized') is not False
+                    or not (c.get('amendment') or c.get('intake_kind')=='rejected_remediation_r1_v1')
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()):
+                raise ValueError('idle unapproved failed planning task required')
+        fx=Effects(b);runs=native.issue_task_runs(fx.settings,s['issue_id'])
+        matches=[t for t in runs if t.get('wakeup_id')==s['wakeup_id']]
+        if len(matches)!=1 or any(t['status'] in ('queued','dispatched','running') for t in runs):
+            raise ValueError('one terminal planning wakeup required')
+        task=fx.task(matches[0]['id'],c['cto']);reads=fx.reads(task)
+        if (task.get('status')!='failed' or task.get('agent_id')!=c['cto']
+                or task.get('issue_id')!=s['issue_id'] or task.get('wakeup_id')!=s['wakeup_id']
+                or any(reads.get(p,{}).get('lines',0)<=0 or reads[p]['lines']!=reads[p]['total_lines'] for p in c['required_paths'])):
+            raise ValueError('authentic failed plan and complete immutable reads required')
+        with b.db() as con:
+            bindings=con.execute('SELECT n.request_id,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',
+                (task['id'],c['cto'],s['issue_id'])).fetchall()
+        if len(bindings)!=1 or bindings[0]['status']!='closed':raise ValueError('exact closed planning binding required')
+        proxy=b.docker('GET','/containers/'+b.PREFIX+'-model-proxy-1/json')
+        rejection=execution_diagnosis_recovery.format_rejection(b,bindings[0]['request_id'],expected_image=proxy['Image'])
+        rejection={**rejection,'execution_id':bindings[0]['request_id']}
+        if (rejection.get('category')!='typed_schema_maxLength' or rejection.get('operation')!='rejected_typed_decision_adapter_v1'
+                or rejection.get('delivery_approval') is not False or rejection.get('worker_tool_executed') is not False):
+            raise ValueError('durable length-only rejection required')
+        diagnostic=dict(category='typed_schema_maxLength',request_id=bindings[0]['request_id'],failed_task=task['id'],
+            retry_authorized=False,rejection=rejection,proxy_image=proxy['Image'],read_evidence=reads)
+        with b.db() as con:
+            if json.loads(con.execute('SELECT state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()[0])!=s:
+                raise ValueError('planning hold changed during capture')
+            con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',
+                (json.dumps({**s,'format_diagnosis':diagnostic},sort_keys=True),source))
+        return diagnostic
+
+
 def reconcile_plan_length_failure(b,source,rejection):
     """One changed transport policy after a correlated plan-schema rejection.
 
@@ -463,7 +509,8 @@ def reconcile_plan_length_failure(b,source,rejection):
             c,s=map(json.loads,row)
             if s.get('plan_length_recovery'):return s
             diagnostic=s.get('format_diagnosis') or {};shape=rejection.get('response_shape') or {}
-            if (s.get('stage')!='blocked' or s.get('category')!='ValueError' or not c.get('amendment')
+            if (s.get('stage')!='blocked' or s.get('category')!='ValueError'
+                    or not (c.get('amendment') or c.get('intake_kind')=='rejected_remediation_r1_v1')
                     or diagnostic.get('category')!='typed_schema_maxLength' or diagnostic.get('retry_authorized') is not False
                     or rejection.get('execution_id')!=diagnostic.get('request_id')
                     or rejection.get('category')!='typed_schema_maxLength'

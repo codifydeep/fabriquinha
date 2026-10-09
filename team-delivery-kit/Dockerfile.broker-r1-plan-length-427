@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261009.426
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
