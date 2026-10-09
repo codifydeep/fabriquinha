@@ -1,0 +1,5 @@
+# Qualification overlay. Verify this exact base before building.
+# Expected: sha256:1da17e0a514fc3c957a42b96a4641d03ac1c59dbc5dbf8e7fb20c9b6d28f991c
+FROM delivery-kit-model-proxy:20261008.111
+COPY provider_tool_routing.py /provider_tool_routing.py
+COPY model_proxy.py /model_proxy.py

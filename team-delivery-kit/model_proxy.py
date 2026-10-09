@@ -330,7 +330,10 @@ class Handler(BaseHTTPRequestHandler):
             stage = 'metrics'
             request_metrics = safe_request_metrics(body)
             upstream=provider_tool_routing.wire(body)
-            if upstream is not body:
+            if upstream.get('response_format')!=body.get('response_format'):
+                request_metrics['provider_schema_projection']='haiku_qa_union_v1'
+                request_metrics['canonical_schema_validation_preserved']=True
+            if upstream is not body and isinstance(body.get('tool_choice'),dict):
                 request_metrics['routing_compatibility']='haiku_named_tool_v1'
                 request_metrics['upstream_require_parameters']=False
                 if upstream.get('tools')!=body.get('tools'):

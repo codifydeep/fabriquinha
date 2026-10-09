@@ -8,6 +8,44 @@ import copy
 
 
 def wire(body):
+    fmt=body.get('response_format') or {}
+    contract=fmt.get('json_schema') or {}
+    if (body.get('model')=='anthropic/claude-haiku-5.5'
+            and fmt.get('type')=='json_schema'
+            and contract.get('name')=='delivery_qa_diagnosis_v1'):
+        schema=contract.get('schema') or {}
+        props=schema.get('properties') or {}
+        fields={'decision','root_cause','editable_code_files','new_test_file','acceptance'}
+        if (contract.get('strict') is not True or body.get('tool_choice')!='none'
+                or (body.get('provider') or {}).get('require_parameters') is not True
+                or schema.get('type')!='object' or set(props)!=fields
+                or set(schema.get('required',[]))!=fields
+                or schema.get('additionalProperties') is not False
+                or props['decision']!={'type':'string','enum':['repair','blocked']}):
+            raise ValueError('canonical QA diagnosis required for union projection')
+        branches=[]
+        for decision in ('blocked','repair'):
+            branch=copy.deepcopy(props)
+            branch['decision']['enum']=[decision]
+            if decision=='blocked':
+                branch['editable_code_files']['maxItems']=0
+                branch['new_test_file']['enum']=['']
+                branch['acceptance']['maxItems']=0
+            else:
+                branch['editable_code_files']['minItems']=1
+                branch['new_test_file']['minLength']=1
+                branch['acceptance']['minItems']=1
+            branches.append({'type':'object','properties':branch,
+                             'required':schema['required'],'additionalProperties':False})
+        if schema.get('anyOf')!=branches:
+            raise ValueError('canonical QA branch constraints required')
+        result=copy.deepcopy(body)
+        # The provider sees one object schema; the unchanged canonical union
+        # validates every returned byte locally before any diagnostic handoff.
+        del result['response_format']['json_schema']['schema']['anyOf']
+        result.pop('tools',None)
+        result.pop('parallel_tool_calls',None)
+        return result
     choice=body.get('tool_choice')
     if (body.get('model')!='anthropic/claude-haiku-5.5'
             or not isinstance(choice,dict) or choice.get('type')!='function'

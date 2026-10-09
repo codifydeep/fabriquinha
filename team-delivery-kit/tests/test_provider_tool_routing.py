@@ -4,6 +4,55 @@ from provider_tool_routing import wire
 
 
 class ProviderToolRoutingTests(unittest.TestCase):
+    def qa_body(self):
+        import json
+        from decision_schema import apply
+        path='/evidence/previous/qa.json'
+        body=apply({'model':'anthropic/claude-haiku-5.5','messages':[
+            {'role':'user','content':'DELIVERY_STRUCTURED_DECISION_V1:qa\nDELIVERY_REVIEW_READ_PATH:'+path+'\n'},
+            {'role':'assistant','tool_calls':[{'id':'r','function':{'name':'read_file',
+                'arguments':json.dumps({'path':path})}}]},
+            {'role':'tool','tool_call_id':'r','content':json.dumps({'content':'1|{}\n','total_lines':1})}],
+            'tools':[{'function':{'name':'unused'}}]})
+        return body
+
+    def test_qa_wire_projection_preserves_canonical_contract_and_requires_reads(self):
+        body=self.qa_body(); before=copy.deepcopy(body)
+        result=wire(body)
+        self.assertEqual(body,before)
+        self.assertNotIn('anyOf',result['response_format']['json_schema']['schema'])
+        self.assertIn('anyOf',body['response_format']['json_schema']['schema'])
+        self.assertNotIn('tools',result)
+        self.assertEqual(result['provider'],body['provider'])
+        self.assertEqual(result['messages'],body['messages'])
+        self.assertTrue(result['response_format']['json_schema']['strict'])
+        self.assertEqual(result['response_format']['json_schema']['schema']['properties'],
+                         body['response_format']['json_schema']['schema']['properties'])
+
+    def test_qa_projection_cannot_omit_canonical_branch_constraints(self):
+        body=self.qa_body()
+        body['response_format']['json_schema']['schema']['anyOf'][0]['properties']['acceptance']['maxItems']=5
+        with self.assertRaisesRegex(ValueError,'branch constraints'): wire(body)
+        body=self.qa_body();body['tool_choice']='auto'
+        with self.assertRaisesRegex(ValueError,'canonical QA'): wire(body)
+
+    def test_projected_qa_response_still_rejects_inconsistent_decisions_locally(self):
+        import json
+        from structured_response_contract import validate,StructuredResponseRejected
+        body=self.qa_body(); wire(body)
+        def response(decision):
+            return json.dumps({'choices':[{'finish_reason':'stop',
+                'message':{'content':json.dumps(decision)}}]}).encode()
+        valid={'decision':'blocked','root_cause':'Scenario selects a nonexistent option.',
+               'editable_code_files':[],'new_test_file':'','acceptance':[]}
+        validate(body,response(valid),'application/json')
+        for invalid in ({**valid,'editable_code_files':['app/static/app.js']},
+                        {**valid,'new_test_file':'tests/imagined.py'},
+                        {**valid,'decision':'repair'},
+                        {**valid,'release_homologated':True}):
+            with self.assertRaises(StructuredResponseRejected):
+                validate(body,response(invalid),'application/json')
+
     def body(self):
         return {'model':'anthropic/claude-haiku-5.5','provider':{'require_parameters':True},
             'tool_choice':{'type':'function','function':{'name':'selected'}},
