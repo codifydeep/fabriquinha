@@ -46,6 +46,16 @@ as recomendações como dados históricos, nunca requisitos atuais ou permissõe
 Essa recuperação e a leitura pelo controlador foram verificadas; consumo por
 agentes em um novo ciclo completo continua pendente de qualificação.
 
+Após a sequência de entrega ser revalidada, o supervisor pode indicar as decisões
+nativas do CTO para curadoria independente do Tech Lead, com intenção e identidade
+persistidas antes dos efeitos. Esse trabalho é auxiliar: não aprova o produto nem
+altera sua entrega. Antes de criar uma execução, confere tarefas nativas inclusive
+enfileiradas, leases, admissões pendentes, manutenção e reserva de chamadas.
+Falta de capacidade ou orçamento adia somente a admissão; um resultado incerto não
+vira retry. Reinícios observam a mesma curadoria. Falhas de memória ficam separadas,
+com responsável técnico e próxima ação. A ligação automática ainda precisa ser
+comprovada no término de uma entrega real.
+
 Um contexto de planejamento acima do limite pode substituir somente a apresentação
 das políticas do controlador por uma versão concisa dos mesmos gates e escopos.
 Brief, propostas aceitas e memória histórica permanecem byte-idênticos, com hashes
@@ -186,7 +196,9 @@ flowchart TB
     R --> UI
     R --> HF[Histórico factual privado por projeto]
     HF -.->|Hash, validade e ancestralidade Git| S
-    C[Curadoria retomável: indicação CTO e revisão Tech Lead] <--> MC
+    R --> MQ[Memória pós-entrega: revalidar recibos e aguardar capacidade livre]
+    MQ --> C[Curadoria retomável: indicação CTO e revisão Tech Lead]
+    C <--> MC
     C --> K[Recomendações históricas privadas]
     K -.->|Provas nativas revalidadas; sem permissões| S
 ```

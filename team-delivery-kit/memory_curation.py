@@ -7,6 +7,14 @@ from delivery_memory import digest
 from memory_native import observe,curate_native
 
 
+class AdmissionDeferred(Exception):
+    """Controller preflight refused dispatch before any issue/tool mutation."""
+    def __init__(self,reason):
+        if reason not in ('capacity','budget'):raise ValueError('fixed admission reason required')
+        self.reason=reason
+        super().__init__(reason)
+
+
 def tick(private,repository,namespace,key,reviewer,*,cli,create,now):
     identity(repository,namespace)
     database=path(private)
@@ -61,10 +69,13 @@ def tick(private,repository,namespace,key,reviewer,*,cli,create,now):
     if not state.get('issue_id'):
         try:state['issue_id']=create('techlead',description,reviewer,
             run_name='MEMORY-'+key[:12].upper()+('-F1' if state.get('format_recovery') else ''))
+        except AdmissionDeferred as error:
+            state.update(stage='admission_deferred',admission=error.reason)
+            save();return state
         except Exception as error:
             state.update(stage='blocked',category='dispatch_uncertain:'+type(error).__name__)
             save();raise
-        state['stage']='awaiting_native_review';save()
+        state.pop('admission',None);state['stage']='awaiting_native_review';save()
     runs=cli('runs',state['issue_id'])
     if len(runs)>1 or any(r.get('agent_id')!=reviewer for r in runs):
         state.update(stage='blocked',category='ambiguous_native_review');save();return state

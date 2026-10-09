@@ -18,6 +18,25 @@ ROOT = Path(__file__).resolve().parent
 STEPS = ('planning', 'materializing', 'compiling', 'executing')
 
 
+def post_delivery_memory(config,private,namespace):
+    """Auxiliary failure is durable and visible, never a fabricated release gate."""
+    incident=Path(private)/'release-memory-incidents'/(config['name']+'.json')
+    if incident.exists():
+        if incident.is_symlink() or incident.stat().st_size>4096:raise ValueError('unsafe memory incident')
+        state=json.loads(incident.read_text())
+        if state.get('configuration_sha256')!=config['sha256']:raise ValueError('memory incident identity drift')
+        return state  # No identical automatic attempt after an unclassified failure.
+    try:
+        from release_memory_pipeline import run
+        return run(config,private,namespace)
+    except Exception as error:
+        state={'stage':'blocked','owner':'cto','category':type(error).__name__,
+               'configuration_sha256':config['sha256'],'delivery_approval':False,
+               'next_action':'Diagnose post-delivery memory provenance; do not replay delivery or waive its gates'}
+        save_receipt(incident,state)
+        return state
+
+
 def verify_registration(config, private):
     path = Path(private) / 'host-service' / (config['name'] + '.brief-input.json')
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 4096:
@@ -170,8 +189,12 @@ def main():
         result = supervise(path, config['sha256'], run, reconcile_planning=pending_clarification(),
                            compilation_revision=revision)
     ledger = json.loads(path.read_text())
+    memory=None
+    if result==0 and ledger['stage']=='qualified':
+        memory=post_delivery_memory(config,PRIVATE,PROJECT)
     print(json.dumps({'name': config['name'], 'stage': ledger['stage'],
-                      'active': ledger.get('active'), 'completed': ledger['completed']}))
+                      'active': ledger.get('active'), 'completed': ledger['completed'],
+                      'post_delivery_memory': {k:memory.get(k) for k in ('stage','owner','category')} if memory else None}))
     if os.environ.get('DELIVERY_KIT_BRIEF_SERVICE') == '1' and ledger['stage'] in ('qualified', 'blocked'):
         return 0
     return result

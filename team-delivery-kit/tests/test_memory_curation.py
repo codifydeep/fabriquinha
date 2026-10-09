@@ -26,6 +26,22 @@ class MemoryCurationTests(unittest.TestCase):
         self.assertEqual(first['stage'],'awaiting_native_review')
         self.assertIn(self.key,self.created[0][0][1])
         self.assertFalse(first['delivery_approval'])
+
+    def test_known_preflight_deferral_creates_no_issue_and_resumes_once(self):
+        from memory_curation import AdmissionDeferred
+        with patch.object(self,'create',side_effect=AdmissionDeferred('capacity')):
+            first=self.call();second=self.call()
+        self.assertEqual(first['stage'],'admission_deferred')
+        self.assertEqual(first,second);self.assertNotIn('issue_id',first)
+        self.assertEqual(self.created,[])
+        resumed=self.call();self.call()
+        self.assertEqual(resumed['stage'],'awaiting_native_review')
+        self.assertEqual(len(self.created),1);self.assertNotIn('admission',resumed)
+
+    def test_unknown_dispatch_failure_is_not_treated_as_capacity_deferral(self):
+        with patch.object(self,'create',side_effect=TimeoutError('uncertain')):
+            with self.assertRaises(TimeoutError):self.call()
+        self.assertEqual(self.call()['stage'],'blocked');self.assertEqual(self.created,[])
     def test_native_failure_is_visible_and_does_not_retry_dispatch(self):
         self.runs=[{'id':'failed','agent_id':REVIEWER,'status':'failed'}]
         self.assertEqual(self.call()['stage'],'blocked')

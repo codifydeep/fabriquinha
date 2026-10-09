@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from brief_delivery_supervisor import supervise, verify_registration
+from unittest.mock import patch
 
 
 class BriefSupervisorTests(unittest.TestCase):
@@ -12,6 +13,16 @@ class BriefSupervisorTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'pipeline.json'
         self.steps = ['planning', 'materializing', 'compiling', 'executing']
+
+    def test_post_delivery_memory_failure_is_separate_durable_and_not_replayed(self):
+        from brief_delivery_supervisor import post_delivery_memory
+        config={'name':'MEMORY-TEST','sha256':'a'*64}
+        with patch('release_memory_pipeline.run',side_effect=ValueError('provenance missing')) as run:
+            first=post_delivery_memory(config,Path(self.temp.name),'delivery-kit-one')
+            second=post_delivery_memory(config,Path(self.temp.name),'delivery-kit-one')
+            self.assertEqual(first,second);run.assert_called_once()
+        self.assertEqual(first['owner'],'cto');self.assertFalse(first['delivery_approval'])
+        self.assertEqual(first['stage'],'blocked')
 
     def test_all_steps_are_automatic_and_durable(self):
         calls = []
