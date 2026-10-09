@@ -4,6 +4,13 @@ Uma equipe de agentes de IA para transformar um brief de produto em software rev
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+Uma recuperação de falha funcional detectada no navegador percorreu diagnóstico
+do Tech Lead, novo card TDD, revisão independente, PR/CI e QA no mesmo commit,
+sem edição manual do produto durante essa recuperação. O controlador preservou
+a tentativa recusada e reconciliou o pai pela entrega do filho. Isso comprova
+essa recuperação específica em um ensaio assistido; não qualifica todo brief,
+memória entre releases ou instalação independente para terceiros.
+
 No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
 formal comprovada podem abrir um diagnóstico independente do CTO. O controlador
 confere identidade, configuração, base, leases encerrados e hashes das propostas;
@@ -18,7 +25,8 @@ completo permanece preservado. Uma falha de tamanho anterior ao despacho admite
 uma recuperação de transporte após conferir a execução e o hash do diagnóstico
 e a ausência da nova issue. Não reexecuta o CTO nem converte o ensaio em autônomo.
 
-A captura de Red conserva saída completa limitada a 1 MiB: assertions de testes
+A captura de Red, suíte completa e Green conserva saída completa limitada a
+1 MiB: assertions de testes
 podem incluir arquivos inteiros e ultrapassar 64 KiB. Uma falha antiga de captura
 admite leitura do mesmo job registrado, com identidade e isolamento revalidados;
 não recria contêiner, reexecuta testes nem reinicia o autor. Logs acima do limite
