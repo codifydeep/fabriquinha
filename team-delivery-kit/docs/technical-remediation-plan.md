@@ -20,6 +20,23 @@ The existing baseline protection, original revision depth, independent review,
 fresh Red, full Green and same-SHA delivery gates continue to apply. This parser
 does not generalize the fixture-specific exhausted-remediation executor.
 
+`exhausted_suite_intake.qualify` is a read-only, fixture-independent entry
+qualifier. It derives exactly two revision generations from persisted parent
+links ending at the initial review, retaining the original Git base. It checks
+the latest completed author/closed lease, controller-owned complete snapshot,
+archived output hash, unchanged handoff failure, actual CTO decision and complete
+immutable source reads. It preserves every original acceptance criterion and
+the source attempt count. Missing evidence, changed scope, rebasing, cycles,
+self-review or partial reads fail closed. Returned data has no mutable aliases
+to historical inputs.
+
+This qualifier makes no provider calls, writes no controller state, dispatches
+no worker and grants no test-edit permission. A numeric mismatch remains an
+observation, not a proven test defect. Registration, generic planning transport,
+independent plan review and executor qualification must still be connected and
+validated before it becomes an autonomous recovery path. It is not an exception
+to the revision-depth guard or evidence of product delivery.
+
 ## Implemented path
 
 1. The controller recognizes an exact source-bound diagnostic experiment,
