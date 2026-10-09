@@ -64,7 +64,10 @@ def run(b, task, kind, payload, *, now=None):
             if not info: raise Pending('observe validation start')
             verify(b, info, expected)
         if info['State']['Status'] != 'exited': raise Pending('validation running; observe same handle')
-        output = b.docker_stdout(info['Id'], include_stderr=kind=='suite', limit=65536)
+        # Assertion tracebacks may embed large source files. Preserve the complete
+        # bounded log, never truncate it into seemingly valid evidence.
+        output = b.docker_stdout(info['Id'], include_stderr=kind=='suite',
+                                 limit=1048576 if kind in ('suite', 'green') else 65536)
     except TimeoutError as error:
         raise Pending('validation pending: ' + str(error)) from error
     result = dict(container_id=info['Id'], exit_code=info['State']['ExitCode'],

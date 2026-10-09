@@ -75,3 +75,44 @@ class ValidationJobTests(unittest.TestCase):
     def test_only_fixed_kinds_and_canonical_tasks(self):
         for task,kind in ((TASK,'shell'),('wrong','suite')):
             with self.assertRaises(ValueError):job.run(self.b,task,kind,self.payload)
+
+    def test_large_test_failure_log_is_complete_and_cached_without_reexecution(self):
+        import hashlib
+        output='AssertionError: '+('source context\n'*8000)
+        def read_log(*args, **kwargs):
+            self.assertEqual(kwargs['limit'],1048576)
+            self.assertTrue(kwargs['include_stderr'])
+            return output
+        self.b.docker_stdout=read_log
+        with self.assertRaises(job.Pending):self.call()
+        self.info['State'].update(Status='exited',ExitCode=1)
+        result=self.call(2)
+        self.assertEqual(result['output'],output)
+        self.assertEqual(result['output_sha256'],hashlib.sha256(output.encode()).hexdigest())
+        self.assertEqual(result['exit_code'],1)
+        self.assertFalse(result['approval'])
+        self.info=None
+        self.assertEqual(self.call(3),result)
+        self.assertEqual(sum(m=='POST' and p.endswith('/start') for m,p in self.calls),1)
+
+    def test_oversized_test_log_cannot_produce_receipt_or_restart_job(self):
+        def read_log(*args, **kwargs):raise RuntimeError('validator output unavailable')
+        self.b.docker_stdout=read_log
+        with self.assertRaises(job.Pending):self.call()
+        self.info['State'].update(Status='exited',ExitCode=1)
+        for now in (2,3):
+            with self.assertRaises(RuntimeError):self.call(now)
+        with self.db() as con:
+            state=json.loads(con.execute('select state from validation_jobs').fetchone()[0])
+        self.assertNotIn('result',state)
+        self.assertEqual(sum(m=='POST' and p.endswith('/start') for m,p in self.calls),1)
+
+    def test_green_log_uses_test_bound_but_structure_retains_small_bound(self):
+        for kind,limit in (('green',1048576),('structure',65536)):
+            with self.subTest(kind=kind):
+                self.info=None
+                with self.assertRaises(job.Pending):job.run(self.b,TASK,kind,self.payload,now=1)
+                self.info['State'].update(Status='exited',ExitCode=0)
+                with patch.object(self.b,'docker_stdout',return_value='OK') as read:
+                    job.run(self.b,TASK,kind,self.payload,now=2)
+                self.assertEqual(read.call_args.kwargs['limit'],limit)
