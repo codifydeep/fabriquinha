@@ -1,0 +1,7 @@
+# Verified local base: sha256:a5ed2b162553728c6aa964c0b02c7b92ef150c848627ff1f81a075d336a041b2
+FROM delivery-kit-execution-broker:20261009.423
+COPY broker/patch_observation_replan.py /patch_observation_replan.py
+COPY broker/unchanged_repair_incident.py /unchanged_repair_incident.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+COPY probe_patch_persistence.py /probe_patch_persistence.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import patch_observation_replan,unchanged_repair_incident,test_first_handoffs"

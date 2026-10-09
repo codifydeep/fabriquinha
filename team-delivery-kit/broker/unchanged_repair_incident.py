@@ -244,6 +244,10 @@ def handle(b,route,runs,source,prior,fx):
                 c.execute('INSERT INTO unchanged_repair_incidents VALUES(?,?,?)',(task,json.dumps(identity,sort_keys=True),'{}'))
         if identity['issue_id']!=issue or identity['route_sha256']!=digest(route):
             raise ValueError('immutable unchanged-repair incident drift')
+        try:import patch_observation_replan
+        except ImportError:from broker import patch_observation_replan
+        if patch_observation_replan.register(b,route,task,identity,state,Effects(b,route,fx)):
+            return True
         def save(state):
             with b.db() as c:
                 current=handoffs.load(c,task)

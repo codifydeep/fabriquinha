@@ -89,3 +89,18 @@ phase-writable data. The fixed bootstrap drops irreversibly to UID/GID 10000 bef
 importing or invoking the handler. This reproduces the installed in-place writer's
 ownership requirement; it does not disable that guard. Only SETUID/SETGID bootstrap
 capabilities are retained, and there are no product mounts or infrastructure secrets.
+
+### Source-bound observed replan
+
+`patch_observation_replan` consumes a diagnosed unchanged-repair incident only
+after revalidating the original real CTO/Tech Lead plan approvals and its R1
+tests-only lineage. A fixed, credential-free probe baked into the installed image
+must pass as a durable controller-owned job; uncertain create/start outcomes are
+observed by the same handle. Registration preserves the old handoff and failure.
+
+The receipt enables one fresh CTO routing decision, not an author retry. Only a
+new `request_correction` decision can use the existing bounded tests-only correction
+path. A refusal or repeated failure remains a technical hold. Previous source
+attempts, original depth, accepted brief, write fences, fresh Red and independent
+review are not reset or waived. No agent supplies arbitrary probe commands or
+can self-register a certificate.

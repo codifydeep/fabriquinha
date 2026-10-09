@@ -431,16 +431,21 @@ def technical_recovery(broker, route, runs, source, prior, effects):
         except ImportError:from broker import prospective_capacity
         with broker.db() as con:
             qualified_prospective_capacity=prospective_capacity.qualified(con,issue,key,data)
+        try:import patch_observation_replan
+        except ImportError:from broker import patch_observation_replan
+        with broker.db() as con:
+            qualified_observation=patch_observation_replan.qualified(con,issue,key,data,getattr(broker,'IMAGE',None))
         qualified_framework=(framework.get('kind')=='unpinned_pytest_cto_replan_v1'
             and framework.get('request',{}).get('issue_id')==issue
             and framework.get('request',{}).get('source_task')==key
             and framework.get('proof',{}).get('verified') is True
             and framework.get('proof',{}).get('framework_mismatch') is True
             and framework.get('diagnostic_sha256')==hashlib.sha256(json.dumps(diagnostic,sort_keys=True).encode()).hexdigest())
-        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport or qualified_tool_incident or qualified_prospective_capacity):
+        if any(json.loads(row['data']).get('test_first_cto_wakeup') for row in used) and not (qualified_structure or qualified_framework or qualified_infrastructure or qualified_restart or qualified_postwrite or qualified_capacity or qualified_byte_budget or qualified_transport or qualified_tool_incident or qualified_prospective_capacity or qualified_observation):
             block('test_first_correction_failed_after_cto_diagnosis')
             return
         suffix = ':diagnostic-replay-1' if data.get('diagnostic_retry') else ''
+        if qualified_observation:suffix+=':installed-patch-observation-v1:'+patch_observation_replan.digest(data['patch_observation_replan'])
         if qualified_byte_budget:suffix+=':preserved-seed-byte-budget-v1'
         if qualified_tool_incident:suffix+=':verified-tool-incident-v1:'+data['verified_tool_incident']['fingerprint']
         if qualified_constraint_presentation:suffix+=':measured-constraint-presentation-v1'
@@ -571,6 +576,16 @@ def technical_recovery(broker, route, runs, source, prior, effects):
                'Do not replay an identical instruction, waive calibration/Red/review, reset depth or approve delivery.'
                if diagnostic.get('kind')=='unchanged_seed_read_only_failure' and not qualified_transport else '')
             +
+            ('\nNEW QUALIFIED OBSERVATION: the installed real handler now reports bounded before/after '
+             'test hashes. An isolated root-seeded UID10000 probe independently validated persistent edit, '
+             'success without byte change and later reversal. This does NOT prove the historical cause. '
+             'Original CTO/TL plan approval, acceptance, depth and previous attempts remain unchanged. '
+             'Decide whether ONE tests-only observed correction is appropriate: inspect the current NEW test, '
+             'make a concrete meaningful harness correction under the approved plan, check actual hash change, '
+             'and run the full pinned suite. No baseline/product edits, weakened coverage, replay of an '
+             'identical instruction, copied Red or delivery approval. If evidence is insufficient, name '
+             'the missing evidence and escalate; do not ask the CEO a technical question. '
+             if qualified_observation else '')+
             '\nOutput reason in one complete sentence, aim below 900 characters; '
             '1200 characters is the output-contract maximum. Target420characters on format recovery. No preface or Markdown. '
             'This is a routing decision, not proof of delivery or release approval.'
