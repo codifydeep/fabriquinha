@@ -886,8 +886,10 @@ flowchart LR
     C --> N[Nova ação autorizada e limitada]
     C -->|Revisões esgotadas| P[CTO: card de plano técnico distinto]
     P --> Q[Tech Lead: revisão independente do plano exato]
-    Q -->|Rejeita| H[Impedimento visível: CTO e próxima ação]
-    Q -.->|Exige contrato executor validado| N
+    Q -->|Pede mudanças: até duas correções distintas| P
+    Q -->|Retém impedimento ou esgota correções| H[Impedimento visível: CTO e próxima ação]
+    Q -->|Aprova apenas o plano| E[Contrato executor e preparação qualificados]
+    E --> N
     N --> V{Resultado verificado?}
     V -->|Não| I
     V -->|Sim| R[Retoma o fluxo correspondente]
@@ -901,6 +903,13 @@ O novo caminho de replanejamento preserva as tentativas anteriores e os critéri
 aprovados; não zera contadores nem abre uma terceira revisão recursiva. A etapa
 de plano/revisão é não executora: sua aprovação ainda precisa ser consumida por
 um adaptador de execução validado. Veja o [contrato de replanejamento](team-delivery-kit/docs/technical-remediation-plan.md).
+
+O driver genérico conecta o plano aprovado aos adaptadores existentes: contrato
+exato, preparação da base original e testes preservados, publicação do contexto
+de trabalho e admissão com orçamento/capacidade. Reinício segue o ledger do
+adaptador; rejeição semântica permanece visível, sem retentativa idêntica. Os
+testes do driver não qualificam a recuperação completa: ainda é necessário
+comprovar Red, revisões independentes, Green, PR/CI e QA no mesmo commit.
 
 ## Qualidade e segurança
 

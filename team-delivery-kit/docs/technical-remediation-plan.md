@@ -49,6 +49,26 @@ full Green and all PR/CI/deploy/QA gates remain mandatory. Live generic planning
 and execution still require end-to-end qualification. This is not an exception
 to the revision-depth guard or evidence of product delivery.
 
+The generic driver connects an actually approved hash-bound plan to the existing
+execution-contract, original-base preparation, preserved seed, lossless runtime
+context, immutable test review and full-chain admission adapters. It performs one
+adapter operation per cycle, only with idle leases and live revalidation of the
+CTO/Tech Lead approvals. Its own journal does not grant permissions: after a
+restart, the underlying adapter ledger determines the next action. Uncertain
+Docker/API effects retain their exact observation handles; semantic rejection is
+a visible technical hold without an identical retry. Admission still checks its
+budget reserve, capacity, original depth and every subsequent gate. Driver state
+`await_delivery_gates` is not release success or a new execution authorization.
+
+Plan review evaluates the proposed future gates, not completion of R1/R2/R3.
+Repaired tests, fresh Red and Green deliberately do not exist before approved
+planning and qualified execution. A reviewer must identify a concrete missing
+or contradictory planned gate, scope, dependency or criterion; absence of future
+evidence alone is not a plan defect when its generation and dependencies are
+explicit. This distinction never approves a test-defect hypothesis or exempts
+the later independent test/product reviews. Existing rejected native decisions
+and correction limits remain preserved when the phase instructions are clarified.
+
 ## Implemented path
 
 1. The controller recognizes an exact source-bound diagnostic experiment,

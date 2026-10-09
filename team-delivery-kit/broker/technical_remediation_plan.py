@@ -196,6 +196,16 @@ def instruction(config,state):
             '\nDELIVERY_REMEDIATION_REVIEW_V1:'+state['plan_sha256'])
         note+='\nDELIVERY_TYPED_REMEDIATION_V1:review:'+state['plan_sha256']
         note+='\nDELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
+        note+=('\nPHASE CONTRACT: this is plan review, not test or delivery review. '
+            'Assess the proposed future R1/R2/R3 steps and their gates. Current frozen tests '
+            'are deliberately unchanged. R1 Red, repaired tests and product Green cannot '
+            'exist yet because plan approval grants no execution authority. Do not reject '
+            'merely for their current absence when the plan explicitly requires them before '
+            'product edits. Request changes for a concrete missing or contradictory planned '
+            'gate, scope, dependency or acceptance criterion, not a gate already present. '
+            'Approve only a sound plan; unsupported test-defect certainty still requires '
+            'an explicit experiment or evidence-producing R1 step. Approval never proves '
+            'that experiment succeeded or waives the later independent test review.')
     if config.get('amendment',{}).get('kind')=='timer_provenance':
         note+='\nTIMER ATTRIBUTION EVIDENCE: '+json.dumps(config['experiment']['proof']['facts'],separators=(',',':'))
         note+=' The unchanged harness counts legitimate board polling as a probe interval. '
@@ -509,6 +519,9 @@ def reconcile_correction_context(b,source):
 
 
 def tick(b):
+    try:import generic_remediation_driver
+    except ImportError:from broker import generic_remediation_driver
+    generic_remediation_driver.tick(b)
     try:import timer_scope_replan
     except ImportError:from broker import timer_scope_replan
     timer_scope_replan.tick(b)
@@ -574,7 +587,12 @@ def tick(b):
         c,s=json.loads(row['config']),json.loads(row['state'])
         if not c:continue
         if s['stage'] in ('blocked','plan_approved'):
-            try:fx.publish(c,s)
+            projection=s
+            if s['stage']=='plan_approved' and c.get('intake_kind')=='exhausted_frozen_suite_v1':
+                with b.db() as con:
+                    driver=con.execute('SELECT state FROM generic_remediation_drivers WHERE source_task=?',(row['source_task'],)).fetchone()
+                if driver:projection={**s,**json.loads(driver[0])}
+            try:fx.publish(c,projection)
             except Exception:pass  # metadata cannot change the authoritative hold/approval
             continue
         with b.LOCK:

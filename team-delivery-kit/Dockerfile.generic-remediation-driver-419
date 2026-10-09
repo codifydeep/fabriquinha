@@ -1,0 +1,5 @@
+# Verified local base: sha256:69cc4b814bf0bff5c1fcfb421861e4e291f54795c4a74acbf040bfd826cd7282
+FROM delivery-kit-execution-broker:20261009.418
+COPY broker/generic_remediation_driver.py /generic_remediation_driver.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_remediation_driver,technical_remediation_plan"
