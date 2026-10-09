@@ -1,7 +1,7 @@
 import copy
 import json
 import unittest
-from broker.unchanged_repair_incident import describe, advance, handle
+from broker.unchanged_repair_incident import describe, advance, handle, instruction, qualify_transport_recovery
 
 
 class UnchangedRepairIncidentTests(unittest.TestCase):
@@ -21,6 +21,42 @@ class UnchangedRepairIncidentTests(unittest.TestCase):
         self.assertFalse(d['author_retry_authorized'])
         self.assertFalse(d['red_verified'])
         self.assertEqual(d['cause'],'unknown')
+
+    def test_diagnosis_projects_to_one_nonexecuting_typed_submission(self):
+        from decision_schema import apply
+        from typed_decision_contract import apply as typed
+        d=describe(self.task,self.route,self.incident,self.policy)
+        wire=typed(apply({'messages':[dict(role='user',content=instruction(d))],
+                          'tools':[dict(type='function',function={'name':'terminal'})]}))
+        self.assertEqual(len(wire['tools']),1)
+        self.assertEqual(wire['tool_choice'],{'type':'function','function':{'name':'submit_delivery_decision'}})
+        schema=wire['tools'][0]['function']['parameters']
+        self.assertEqual(schema['properties']['action']['enum'],['escalate_cto'])
+        self.assertEqual(schema['properties']['reason']['maxLength'],1200)
+        self.assertIn('HARD LIMIT 1200',instruction(d))
+
+    def test_only_exact_length_failure_qualifies_changed_transport(self):
+        d=describe(self.task,self.route,self.incident,self.policy)
+        state=dict(stage='technical_hold',category='diagnosis_execution_failed',task_id='diagnosis',wakeup_id='wake')
+        task=dict(id='diagnosis',wakeup_id='wake',agent_id='cto',issue_id=self.issue,status='failed',
+                  failure_reason='agent_error.provider_server_error')
+        event=dict(status=502,category='structured_decision_response_invalid',decision_schema='delivery_decision_v1',
+                   structured_rejection_category='schema_violation',structured_rejection_diagnostic=dict(
+                       version='structured-constraint-v1',constraints=['maxLength'],upstream_sha256='d'*64))
+        proof=qualify_transport_recovery(d,state,task,event)
+        self.assertFalse(proof['author_retry_authorized']);self.assertEqual(proof['attempt_limit'],1)
+        for changed in (dict(task,status='completed'),dict(task,agent_id='author'),dict(task,wakeup_id='stale')):
+            with self.assertRaises(ValueError):qualify_transport_recovery(d,state,changed,event)
+        with self.assertRaises(ValueError):qualify_transport_recovery(d,state,task,dict(event,status=429))
+
+    def test_overlength_recommendation_does_not_advance(self):
+        class FX:
+            def runs(self):return [dict(id='cto-task',wakeup_id='wake',agent_id='cto',status='completed')]
+            def decision(self,task):return dict(action='escalate_cto',reason='x'*1201,optional_files=[])
+        saved=[]
+        advance(describe(self.task,self.route,self.incident,self.policy),
+                dict(stage='awaiting_diagnosis',wakeup_id='wake'),FX(),saved.append,now=1)
+        self.assertEqual(saved[-1]['category'],'diagnosis_recommendation_rejected')
 
     def test_unrelated_argument_incident_retains_legacy_recovery(self):
         prior=dict(stage='test_first_blocked',data=json.dumps(dict(

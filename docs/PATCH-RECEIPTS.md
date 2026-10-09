@@ -36,3 +36,16 @@ as a recommendation pending a separately qualified changed-condition experiment
 against the existing plan. Failed/invalid diagnoses remain visible and cannot
 rearm the incident. After an uncertain POST, only the original native marker
 is observed; restart does not issue another POST or duplicate a diagnosis.
+
+### Diagnosis transport recovery
+
+The diagnostic prompt uses the existing non-executing typed technical submission,
+with no filesystem or terminal tools, a 1,200-character hard limit and a shorter
+target. This limit matches the installed proxy schema. A length-rejected plain
+JSON diagnosis may qualify exactly one changed-transport diagnosis, not an author
+retry. Registration verifies the actual closed native execution, the owned proxy
+rejection and its installed schema projection before creating another intent.
+The first failed task, wakeup and hold remain preserved; the recovery has its own
+hash-bound marker and persistent state. A second failure remains a visible hold.
+Neither a diagnosis nor successful transport grants fresh Red, review approval,
+implementation permission or release completion.

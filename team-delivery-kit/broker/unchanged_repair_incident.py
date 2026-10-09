@@ -18,6 +18,93 @@ def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True).encode()).hexdigest()
 
 
+def instruction(identity):
+    return ('DELIVERY_PRE_RED_UNCHANGED_INCIDENT_V2\nDELIVERY_STRUCTURED_DECISION_V1:technical\n'
+        'DELIVERY_EXECUTION_DIAGNOSIS_V1\nDELIVERY_TYPED_DECISION_V1\n'
+        'DIAGNOSIS ONLY. The completed tests-only correction has the SAME NEW-test hash as its seed. '
+        'This is not qualified fresh Red. Controller evidence: '+json.dumps(identity,sort_keys=True)+
+        '. Historical cause UNKNOWN; legacy patch summaries do not prove lasting edits. '
+        'Recommend ONE bounded experiment to distinguish no-op, persistence and later overwrite, '
+        'or identify missing evidence. Do not assert an unobserved cause. No file/shell/admin tools, '
+        'author retry, test weakening, budget/depth reset or CEO technical question. '
+        'Submit escalate_cto, optional_files=[], reason target <=700 characters, HARD LIMIT 1200. '
+        'Use the required typed submission, not prose. This recommendation grants NO execution or approval.')
+
+
+def qualify_transport_recovery(identity,state,task,event):
+    """Exactly one changed-contract CTO diagnosis; never an author retry."""
+    diagnostic=event.get('structured_rejection_diagnostic',{})
+    if (state.get('stage')!='technical_hold' or state.get('category')!='diagnosis_execution_failed'
+            or task.get('id')!=state.get('task_id') or task.get('wakeup_id')!=state.get('wakeup_id')
+            or task.get('agent_id')!=identity['owner'] or task.get('issue_id')!=identity['issue_id']
+            or task.get('status')!='failed' or task.get('failure_reason')!='agent_error.provider_server_error'
+            or event.get('status')!=502 or event.get('category')!='structured_decision_response_invalid'
+            or event.get('structured_rejection_category')!='schema_violation'
+            or diagnostic.get('version')!='structured-constraint-v1'
+            or diagnostic.get('constraints')!=['maxLength']
+            or not re.fullmatch(r'[a-f0-9]{64}',str(diagnostic.get('upstream_sha256')))
+            or event.get('decision_schema')!='delivery_decision_v1'):
+        raise ValueError('exact failed length-constrained CTO diagnosis required')
+    return dict(operation='unchanged_diagnosis_typed_transport_v2',failed_task=task['id'],
+        failed_wakeup=state['wakeup_id'],rejection=diagnostic,attempt_limit=1,
+        instruction_sha256=hashlib.sha256(instruction(identity).encode()).hexdigest(),
+        author_retry_authorized=False,delivery_approval=False)
+
+
+def register_transport_recovery(b,source):
+    """Controller registration binds actual failure and installed proxy projection."""
+    from pathlib import Path
+    with b.LOCK:
+        with b.db() as c:
+            row=c.execute('SELECT identity,state FROM unchanged_repair_incidents WHERE source_task=?',(source,)).fetchone()
+            identity,state=map(json.loads,row)
+            if state.get('transport_recovery'):return state
+            if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone():
+                raise ValueError('settled leases required')
+            bindings=c.execute('SELECT n.request_id,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',(state['task_id'],)).fetchall()
+            if len(bindings)!=1 or bindings[0][1]!='closed':raise ValueError('one closed diagnosis binding required')
+        settings=json.loads((b.STATE/'native.json').read_text())
+        task=native.task_record(settings,state['task_id'],identity['owner'])
+        proxy=b.docker('GET','/containers/'+b.PREFIX+'-model-proxy-1/json')
+        labels=proxy['Config'].get('Labels',{})
+        if (not proxy['State']['Running'] or labels.get('com.docker.compose.project')!=b.PREFIX
+                or labels.get('com.docker.compose.service')!='model-proxy'):raise ValueError('owned live proxy required')
+        events=[]
+        for line in b.docker_stdout(proxy['Id'],limit=2*1024*1024).splitlines():
+            try:e=json.loads(line)
+            except ValueError:continue
+            if e.get('execution_id')==bindings[0][0] and e.get('status')==502:events.append(e)
+        if len(events)!=1:raise ValueError('one correlated rejection required')
+        proof=qualify_transport_recovery(identity,state,task,events[0])
+        script='''import json,sys,hashlib,decision_schema,typed_decision_contract
+body={'messages':[{'role':'user','content':sys.argv[1]}],'tools':[{'type':'function','function':{'name':'terminal'}}]}
+wire=typed_decision_contract.apply(decision_schema.apply(body))
+schema=wire['tools'][0]['function']['parameters']
+assert len(wire['tools'])==1 and wire['tool_choice']=={'type':'function','function':{'name':'submit_delivery_decision'}}
+assert schema['properties']['action']['enum']==['escalate_cto']
+assert schema['properties']['reason']['maxLength']==1200 and schema['properties']['optional_files']['maxItems']==0
+print(json.dumps({'schema_sha256':hashlib.sha256(json.dumps(schema,sort_keys=True).encode()).hexdigest(),'no_worker_tools':True,'reason_maximum':1200}))
+'''
+        entry=b.docker('POST','/containers/'+proxy['Id']+'/exec',dict(AttachStdout=True,AttachStderr=False,Tty=True,
+            Env=['PYTHONPATH=/'],Cmd=['python','-c',script,instruction(identity)]))
+        conn=b.DockerConnection('localhost',timeout=10)
+        try:
+            conn.request('POST','/v1.45/exec/'+entry['Id']+'/start',json.dumps(dict(Detach=False,Tty=True)),{'Content-Type':'application/json'})
+            response=conn.getresponse();raw=response.read(4097)
+            if response.status!=200 or len(raw)>4096:raise ValueError('bounded installed qualification required')
+        finally:conn.close()
+        result=b.docker('GET','/exec/'+entry['Id']+'/json')
+        if result.get('Running') or result.get('ExitCode')!=0:raise ValueError('installed transport qualification failed')
+        proof.update(installed_projection=json.loads(raw),proxy_image=proxy['Image'],
+                     module_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+        updated={**state,'transport_recovery':dict(proof=proof,state={})}
+        with b.db() as c:
+            if json.loads(c.execute('SELECT state FROM unchanged_repair_incidents WHERE source_task=?',(source,)).fetchone()[0])!=state:
+                raise ValueError('diagnosis state drift')
+            c.execute('UPDATE unchanged_repair_incidents SET state=? WHERE source_task=?',(json.dumps(updated,sort_keys=True),source))
+        return updated
+
+
 def describe(task,route,incident,policy):
     hashes=incident.get('test_sha256',{})
     if (task.get('status')!='completed' or task.get('agent_id')!=route.get('author')
@@ -87,7 +174,7 @@ def advance(identity,state,fx,save,*,now=None):
         if (set(decision)!={'action','reason','optional_files'}
                 or decision['action'] not in ('request_correction','escalate_cto')
                 or decision['optional_files']!=[] or not isinstance(decision['reason'],str)
-                or not 1<=len(decision['reason'])<=3000):
+                or not 1<=len(decision['reason'])<=1200):
             state.update(stage='technical_hold',category='diagnosis_recommendation_rejected',task_id=task['id'],
                          required_action='inspect preserved diagnosis; no author restart');save(state)
             return state
@@ -104,15 +191,7 @@ class Effects:
             return not c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()
     def remaining(self):return self.fx.remaining_calls()
     def wake(self,identity,*,allow_create):
-        note=('DELIVERY_PRE_RED_UNCHANGED_INCIDENT_V1\nDELIVERY_STRUCTURED_DECISION_V1:technical\n'
-            'DIAGNOSIS ONLY. A completed tests-only correction submitted the same NEW-test hash as its seed. '
-            'The full suite ran, but this is not a fresh qualified Red. Evidence: '+json.dumps(identity,sort_keys=True)+
-            '. Legacy formatted patch completions do NOT prove lasting edits; the historical cause is UNKNOWN. '
-            'Do not infer reversion, failed persistence or test correctness. Propose one bounded local experiment '
-            'to distinguish those hypotheses, or identify missing evidence. No file/shell/admin tools, no author '
-            'retry, test weakening, budget/depth reset or CEO technical question. Original acceptance and independent '
-            'review remain binding. Return JSON only with action=request_correction or escalate_cto, reason<=3000 '
-            'and optional_files=[]. Either action is only a recommendation; the controller grants no execution.')
+        note=instruction(identity)
         return self.fx.ensure_wakeup(identity['issue_id'],identity['owner'],identity['source_task'],
             digest(identity),note,allow_create=allow_create)
     def runs(self):return native.issue_task_runs(self.fx.settings,self.route['issue_id'])
@@ -173,5 +252,11 @@ def handle(b,route,runs,source,prior,fx):
                 data['required_action']=state.get('required_action','CTO diagnose unchanged repair; no author retry')
                 c.execute('UPDATE unchanged_repair_incidents SET state=? WHERE source_task=?',(json.dumps(state,sort_keys=True),task))
                 handoffs.save(c,task,issue,'test_first_blocked',route['cto'],data,time.time())
-        advance(identity,state,Effects(b,route,fx),save)
+        recovery=state.get('transport_recovery')
+        if recovery:
+            recovered={**identity, 'transport_recovery_sha256':digest(recovery['proof'])}
+            def save_recovery(next_state):
+                save({**state,'transport_recovery':{**recovery,'state':next_state}})
+            advance(recovered,recovery['state'],Effects(b,route,fx),save_recovery)
+        else:advance(identity,state,Effects(b,route,fx),save)
     return True

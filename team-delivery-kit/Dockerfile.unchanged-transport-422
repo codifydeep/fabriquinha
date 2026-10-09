@@ -1,0 +1,4 @@
+# Verified local base: sha256:5e13c61f5f4abc6223e99f7b7e366fde27480bf2ce7513c42a4dd9d2e6849b6f
+FROM delivery-kit-execution-broker:20261009.421
+COPY broker/unchanged_repair_incident.py /unchanged_repair_incident.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import unchanged_repair_incident"
