@@ -1,0 +1,2 @@
+FROM delivery-kit-execution-broker:20261009.431
+COPY broker/helper_cleanup.py /helper_cleanup.py
