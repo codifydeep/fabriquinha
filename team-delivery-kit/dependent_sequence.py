@@ -941,6 +941,9 @@ def run_sequence():
             if not resumed:
                 from provider_review_supervision import resume as resume_provider_review
                 resumed = resume_provider_review(ledger, plan, PRIVATE)
+            if not resumed:
+                from scoped_delivery_supervision import resume as resume_scoped_delivery
+                resumed = resume_scoped_delivery(ledger, plan, PRIVATE)
         except Exception as error:
             print(json.dumps({'stage': 'blocked', 'sequence': plan['name'],
                               'recovery_verification': (type(error).__name__ + ':' + str(error))[:160]}), flush=True)

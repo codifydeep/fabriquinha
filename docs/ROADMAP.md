@@ -205,3 +205,9 @@ estejam completas. O loop reabre uma única revisão do mesmo snapshot quando
 detecta uma aprovação histórica sem inspeção, com marcador novo e evidência
 anterior preservada. Não reinicia a implementação nem muda o Red. Uma segunda
 revisão incompleta é um impedimento técnico visível, não outra retentativa.
+O observador host também reconsulta esse gate para retomar uma sequência parada
+pela falha funcional anterior. A retomada exige a entrega atual aprovada, tarefas
+concluídas, inspeção completa, TDD congelado, base Git e contrato original exatos.
+Ela preserva o incidente anterior no ledger e apenas reinicia a observação da
+publicação: não autoriza nova execução do autor, merge, CI ou homologação. Esses
+gates continuam sendo verificados pelo driver de entrega em cada transição.
