@@ -65,3 +65,27 @@ evidence. It never turns a handler success into delivery proof. These controls
 qualify observation, not the historical cause of a failed product task, and grant
 no author retry. The next real correction still requires source-bound observation,
 fresh Red and independent review under the original contract.
+
+### Immediate worker observations
+
+`patch_persistence_observer` wraps only the exactly pinned installed patch handler.
+It calls the original handler once, without altering arguments, write fences or
+permissions. In fenced implementation mode, it observes regular Python tests of
+at most 32 KiB beneath `/workspace/tests` before and after replace-mode edits.
+Directory traversal, symlinks, hard links and files outside this boundary do not
+produce an observation. No file content is returned; malformed observations are
+not forwarded by the ACP receipt formatter.
+
+These are immediate observations, not final snapshot evidence: a subsequent edit
+can still reverse the change. Missing observations are inconclusive, not permission
+to rerun an author or accept Red. Review/planning executions remain uninstrumented.
+The synthetic launcher supports `--observed` to qualify the actual handler and
+formatter against independently measured hashes in an isolated tmpfs workspace.
+Real worker ACP persistence and source-bound recovery still require their own
+end-to-end evidence; synthetic controls do not replace delivery gates.
+
+The observed fixture is precreated by the synthetic controller as root-owned,
+phase-writable data. The fixed bootstrap drops irreversibly to UID/GID 10000 before
+importing or invoking the handler. This reproduces the installed in-place writer's
+ownership requirement; it does not disable that guard. Only SETUID/SETGID bootstrap
+capabilities are retained, and there are no product mounts or infrastructure secrets.

@@ -7,21 +7,25 @@ import subprocess
 from docker_grouping import args as group_args
 
 
-def command(image):
+def command(image,observed=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}',image):raise ValueError('pinned local image ID required')
     probe=Path(__file__).resolve().with_name('probe_patch_persistence.py')
-    return ['docker','run','--rm','--network','none','--read-only','--user','10000:10000',
+    root='/workspace' if observed else '/tmp'
+    return ['docker','run','--rm','--network','none','--read-only','--user','0:0' if observed else '10000:10000',
         '--tmpfs','/tmp:rw,size=128m,mode=1777',*group_args('patch-persistence-probe','delivery-kit-port2'),
         '-e','PYTHONDONTWRITEBYTECODE=1','-e','HERMES_HOME=/tmp/hermes',
-        '-e','HERMES_WRITE_SAFE_ROOT=/tmp','-e','TERMINAL_ENV=local','-e','TERMINAL_CWD=/tmp',
+        '-e','HERMES_WRITE_SAFE_ROOT='+root,'-e','TERMINAL_ENV=local','-e','TERMINAL_CWD='+root,
+        *(['--cap-drop','ALL','--cap-add','SETUID','--cap-add','SETGID',
+           '--tmpfs','/workspace:rw,size=1m,mode=1777','-e','DELIVERY_EXECUTION_MODE=implementation',
+           '-e','HERMES_FENCED_INPLACE_WRITES=1','-e','DELIVERY_PROBE_REQUIRE_OBSERVATION=1'] if observed else []),
         '-v',str(probe)+':/probe_patch_persistence.py:ro','--entrypoint','python',image,
         '/probe_patch_persistence.py']
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--image',required=True);options=parser.parse_args()
-    result=subprocess.run(command(options.image),capture_output=True,text=True)
+    parser.add_argument('--image',required=True);parser.add_argument('--observed',action='store_true');options=parser.parse_args()
+    result=subprocess.run(command(options.image,options.observed),capture_output=True,text=True)
     if result.returncode:
         raise ValueError('synthetic installed-handler qualification failed; no authorization issued')
     receipt=json.loads(result.stdout)

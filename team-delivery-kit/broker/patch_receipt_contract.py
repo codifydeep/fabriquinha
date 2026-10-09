@@ -7,6 +7,7 @@ Final filesystem/snapshot hashes still decide whether a delivery changed.
 import ast
 import hashlib
 import json
+import re
 
 
 def receipt(tool, raw):
@@ -19,12 +20,25 @@ def receipt(tool, raw):
     success=value.get('success') is True and not value.get('error')
     noop=value.get('no_change') is True or value.get('already_applied') is True
     changed=bool(success and not noop and known_diff)
-    return dict(operation='patch_handler_receipt_v1',success=bool(success),
+    result=dict(operation='patch_handler_receipt_v1',success=bool(success),
                 no_change=noop,changed=changed,
                 diff_sha256=hashlib.sha256(diff.encode()).hexdigest() if known_diff else None,
                 diff_bytes=len(diff.encode()) if known_diff else 0,
                 evidence_scope='original_handler_result_not_final_snapshot',
                 delivery_approval=False,author_retry_authorized=False)
+    observation=value.get('_patch_persistence_v1')
+    if (isinstance(observation,dict) and set(observation)=={'operation','path','before_sha256',
+            'after_sha256','changed','evidence_scope','delivery_approval','author_retry_authorized'}
+            and observation['operation']=='handler_test_hash_observation_v1'
+            and isinstance(observation['path'],str) and len(observation['path'])<=240
+            and re.fullmatch(r'tests/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py',observation['path'])
+            and all(re.fullmatch(r'[a-f0-9]{64}',str(observation[k])) for k in ('before_sha256','after_sha256'))
+            and type(observation['changed']) is bool
+            and observation['changed']==(observation['before_sha256']!=observation['after_sha256'])
+            and observation['evidence_scope']=='immediate_handler_observation_not_final_snapshot'
+            and observation['delivery_approval'] is False and observation['author_retry_authorized'] is False):
+        result['test_hash_observation']=observation
+    return result
 
 
 ANCHOR='    data = _json_loads_maybe(result)\n    path = str((args or {}).get("path") or "file").strip()\n'

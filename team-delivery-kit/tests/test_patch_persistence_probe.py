@@ -38,3 +38,10 @@ class PatchPersistenceTests(unittest.TestCase):
         self.assertIn('com.docker.compose.project=delivery-kit-port2-tests',cmd)
         self.assertFalse(any('docker.sock' in v or 'TOKEN=' in v for v in cmd))
         with self.assertRaises(ValueError):command('latest')
+
+    def test_observed_fixture_bootstraps_root_owner_then_drops_to_worker(self):
+        cmd=command('sha256:'+'a'*64,True)
+        self.assertIn('HERMES_FENCED_INPLACE_WRITES=1',cmd)
+        self.assertIn('DELIVERY_PROBE_REQUIRE_OBSERVATION=1',cmd)
+        self.assertEqual(cmd[cmd.index('--cap-drop')+1],'ALL')
+        self.assertEqual(cmd.count('-v'),1)

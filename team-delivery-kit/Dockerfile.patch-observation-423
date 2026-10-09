@@ -1,0 +1,7 @@
+# Verified local base: sha256:4f97a71a1708a8148ccf6e257a34ac16029ad6090f36900ea22931ff07a60691
+FROM delivery-kit-execution-broker:20261009.422
+COPY broker/patch_persistence_observer.py /patch_persistence_observer.py
+COPY broker/patch_persistence_observer.py /opt/hermes/patch_persistence_observer.py
+COPY broker/patch_receipt_contract.py /patch_receipt_contract.py
+COPY broker/patch_receipt_contract.py /opt/hermes/patch_receipt_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python /patch_persistence_observer.py
