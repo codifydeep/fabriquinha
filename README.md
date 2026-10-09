@@ -970,6 +970,10 @@ a proposta do CTO é vinculada ao snapshot e recebe revisão independente do Tec
 Lead, sem autorizar execução, mudar testes ou resetar tentativas. A instalação de
 referência só ativará esse caminho após validar seu adaptador de execução limitado;
 uma revisão de plano não é uma entrega nem evidência de autonomia completa.
+O helper de preparação já possui seleção separada, vinculada por hashes, para
+reaproveitar código parcial autorizado sem substituir testes ou políticas. Esse
+transporte permanece inativo no controlador até a validação da admissão limitada;
+reiniciar a preparação não sobrescreve o progresso existente do autor.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.

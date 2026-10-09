@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from portable_contract import validate, safe_path, MAX_FILE_BYTES
+from portable_contract import validate, safe_path, is_test_path, MAX_FILE_BYTES
 
 BASE = Path('/base')
 WORK = Path('/workspace')
@@ -13,27 +13,48 @@ FILES = ('AGENTS.md', 'calc.py', 'test_calc.py')
 
 
 def revision_contents(contract, baseline):
-    """Read only controller-selected NEW tests from a hash-bound frozen Red."""
+    """Copy hash-bound selections supplied only by the controller's seed helper.
+
+    Product selection is a transport primitive, not execution authorization.
+    Admission must first verify the independently reviewed, bounded replan.
+    Legacy Red selections continue to copy NEW tests only.
+    """
     raw = os.environ.get('REVISION_SEED_JSON')
     if raw is None:
         return {}
     selection = json.loads(raw)
     if (not contract or not isinstance(selection, dict)
             or set(selection) not in ({'manifest_sha256', 'test_sha256'},
-                                      {'manifest_sha256','test_sha256','repair_input_bytes'})
+                                      {'manifest_sha256','test_sha256','repair_input_bytes'},
+                                      {'manifest_sha256','test_sha256','product_sha256','bounded_execution'})
             or not isinstance(selection['test_sha256'], dict) or not selection['test_sha256']):
         raise ValueError('invalid revision seed selection')
     names = set(selection['test_sha256'])
     if (names & set(baseline) or not names <= set(contract['test_files']) & set(contract['editable_files'])):
         raise ValueError('revision seed may only copy declared NEW tests')
+    products=selection.get('product_sha256',{})
+    if 'product_sha256' in selection:
+        binding=selection['bounded_execution']
+        if (not isinstance(products,dict) or not products
+                or not isinstance(binding,dict)
+                or set(binding)!={'operation','source_task','plan_sha256'}
+                or binding['operation']!='reviewed_failed_candidate_seed_v1'
+                or not isinstance(binding['source_task'],str) or not binding['source_task']
+                or not isinstance(binding['plan_sha256'],str)
+                or len(binding['plan_sha256'])!=64
+                or any(c not in '0123456789abcdef' for c in binding['plan_sha256'])
+                or not set(products)<=set(contract['editable_files'])-set(contract['test_files'])-set(contract['protected_files'])
+                or any(is_test_path(p,root,contract['test_command'][0])
+                       for p in products for root in contract['test_roots'])):
+            raise ValueError('bounded product-only seed selection required')
     repair=selection.get('repair_input_bytes',{})
     if (not isinstance(repair,dict) or not set(repair)<=names
             or any(type(v) is not int or not 32768<v<=65536 for v in repair.values())):
         raise ValueError('bounded historical repair input required')
-    def read(name):
+    def read(name, product=False):
         safe_path(name)
         path = PREVIOUS / name
-        limit=repair.get(name,32768)
+        limit=MAX_FILE_BYTES if product else repair.get(name,32768)
         if (path.is_symlink() or not path.is_file() or path.stat().st_size > limit
                 or any(parent.is_symlink() for parent in
                        list(path.parents)[:len(Path(name).parts) - 1])):
@@ -53,6 +74,12 @@ def revision_contents(contract, baseline):
                 or frozen['files'].get(name) != {'sha256': digest, 'bytes': len(data)}):
             raise ValueError('revision seed test hash mismatch')
         result[name] = data
+    for name,expected in products.items():
+        data=read(name,product=True)
+        digest=hashlib.sha256(data).hexdigest()
+        if (digest!=expected or frozen['files'].get(name)!={'sha256':digest,'bytes':len(data)}):
+            raise ValueError('revision seed product hash mismatch')
+        result[name]=data
     return result
 
 

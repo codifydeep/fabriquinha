@@ -13,6 +13,63 @@ from test_portable_contract import contract
 
 
 class RevisionSeedTests(unittest.TestCase):
+    def candidate_selection(self, products):
+        files={self.name:self.data, **products}
+        for name,data in products.items():
+            path=self.previous/name
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_bytes(data)
+        encoded=json.dumps({'files':{name:{'sha256':hashlib.sha256(data).hexdigest(),
+            'bytes':len(data)} for name,data in files.items()}}).encode()
+        (self.previous/'manifest.json').write_bytes(encoded)
+        return {**self.selection,'manifest_sha256':hashlib.sha256(encoded).hexdigest(),
+            'product_sha256':{name:hashlib.sha256(data).hexdigest() for name,data in products.items()},
+            'bounded_execution':{'operation':'reviewed_failed_candidate_seed_v1',
+                'source_task':'source-1','plan_sha256':'a'*64}}
+
+    def test_reviewed_candidate_seeds_product_and_preserves_baseline_and_frozen_tests(self):
+        product=b'# partial product\n'+b'x'*40000
+        selection=self.candidate_selection({'app.py':product})
+        with patch.dict(os.environ,{'REVISION_SEED_JSON':json.dumps(selection)}):
+            seed.main()
+            self.assertEqual((self.work/'app.py').read_bytes(),product)
+            self.assertEqual((self.work/self.name).read_bytes(),self.data)
+            self.assertEqual((self.work/'tests/test_old.py').read_bytes(),
+                             b'def test_old(): assert True')
+            (self.work/'app.py').write_bytes(b'new author progress')
+            seed.main()
+            self.assertEqual((self.work/'app.py').read_bytes(),b'new author progress')
+        self.assertEqual((self.previous/'app.py').read_bytes(),product)
+
+    def test_product_seed_cannot_replace_tests_policy_or_undeclared_files(self):
+        for name in ('tests/test_old.py',self.name,'AGENTS.md','unknown.py'):
+            selection=self.candidate_selection({name:b'forbidden'})
+            with patch.dict(os.environ,{'REVISION_SEED_JSON':json.dumps(selection)}):
+                with self.assertRaises(ValueError):seed.main()
+            self.assertEqual(list(self.work.iterdir()),[])
+
+    def test_candidate_product_hash_drift_and_missing_execution_binding_rejected(self):
+        selection=self.candidate_selection({'app.py':b'partial'})
+        for invalid in ({**selection,'product_sha256':{'app.py':'b'*64}},
+                        {k:v for k,v in selection.items() if k!='bounded_execution'},
+                        {**selection,'bounded_execution':{}}):
+            with patch.dict(os.environ,{'REVISION_SEED_JSON':json.dumps(invalid)}):
+                with self.assertRaises(ValueError):seed.main()
+            self.assertEqual(list(self.work.iterdir()),[])
+
+    def test_candidate_product_symlink_and_oversize_rejected_before_copy(self):
+        selection=self.candidate_selection({'app.py':b'partial'})
+        (self.previous/'app.py').unlink()
+        (self.previous/'app.py').symlink_to(self.base/'app.py')
+        with patch.dict(os.environ,{'REVISION_SEED_JSON':json.dumps(selection)}):
+            with self.assertRaisesRegex(ValueError,'unsafe revision'):seed.main()
+        self.assertEqual(list(self.work.iterdir()),[])
+        (self.previous/'app.py').unlink()
+        selection=self.candidate_selection({'app.py':b'x'*(seed.MAX_FILE_BYTES+1)})
+        with patch.dict(os.environ,{'REVISION_SEED_JSON':json.dumps(selection)}):
+            with self.assertRaisesRegex(ValueError,'unsafe revision'):seed.main()
+        self.assertEqual(list(self.work.iterdir()),[])
+
     def test_oversized_historical_input_requires_explicit_hash_bound_repair_admission(self):
         data=self.data+b'#'+b'x'*38000
         (self.previous/self.name).write_bytes(data)
