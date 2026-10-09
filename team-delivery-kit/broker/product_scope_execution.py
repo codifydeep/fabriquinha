@@ -123,6 +123,12 @@ class NativeEffects:
         # Do not substitute UI projections for controller-bound full read pages.
         return observed_hashes(messages,expected)
 
+    def delivery_reads(self,task):
+        with self.b.db() as con:durable=read_stream_receipts.load(con,task['id'])
+        # Only task/request-bound full handler results are authoritative. Model
+        # statements and truncated UI transcripts cannot substitute inspection.
+        return coverage(read_stream_receipts.merge([],durable))
+
 
 def save(b,before,after):
     with b.LOCK,b.db() as con:return ledger.save_transition(con,before,after)

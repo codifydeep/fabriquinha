@@ -191,3 +191,10 @@ continuam exatos. Uma recuperação separada pode observar o mesmo job registrad
 quando essa era a única diferença, o contêiner ainda está `created`, os prazos
 originais não expiraram e todas as identidades reautenticam. Não recria o job,
 não altera seu prazo nem repete a criação; jobs já iniciados não são elegíveis.
+Uma aprovação de suíte, mesmo independente e verde, não qualifica publicação
+da entrega com escopo revisado sem inspeção real. O gate requer recibos completos
+de leitura do código autorizado e dos testes congelados, ligados à tarefa e
+request do reviewer pelo transporte do controlador. Afirmações textuais ou
+transcrições truncadas da interface não substituem essas leituras. Aprovações
+anteriores sem inspeção permanecem históricas, mas não são prova suficiente
+para liberar merge ou implantação; exigem revalidação independente.

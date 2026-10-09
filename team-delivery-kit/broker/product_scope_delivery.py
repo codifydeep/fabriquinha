@@ -32,11 +32,20 @@ def qualified(b,issue,delivery,effects=None):
             or delivery['author']!=selected['author'] or delivery['reviewer']==delivery['author']
             or not tdd_row):raise ValueError('exact independent approved scope delivery required')
     fx=effects or execution.NativeEffects(b)
+    review_task=None
     for role,key in (('author','source_task'),('reviewer','review_task')):
         task=fx.task(delivery[key],delivery[role])
         if (task.get('id')!=delivery[key] or task.get('agent_id')!=delivery[role]
                 or task.get('issue_id')!=issue or task.get('status')!='completed'):
             raise ValueError('completed exact native delivery and review required')
+        if role=='reviewer':review_task=task
+    read_paths={'/delivery/'+p.removeprefix('/workspace/') for p in configuration['editable_paths']}
+    read_paths.update('/delivery/'+p for p in selected['frozen_test_sha256'])
+    reads=fx.delivery_reads(review_task)
+    if (not read_paths or any(type(reads.get(path,{}).get('lines')) is not int
+            or reads[path]['lines']<=0 or reads[path]['lines']!=reads[path].get('total_lines')
+            for path in read_paths)):
+        raise ValueError('complete independent scoped code and frozen test inspection required')
     volume=b.docker('GET','/volumes/'+delivery['volume'])
     if (not volume or volume.get('Name')!=delivery['volume'] or volume.get('Labels',{}).get('delivery-kit.owner')!=b.OWNER
             or volume.get('Labels',{}).get('delivery-kit.source-task')!=delivery['source_task']):

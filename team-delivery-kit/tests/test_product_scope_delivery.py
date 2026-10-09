@@ -30,6 +30,11 @@ class ProductScopeDeliveryTests(unittest.TestCase):
             if path=='/volumes/candidate' else prior(method,path,payload))
         self.fx=Mock()
         self.fx.task.side_effect=lambda task,actor:dict(id=task,agent_id=actor,issue_id='issue',status='completed')
+        from broker import product_scope_worker
+        configuration=product_scope_worker.selection(self.b,'issue','new-author')
+        paths={'/delivery/'+p.removeprefix('/workspace/') for p in configuration['editable_paths']}
+        paths.update('/delivery/'+p for p in self.bound['frozen_test_sha256'])
+        self.fx.delivery_reads.return_value={p:dict(lines=10,total_lines=10) for p in paths}
         self.original=self.f.f.f.f.f.original
 
     def test_exact_scope_delivery_preserves_independent_review_and_all_other_gates(self):
@@ -48,6 +53,17 @@ class ProductScopeDeliveryTests(unittest.TestCase):
         with self.b.db() as con:con.execute("UPDATE reviews SET status='approved'")
         self.fx.task.side_effect=lambda task,actor:dict(id=task,agent_id=actor,issue_id='issue',status='failed')
         with self.assertRaises(ValueError):gate.qualified(self.b,'issue',self.delivery,self.fx)
+
+    def test_tests_only_approval_or_partial_code_inspection_cannot_publish(self):
+        complete=copy.deepcopy(self.fx.delivery_reads.return_value)
+        self.fx.delivery_reads.return_value={}
+        with self.assertRaisesRegex(ValueError,'complete independent scoped code'):
+            gate.qualified(self.b,'issue',self.delivery,self.fx)
+        for path in complete:
+            for incomplete in ({},{'lines':9,'total_lines':10},{'lines':0,'total_lines':0},{'lines':True,'total_lines':True}):
+                self.fx.delivery_reads.return_value=dict(complete,**{path:incomplete})
+                with self.subTest(path=path,incomplete=incomplete),self.assertRaises(ValueError):
+                    gate.qualified(self.b,'issue',self.delivery,self.fx)
 
     def test_tdd_scope_bridge_cannot_be_swapped_or_weakened_before_publication(self):
         for mutation in ({'delivery_manifest_sha256':'0'*64},{'delivery_approval':True},{'historical_red_recreated':True},
