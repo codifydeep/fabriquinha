@@ -6,6 +6,7 @@ Multica wakeup lookup recovers a POST accepted before a connection failure.
 import hashlib
 import json
 import re
+import sqlite3
 import time
 
 
@@ -442,6 +443,10 @@ def reconcile(con, route, runs, effects, *, now=None):
             if wake is None:return 'recovery_wakeup_observation'
             failed_candidate_execution.record_wakeup(con,issue,grant['dispatch_marker'],wake['id'])
         recovery=failed_candidate_execution.observe_author(con,route,source)
+        # Persist execution binding/termination before validators write through
+        # their own connection. Holding this writer makes freezing deadlock on
+        # the controller itself, not on the product database.
+        con.commit()
     for old in con.execute("SELECT * FROM delivery_handoffs WHERE issue_id=? AND source_task<>? "
                            "AND stage NOT IN ('approved','superseded')", (issue, key)).fetchall():
         previous_data = json.loads(old['data'])
@@ -770,6 +775,18 @@ def reconcile(con, route, runs, effects, *, now=None):
                 if isinstance(error, ValidationPending):
                     data['validation_observation'] = str(error)[:240]
                     return save(con, key, issue, 'validation_pending', route['reviewer'], data, now)
+                if (isinstance(error,sqlite3.OperationalError) and
+                        (getattr(error,'sqlite_errorcode',None) in (sqlite3.SQLITE_BUSY,sqlite3.SQLITE_LOCKED)
+                         or str(error) in ('database is locked','database table is locked'))):
+                    wait=data.setdefault('sqlite_validation_wait',dict(task_id=key,first_seen=now,
+                        observations=0,delivery_approval=False,author_restarted=False))
+                    if wait['task_id']!=key:raise ValueError('SQLite validation wait identity drift')
+                    wait['observations']+=1
+                    if wait['observations']>2:
+                        data.update(error='sqlite_validation_contention_repeated',error_type='infrastructure',
+                            required_action='CTO diagnose controller persistence; do not revise product or tests')
+                        return save(con,key,issue,'technical_decision_required',route['cto'],data,now)
+                    return save(con,key,issue,'validation_pending',route['reviewer'],data,now)
                 # All errors remain durable. Only bounded infrastructure retries;
                 # invalid artifacts go straight to technical diagnosis.
                 data.update(error=str(error)[:240], error_type=type(error).__name__)

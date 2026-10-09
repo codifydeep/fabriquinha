@@ -620,6 +620,9 @@ def error_stage(previous, data, cto, count):
 
 
 def tick(broker):
+    try:import validation_sqlite_recovery
+    except ImportError:from broker import validation_sqlite_recovery
+    validation_sqlite_recovery.tick(broker)
     try:import failed_candidate_bootstrap
     except ImportError:from broker import failed_candidate_bootstrap
     failed_candidate_bootstrap.tick(broker)

@@ -730,6 +730,14 @@ dispatch, falha, contadores e grant originais; não aprova entrega nem autoriza
 enfraquecer testes. Falha depois de um prompt, drift ou repetição ficam bloqueados.
 Esse caminho não substitui a qualificação ponta a ponta da autonomia.
 
+A conclusão de uma execução é persistida antes de validadores abrirem outra
+conexão SQLite. Contenção do banco do controlador é espera de infraestrutura,
+nunca evidência de defeito de produto ou dos testes. A observação é limitada;
+contenção repetida fica visível para diagnóstico sem gastar tentativas do autor.
+A recuperação de uma falha antiga reabre somente a validação da mesma execução
+concluída, preservando o diagnóstico anterior, contadores e provas de TDD.
+Ela não repete implementação, não aceita um parecer e não altera critérios.
+
 O controle de manutenção tem estado persistente,
 sem endpoint para os workers. `drain` suspende novas reconciliações; tarefas já
 existentes podem concluir normalmente. `seal` exige inventário nativo completo,

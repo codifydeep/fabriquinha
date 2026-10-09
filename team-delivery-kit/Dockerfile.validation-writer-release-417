@@ -1,0 +1,8 @@
+# Verified local base: sha256:df4ec45abbbd7b8605ddcb536ede0289cc940f3affe0fc7df189e3418050491a
+FROM delivery-kit-execution-broker:20261009.416
+COPY broker/handoffs.py /handoffs.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/validation_sqlite_recovery.py /validation_sqlite_recovery.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import handoffs,handoff_runtime,validation_sqlite_recovery"

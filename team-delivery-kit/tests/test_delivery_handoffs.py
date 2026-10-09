@@ -599,6 +599,38 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(self.tick([dict(author,status='failed')],now=130),'technical_decision_required')
         self.assertEqual(len(self.effects.created),1)
 
+    def test_replan_completion_releases_writer_before_freezing_on_second_connection(self):
+        execution=self.bounded_replan_setup()
+        self.tick(now=100)
+        old=json.loads(handoffs.load(self.con,'source')['data'])
+        author=dict(id='new-author',issue_id='issue',agent_id='author',status='running',
+            wakeup_id=old['wakeup_id'],created_at='9999')
+        self.tick([author],now=110)
+        self.con.execute('CREATE TABLE validation_probe(task TEXT)');self.con.commit()
+        def freeze(task):
+            with sqlite3.connect(self.path,timeout=0.05) as nested:
+                nested.execute('INSERT INTO validation_probe VALUES(?)',(task,))
+            return {'task_id':task,'volume':'frozen','status':'complete'}
+        self.effects.freeze=freeze
+        self.tick([dict(author,status='completed')],now=120)
+        data=json.loads(handoffs.load(self.con,'new-author')['data'])
+        self.assertNotIn('error',data)
+        self.assertIn('evidence',data)
+        self.assertEqual(execution.load(self.con,'issue')['status'],'awaiting_delivery_validation')
+        self.assertEqual(self.con.execute('SELECT task FROM validation_probe').fetchone()[0],'new-author')
+
+    def test_busy_sqlite_is_infrastructure_wait_not_test_defect_or_author_attempt(self):
+        self.effects.failure=sqlite3.OperationalError('database is locked')
+        self.assertEqual(self.tick(now=100),'validation_pending')
+        data=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertEqual(data['attempts'],0)
+        self.assertEqual(data['sqlite_validation_wait']['observations'],1)
+        self.assertFalse(self.effects.created)
+        self.assertEqual(self.tick(now=110),'validation_pending')
+        self.assertEqual(self.tick(now=120),'technical_decision_required')
+        self.assertEqual(json.loads(handoffs.load(self.con,'source')['data'])['attempts'],0)
+        self.assertFalse(self.effects.created)
+
     def test_unknown_replan_post_ack_observes_same_wakeup_before_new_author_binding(self):
         execution=self.bounded_replan_setup();self.effects.lose_response=True
         with self.assertRaises(OSError):self.tick(now=100)
