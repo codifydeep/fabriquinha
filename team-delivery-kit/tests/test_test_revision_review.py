@@ -787,6 +787,7 @@ class RevisionReviewTests(unittest.TestCase):
         self.initial_submission();revision.reconcile(self.broker,self.route,[],self.effects,self.red)
         with self.db() as con:state=json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
         state.update(status='blocked',reason='Observed coverage lost',review_task='independent-review',
+            evidence_policy=1,comparison={'files':{}},
             rejection_diagnosis=dict(status='dispatch_intent',target='cto',schema_recovery={
                 'failed_task':'failed-schema-cto','attempt_limit':1,'delivery_approval':False}))
         revision.reconcile_rejection(self.broker,self.route,[],self.effects,self.red,

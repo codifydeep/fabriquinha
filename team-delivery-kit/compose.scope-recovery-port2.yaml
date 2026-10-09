@@ -3,6 +3,6 @@
 # No scope route is enabled merely by installing these images.
 services:
   execution-broker:
-    image: sha256:27ac3fb18d99851689a7921783dbb76609ecded737a27d4b75ed02fe3503114e
+    image: sha256:6d129cdfbe078f2d03d93ecf304ab1e81a35c556373c2ae0992515d6e635d504
   model-proxy:
     image: sha256:1aabfd7b108acd31098463662ccef7db2da5bc1c22da9892749bbc80d240da84

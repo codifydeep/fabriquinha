@@ -910,13 +910,7 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
             instruction += evidence_instruction(state)
             instruction += '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
         if schema_recovery:
-            instruction += ('\nONE FRESH READ-ONLY DIAGNOSIS after a schema-rejected submission. '
-                'The old invalid decision is not recovered. No missing legacy constraint is inferred. '
-                'Read both trees again; submit exactly one schema-valid decision with action, reason, '
-                'optional_files and findings. reason target400characters/max1200; findings1-3; '
-                'quote/expected/observed target200characters/max500, line integer. Use only actual '
-                'observed locations. No prose outside the typed submission; no approval or writes. '
-                'If this fails, preserve the incident; no identical repeat is admitted.\n')
+            instruction=schema_recovery_instruction(state,paths)
         diagnosis.update(status='dispatch_intent', marker=marker, target=cto)
         _save_rejection(broker, route, state)
         wakeup = effects.ensure_wakeup(route['issue_id'], cto, source,
@@ -960,6 +954,24 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
             diagnosis.update(status='blocked', reason='invalid_cto_test_review_diagnosis:' + type(error).__name__,
                              failure={**failure, 'error_type': type(error).__name__, 'detail': str(error)[:300]})
     _save_rejection(broker, route, state)
+
+
+def schema_recovery_instruction(state,paths):
+    """Compact controller policy; finding and immutable evidence stay intact."""
+    return ('ONE FRESH READ-ONLY DIAGNOSIS after schema rejection; not a recovered verdict. '
+        'No missing legacy constraint is inferred. Re-read every frozen path. '
+        'Original acceptance criteria stay binding; assess the reviewer claim independently. '
+        'Only sponsor a NEW child on the original base or escalate; never approve, write or execute shell. '
+        'Distinguish pre-submit/pending observations and real browser dispatch from listener calls. '
+        'Submit exactly one typed decision: action=request_test_revision|escalate_cto, '
+        'reason target400/max1200 chars, optional_files=[], findings1-3. '
+        'Observed quote/expected/observed target200/max500 chars; line integer. '
+        'No prose outside submission. Failure stays visible without another identical attempt. '
+        'Reviewer claim (not unquestionable truth): '+state['reason']+'\n'
+        'DELIVERY_STRUCTURED_DECISION_V1:technical\n'+
+        ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in paths)+
+        evidence_instruction(state)+
+        '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n')
 
 
 def evidence_instruction(state):

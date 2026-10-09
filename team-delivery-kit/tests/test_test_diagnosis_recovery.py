@@ -106,3 +106,14 @@ class DiagnosisRecoveryTests(unittest.TestCase):
             self.assertEqual(saved['rejection_diagnosis']['status'],'dispatch_intent')
             self.assertEqual(json.loads(handoff['data'])['rejection_diagnosis'],saved['rejection_diagnosis'])
             self.assertFalse(result['delivery_approval'])
+
+    def test_recovery_policy_fits_native_bound_without_truncating_finding(self):
+        from broker.test_revision_review import schema_recovery_instruction
+        reason='x'*1200
+        state={'reason':reason,'comparison':{'files':{}}}
+        paths=['/evidence/'+tree+'/tests/test_feedback_latest_ui.py' for tree in ('candidate','previous')]
+        note=schema_recovery_instruction(state,paths)
+        self.assertLessEqual(len('DELIVERY_HANDOFF '+'a'*64+'\n'+note),4000)
+        self.assertIn(reason,note)
+        for path in paths:self.assertIn(path,note)
+        self.assertIn('DELIVERY_TYPED_TEST_DIAGNOSIS_V1',note)
