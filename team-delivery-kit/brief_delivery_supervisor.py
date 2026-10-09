@@ -133,6 +133,9 @@ def main():
             from planning_constraint_recovery import pending as constraint_pending
             from start_eval import cli
             registry=json.loads((PRIVATE/'planning-agents.json').read_text())
+            from planning_presentation import resume as presentation_resume
+            if presentation_resume(state,config['selection'],registry,cli,PROJECT) is not None:
+                return True
             from planning_semantic_escalation import pending as semantic_pending
             if semantic_pending(state,config['selection'],registry,cli,
                                 ROOT/'projects'/config['project_config']):

@@ -250,7 +250,10 @@ def capability_context(selection, *, compact=False):
                 'No additional cards. Runner exactly '
                 '["python3","-m","unittest","discover","-s",".","-q"]. '
                 'Keep Python stdlib/vanilla. No existing-test edits. Each files array includes '
-                'one NEW unique tests/test_<name>.py plus product paths within: '+json.dumps(scope_data,separators=(',',':')))
+                'one NEW unique tests/test_<name>.py plus product paths within: '+json.dumps(scope_data,separators=(',',':'))+
+                '. CI/deploy/QA are controller gates, not implementation cards. '
+                'No partial tests, pytest, shell strings, Docker commands or claimed execution. '
+                'These paths constrain a proposal, not permission to execute it.')
     return ('\n\nCONTROLLER-VERIFIED CAPABILITIES: This qualification supports exactly '
             'two implementation cards, C1 backend_data then C2 frontend depending on C1. '
             'CI/deployment/QA are controller gates, not extra implementation cards. '
@@ -435,6 +438,12 @@ def main():
     if replanned is not None:
         existing = replanned
         save_receipt(ledger_path, existing)
+    from planning_presentation import resume as presentation_resume
+    from evalctl import PROJECT as presentation_namespace
+    presented= presentation_resume(existing,selection,registry,cli,presentation_namespace)
+    if presented is not None:
+        existing=presented
+        save_receipt(ledger_path,existing)
     clarified = source_clarification(existing)
     if clarified:
         existing = clarified
@@ -669,6 +678,15 @@ def main():
             context=replan_prompt(ledger,body,capability_context(selection,compact=True))
         answer = None
         try:
+            if len(context)>8000 and selection['configuration_sha256']:
+                from planning_presentation import present
+                context,proof=present(context,capabilities,capability_context(selection,compact=True))
+                if proof:
+                    previous=ledger.setdefault('context_presentations',{}).get(role)
+                    if previous is not None and previous!=proof:
+                        raise ValueError('planning policy presentation drift')
+                    ledger['context_presentations'][role]=proof
+                    save_receipt(ledger_path,ledger)
             issue_id = issue_for(role, context, registry['agents'][role],
                                  retry=retry, recovery=recovery, schema=schema,
                                  run_name=name+'-S1' if role=='techlead' and semantic.get('stage')=='awaiting_replan' else name,

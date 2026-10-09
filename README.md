@@ -46,6 +46,15 @@ as recomendações como dados históricos, nunca requisitos atuais ou permissõe
 Essa recuperação e a leitura pelo controlador foram verificadas; consumo por
 agentes em um novo ciclo completo continua pendente de qualificação.
 
+Um contexto de planejamento acima do limite pode substituir somente a apresentação
+das políticas do controlador por uma versão concisa dos mesmos gates e escopos.
+Brief, propostas aceitas e memória histórica permanecem byte-idênticos, com hashes
+antes/depois. A recuperação de um bloqueio anterior ao despacho exige fontes
+nativas concluídas e revalidadas, nenhuma issue do Tech Lead existente e uma única
+retomada registrada. Não aumenta limites, reexecuta autores ou concede aprovação.
+A instalação dessa correção durante BRIEFLATEST-1 conta como intervenção do operador:
+mesmo que a entrega termine, esse ciclo não comprova autonomia integral sem reparos.
+
 No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
 formal comprovada podem abrir um diagnóstico independente do CTO. O controlador
 confere identidade, configuração, base, leases encerrados e hashes das propostas;
