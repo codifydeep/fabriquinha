@@ -974,6 +974,12 @@ O helper de preparação já possui seleção separada, vinculada por hashes, pa
 reaproveitar código parcial autorizado sem substituir testes ou políticas. Esse
 transporte permanece inativo no controlador até a validação da admissão limitada;
 reiniciar a preparação não sobrescreve o progresso existente do autor.
+O ledger de admissão registra uma única execução por issue, preserva o contador
+anterior e exige intenção durável antes do efeito nativo. Uma falha dessa execução
+continua bloqueada sob responsabilidade técnica; conclusão do worker exige nova
+validação e não aprova a entrega. A integração instalada ainda precisa verificar
+os fatos diretamente nos validadores, snapshots e identidades nativas antes de
+ativar esse ledger; ele não é uma ferramenta disponível aos agentes.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.
