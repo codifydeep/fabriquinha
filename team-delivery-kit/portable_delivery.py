@@ -1034,6 +1034,10 @@ def reconcile(context, contract):
         raise QualityBlocked(incident) from error
     receipt['stage'] = 'deployed_qa_passed'
     save_receipt(RECEIPT, receipt)
+    # Historical facts do not transfer this delivery's permissions or approval.
+    if RUN_SPEC and RUN_SPEC.get('browser_qa'):
+        from delivery_memory import record as remember_delivery
+        remember_delivery(PRIVATE, 'https://github.com/' + REPOSITORY, INSTANCE, LABEL)
     return receipt
 
 

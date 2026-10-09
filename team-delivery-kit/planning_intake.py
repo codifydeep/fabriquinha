@@ -176,6 +176,24 @@ def tracked_base(selection):
         'ls-tree', '-r', '--name-only', selection['base_sha']], text=True).splitlines()
 
 
+def historical_context(selection):
+    """Facts pinned once per fresh planning ledger; no cross-project summaries."""
+    if not selection['configuration_sha256'] or not (PRIVATE/'delivery-memory.sqlite').exists():
+        return ''
+    import subprocess
+    from project_selection import current
+    from evalctl import PROJECT as instance
+    from delivery_memory import context
+    project=current()
+    def ancestor(old,new):
+        result=subprocess.run(['git','-C',str(project['checkout']),
+            'merge-base','--is-ancestor',old,new],capture_output=True)
+        if result.returncode not in (0,1):raise ValueError('memory Git lineage unavailable')
+        return result.returncode==0
+    return context(PRIVATE,'https://github.com/'+project['repository'],instance,
+                   role='product',base_sha=selection['base_sha'],is_ancestor=ancestor)
+
+
 def validate_execution_plan(proposal, tracked):
     """A syntactically valid proposal can still be impossible to dispatch."""
     from portable_contract import is_test_path
@@ -535,6 +553,9 @@ def main():
         if budget['remaining'] < selection['minimum_calls']:
             raise ValueError('planning requires at least ' + str(selection['minimum_calls']) + ' model calls')
     ledger = existing or {'brief_sha256': digest, 'stage': 'planned', 'outputs': {}, 'issues': {}}
+    if not existing:
+        history=historical_context(selection)
+        if history:ledger['historical_delivery_context']=history
     capabilities = capability_context(selection)
     if selection['configuration_sha256']:
         ledger.update(configuration_sha256=selection['configuration_sha256'],
@@ -638,6 +659,7 @@ def main():
                         '"acceptance":["API tests pass"],"files":["app/server.js"],'
                         '"test_command":["node","--test"]}],"integration_order":["C1"]}.')
         context += capabilities
+        context += ledger.get('historical_delivery_context','')
         semantic=ledger.get('semantic_escalation') or {}
         if role=='techlead' and semantic.get('stage')=='awaiting_replan':
             context=replan_prompt(ledger,body,capability_context(selection,compact=True))

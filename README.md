@@ -11,6 +11,15 @@ a tentativa recusada e reconciliou o pai pela entrega do filho. Isso comprova
 essa recuperação específica em um ensaio assistido; não qualifica todo brief,
 memória entre releases ou instalação independente para terceiros.
 
+O controlador mantém também histórico factual de entregas concluídas, privado
+e separado por repositório e instalação. Novos planejamentos podem receber até
+dois registros revalidados por hash do recibo, QA no mesmo commit e ancestralidade
+Git, com validade de 30 dias. O contexto é fixado no ledger do planejamento para
+não mudar numa retomada. Esses fatos não carregam conversas, credenciais,
+aprovações antigas nem permissões. A memória semântica de decisões e aprendizados,
+com curadoria independente, e o uso desse histórico por agentes em um novo ciclo
+continuam pendentes de qualificação.
+
 No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
 formal comprovada podem abrir um diagnóstico independente do CTO. O controlador
 confere identidade, configuração, base, leases encerrados e hashes das propostas;
