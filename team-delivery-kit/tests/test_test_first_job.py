@@ -62,6 +62,19 @@ class TestFirstJobTests(unittest.TestCase):
         self.assertEqual(run(self.b,self.con,TASK,'red',self.payload,now=3),result)
         self.assertEqual(sum(method=='POST' and path.endswith('/start') for method,path in self.calls),1)
 
+    def test_failed_copy_preserves_stderr_before_helper_retirement(self):
+        with self.assertRaises(TimeoutError):self.call()
+        self.info['State']=dict(Status='exited',ExitCode=1)
+        observed=[]
+        def logs(*args,**kwargs):
+            observed.append(kwargs['include_stderr']);return 'ModuleNotFoundError: missing fixed helper dependency'
+        self.b.docker_stdout=logs
+        result=self.call(now=2)
+        self.assertEqual(observed,[True])
+        self.assertIn('ModuleNotFoundError',result['output'])
+        self.assertEqual(self.call(now=3),result)
+        self.assertEqual(observed,[True])
+
     def test_resume_flag_change_preserves_first_intent_and_other_drift_is_denied(self):
         with self.assertRaises(TimeoutError):self.call()
         self.info['State']['Status']='exited'

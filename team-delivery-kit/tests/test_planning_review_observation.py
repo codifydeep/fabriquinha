@@ -44,9 +44,29 @@ class PlanningReviewObservationTests(unittest.TestCase):
                 self.assertEqual(module.reconcile(b,'source'),recovered)
                 self.assertEqual(run.call_count,1)
                 payload=run.call_args.args[-1]
+                self.assertIn("sys.path.insert(0,'/')",payload['Cmd'][1])
+                self.assertIn("assert importlib.util.find_spec('acp_transport') is None",payload['Cmd'][1])
+                self.assertIn("assert importlib.util.find_spec('acp_transport') is not None",payload['Cmd'][1])
                 self.assertEqual(payload['HostConfig']['NetworkMode'],'none')
                 self.assertNotIn('Mounts',payload['HostConfig'])
                 self.assertEqual(recovered['planning_review_observation']['previous'],state)
+            # A failed immutable old launch is retained, not overwritten. The
+            # changed experiment gets one stable distinct job identity.
+            con.execute('UPDATE technical_remediation_plans SET state=?',(json.dumps(state),))
+            old_payload={**payload,'Cmd':['-c',program.read_text()]}
+            identity=dict(name='old-job',payload=old_payload)
+            old_result=dict(exit_code=1,container_id='retired-original',output='',output_sha256='old-output')
+            old_job=dict(stage='complete',result=old_result)
+            con.execute('INSERT INTO test_first_jobs VALUES(?,?,?)',(task_id+':copy',json.dumps(identity),json.dumps(old_job)))
+            b.docker=lambda *args:None
+            with patch.object(module,'Path',return_value=program),patch.object(module.plans,'Effects',return_value=fx),patch.object(module.plans.native,'issue_task_runs',return_value=[failed]),patch.object(module.test_first_job,'run',side_effect=[old_result,result]) as run:
+                repaired=module.reconcile(b,'source')
+                self.assertEqual(run.call_count,2)
+                self.assertNotEqual(run.call_args_list[0].args[2],run.call_args_list[1].args[2])
+                self.assertEqual(repaired['planning_review_probe_import_repair']['historical_probe_cause'],'unknown')
+                self.assertEqual(repaired['planning_review_probe_import_repair']['attempt_limit'],1)
+                self.assertEqual(module.reconcile(b,'source'),repaired)
+            self.assertEqual(json.loads(con.execute('SELECT state FROM test_first_jobs WHERE job_key=?',(task_id+':copy',)).fetchone()[0]),old_job)
 
     def setUp(self):
         self.config=dict(cto='cto',reviewer='lead')
