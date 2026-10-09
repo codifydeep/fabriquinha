@@ -950,6 +950,11 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
                 validate_evidence(broker, route, state, decision)
             diagnosis.update(status='revision_required', decision_task=task['id'],
                              decision=decision, read_evidence={p: reads[p] for p in paths})
+            if state.get('evidence_policy') and not protocol_task:
+                try:import test_review_replan_certificate
+                except ImportError:from broker import test_review_replan_certificate
+                state['technical_replan_certificate']=test_review_replan_certificate.qualify(
+                    route,state,red,task,decision,reads,config.get('initial_review',False))
         except (ValueError, KeyError, TypeError) as error:
             diagnosis.update(status='blocked', reason='invalid_cto_test_review_diagnosis:' + type(error).__name__,
                              failure={**failure, 'error_type': type(error).__name__, 'detail': str(error)[:300]})
@@ -1042,6 +1047,8 @@ def _save_rejection(broker, route, state):
         data['test_revision_proposal'] = {'decision_task': diagnosis['decision_task'],
             'source_task': state['source_task'], 'new_test_files': route['test_first_files'],
             'reason': diagnosis['decision']['reason']}
+        if state.get('technical_replan_certificate'):
+            data['test_revision_proposal']['output_sha256']=state['technical_replan_certificate']['output_sha256']
     if diagnosis['status'] == 'blocked':
         data['reason'] = diagnosis['reason']
     with broker.db() as con:

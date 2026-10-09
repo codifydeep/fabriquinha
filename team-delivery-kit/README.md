@@ -56,6 +56,15 @@ converte a tentativa em aprovação. O reconciliador normal valida a nova decis�
 Nova falha permanece bloqueada, sem repetição idêntica. Esse caminho não prova
 recuperação autônoma: sua admissão inicial ainda requer o operador.
 
+Replanejamentos após rejeição de testes usam o certificado
+`immutable-test-review-replan-v1`, distinto do certificado de falha de Green.
+Ele vincula a decisão real do CTO ao snapshot, à revisão independente e às
+leituras completas de candidato/anterior. O supervisor reobserva a decisão e
+seus achados antes de retomar a correção; não transforma o parecer em aprovação.
+O limite atual continua sendo uma revisão adicional no segundo nível. Falhas
+além desse limite exigem outra estratégia de diagnóstico, ainda não uma
+retentativa idêntica ilimitada.
+
 ## Convenções
 
 `broker/` concentra isolamento, autorização, handoffs e recuperação.

@@ -1,0 +1,5 @@
+# Qualified local base: sha256:6d129cdfbe078f2d03d93ecf304ab1e81a35c556373c2ae0992515d6e635d504
+FROM delivery-kit-execution-broker:20261009.406
+COPY broker/test_review_replan_certificate.py /test_review_replan_certificate.py
+COPY broker/test_revision_review.py /test_revision_review.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_review_replan_certificate,test_revision_review"

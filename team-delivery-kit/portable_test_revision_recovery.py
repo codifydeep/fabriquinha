@@ -222,7 +222,19 @@ def next_revision_depth(context, managed, depth):
     proposal = data.get('test_revision_proposal') or {}
     reads = proof.get('read_evidence') or {}
     paths = proof.get('required_read_paths') or []
-    if (depth != '1' or proof.get('version') != 'complete-source-replan-v1'
+    if proof.get('version')=='immutable-test-review-replan-v1':
+        diagnosis=data.get('rejection_diagnosis') or {}
+        if (proof.get('operation')!='qualified_immutable_test_cto_replan_v1'
+                or proof.get('manifest_sha256')!=data.get('manifest_sha256')
+                or proof.get('independent_review_task')!=data.get('review_task')
+                or proof.get('green_evidence') is not False or proof.get('delivery_approval') is not False
+                or diagnosis.get('status')!='revision_required'
+                or diagnosis.get('decision_task')!=proof.get('decision_task')
+                or proof.get('output_sha256')!=hashlib.sha256(json.dumps(diagnosis.get('decision'),
+                    sort_keys=True,separators=(',',':')).encode()).hexdigest()
+                or diagnosis.get('decision',{}).get('action')!='request_test_revision'):
+            raise ValueError('second test revision requires new technical replan')
+    if (depth != '1' or proof.get('version') not in ('complete-source-replan-v1','immutable-test-review-replan-v1')
             or proof.get('issue_id') != context['issue_id']
             or proof.get('source_task') != managed['state']['source_task']
             or proof.get('decision_task') != proposal.get('decision_task')

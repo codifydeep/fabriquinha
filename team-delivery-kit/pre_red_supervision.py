@@ -9,6 +9,7 @@ def recoverable(status):
     category=str((status or {}).get('category',''))
     return ((status or {}).get('stage')=='escalation_required' and
         (category.startswith('technical_decision_required:') or category in (
+            'test_revision_blocked:invalid_cto_test_review_diagnosis:ValueError',
             'test_first_blocked:test_first_correction_failed_after_cto_diagnosis',
             'test_revision_recovery:ValueError:second test revision requires new technical replan')))
 
@@ -82,6 +83,18 @@ with b.db() as c:
    observed=technical_replan_certificate.qualify(configuration,current,task,effects.decision(task),effects.read_evidence(task))==certificate
    print(json.dumps(dict(managed=dict(route=configuration,state=latest),issue_id=issue,
      contract_sha256=configuration['contract_sha256'],independent=configuration['cto']!=configuration['author'],
+     qualified=observed,task=task['id'],delivery_approval=False,author_retry_authorized=False)));sys.exit()
+  if latest['stage']=='test_revision_required' and certificate.get('operation')=='qualified_immutable_test_cto_replan_v1':
+   import test_review_replan_certificate,test_revision_review
+   settings=json.loads((b.STATE/'native.json').read_text());effects=handoff_runtime.Effects(b,settings)
+   task=native.task_record(settings,certificate['decision_task'],configuration['cto'])
+   redrow=c.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
+   configrow=c.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()
+   test_revision_review.validate_evidence(b,configuration,current,effects.decision(task))
+   observed=test_review_replan_certificate.qualify(configuration,current,json.loads(redrow[0]),task,
+      effects.decision(task),effects.read_evidence(task),json.loads(configrow[0]).get('initial_review',False))==certificate
+   print(json.dumps(dict(managed=dict(route=configuration,state=latest),issue_id=issue,
+     contract_sha256=configuration['contract_sha256'],independent=configuration['cto'] not in (configuration['author'],configuration['techlead']),
      qualified=observed,task=task['id'],delivery_approval=False,author_retry_authorized=False)));sys.exit()
   red=c.execute('SELECT task_id,receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()
   trial=c.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()
