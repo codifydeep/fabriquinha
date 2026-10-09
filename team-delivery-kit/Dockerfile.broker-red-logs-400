@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261009.399
+COPY broker/test_first_job.py /test_first_job.py
+COPY broker/red_log_recovery.py /red_log_recovery.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_first_job, red_log_recovery, test_first_handoffs"

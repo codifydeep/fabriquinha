@@ -96,7 +96,9 @@ def run(b,con,task,phase,payload,*,now=None):
         except TimeoutError:raise TimeoutError('observe test-first start; no repeated POST') from None
         info=b.docker('GET','/containers/'+info['Id']+'/json');verify(b,info,expected)
     if info['State']['Status']!='exited':raise TimeoutError('test-first job pending; observe existing execution')
-    output=b.docker_stdout(info['Id'],include_stderr=phase=='red',limit=65536)
+    # A normal unittest assertion can render a whole existing client file.
+    # Preserve bounded, complete evidence; never turn a clipped log into Red.
+    output=b.docker_stdout(info['Id'],include_stderr=phase=='red',limit=1048576 if phase=='red' else 65536)
     result=dict(container_id=info['Id'],exit_code=info['State']['ExitCode'],output=output,
         output_sha256=hashlib.sha256(output.encode()).hexdigest(),approval=False)
     save(stage='complete',result=result)

@@ -913,6 +913,9 @@ def reconcile(broker, route, runs, effects):
                                   data, time.time())
             return None
         if prior and prior['stage'] == 'technical_decision_required':
+            try: import red_log_recovery
+            except ImportError: from broker import red_log_recovery
+            if red_log_recovery.reconcile(broker,route,source,prior,effects): return None
             technical_recovery(broker, route, runs, source, prior, effects)
             return None
         if source['status'] in ('queued', 'dispatched', 'running'):

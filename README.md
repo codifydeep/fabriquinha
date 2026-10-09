@@ -18,6 +18,13 @@ completo permanece preservado. Uma falha de tamanho anterior ao despacho admite
 uma recuperação de transporte após conferir a execução e o hash do diagnóstico
 e a ausência da nova issue. Não reexecuta o CTO nem converte o ensaio em autônomo.
 
+A captura de Red conserva saída completa limitada a 1 MiB: assertions de testes
+podem incluir arquivos inteiros e ultrapassar 64 KiB. Uma falha antiga de captura
+admite leitura do mesmo job registrado, com identidade e isolamento revalidados;
+não recria contêiner, reexecuta testes nem reinicia o autor. Logs acima do limite
+continuam bloqueados, nunca truncados para produzir evidência válida. A retomada
+do supervisor exige recibo Red durável correspondente, sem aprovação de entrega.
+
 Correções de planos rejeitados usam referências a registros completos do controlador,
 vinculadas ao card, CTO, wakeup ativo e hash da revisão. O gateway expande esses
 registros sem truncamento e guarda um recibo de apresentação; referências antigas

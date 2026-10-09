@@ -319,6 +319,7 @@ def main():
             from citation_supervision import eligible as stale_citation_blocker
             from pre_red_supervision import qualified as recovered_pre_red
             from scoped_delivery_supervision import eligible as recovered_scope
+            from red_log_supervision import eligible as recovered_red_log
             if (stale_size_blocker(initial, managed) or stale_restart_blocker(initial, managed)
                     or stale_review_transport_blocker(initial, managed)
                     or stale_execution_diagnosis_blocker(initial, managed)
@@ -327,7 +328,8 @@ def main():
                     or stale_worker_interruption_blocker(initial, managed)
                     or stale_artifact_diagnosis_blocker(initial, managed)
                     or recovered_pre_red(initial,context)
-                    or recovered_scope(initial,context)):
+                    or recovered_scope(initial,context)
+                    or recovered_red_log(initial,context)):
                 # Read current controller evidence; never rewrite status to success
                 # or blindly retry an unchanged terminal blocker.
                 run()

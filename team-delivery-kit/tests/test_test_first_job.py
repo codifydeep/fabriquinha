@@ -46,6 +46,22 @@ class TestFirstJobTests(unittest.TestCase):
         self.assertEqual(sum(method=='POST' and path.endswith('/start') for method,path in self.calls),1)
         self.assertFalse(any(method=='DELETE' for method,_ in self.calls))
 
+    def test_red_preserves_large_complete_output_without_reexecuting_job(self):
+        output='assertion details\n'*7000+'Ran 361 tests\nFAILED (failures=4)\n'
+        observed=[]
+        def logs(*args,**kwargs):
+            observed.append(kwargs['limit'])
+            if len(output.encode())>kwargs['limit']:raise RuntimeError('validator output unavailable')
+            return output
+        self.b.docker_stdout=logs
+        with self.assertRaises(TimeoutError):run(self.b,self.con,TASK,'red',self.payload,now=1)
+        self.info['State']=dict(Status='exited',ExitCode=1)
+        result=run(self.b,self.con,TASK,'red',self.payload,now=2)
+        self.assertEqual(result['output'],output)
+        self.assertEqual(observed,[1048576])
+        self.assertEqual(run(self.b,self.con,TASK,'red',self.payload,now=3),result)
+        self.assertEqual(sum(method=='POST' and path.endswith('/start') for method,path in self.calls),1)
+
     def test_resume_flag_change_preserves_first_intent_and_other_drift_is_denied(self):
         with self.assertRaises(TimeoutError):self.call()
         self.info['State']['Status']='exited'
