@@ -495,6 +495,56 @@ class HandoffTests(unittest.TestCase):
         self.tick([task], now=140)
         self.assertEqual(len(self.effects.created), count)
 
+    def failed_plan_setup(self):
+        from broker.suite_failure import evidence
+        self.author['status']='failed'
+        self.route.update(test_first=True,test_first_files=['tests/test_new.py'])
+        failure=dict(evidence(1,'FAIL: test_hook (tests.test_new.C.test_hook)\nRan 3 tests\nFAILED (failures=1)',
+                     'source','failed-frozen'),diagnostic_only=True,phase='failed_execution_diagnostic',
+                     diagnostic_read_files=['app.js'])
+        proof=dict(request=dict(source_task='source',failure_signature='f'*64),volume='failed-frozen',
+                   failure=failure,status='diagnostic_only_not_approved')
+        self.con.execute('CREATE TABLE failed_execution_diagnoses(source_task TEXT PRIMARY KEY,receipt TEXT)')
+        self.con.execute('CREATE TABLE failed_execution_snapshots(task_id TEXT,volume TEXT,status TEXT)')
+        self.con.execute('INSERT INTO failed_execution_diagnoses VALUES(?,?)',('source',json.dumps(proof)))
+        self.con.execute('INSERT INTO failed_execution_snapshots VALUES(?,?,?)',('source','failed-frozen','complete'))
+        self.effects.author_edit_scope=lambda _:['app.js']
+        self.effects.read_evidence=lambda _:['/evidence/candidate/app.js','/evidence/candidate/tests/test_new.py']
+        return dict(source_task='source',contract_sha256=self.route['contract_sha256'],attempts=2,
+                    failure_signature='f'*64,source_status='failed',artifact_diagnosis=True,
+                    validation_failure=failure,failed_execution_diagnostic=proof,diagnostic_revision='old',
+                    diagnostic_challenge=dict(observation='Inspect the startup hook'),
+                    error='portable frozen suite failed')
+
+    def test_failed_cto_self_escalation_receives_installed_scope_once(self):
+        data=self.failed_plan_setup()
+        data.update(target='cto',recipient_task='old-cto',wakeup_id='old-wake',
+                    decision=dict(action='escalate_cto',reason='Missing product hook',optional_files=[]))
+        handoffs.save(self.con,'source','issue','technical_decision_required','cto',data,90)
+        task=dict(id='old-cto',issue_id='issue',agent_id='cto',status='completed',wakeup_id='old-wake')
+        self.assertEqual(self.tick([task]),'awaiting_acceptance')
+        saved=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertEqual(saved['author_edit_files'],['app.js'])
+        self.assertEqual(saved['attempts'],2)
+        self.assertIn('You are the CTO',saved['instruction'])
+        self.assertFalse(saved['scope_inspection_recovery']['author_restarted'])
+
+    def test_failed_candidate_correction_receives_independent_plan_review_not_author_grant(self):
+        data=self.failed_plan_setup();data['author_edit_files']=['app.js']
+        handoffs.save(self.con,'source','issue','diagnose_cto','cto',data,90)
+        self.tick()
+        self.assertEqual(self.tick([self.recipient(target='cto')],now=110),'diagnose')
+        saved=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertFalse(saved['failed_candidate_plan']['author_execution_authorized'])
+        self.tick(now=120)
+        self.assertEqual(self.tick([dict(self.recipient(target='lead'),id='lead-recipient')],now=130),'technical_decision_required')
+        row=handoffs.load(self.con,'source');saved=json.loads(row['data'])
+        self.assertEqual(row['owner'],'cto')
+        self.assertFalse(saved['failed_candidate_plan_review']['retry_budget_reset'])
+        self.assertFalse(saved['failed_candidate_plan_review']['author_execution_authorized'])
+        self.assertEqual(saved['attempts'],2)
+        self.assertFalse(any(w['target']=='author' for w in self.effects.created.values()))
+
     def test_diagnosis_receives_existing_red_instead_of_inventing_missing_tests(self):
         self.effects.phase_evidence = lambda _: {'phase': 'implementation', 'red_manifest': 'a' * 64,
                                                 'independent_test_review': 'approved'}

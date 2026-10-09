@@ -965,6 +965,11 @@ Diagnósticos extensos usam uma referência lossless: o handoff carrega o hash e
 o controlador expande a evidência durável somente para o destinatário e wakeup
 correspondentes. Os limites do gateway e da expansão continuam ativos; não há
 truncamento de falhas ou retentativa idêntica para contornar um limite.
+O contrato de replanejamento de candidatos interrompidos está em desenvolvimento:
+a proposta do CTO é vinculada ao snapshot e recebe revisão independente do Tech
+Lead, sem autorizar execução, mudar testes ou resetar tentativas. A instalação de
+referência só ativará esse caminho após validar seu adaptador de execução limitado;
+uma revisão de plano não é uma entrega nem evidência de autonomia completa.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.
