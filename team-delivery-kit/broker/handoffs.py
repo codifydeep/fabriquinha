@@ -520,8 +520,9 @@ def reconcile(con, route, runs, effects, *, now=None):
             and data.get('control_error')=='ValueError:handoff instruction too large'
             and (data.get('validation_failure') or {}).get('category')=='executed_test_failure'
             and not data.get('wakeup_id') and not data.get('recipient_task')
-            and not data.get('bound_failure_recovery') and source['status']=='completed'
-            and bound_failure_context.verified_red(effects,key)):
+            and not data.get('bound_failure_recovery')
+            and ((source['status']=='completed' and bound_failure_context.verified_red(effects,key))
+                 or (source['status']=='failed' and bound_failure_context.verified_failed_diagnostic(con,key,data)))):
         data.update(artifact_diagnosis=True,
             bound_failure_recovery=dict(operation='lossless_frozen_failure_context_v1',
                 failure_sha256=bound_failure_context.digest(data['validation_failure']),
@@ -871,7 +872,7 @@ def reconcile(con, route, runs, effects, *, now=None):
                     summary['validation_failure']['assertion_trace_anchors']=proof['anchors']
                 summary['validation_failure']['failure_count'] = len(failure.get('failures', []))
             if (data.get('artifact_diagnosis') and data.get('validation_failure')
-                    and (data.get('bound_failure_recovery') or
+                    and (data.get('bound_failure_recovery') or data.get('diagnostic_challenge') or
                          (not route.get('test_first') and bound_failure_context.verified_red(effects,key)))):
                 summary,_=bound_failure_context.project(summary,key,data['validation_failure'])
             instruction = ('Diagnose this delivery handoff. Evidence: ' + json.dumps(summary, sort_keys=True, separators=(',', ':'))

@@ -961,6 +961,10 @@ Uma contradição no diagnóstico pode gerar uma única releitura pelo CTO, incl
 de trabalho interrompido, somente quando o snapshot diagnóstico e seu resultado
 executado correspondem ao recibo durável. Isso não transforma o snapshot parcial
 em entrega aprovada nem concede permissão para enfraquecer testes.
+Diagnósticos extensos usam uma referência lossless: o handoff carrega o hash e
+o controlador expande a evidência durável somente para o destinatário e wakeup
+correspondentes. Os limites do gateway e da expansão continuam ativos; não há
+truncamento de falhas ou retentativa idêntica para contornar um limite.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.

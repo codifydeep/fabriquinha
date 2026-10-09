@@ -385,6 +385,38 @@ class HandoffTests(unittest.TestCase):
         for n in range(30):self.assertIn('tests.test_new.Cases.test_case_'+str(n),full)
         self.assertNotIn('approve',str(data.get('decision','')))
 
+    def test_failed_diagnostic_challenge_repairs_oversized_predispatch_note_losslessly(self):
+        from broker.suite_failure import evidence
+        from broker.bound_failure_context import expand
+        self.author['status']='failed'
+        self.route.update(test_first=True,test_first_files=['tests/test_new.py'])
+        output='\n'.join('FAIL: test_case_'+str(n)+' (tests.test_new.Cases.test_case_'+str(n)+')'
+                         for n in range(20))+'\nRan 386 tests\nFAILED (failures=20)'
+        failure=dict(evidence(1,output,'source','failed-frozen'),
+                     diagnostic_only=True,phase='failed_execution_diagnostic')
+        proof=dict(request=dict(source_task='source',failure_signature='f'*64),
+                   volume='failed-frozen',failure=failure,status='diagnostic_only_not_approved')
+        self.con.execute('CREATE TABLE failed_execution_diagnoses(source_task TEXT PRIMARY KEY,receipt TEXT)')
+        self.con.execute('CREATE TABLE failed_execution_snapshots(task_id TEXT,volume TEXT,status TEXT)')
+        self.con.execute('INSERT INTO failed_execution_diagnoses VALUES(?,?)',('source',json.dumps(proof)))
+        self.con.execute('INSERT INTO failed_execution_snapshots VALUES(?,?,?)',('source','failed-frozen','complete'))
+        data=dict(source_task='source',contract_sha256=self.route['contract_sha256'],
+            failure_signature='f'*64,validation_failure=failure,failed_execution_diagnostic=proof,
+            source_status='failed',artifact_diagnosis=True,attempts=1,
+            diagnostic_challenge=dict(observation='Inspect the actual startup hook, not the test name.'),
+            control_error='ValueError:handoff instruction too large',control_error_count=2)
+        handoffs.save(self.con,'source','issue','technical_decision_required','cto',data,90)
+        self.assertEqual(self.tick(),'awaiting_acceptance')
+        row=handoffs.load(self.con,'source');saved=json.loads(row['data'])
+        self.assertLessEqual(len('DELIVERY_HANDOFF '+'a'*64+'\n'+saved['instruction']),4000)
+        self.assertFalse(saved['bound_failure_recovery']['author_restarted'])
+        self.assertEqual(saved['attempts'],1)
+        full=expand(saved['instruction'],'issue',dict(agent_id='cto',wakeup_id=saved['wakeup_id']),lambda _:row)
+        for n in range(20):self.assertIn('tests.test_new.Cases.test_case_'+str(n),full)
+        self.tick(now=110)
+        self.assertEqual(len(self.effects.created),1)
+        self.assertFalse(any(w['target']=='author' for w in self.effects.created.values()))
+
     def test_correction_budget_is_issue_scoped_not_reset_for_each_author_task(self):
         data = {'contract_sha256': self.route['contract_sha256'], 'error': 'artifact_validation: new code and test files required',
                 'dispatch_stage': 'correct_author'}

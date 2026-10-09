@@ -35,3 +35,25 @@ def expand(note,issue,task,lookup):
 
 def verified_red(effects,task):
     return effects.test_first_red(task) if hasattr(effects,'test_first_red') else None
+
+
+def verified_failed_diagnostic(con,source,data):
+    """Transport qualification only; never treat partial work as a submission."""
+    if not data.get('diagnostic_challenge') or not data.get('failed_execution_diagnostic'):
+        return False
+    tables={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if not {'failed_execution_diagnoses','failed_execution_snapshots'}<=tables:return False
+    stored=con.execute('SELECT receipt FROM failed_execution_diagnoses WHERE source_task=?',(source,)).fetchone()
+    snapshot=con.execute('SELECT volume,status FROM failed_execution_snapshots WHERE task_id=?',(source,)).fetchone()
+    if not stored or not snapshot or snapshot['status']!='complete':return False
+    proof=json.loads(stored[0]);failure=proof.get('failure',{})
+    return bool(proof==data['failed_execution_diagnostic']
+        and proof.get('request')==dict(source_task=source,failure_signature=data.get('failure_signature'))
+        and proof.get('status')=='diagnostic_only_not_approved'
+        and proof.get('volume')==snapshot['volume']
+        and failure==data.get('validation_failure') and failure.get('source_task')==source
+        and failure.get('volume')==snapshot['volume']
+        and failure.get('category')=='executed_test_failure'
+        and failure.get('phase')=='failed_execution_diagnostic'
+        and failure.get('diagnostic_only') is True
+        and data.get('source_status')=='failed' and not data.get('evidence') and not data.get('review'))

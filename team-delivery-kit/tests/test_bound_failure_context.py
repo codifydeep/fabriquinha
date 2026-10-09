@@ -1,6 +1,7 @@
 import json
+import sqlite3
 import unittest
-from broker.bound_failure_context import project, expand
+from broker.bound_failure_context import project, expand, verified_failed_diagnostic
 
 
 class BoundFailureContextTests(unittest.TestCase):
@@ -26,3 +27,24 @@ class BoundFailureContextTests(unittest.TestCase):
         with self.assertRaises(ValueError):expand(marker+'\n'+marker,'issue',{},lambda source:None)
         with self.assertRaises(ValueError):expand(marker,'issue',{},lambda source:None)
         self.assertEqual(expand('ordinary','issue',{},lambda source:self.fail()),'ordinary')
+
+    def test_failed_transport_requires_exact_durable_diagnostic_and_snapshot(self):
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row
+        self.addCleanup(con.close)
+        self.assertFalse(verified_failed_diagnostic(con,'source',{}))
+        con.execute('CREATE TABLE failed_execution_diagnoses(source_task TEXT,receipt TEXT)')
+        con.execute('CREATE TABLE failed_execution_snapshots(task_id TEXT,volume TEXT,status TEXT)')
+        failure=dict(source_task='source',volume='frozen',category='executed_test_failure',
+                     diagnostic_only=True,phase='failed_execution_diagnostic')
+        proof=dict(request=dict(source_task='source',failure_signature='a'*64),volume='frozen',
+                   failure=failure,status='diagnostic_only_not_approved')
+        data=dict(failed_execution_diagnostic=proof,validation_failure=failure,source_status='failed',
+                  failure_signature='a'*64,diagnostic_challenge=dict(observation='Inspect the startup hook'))
+        con.execute('INSERT INTO failed_execution_diagnoses VALUES(?,?)',('source',json.dumps(proof)))
+        con.execute('INSERT INTO failed_execution_snapshots VALUES(?,?,?)',('source','frozen','complete'))
+        self.assertTrue(verified_failed_diagnostic(con,'source',data))
+        for field,value in [('failure_signature','b'*64),('source_status','completed'),
+                ('evidence',{'approved':True}),('review',{'approved':True}),('diagnostic_challenge',None)]:
+            self.assertFalse(verified_failed_diagnostic(con,'source',dict(data,**{field:value})))
+        con.execute("UPDATE failed_execution_snapshots SET volume='other'")
+        self.assertFalse(verified_failed_diagnostic(con,'source',data))
