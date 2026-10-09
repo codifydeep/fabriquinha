@@ -469,6 +469,32 @@ class TypedDecisionTests(unittest.TestCase):
         self.assertFalse(caught.exception.receipt['worker_tool_executed'])
         self.assertFalse(caught.exception.receipt['delivery_approval'])
 
+    def test_rejection_distinguishes_root_failures_without_exporting_instance_paths(self):
+        from typed_decision_contract import constraint_diagnostic
+        from jsonschema import Draft202012Validator
+        schema={'type':'object','properties':{
+            'findings':{'type':'array','maxItems':3,'items':{'anyOf':[
+                {'type':'object','properties':{'quote':{'enum':['PRIVATE_EXPECTED']}},'required':['quote']}]}}
+        }}
+        bad={'findings':[{'quote':'PRIVATE_ACTUAL'}]*4}
+        d=constraint_diagnostic(list(Draft202012Validator(schema).iter_errors(bad)),schema,b'private-wire')
+        self.assertEqual(d['root_constraints'],['anyOf','maxItems'])
+        self.assertEqual(d['locations'],['finding_count','finding_location_selection'])
+        encoded=json.dumps(d)
+        for private in ('PRIVATE_EXPECTED','PRIVATE_ACTUAL','quote','private-wire'):
+            self.assertNotIn(private,encoded)
+
+    def test_alternative_branch_failures_are_not_reported_as_root_finding_count(self):
+        from typed_decision_contract import constraint_diagnostic
+        from jsonschema import Draft202012Validator
+        schema={'anyOf':[{'properties':{'findings':{'maxItems':0},'action':{'enum':['approve']}}},
+            {'properties':{'action':{'enum':['reject']}}}]}
+        bad={'action':'unknown','findings':[{}]}
+        d=constraint_diagnostic(list(Draft202012Validator(schema).iter_errors(bad)),schema,b'wire')
+        self.assertEqual(d['root_constraints'],['anyOf'])
+        self.assertIn('maxItems',d['constraints'])
+        self.assertEqual(d['locations'],[])
+
     def test_constraint_receipt_is_durable_and_never_repairs_a_decision(self):
         from typed_decision_contract import record
         from deterministic_read_dispatch import ledger

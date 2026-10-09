@@ -842,6 +842,12 @@ adicional conta no teto do provedor. Uma segunda proposta inválida permanece
 bloqueada, inclusive após reinício. Isso não aprova testes nem rearma um worker
 que já falhou; a recuperação técnica continua exigindo evidências próprias.
 
+Rejeições de decisão distinguem constraints principais de falhas internas das
+alternativas `anyOf`. Categorias fixas identificam seleção de ação, snapshot,
+quantidade de findings, arquivos opcionais e seleção de localização observada.
+O diagnóstico não registra argumentos, citações, valores nem paths arbitrários.
+Uma categoria de diagnóstico não modifica a decisão e não autoriza retentativa.
+
 O provedor usado na instalação de referência é OpenRouter. A política compartilhada
 em `team-delivery-kit/model_policy.py` seleciona `anthropic/claude-haiku-5.5`.
 A migração do DeepSeek preserva recibos históricos e só admite a configuração

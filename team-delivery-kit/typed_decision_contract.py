@@ -618,12 +618,30 @@ def constraint_diagnostic(violations,schema,data):
     allowed={'type','enum','const','required','additionalProperties','minLength',
              'maxLength','minItems','maxItems','uniqueItems','pattern',
              'minimum','maximum','anyOf','oneOf','allOf','not'}
-    pending=list(violations);constraints=set()
+    violations=list(violations)
+    pending=list(violations);constraints=set();locations=set()
+    # Only controller-defined labels, never arbitrary instance/schema paths,
+    # enum values, source quotes, expected strings or validator messages.
+    labels={('action','enum'):'action_selection',
+        ('manifest_sha256','enum'):'snapshot_selection',
+        ('optional_files','maxItems'):'optional_file_count',
+        ('findings','maxItems'):'finding_count',
+        ('findings','minItems'):'finding_count'}
+    for error in violations:
+        path=list(error.path)
+        if len(path)==1:
+            label=labels.get((path[0],error.validator))
+            if label:locations.add(label)
+        elif (len(path)==2 and path[0]=='findings' and type(path[1]) is int
+                and 0<=path[1]<64 and error.validator=='anyOf'):
+            locations.add('finding_location_selection')
     while pending:
         error=pending.pop()
         constraints.add(error.validator if error.validator in allowed else 'other')
         pending.extend(error.context)
     return dict(version='typed-constraint-v1',constraints=sorted(constraints),
+        root_constraints=sorted({e.validator if e.validator in allowed else 'other' for e in violations}),
+        locations=sorted(locations),
         schema_sha256=hashlib.sha256(json.dumps(schema,sort_keys=True).encode()).hexdigest(),
         upstream_sha256=hashlib.sha256(data).hexdigest())
 
