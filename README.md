@@ -633,7 +633,7 @@ O procedimento de atualização dos controladores com essa barreira será:
 1. Suspender os serviços host de despacho da instância, preservando seus registros.
 2. Executar `controller_maintenance_cli.py --namespace <instância> --action drain --operation <UUID>`.
 3. Consultar `seal` com o mesmo UUID até obter `stage=sealed` e `drained=true`.
-4. Construir **e aguardar** a imagem final, atualizar somente o controlador e conferir seu ID imutável.
+4. Construir **e aguardar** a imagem final, atualizar somente o controlador e conferir seu ID imutável. Usar `docker compose -p <instância>` explicitamente: `DELIVERY_KIT_COMPOSE_PROJECT` configura o namespace dos serviços, mas não substitui o `name` fixo do Compose. Conferir também o label `com.docker.compose.project` do contêiner selecionado antes e depois da atualização.
 5. Validar o controlador, executar `release` com o mesmo UUID e restaurar os serviços host.
 
 Um estado `draining` não permite trocar a imagem. Não interromper workers para
