@@ -19,6 +19,13 @@ de ser editável ao crescer além do tamanho reservado aos testes. A escrita con
 restrita a arquivos precriados, pertencentes ao controlador e graváveis na fase atual;
 essa capacidade não amplia caminhos autorizados nem altera aprovação ou revisão.
 
+O orçamento de chamadas do ensaio não aumenta o limite financeiro da chave no
+provedor. Recusas HTTP 401/403 suspendem novas chamadas do proxy, assim como HTTP
+402: o incidente persiste após reinício e exige resolução pelo operador. Somente
+status, hash e pistas de uma lista fixa saem do corpo de erro do provedor; nenhuma
+credencial ou resposta privada é publicada. Esse bloqueio não aprova a entrega,
+não muda o modelo e não autoriza aumento de gastos.
+
 Uma recuperação de falha funcional detectada no navegador percorreu diagnóstico
 do Tech Lead, novo card TDD, revisão independente, PR/CI e QA no mesmo commit,
 sem edição manual do produto durante essa recuperação. O controlador preservou

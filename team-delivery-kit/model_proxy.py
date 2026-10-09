@@ -45,17 +45,22 @@ def provider_pause():
         raise RuntimeError('unsafe provider pause receipt')
     value = json.loads(path.read_text())
     if (set(value) != {'category', 'upstream_status', 'call_number'}
-            or value['category'] != 'upstream_payment_required'
-            or value['upstream_status'] != 402
+            or (value['category'],value['upstream_status']) not in (
+                ('upstream_payment_required',402),('upstream_access_denied',401),
+                ('upstream_access_denied',403))
             or type(value['call_number']) is not int or value['call_number'] < 1):
         raise RuntimeError('invalid provider pause receipt')
     return value
 
 
-def pause_provider(call_number):
+def pause_provider(call_number,status=402):
     """Payment failure requires operator resolution, not another agent call."""
     global PROVIDER_PAUSE
-    value = {'category': 'upstream_payment_required', 'upstream_status': 402,
+    if type(status) is not int or status not in (401,402,403):
+        raise ValueError('fixed provider pause status required')
+    if type(call_number) is not int or call_number<1:
+        raise ValueError('actual provider call required')
+    value = {'category': 'upstream_payment_required' if status==402 else 'upstream_access_denied', 'upstream_status': status,
              'call_number': call_number}
     with LOCK:
         if COUNTER_PATH:
@@ -104,8 +109,9 @@ if MAX_OUTPUT_TOKENS not in (2048, 4096, 8192):
 def reserve_call():
     global CALLS
     with LOCK:
-        if provider_pause():
-            raise ValueError('upstream payment paused')
+        paused=provider_pause()
+        if paused:
+            raise ValueError('upstream payment paused' if paused['upstream_status']==402 else 'upstream access paused')
         if CALLS >= MAX_CALLS:
             raise ValueError('evaluation model-call limit reached')
         value = CALLS + 1
@@ -270,7 +276,7 @@ def forward(body):
         data = read_bounded_response(response, conn, deadline)
         media_type = response.getheader('Content-Type', '')
         content_type = 'text/event-stream' if media_type.startswith('text/event-stream') else 'application/json'
-        if response.status==400:raise UpstreamRequestRejected(data)
+        if response.status in (400,401,403):raise UpstreamRequestRejected(data,status=response.status)
         return response.status, data if response.status == 200 else b'{}', content_type
     finally:
         conn.close()
@@ -439,6 +445,7 @@ class Handler(BaseHTTPRequestHandler):
                     patch_feedback=None
                 break
         except UpstreamRequestRejected as error:
+            if error.status in (401,403):pause_provider(call_number,status=error.status)
             status,reason,data,content_type=error.status,'upstream_request_rejected',b'{}','application/json'
             response_metrics['upstream_error_diagnostic']=error.diagnostic
         except (ValueError, TypeError, json.JSONDecodeError) as error:
@@ -485,6 +492,9 @@ class Handler(BaseHTTPRequestHandler):
             if str(error) == 'upstream payment paused':
                 status, reason = 402, 'upstream_payment_paused'
                 data = b'{"error":{"code":"upstream_payment_paused"}}'
+            if str(error) == 'upstream access paused':
+                status,reason=provider_pause()['upstream_status'],'upstream_access_paused'
+                data=b'{"error":{"code":"upstream_access_paused"}}'
         except Exception as error:
             if execution_id and request_sha and call_number is None:
                 local_rejection = proxy_request_rejections.describe(error,stage,execution_id,request_sha)

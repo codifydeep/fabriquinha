@@ -1,0 +1,2 @@
+FROM delivery-kit-model-proxy:20261009.116
+COPY model_proxy.py upstream_error_diagnostic.py /

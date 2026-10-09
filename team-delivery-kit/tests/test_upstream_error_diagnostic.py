@@ -5,6 +5,15 @@ from upstream_error_diagnostic import describe,UpstreamRequestRejected
 
 
 class UpstreamErrorTests(unittest.TestCase):
+    def test_auth_status_is_preserved_without_exporting_provider_text(self):
+        raw=b'{"error":{"message":"PRIVATE credit limit API key"}}'
+        for status in (401,403):
+            error=UpstreamRequestRejected(raw,status=status)
+            self.assertEqual(error.status,status)
+            self.assertNotIn('PRIVATE',json.dumps(error.diagnostic))
+            self.assertEqual(error.diagnostic['markers'],['credit','limit'])
+        with self.assertRaises(ValueError):UpstreamRequestRejected(raw,status=200)
+
     def test_only_fixed_markers_and_hash_leave_untrusted_provider_body(self):
         raw=json.dumps({'error':{'message':'SECRET-API-TOKEN tool_result missing tool_use in messages schema'}}).encode()
         result=describe(raw)

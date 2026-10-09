@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-MARKERS=('additionalproperties','anyof','context','invalid','maxitems','messages',
+MARKERS=('additionalproperties','anyof','context','credit','invalid','limit','maxitems','messages',
          'oneof','parameter','required','schema','strict','tool_choice','tool_result',
          'tool_use','unsupported')
 
@@ -23,7 +23,9 @@ def describe(raw):
 
 
 class UpstreamRequestRejected(Exception):
-    def __init__(self,raw):
+    def __init__(self,raw,status=400):
+        if type(status) is not int or status not in (400,401,403):
+            raise ValueError('fixed upstream rejection status required')
         super().__init__('upstream request rejected')
-        self.status=400
+        self.status=status
         self.diagnostic=describe(raw)

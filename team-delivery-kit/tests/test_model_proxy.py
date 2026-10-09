@@ -9,6 +9,39 @@ from model_proxy import MODEL, validate_request
 
 
 class ModelProxyTests(unittest.TestCase):
+    def test_http_403_blocks_next_forward_without_spending_another_call(self):
+        from io import BytesIO
+        from upstream_error_diagnostic import UpstreamRequestRejected
+        body=json.dumps({'model':MODEL,'messages':[{'role':'user','content':'fixture'}]}).encode()
+        def request():
+            handler=object.__new__(model_proxy.Handler);handler.path='/api/v1/chat/completions'
+            handler.headers={'Content-Length':str(len(body)),'Authorization':model_proxy.PLACEHOLDER}
+            handler.rfile,handler.wfile=BytesIO(body),BytesIO()
+            handler.send_response=lambda value:setattr(handler,'test_status',value)
+            handler.send_header=lambda *args:None;handler.end_headers=lambda:None
+            return handler
+        with patch.object(model_proxy,'COUNTER_PATH',None),patch.object(model_proxy,'CALLS',0), \
+                patch.object(model_proxy,'MAX_CALLS',10),patch.object(model_proxy,'PROVIDER_PAUSE',None), \
+                patch.object(model_proxy,'forward',side_effect=UpstreamRequestRejected(
+                    b'{"error":{"message":"PRIVATE credit limit exhausted"}}',status=403)) as forward:
+            first,second=request(),request();first.do_POST();second.do_POST()
+            self.assertEqual(first.test_status,403);self.assertEqual(second.test_status,403)
+            self.assertIn(b'upstream_access_paused',second.wfile.getvalue())
+            self.assertNotIn(b'PRIVATE',first.wfile.getvalue())
+            forward.assert_called_once();self.assertEqual(model_proxy.CALLS,1)
+
+    def test_access_pause_survives_restart_and_cannot_raise_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'calls.json';path.write_text('{"calls":7}')
+            with patch.object(model_proxy,'COUNTER_PATH',str(path)),patch.object(model_proxy,'CALLS',7), \
+                    patch.object(model_proxy,'PROVIDER_PAUSE',None):
+                receipt=model_proxy.pause_provider(7,status=403)
+                self.assertEqual(receipt['category'],'upstream_access_denied')
+                with patch.object(model_proxy,'PROVIDER_PAUSE',None):
+                    self.assertEqual(model_proxy.provider_pause(),receipt)
+                    with self.assertRaisesRegex(ValueError,'access paused'):model_proxy.reserve_call()
+                self.assertEqual(model_proxy.load_calls(),7)
+
     def test_budget_status_shape_is_unchanged_and_runtime_has_separate_endpoint(self):
         from io import BytesIO
         for path, keys in (('/status', {'calls', 'max_calls', 'remaining'}),
