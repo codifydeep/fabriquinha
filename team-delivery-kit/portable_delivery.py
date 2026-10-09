@@ -428,6 +428,9 @@ def approved(context):
         return approved_submission(context['issue_id'], author_file, reviewer_file)
     except ValueError as error:
         if str(error) in ('no completed implementation', 'expected one approved exact revision'):
+            if (context.get('durable_handoffs') and managed
+                    and managed.get('state',{}).get('stage')=='approved'):
+                raise RecoveryEscalation('approved_revision_ambiguous') from None
             reviewer = json.loads((PRIVATE / reviewer_file).read_text())['agent_id']
             runs = [run for run in cli('runs', context['issue_id'])
                     if run.get('agent_id') == reviewer]

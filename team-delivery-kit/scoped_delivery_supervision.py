@@ -33,14 +33,19 @@ def read_proof(context):
 
 
 def resume(ledger,plan,private,*,query=read_proof):
+    category=ledger.get('category')
+    if category not in ('RuntimeError:technical_decision_required:portable frozen suite failed',
+                        'RuntimeError:approved_revision_ambiguous','RuntimeError:delivery_incomplete'):
+        return None
     return shared_resume(ledger,plan,private,query=query,
-        category='RuntimeError:technical_decision_required:portable frozen suite failed',
+        category=category,
         record_key='scoped_delivery_supervision')
 
 
 def eligible(status,context,*,query=read_proof):
     if (not status or status.get('stage')!='escalation_required'
-            or status.get('category')!='technical_decision_required:portable frozen suite failed'
+            or status.get('category') not in ('technical_decision_required:portable frozen suite failed',
+                                             'approved_revision_ambiguous')
             or status.get('issue_id')!=context.get('issue_id')
             or context.get('durable_handoffs') is not True):return False
     proof=query(context) or {}

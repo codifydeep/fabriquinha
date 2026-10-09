@@ -87,6 +87,10 @@ def approved_submission(issue_id, implementer_registry='implementer.json',
         row = json_command('docker', 'exec', BROKER, 'python3', '-c', query, run['id'])
         if row and row[4] == 'approved' and row[1] == latest['id']:
             approved.append(row)
+    if len(approved) == 2:
+        from scoped_approval_selection import select, query_with
+        approved = [select(issue_id, approved,
+                           lambda issue, source: query_with(command, BROKER, issue, source))]
     if len(approved) != 1:
         raise ValueError('expected one approved exact revision')
     review_task, source_task, reviewer_id, manifest, status, volume, frozen_status, author_id = approved[0]

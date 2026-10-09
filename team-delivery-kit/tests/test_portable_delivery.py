@@ -14,6 +14,19 @@ def git(repo, *args):
 
 
 class PortableDeliveryTests(unittest.TestCase):
+    def test_approved_handoff_with_ambiguous_revision_escalates_instead_of_waiting(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            (root/'portable-implementer.json').write_text(json.dumps({'agent_id':'author'}))
+            managed=dict(route={'enabled':True},state={'stage':'approved'})
+            with patch.object(portable_delivery,'PRIVATE',root), \
+                    patch.object(portable_delivery,'RUN_SPEC',None), \
+                    patch.object(portable_delivery,'LABEL','TEST-1'), \
+                    patch.object(portable_delivery,'managed_handoff',return_value=managed), \
+                    patch.object(portable_delivery,'cli',return_value=[]), \
+                    patch.object(portable_delivery,'approved_submission',side_effect=ValueError('expected one approved exact revision')):
+                with self.assertRaisesRegex(portable_delivery.RecoveryEscalation,'approved_revision_ambiguous'):
+                    portable_delivery.approved(dict(issue_id='issue',durable_handoffs=True))
     def test_publication_auth_wait_never_recovers_or_redispatches_workers(self):
         context={'issue_id':'issue'}
         with patch.object(portable_delivery,'read_context',return_value=context), \

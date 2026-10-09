@@ -211,3 +211,8 @@ concluídas, inspeção completa, TDD congelado, base Git e contrato original ex
 Ela preserva o incidente anterior no ledger e apenas reinicia a observação da
 publicação: não autoriza nova execução do autor, merge, CI ou homologação. Esses
 gates continuam sendo verificados pelo driver de entrega em cada transição.
+A aprovação histórica e a revisão vigente não são selecionadas por timestamp.
+Quando coexistem, o leitor exige o vínculo persistente de revalidação do mesmo
+snapshot e qualifica novamente a inspeção, a independência e o TDD. Divergências
+permanecem bloqueadas. Um handoff aprovado com seleção ambígua não fica em espera
+infinita: gera impedimento técnico explícito, sem alterar as aprovações antigas.

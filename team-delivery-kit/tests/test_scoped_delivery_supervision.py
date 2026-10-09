@@ -17,6 +17,12 @@ class ScopedDeliverySupervisionTests(unittest.TestCase):
             self.assertFalse(result['scoped_delivery_supervision']['delivery_approval'])
             self.assertEqual(ledger['stage'],'blocked')
             self.assertEqual(result['scoped_delivery_supervision']['category'],ledger['category'])
+            for category in ('RuntimeError:approved_revision_ambiguous','RuntimeError:delivery_incomplete'):
+                ledger['category']=category
+                resumed=resume(ledger,plan,root,query=lambda _:proof)
+                self.assertEqual(resumed['stage'],'working')
+                self.assertEqual(resumed['scoped_delivery_supervision']['category'],category)
+                self.assertFalse(resumed['scoped_delivery_supervision']['delivery_approval'])
 
     def test_unqualified_or_wrong_identity_cannot_resume(self):
         with tempfile.TemporaryDirectory() as folder:
