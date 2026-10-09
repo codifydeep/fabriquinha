@@ -88,16 +88,46 @@ def _block_delivery_gate(private, cli, incident):
         if (delivery.get('issue_id') != issue_id
                 or delivery.get('label') != incident['label']
                 or delivery.get(sha_field) != incident['source_sha']
-                or not isinstance(handoff, dict)
-                or handoff.get('stage') != 'approved'
                 or not approved.get('source_task')
-                or handoff.get('source_task') != approved.get('source_task')
                 or not approved.get('author') or not approved.get('reviewer')
                 or approved['author'] == approved['reviewer']
-                or handoff.get('owner') != approved['reviewer']
                 or not approved.get('review_task')
                 or not re.fullmatch(r'[a-f0-9]{64}', approved.get('manifest_sha256', ''))):
             raise ValueError('QA gate delivery evidence drift')
+        identity={'issue_id':issue_id,'label':incident['label'],'phase':incident['phase'],
+                  'source_sha':incident['source_sha'],'delivery':approved}
+        approved_projection=(isinstance(handoff,dict) and handoff.get('stage')=='approved'
+                    and handoff.get('source_task')==approved['source_task']
+                    and handoff.get('owner')==approved['reviewer'])
+        paused_projection=(current==target and isinstance(handoff,dict) and handoff.get('stage')=='paused'
+                    and handoff.get('source_task') in (None,approved['source_task'])
+                    and handoff.get('owner')==incident['techlead_id'])
+        if not approved_projection and not paused_projection:
+            raise ValueError('QA gate delivery evidence drift')
+        frozen=Path(private)/'qa-gate-transitions'/(incident['key']+'.json')
+        if frozen.exists():
+            if frozen.is_symlink() or frozen.stat().st_size>262144:
+                raise ValueError('safe frozen QA gate evidence required')
+            proof=json.loads(frozen.read_text())
+            if proof.get('identity')!=identity or proof.get('delivery_approval') is not False:
+                raise ValueError('frozen QA gate evidence drift')
+        else:
+            if approved_projection:
+                evidence={'approved_handoff':handoff}
+            elif paused_projection:
+                # Older installations did not freeze this transition. Verify
+                # actual prior independent approval; never convert paused text
+                # or old test receipts into new approval evidence.
+                from portable_qa_gate_evidence import verify
+                verified=verify(incident,approved)
+                if (verified.get('operation')!='existing_approved_snapshot_verified_not_new_approval'
+                        or verified.get('issue_id')!=issue_id or verified.get('delivery')!=approved
+                        or verified.get('delivery_approval') is not False):
+                    raise ValueError('QA gate historical verification drift')
+                evidence={'historical_verification':verified}
+            else:
+                raise ValueError('QA gate delivery evidence drift')
+            save_receipt(frozen,{'identity':identity,'evidence':evidence,'delivery_approval':False})
     elif current not in (None, target):
         raise ValueError('QA incident parent gate drift')
     if current != target:

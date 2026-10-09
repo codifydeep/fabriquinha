@@ -171,10 +171,17 @@ def drive_qa_repair(incident, contract, *, stop_after_cto_dispatch=False):
             return False
     def escalate_cto(reason):
         planning = json.loads((PRIVATE / 'planning-agents.json').read_text())['agents']
-        return record_qa_cto_escalation(
+        ready=budget_available()
+        original=record_qa_cto_escalation(
             PRIVATE, cli, incident=incident, parent_contract=contract,
             cto_id=planning['cto'], reason=reason,
-            budget_ready=budget_available())
+            budget_ready=ready)
+        if original['dispatch']=='cto_failed':
+            from portable_qa_protocol_recovery import recover
+            recovery=recover(PRIVATE,cli,incident=incident,original=original,
+                             parent_contract=contract,budget_ready=ready)
+            if recovery:return recovery
+        return original
     def diagnosis_output(issue_id, agent_id):
         completed = [run for run in cli('runs', issue_id)
                      if run.get('agent_id') == agent_id

@@ -91,6 +91,37 @@ class QualityIncidentTests(unittest.TestCase):
             self.assertEqual(cli.created, 1)
             self.assertEqual(cli.started, 1)
 
+    def test_paused_route_projection_preserves_frozen_approved_delivery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cli=FakeCLI();self.dispatched_delivery(directory,cli)
+            record(directory,cli,**self.kwargs(),budget_ready=False)
+            cli.parent['metadata']['delivery_handoff']=json.dumps({
+                'stage':'paused','source_task':None,'owner':TECHLEAD})
+            with patch('portable_qa_gate_evidence.verify',side_effect=AssertionError('already frozen')):
+                record(directory,cli,**self.kwargs(),budget_ready=False)
+            self.assertEqual(cli.created,1)
+            self.assertEqual(cli.started,0)
+            cli.parent['metadata']['delivery_handoff']=json.dumps({
+                'stage':'approved','source_task':'other-delivery','owner':TECHLEAD})
+            with self.assertRaisesRegex(ValueError,'QA gate delivery'):
+                record(directory,cli,**self.kwargs(),budget_ready=False)
+
+    def test_legacy_paused_projection_requires_real_historical_verification(self):
+        for valid in (False,True):
+            with self.subTest(valid=valid),tempfile.TemporaryDirectory() as directory:
+                cli=FakeCLI();_,delivery=self.dispatched_delivery(directory,cli)
+                cli.parent['metadata'].update(execution_gate='blocked_deployed_qa',
+                    delivery_handoff=json.dumps({'stage':'paused','source_task':None,'owner':TECHLEAD}))
+                proof={'operation':'existing_approved_snapshot_verified_not_new_approval',
+                       'issue_id':PARENT,'delivery':delivery['delivery'],'delivery_approval':not valid}
+                with patch('portable_qa_gate_evidence.verify',return_value=proof) as verify:
+                    if valid:record(directory,cli,**self.kwargs(),budget_ready=False)
+                    else:
+                        with self.assertRaisesRegex(ValueError,'historical verification drift'):
+                            record(directory,cli,**self.kwargs(),budget_ready=False)
+                    verify.assert_called_once()
+                self.assertEqual(cli.started,0)
+
     def test_dispatched_gate_rejects_missing_stale_or_self_review_evidence(self):
         for defect in ('missing', 'sha', 'issue', 'source', 'reviewer', 'stage'):
             with self.subTest(defect=defect), tempfile.TemporaryDirectory() as directory:

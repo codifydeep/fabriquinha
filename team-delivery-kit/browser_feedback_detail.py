@@ -34,7 +34,11 @@ class ExpectedDetailFailure:
         if match is not None:
             self.pending.pop(match)
         else:
-            errors.append(message.text)
+            # Fixed isolated fixture only: retain the request location so QA
+            # can distinguish real UI failures from driver-injected responses.
+            url = message.location.get('url', '')
+            location = url if isinstance(url, str) and url.startswith(ORIGIN + '/') else 'unknown'
+            errors.append(message.text + ' at ' + location)
 
 
 def exact_json(response, status, expected):
@@ -95,7 +99,7 @@ def observe_detail_ui(a, b, request, expect, expected_failures):
     query = a.get_by_role('searchbox', name='Search feedback', exact=True)
     query.fill('Detail UI'); query.press('Enter')
     a.get_by_role('button', name='Open', exact=True).click()
-    a.get_by_role('combobox', name='Sort feedback', exact=True).select_option('oldest')
+    a.get_by_role('combobox', name='Sort feedback', exact=True).select_option(label='Oldest first')
     def state():
         return a.evaluate('''() => Array.from(document.querySelectorAll(
           'input,textarea,select,[aria-pressed]')).map(e => [e.id,e.value,e.getAttribute('aria-pressed')])''')

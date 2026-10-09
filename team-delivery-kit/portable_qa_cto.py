@@ -14,7 +14,7 @@ def find(private, key):
 
 
 def record(private, cli, *, incident, parent_contract, cto_id, reason,
-           budget_ready):
+           budget_ready, protocol_recovery=None):
     """Create/dispatch one read-only CTO card; never start a second run."""
     if (not isinstance(reason, str) or not 0 < len(reason) <= 300
             or not isinstance(cto_id, str) or not cto_id):
@@ -22,10 +22,19 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
     key = incident['key']
     title = 'QA-CTO-' + key[:8].upper()
     path = Path(private) / 'qa-cto-escalations' / (key + '.json')
+    original=find(private,key)
+    if protocol_recovery is not None:
+        from portable_qa_protocol_recovery import validate
+        if not original:raise ValueError('historical CTO execution required')
+        validate(private,incident,original,protocol_recovery)
+        title+='-P1'
+        path=Path(private)/'qa-cto-protocol-recoveries'/(key+'.json')
     identity = {'incident_key': key, 'source_sha': incident['source_sha'],
                 'parent_issue_id': incident['child_issue_id'],
                 'cto_id': cto_id, 'reason': reason, 'title': title}
-    prior = find(private, key)
+    if protocol_recovery is not None:identity['protocol_recovery']=protocol_recovery
+    if path.is_symlink():raise ValueError('unsafe QA CTO receipt')
+    prior = json.loads(path.read_text()) if path.exists() else None
     if prior:
         if any(prior.get(field) != value for field, value in identity.items()):
             raise ValueError('QA CTO escalation identity drift')
@@ -55,6 +64,8 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
         'test path and state the precise technical impediment. Do not edit '
         'files, claim execution, or request a technical decision from CEO.')
     description += evidence_description(incident)
+    if protocol_recovery is not None:
+        description+=' Protocol recovery P1: prior CTO execution remains failed. A counted protocol fixture passed after the controller transport correction. Inspect the SAME immutable artifacts anew; this authorizes diagnosis only, not product writes, retry, QA waiver or release approval.'
     matches = [item for item in cli('search', title, '--include-closed',
                                     '--limit', '100')['issues']
                if item.get('title') == title]
@@ -63,6 +74,8 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
     child = matches[0] if matches else cli(
         'create', '--title', title, '--description', description,
         '--status', 'blocked', '--parent', incident['child_issue_id'])
+    if protocol_recovery and child.get('id')==original['child_issue_id']:
+        raise ValueError('protocol recovery cannot replace historical CTO card')
     if (child.get('title') != title
             or child.get('parent_issue_id') != incident['child_issue_id']
             or not child.get('id')
@@ -75,7 +88,8 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
     receipt['child_issue_id'] = child['id']
     _set_metadata(cli, child['id'], 'qa_incident_key', key)
     _set_metadata(cli, child['id'], 'qa_source_sha', incident['source_sha'])
-    _set_metadata(cli, incident['child_issue_id'], 'qa_cto_issue_id', child['id'])
+    _set_metadata(cli, incident['child_issue_id'],
+                  'qa_cto_protocol_issue_id' if protocol_recovery else 'qa_cto_issue_id', child['id'])
     if child['assignee_id'] is None:
         cli('assign', child['id'], '--to-id', cto_id, '--no-start')
     if budget_ready:

@@ -1,4 +1,6 @@
 import unittest
+import ast
+import inspect
 from types import SimpleNamespace
 from browser_feedback_detail import exact_json, observe_detail_api, run, ORIGIN, ExpectedDetailFailure
 
@@ -8,6 +10,16 @@ def response(status, body, mime='application/json'):
 
 
 class DetailApiRecipeTests(unittest.TestCase):
+    def test_detail_sort_uses_visible_label_not_nonexistent_option_value(self):
+        from browser_feedback_detail import observe_detail_ui
+        calls = [node for node in ast.walk(ast.parse(inspect.getsource(observe_detail_ui)))
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                 and node.func.attr == 'select_option']
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].args, [])
+        self.assertEqual([(arg.arg, ast.literal_eval(arg.value)) for arg in calls[0].keywords],
+                         [('label', 'Oldest first')])
+
     def test_http_mime_shape_and_json_types_cannot_be_weakened(self):
         expected={'item': {'id': 1, 'title': 'literal', 'completed': False}}
         self.assertEqual(exact_json(response(200, expected),200,expected), expected)
@@ -59,3 +71,13 @@ class DetailApiRecipeTests(unittest.TestCase):
     def test_arbitrary_commands_are_not_enabled(self):
         for scenario in ('shell','../script.py'):
             with self.assertRaisesRegex(ValueError,'not qualified'):run(scenario)
+
+    def test_unexpected_console_errors_retain_only_fixture_location(self):
+        guard = ExpectedDetailFailure(); errors = []; page = object()
+        message = SimpleNamespace(type='error', text='HTTP 400',
+                                  location={'url': ORIGIN + '/feedback?status=open'})
+        guard.console(page, message, errors)
+        self.assertEqual(errors, ['HTTP 400 at ' + ORIGIN + '/feedback?status=open'])
+        message.location = {'url': 'https://unrelated.invalid/private'}
+        guard.console(page, message, errors)
+        self.assertEqual(errors[-1], 'HTTP 400 at unknown')
