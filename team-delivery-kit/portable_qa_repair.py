@@ -74,7 +74,7 @@ def parse_diagnosis(raw, parent_contract, tracked):
     return {**proposal, 'new_test_file': test}
 
 
-def derive(incident, parent_contract, parent_spec, tracked, diagnosis):
+def derive(incident, parent_contract, parent_spec, tracked, diagnosis, *, review_policy_version=2):
     """Derive, never accept, privileged delivery policy from agent output."""
     if incident['phase'] not in ('deployed', 'browser'):
         raise ValueError('candidate QA repair lacks a safe merged base')
@@ -133,6 +133,16 @@ def derive(incident, parent_contract, parent_spec, tracked, diagnosis):
         'implementer_registry': parent_spec['implementer_registry'],
         'reviewer_registry': parent_spec['reviewer_registry'],
     }
+    if review_policy_version not in (1, 2):
+        raise ValueError('unsupported repair review policy')
+    if review_policy_version == 2:
+        spec['review_instruction'] += (
+            ' Read the complete code and new test first. Then call terminal '
+            'with EXACTLY: cd /delivery && PYTHONDONTWRITEBYTECODE=1 ' + command +
+            ' 2>&1. This is the controller-owned offline review suite, not a '
+            'generic shell. Your own successful suite receipt is mandatory '
+            'before APPROVE; the implementer Green receipt does not replace it. '
+            'Never replay Red or modify files.')
     # A repair must retain the original browser gate and application runtime;
     # HTTP green alone can never replace a failed real-browser acceptance.
     for field in ('browser_qa', 'runtime_env'):
@@ -167,18 +177,26 @@ def prepare_repair(private, incident, parent_contract, parent_spec, tracked,
     """Persist immutable contract/spec; no agent or GitHub writes here."""
     if diagnosis['decision'] == 'blocked':
         return {'stage': 'diagnosis_blocked', 'reason': diagnosis['root_cause']}
-    contract, spec = derive(incident, parent_contract, parent_spec, tracked, diagnosis)
     folder = Path(private) / 'qa-repairs'
     key = incident['key']
     paths = {'contract': folder / (key + '.contract.json'),
              'run_spec': folder / (key + '.run.json'),
              'receipt': folder / (key + '.receipt.json')}
+    policy = 2
+    if paths['receipt'].exists():
+        if paths['receipt'].is_symlink() or paths['receipt'].stat().st_size > 65536:
+            raise ValueError('safe prepared repair identity required')
+        policy = json.loads(paths['receipt'].read_text()).get('review_policy_version', 1)
+    contract, spec = derive(incident, parent_contract, parent_spec, tracked, diagnosis,
+                            review_policy_version=policy)
     identity = {'incident_key': key, 'source_sha': incident['source_sha'],
                 'diagnosis_task_id': diagnosis_task_id,
                 'diagnosis_sha256': exact_json_hash(diagnosis),
                 'contract_sha256': exact_json_hash(contract),
                 'run_spec_sha256': exact_json_hash(spec),
                 'label': spec['label'], 'stage': 'prepared'}
+    if policy == 2:
+        identity['review_policy_version'] = policy
     _write_once(paths['contract'], contract)
     _write_once(paths['run_spec'], spec)
     _write_once(paths['receipt'], identity)

@@ -803,6 +803,12 @@ def reconcile(con, route, runs, effects, *, now=None):
                 instruction+='\nInspect code and frozen tests before executing the suite. Read consecutive pages with explicit offset and limit <=100.\n'
                 instruction+=''.join('DELIVERY_REVIEW_READ_PATH:'+path+'\n'
                     for path in data['inspection_revalidation']['read_paths'])
+            if hasattr(effects,'review_command'):
+                instruction += ('\nMANDATORY INDEPENDENT REVIEW: after complete code/test reads, '
+                    'call terminal with EXACTLY: '+effects.review_command(issue)+
+                    '. This invokes the controlled offline suite, not a generic shell. '
+                    'Your own passed receipt is required for APPROVE. Implementer Green '
+                    'does not replace it. Never edit files or replay Red.\n')
         elif stage == 'correct_author':
             if not effects.implementation_available(issue, route['author']):
                 data.setdefault('capacity_wait_at', now)
@@ -1139,6 +1145,14 @@ def reconcile(con, route, runs, effects, *, now=None):
                 data.update(finding=result['finding'], trigger_task=recipient['id'])
                 return save(con, key, issue, 'correct_author', route['author'], data, now)
             if result['status'] == 'infrastructure_blocked':
+                if (result['review_suite_status']=='issued'
+                        and not data.get('review_preconditions_recovery')
+                        and hasattr(effects,'review_preconditions')):
+                    try:from review_precondition_recovery import prepare,ERROR
+                    except ImportError:from broker.review_precondition_recovery import prepare,ERROR
+                    proof=effects.review_preconditions(issue,key,recipient['id'])
+                    changed=prepare(dict(data,control_error=ERROR),route,recipient,proof)
+                    return save(con,key,issue,'ready_review',route['reviewer'],changed,now)
                 data.update(error='review_infrastructure_pending',error_type='review_infrastructure',
                     review_suite_status=result['review_suite_status'],trigger_task=recipient['id'],
                     failed_dispatch_stage='ready_review',required_action='diagnose review suite; never restart author for infrastructure')
@@ -1147,6 +1161,12 @@ def reconcile(con, route, runs, effects, *, now=None):
         if data['dispatch_stage'] == 'correct_author':
             return save(con, key, issue, 'superseded', route['author'], data, now)
         decision = effects.decision(recipient)
+        if (data.get('error_type') == 'review_infrastructure'
+                and decision.get('action') == 'request_correction'):
+            data.update(error='review_infrastructure_cannot_request_product_correction',
+                required_action='Resolve the independent review preconditions; preserve the author delivery',
+                trigger_task=recipient['id'])
+            return save(con,key,issue,'technical_decision_required',route['cto'],data,now)
         if data.get('unsupported_experiment_recovery'):
             paths = {'/evidence/candidate/' + p for p in data['validation_failure']['diagnostic_read_files']}
             reads = effects.read_evidence(recipient)

@@ -433,6 +433,46 @@ class Effects:
         except ImportError:from broker import product_scope_review
         return product_scope_review.inspection(self.b,issue,source,review)
 
+    def review_command(self, issue):
+        with self.b.db() as con:
+            row=con.execute('SELECT command FROM issue_test_commands WHERE issue_id=?',(issue,)).fetchone()
+        if not row:
+            raise ValueError('pinned independent review command required')
+        self.b.validate_workspace_command(row[0])
+        return row[0].replace('cd /workspace && ', 'cd /delivery && ', 1)
+
+    def review_preconditions(self, issue, source, review):
+        try:
+            import delivery_code_inspection
+        except ImportError:
+            from broker import delivery_code_inspection
+        paths = delivery_code_inspection.paths(self.b,issue,source)
+        if not paths:
+            raise ValueError('registered ordinary review paths required')
+        with self.b.db() as con:
+            row = con.execute('SELECT n.agent_id,n.issue_id,g.mode,l.status AS lease_status,r.source_task,r.volume,r.status AS suite_status '
+                'FROM native_bindings n JOIN grants g USING(request_id) JOIN leases l USING(request_id) '
+                'JOIN review_suite_rpc r USING(request_id) WHERE n.task_id=?',(review,)).fetchone()
+            incident = con.execute('SELECT reason FROM review_incidents WHERE review_task_id=?',(review,)).fetchone()
+            snapshot = con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',(source,)).fetchone()
+            if (not row or row['issue_id']!=issue or row['mode']!='review'
+                    or row['lease_status']!='closed' or row['suite_status']!='issued' or row['source_task']!=source
+                    or not snapshot or tuple(snapshot)!=(row['volume'],'complete')
+                    or not incident or incident[0]!='review approval requires exact offline suite receipt'
+                    or con.execute('SELECT 1 FROM reviews WHERE review_task_id=?',(review,)).fetchone()):
+                raise ValueError('closed unapproved review with omitted suite required')
+        task = native.task_record(self.settings,review,row['agent_id'])
+        if (task.get('id')!=review or task.get('issue_id')!=issue
+                or task.get('agent_id')!=row['agent_id'] or task.get('status')!='completed'):
+            raise ValueError('completed exact independent reviewer required')
+        validated = self.b.validate_frozen_delivery(row['volume'],source)
+        if validated.get('baseline_tests_intact') is not True:
+            raise ValueError('unchanged frozen author delivery required')
+        return dict(operation='omitted_independent_review_preconditions',review_task=review,
+            source_task=source,volume=row['volume'],manifest_sha256=validated['manifest_sha256'],
+            closed_review_lease=True,suite_status='issued',read_paths=paths,
+            delivery_approval=False)
+
     def review_result(self, review, source):
         with self.b.db() as con:
             row = con.execute('SELECT * FROM reviews WHERE review_task_id=? AND source_task_id=?',
@@ -440,6 +480,13 @@ class Effects:
             if not row:
                 incident = con.execute('SELECT reason FROM review_incidents WHERE review_task_id=?', (review,)).fetchone()
                 if incident:
+                    if incident[0] == 'review approval requires exact offline suite receipt':
+                        rpc = con.execute('SELECT status FROM review_suite_rpc WHERE request_id IN '
+                            '(SELECT request_id FROM native_bindings WHERE task_id=?)',(review,)).fetchone()
+                        if rpc and rpc['status'] == 'issued':
+                            return {'status':'infrastructure_blocked',
+                                'finding':'Reviewer omitted the mandatory independent offline suite; no product defect established.',
+                                'review_suite_status':'issued'}
                     raise ValueError('review_protocol_failure: ' + incident[0])
                 return None
             result = dict(row)

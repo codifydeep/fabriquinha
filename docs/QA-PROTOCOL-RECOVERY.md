@@ -78,6 +78,24 @@ instance and model-budget configuration remain inherited. Both bootstrap and
 delivery reconciliation use this same environment boundary; planned-card
 identity checks are not relaxed.
 
+## Omitted independent review preconditions
+
+Repair review policy v2 spells out the exact registered offline suite command;
+prepared v1 contracts remain frozen. An implementer's Green receipt does not
+replace the reviewer's own execution-scoped receipt. The broker presents the
+registered command and mandatory read paths, not arbitrary reviewer commands.
+
+If a completed independent reviewer attempts approval while its suite capability
+is still merely `issued`, the outcome is review infrastructure/protocol failure,
+not a demonstrated product defect. One fresh read-only review may be prepared
+after verifying the closed reviewer lease, immutable source and manifest,
+registered inspection scope, intact baseline and absence of an accepted review.
+The original incident remains preserved; retry counters are not reset and the
+author is not restarted. Approval still requires complete actual reads and a
+successful independent suite. Repetition escalates technically. A technical
+decision may not request product correction solely to resolve review
+infrastructure.
+
 ## Qualification boundary
 
 This mechanism is bounded provider recovery, not general zero-intervention

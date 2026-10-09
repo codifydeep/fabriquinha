@@ -823,6 +823,32 @@ class HandoffTests(unittest.TestCase):
         self.tick([recipient],now=110)
         self.assertEqual(list(self.effects.created.values())[-1]['target'],'lead')
         self.assertFalse(any(r['target']=='author' for r in self.effects.created.values()))
+        lead=self.recipient(target='lead')
+        self.assertEqual(self.tick([recipient,lead],now=111),'technical_decision_required')
+        self.assertFalse(any(r['target']=='author' for r in self.effects.created.values()))
+
+    def test_missing_review_suite_opens_one_fresh_readonly_review(self):
+        self.effects.review_command=lambda _: 'cd /delivery && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1'
+        self.tick()
+        old=self.recipient()
+        def proof(issue,source,review):
+            return dict(operation='omitted_independent_review_preconditions',review_task=review,
+                source_task=source,volume='frozen',manifest_sha256='a'*64,
+                closed_review_lease=True,suite_status='issued',read_paths=['/delivery/app.js'],
+                delivery_approval=False)
+        self.effects.review_preconditions=proof
+        self.effects.verdict=dict(status='infrastructure_blocked',review_suite_status='issued')
+        self.assertEqual(self.tick([old]),'ready_review')
+        self.tick([old],now=110)
+        state=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertIn('DELIVERY_REVIEW_READ_PATH:/delivery/app.js',state['instruction'])
+        self.assertIn('call terminal with EXACTLY: cd /delivery',state['instruction'])
+        self.assertEqual(len(self.effects.created),2)
+        self.assertFalse(state['review_preconditions_recovery']['delivery_approval'])
+        new=self.recipient()
+        self.assertEqual(self.tick([new],now=111),'diagnose')
+        self.assertEqual(len(self.effects.created),2)
+        self.assertFalse(any(r['target']=='author' for r in self.effects.created.values()))
 
     def test_author_correction_waits_for_release_before_wakeup(self):
         self.tick()

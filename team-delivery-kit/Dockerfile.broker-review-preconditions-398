@@ -1,0 +1,8 @@
+# Local qualification overlay; verify the immutable base before building.
+# Expected: sha256:0fd48cd0f4521a8b0fab04fe2f1cbe3ef3791fa8fa1119f629f26b19a228a0e1
+FROM delivery-kit-execution-broker:20261009.397
+COPY broker/handoffs.py /handoffs.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/review_precondition_recovery.py /review_precondition_recovery.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py

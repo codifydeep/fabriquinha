@@ -30,6 +30,29 @@ DIAGNOSIS = {'decision': 'repair', 'root_cause': 'wrong JavaScript MIME type',
 
 
 class RepairTests(unittest.TestCase):
+    def test_repair_reviewer_must_execute_exact_independent_suite(self):
+        _, spec = derive(INCIDENT, CONTRACT, SPEC, CONTRACT['files'], DIAGNOSIS)
+        expected = ('cd /delivery && PYTHONDONTWRITEBYTECODE=1 ' +
+                    ' '.join(CONTRACT['test_command']) + ' 2>&1')
+        self.assertIn(expected, spec['review_instruction'])
+        self.assertIn('Your own successful suite receipt is mandatory', spec['review_instruction'])
+        self.assertIn('Never replay Red or modify files', spec['review_instruction'])
+
+    def test_historical_prepared_review_contract_is_not_rewritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            _, legacy = derive(INCIDENT, CONTRACT, SPEC, CONTRACT['files'], DIAGNOSIS,
+                               review_policy_version=1)
+            prepared=prepare_repair(directory,INCIDENT,CONTRACT,SPEC,CONTRACT['files'],DIAGNOSIS,'task-1')
+            receipt_path=Path(prepared['receipt_path']);spec_path=Path(prepared['run_spec_path'])
+            old=json.loads(receipt_path.read_text());old.pop('review_policy_version')
+            from portable_qa_repair import exact_json_hash
+            old['run_spec_sha256']=exact_json_hash(legacy)
+            spec_path.write_text(json.dumps(legacy));receipt_path.write_text(json.dumps(old))
+            before=(spec_path.read_bytes(),receipt_path.read_bytes())
+            again=prepare_repair(directory,INCIDENT,CONTRACT,SPEC,CONTRACT['files'],DIAGNOSIS,'task-1')
+            self.assertEqual((spec_path.read_bytes(),receipt_path.read_bytes()),before)
+            self.assertEqual(again['run_spec_sha256'],exact_json_hash(legacy))
+
     def test_new_repair_does_not_inherit_parent_dispatch_or_fault_identity(self):
         from portable_qa_repair import repair_environment
         inherited = {name:'parent-context' for name in (

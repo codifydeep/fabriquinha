@@ -18,6 +18,7 @@ LEGACY_SOURCE_SHA='d911f64499a5ae44fd0c1583d2f3de092376933353ea1cbc856339e3a23ec
 FINALIZATION_SOURCE_SHA='17bada109325765d5dfb10b53e370eabecadc3203dff3cd1a1c7997aaa984833'
 DEPENDENCY_DIAGNOSTIC_SOURCE_SHA='5745afe1e7ba31c866266fbdf22cc847f13628c7be89773a7cd74c90e0fd5d24'
 SCOPED_INSPECTION_SOURCE_SHA='ded8dcc98130da2f123b48884c9d19ca0f6f24c517f8a82ea1e3f3b2084e871d'
+REVIEW_PRECONDITIONS_SOURCE_SHA='d4e02169989649408f6f1b8ca5aa258142a62541f92b867e255d7697875f8900'
 PROXY_IMAGE='sha256:55e34ae248147017aad74670c5e50a7f6e9c9783b3759f917459fe76bf456ddd'
 
 
@@ -42,7 +43,7 @@ def register(b,payload):
         raise ValueError('exact runtime transport identities required')
     for value in payload.values():
         if str(uuid.UUID(value))!=value:raise ValueError('canonical runtime transport identity required')
-    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {SCOPED_INSPECTION_SOURCE_SHA,SOURCE_SHA,LEGACY_SOURCE_SHA,VALIDATION_PENDING_SOURCE_SHA,FINALIZATION_SOURCE_SHA,DEPENDENCY_DIAGNOSTIC_SOURCE_SHA,'e4fd3719fab26bc5a3cc2ac2732fe0617e50f8e9dfdc77cbe039056ab029d1e9'}:
+    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {REVIEW_PRECONDITIONS_SOURCE_SHA,SCOPED_INSPECTION_SOURCE_SHA,SOURCE_SHA,LEGACY_SOURCE_SHA,VALIDATION_PENDING_SOURCE_SHA,FINALIZATION_SOURCE_SHA,DEPENDENCY_DIAGNOSTIC_SOURCE_SHA,'e4fd3719fab26bc5a3cc2ac2732fe0617e50f8e9dfdc77cbe039056ab029d1e9'}:
         raise ValueError('fixed source-pinned recovery transport required')
     issue,source,failed=(payload[k] for k in ('issue_id','source_task','failed_task'))
     with b.LOCK:
