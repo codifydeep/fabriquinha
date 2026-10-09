@@ -61,6 +61,20 @@ class WorkspaceLockdownTests(unittest.TestCase):
         with patch.object(lock.os, 'chown'), self.assertRaisesRegex(ValueError, 'scope'):
             lock.lockdown(self.base, self.work, ['tests/test_old.py'])
 
+    def test_large_product_allowed_but_new_tests_keep_small_limit(self):
+        (self.work / 'app.py').write_bytes(b'#' + b'x' * 40000)
+        with patch.object(lock.os, 'chown'):
+            lock.lockdown(self.base, self.work, ['app.py'])
+            self.assertEqual((self.work / 'app.py').stat().st_mode & 0o777, 0o666)
+            self.work.chmod(0o755)
+            (self.work / 'tests').chmod(0o755)
+            (self.work / 'tests/test_new.py').write_bytes(b'#' + b'x' * 40000)
+            with self.assertRaisesRegex(ValueError, 'unsafe workspace'):
+                lock.lockdown(self.base, self.work, ['tests/test_new.py'])
+            (self.work / 'app.py').write_bytes(b'x' * (lock.MAX_FILE_BYTES + 1))
+            with self.assertRaisesRegex(ValueError, 'unsafe workspace'):
+                lock.lockdown(self.base, self.work, ['app.py'])
+
     def test_oversized_repair_is_hash_bound_and_never_grants_baseline_write(self):
         name='tests/test_new.py';payload=b'#'+b'x'*38509
         target=self.work/name;target.write_bytes(payload)

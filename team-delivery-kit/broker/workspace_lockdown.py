@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from portable_contract import validate
+from portable_contract import validate, is_test_path, MAX_FILE_BYTES
 
 
 BASE = Path('/base')
@@ -70,8 +70,12 @@ def lockdown(base, work, allowed, repair=None):
             with os.fdopen(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb'):
                 pass
         bound=repair.get(name)
-        content=_regular(target, bound['bytes'] if bound else 32768)
-        if len(content)>32768 and (len(content)!=bound['bytes']
+        test = name in contract['test_files'] or any(
+            is_test_path(name, root, contract['test_command'][0])
+            for root in contract['test_roots'])
+        limit = (bound['bytes'] if bound else 32768) if test else MAX_FILE_BYTES
+        content=_regular(target, limit)
+        if test and len(content)>32768 and (len(content)!=bound['bytes']
                 or hashlib.sha256(content).hexdigest()!=bound['sha256']):
             raise ValueError('historical repair lockdown hash drift')
     # Root owns every directory and file. Only the exact selected regular

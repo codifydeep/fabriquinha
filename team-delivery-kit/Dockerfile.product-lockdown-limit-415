@@ -1,0 +1,5 @@
+# Build only after verifying this local tag resolves to
+# sha256:b7fd4d6420adc78ba2bde4ad0cac7c95998533519bbcb94cc928bbbaf6a4bd37.
+FROM delivery-kit-execution-broker:20261009.414
+COPY broker/workspace_lockdown.py /workspace_lockdown.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import workspace_lockdown"
