@@ -178,7 +178,8 @@ def tracked_base(selection):
 
 def historical_context(selection):
     """Facts pinned once per fresh planning ledger; no cross-project summaries."""
-    if not selection['configuration_sha256'] or not (PRIVATE/'delivery-memory.sqlite').exists():
+    if not selection['configuration_sha256'] or not any((PRIVATE/name).exists() for name in
+            ('delivery-memory.sqlite','decision-memory.sqlite')):
         return ''
     import subprocess
     from project_selection import current
@@ -190,8 +191,11 @@ def historical_context(selection):
             'merge-base','--is-ancestor',old,new],capture_output=True)
         if result.returncode not in (0,1):raise ValueError('memory Git lineage unavailable')
         return result.returncode==0
-    return context(PRIVATE,'https://github.com/'+project['repository'],instance,
-                   role='product',base_sha=selection['base_sha'],is_ancestor=ancestor)
+    repository='https://github.com/'+project['repository']
+    facts=context(PRIVATE,repository,instance,role='product',base_sha=selection['base_sha'],is_ancestor=ancestor)
+    from decision_context import context as decisions
+    return facts+decisions(PRIVATE,repository,instance,role='product',
+        base_sha=selection['base_sha'],is_ancestor=ancestor,cli=cli)
 
 
 def validate_execution_plan(proposal, tracked):

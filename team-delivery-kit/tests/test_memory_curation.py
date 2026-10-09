@@ -43,3 +43,18 @@ class MemoryCurationTests(unittest.TestCase):
                          lambda *a:calls.append(a))
         self.assertEqual(calls[-1],('status','issue','blocked','--no-start'))
         self.assertTrue(any('memory_curation_error' in c for c in calls))
+
+    def test_recovery_preserves_old_issue_and_dispatches_only_one_changed_context(self):
+        self.runs=[{'id':'failed','agent_id':REVIEWER,'status':'failed'}]
+        blocked=self.call()
+        recovered={**blocked,'stage':'format_recovery_intent',
+            'format_recovery':{'prior_failure':blocked,'attempt_limit':1}}
+        recovered.pop('issue_id');recovered.pop('category')
+        self.runs=[]
+        with patch('memory_format_recovery.observe',return_value=recovered):
+            value=self.call()
+        self.assertEqual(len(self.created),2)
+        self.assertTrue(self.created[-1][1]['run_name'].endswith('-F1'))
+        self.assertIn('300 characters',self.created[-1][0][1])
+        self.assertEqual(value['format_recovery']['prior_failure']['issue_id'],'issue')
+        self.call();self.assertEqual(len(self.created),2)

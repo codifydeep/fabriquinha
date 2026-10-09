@@ -27,11 +27,16 @@ Tech Lead sobre seu hash exato. Rejeição é terminal; substituição exige nov
 revisão, mesma identidade de assunto e preservação da versão anterior. Retomar
 uma indicação não renova sua validade. O adaptador confere o modo de planejamento,
 o agente e o lease encerrado diretamente no controlador. O contrato estruturado
-foi instalado no proxy isolado, sem alterar modelo, chave ou medição. O primeiro
-curador real teve a resposta rejeitada por limite de comprimento; a indicação
-permaneceu privada e bloqueada, sem retentativa idêntica. Recuperação limitada
-de formato e curadoria concluída ainda precisam de qualificação; nenhuma
-indicação foi promovida automaticamente.
+foi instalado no proxy isolado, sem alterar modelo, chave ou medição. Uma resposta
+recusada por comprimento percorreu uma recuperação de formato limitada: o
+controlador correlacionou tarefa encerrada e diagnóstico do proxy, preservou a
+falha e exigiu nova decisão sobre o mesmo hash, sem relaxar o limite. A curadoria
+real subsequente aprovou essa indicação; outra falha não permite nova retentativa.
+Novos planejamentos podem receber recomendações após revalidar ambas as execuções
+nativas, validade, isolamento do projeto e ancestralidade Git. O contexto mantém
+as recomendações como dados históricos, nunca requisitos atuais ou permissões.
+Essa recuperação e a leitura pelo controlador foram verificadas; consumo por
+agentes em um novo ciclo completo continua pendente de qualificação.
 
 No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
 formal comprovada podem abrir um diagnóstico independente do CTO. O controlador
@@ -162,6 +167,11 @@ flowchart TB
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]
     R --> UI
+    R --> HF[Histórico factual privado por projeto]
+    HF -.->|Hash, validade e ancestralidade Git| S
+    C[Curadoria retomável: indicação CTO e revisão Tech Lead] <--> MC
+    C --> K[Recomendações históricas privadas]
+    K -.->|Provas nativas revalidadas; sem permissões| S
 ```
 
 Multica é o plano de colaboração; Hermes executa os agentes; os controladores e o broker implementam as restrições e a recuperação que não podem depender apenas de prompts. **Temporal foi estudado, mas não está integrado ao runtime atual.** Telegram pertence à instalação Hermes anterior, não é requisito deste caminho de avaliação.

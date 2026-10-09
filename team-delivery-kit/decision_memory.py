@@ -118,6 +118,8 @@ def read(private,repository,namespace,*,base_sha,is_ancestor,now=None):
                 or envelope['source']['agent_id']==curation['proof']['agent_id']):
             raise ValueError('independent approved recommendation required')
         if is_ancestor(entry['commit'],base_sha):
-            result.append({'id':key,'entry':entry,'validity':'historical_recommendation_revalidate','authority':False})
+            result.append({'id':key,'entry':entry,'validity':'historical_recommendation_revalidate','authority':False,
+                           'source_proof':envelope['source'],'review_proof':curation['proof'],
+                           'review_answer':curation['answer']})
         if len(result)==3:break
     return result
