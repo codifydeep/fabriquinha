@@ -124,6 +124,12 @@ def task_base(broker, issue_id, task_id):
 
 
 class Effects:
+    def failed_candidate_admission(self,con,route,data):
+        """Internal only; fixed validators and native records qualify the grant."""
+        try:import failed_candidate_admission
+        except ImportError:from broker import failed_candidate_admission
+        return failed_candidate_admission.admit(con,route,data,self)
+
     def author_edit_scope(self, route):
         """Read the controller-installed write contract; never infer it from prose."""
         from portable_contract import safe_path

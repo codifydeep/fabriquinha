@@ -980,6 +980,11 @@ continua bloqueada sob responsabilidade técnica; conclusão do worker exige nov
 validação e não aprova a entrega. A integração instalada ainda precisa verificar
 os fatos diretamente nos validadores, snapshots e identidades nativas antes de
 ativar esse ledger; ele não é uma ferramenta disponível aos agentes.
+O adaptador interno de admissão consulta a rota instalada, o recibo diagnóstico,
+leases, decisões nativas, leituras completas e inventários dos validadores para
+o candidato e as tentativas anteriores. Recibos ausentes não são convertidos em
+evidência positiva. O despacho automático e o seeding desse caminho ainda não
+estão ativados na instalação de referência.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.
