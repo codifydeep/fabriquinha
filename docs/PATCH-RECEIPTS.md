@@ -22,3 +22,17 @@ verified backup, pinned image build and installed-code qualification. Both the
 controller and Hermes import paths carry the same source. It does not repair or
 retrospectively approve a previous failed delivery; the unchanged trial remains
 blocked. New real worker execution must still validate the ACP receipt end to end.
+
+## Completed unchanged repair incidents
+
+`unchanged_repair_incident` qualifies completed, closed-lease seeded repairs
+against the controller-owned copy/Red job receipts and the historical test
+hash. It registers a distinct, durable CTO diagnosis while preserving the
+blocked handoff. Cause remains unknown: a formatted success is not evidence
+of a lasting change, and equal hashes do not prove that the agent reverted it.
+
+The diagnosis cannot wake the author or waive Red. Either CTO action is stored
+as a recommendation pending a separately qualified changed-condition experiment
+against the existing plan. Failed/invalid diagnoses remain visible and cannot
+rearm the incident. After an uncertain POST, only the original native marker
+is observed; restart does not issue another POST or duplicate a diagnosis.

@@ -97,6 +97,9 @@ def resume_diagnosis(broker, payload):
 
 def technical_recovery(broker, route, runs, source, prior, effects):
     """One actual CTO diagnosis and one author correction; never a passive wait."""
+    try:import unchanged_repair_incident
+    except ImportError:from broker import unchanged_repair_incident
+    if unchanged_repair_incident.handle(broker,route,runs,source,prior,effects):return
     data = json.loads(prior['data'])
     try:import calibration_failure_plan
     except ImportError:from broker import calibration_failure_plan
