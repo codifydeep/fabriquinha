@@ -1,0 +1,6 @@
+# Verified local base: sha256:a2cdf17accc576653a5697a57fb59df775729741bea4131be3d4adbeb12f301f
+FROM delivery-kit-execution-broker:20261009.417
+COPY broker/suite_failure.py /suite_failure.py
+COPY broker/exhausted_suite_intake.py /exhausted_suite_intake.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import suite_failure,exhausted_suite_intake,technical_remediation_plan"

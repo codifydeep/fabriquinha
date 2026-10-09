@@ -1,6 +1,11 @@
 import copy
 import json
 import unittest
+import sqlite3
+import threading
+from contextlib import contextmanager
+from types import SimpleNamespace
+from unittest.mock import patch
 from broker import exhausted_suite_intake as intake
 from broker.suite_failure import evidence
 from execution_context import freeze
@@ -87,3 +92,66 @@ class ExhaustedSuiteIntakeTests(unittest.TestCase):
         self.assertEqual(diagnostic['numeric_assertion_details'],[dict(observed=2,expected=3,comparison='>=')])
         self.assertFalse(diagnostic['test_defect_proven'])
         self.assertEqual(self.failure['numeric_assertion_details'],[])
+
+    def database(self):
+        from broker import handoffs
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row
+        self.addCleanup(con.close)
+        handoffs.initialize(con)
+        con.execute('CREATE TABLE leases(status TEXT)')
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',('second',json.dumps(dict(self.route,enabled=True))))
+        handoffs.save(con,'author-task','second','test_revision_required','cto',self.data,100)
+        @contextmanager
+        def db():
+            try:
+                yield con
+                con.commit()
+            except Exception:
+                con.rollback()
+                raise
+        return con,SimpleNamespace(db=db,LOCK=threading.RLock())
+
+    def test_registration_then_restart_observes_same_intent_without_new_qualification(self):
+        con,b=self.database();config=self.build()
+        with patch.object(intake,'qualify',return_value=config) as qualify:
+            state=intake.register(b,'author-task')
+            self.assertEqual(state['stage'],'issue_intent')
+            self.assertFalse(state['execution_authorized'])
+            qualify.side_effect=AssertionError('restart must observe durable intent')
+            self.assertEqual(intake.register(b,'author-task'),state)
+        self.assertEqual(con.execute('SELECT count(*) FROM technical_remediation_plans').fetchone()[0],1)
+        route=json.loads(con.execute('SELECT config FROM delivery_routes').fetchone()[0])
+        self.assertFalse(route['enabled'])
+        row=con.execute('SELECT stage,data FROM delivery_handoffs').fetchone()
+        self.assertEqual(row[0],'technical_decision_required')
+        data=json.loads(row[1]);self.assertEqual(data['attempts'],3)
+        self.assertEqual(data['validation_failure'],self.failure)
+        self.assertEqual(data['exhausted_revision_proposal'],self.data['test_revision_proposal'])
+
+    def test_busy_or_changed_source_cannot_be_registered_after_qualification(self):
+        for mode in ('busy','changed'):
+            with self.subTest(mode=mode):
+                con,b=self.database();config=self.build()
+                def changed(*args):
+                    if mode=='busy':con.execute("INSERT INTO leases VALUES('starting')")
+                    else:con.execute("UPDATE delivery_handoffs SET updated=101")
+                    con.commit()
+                    return config
+                with patch.object(intake,'qualify',side_effect=changed),self.assertRaises(ValueError):
+                    intake.register(b,'author-task')
+                self.assertEqual(con.execute('SELECT count(*) FROM technical_remediation_plans').fetchone()[0],0)
+                self.assertTrue(json.loads(con.execute('SELECT config FROM delivery_routes').fetchone()[0])['enabled'])
+
+    def test_generic_plan_prompt_does_not_inherit_fixture_specific_guidance(self):
+        from broker.technical_remediation_plan import instruction,advance
+        config=self.build()
+        state=dict(stage='plan_dispatch',owner='cto',execution_authorized=False,release_homologated=False)
+        note=instruction(config,state)
+        self.assertNotIn('/service-mode',note)
+        self.assertIn('does not prove a test defect',note)
+        self.assertIn('retain_hold',note)
+        self.assertIn('DELIVERY_TYPED_REMEDIATION_V1:plan:',note)
+        fx=SimpleNamespace(wake=lambda *args:dict(id='new-wake'))
+        dispatched=advance(config,state,[],fx,now=100)
+        self.assertEqual(dispatched['stage'],'awaiting_plan')
+        self.assertFalse(dispatched['execution_authorized'])

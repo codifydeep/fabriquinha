@@ -5,6 +5,7 @@ Historical receipts are inputs, never retroactively upgraded evidence.
 """
 import json
 import re
+import time
 from pathlib import PurePosixPath
 
 try:
@@ -117,7 +118,7 @@ def qualify(b, source):
                 return json.loads(trial[0]) if trial else None
             settings = json.loads((b.STATE / 'native.json').read_text())
             task = native.task_record(settings, data['recipient_task'], route['cto'])
-            fx = handoff_runtime.Effects(b.handoff_context(), settings)
+            fx = handoff_runtime.Effects(b.handoff_context() if hasattr(b, 'handoff_context') else b, settings)
             author = native.task_record(settings, source, route['author'])
             bindings = con.execute('SELECT l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',
                 (source, route['author'], row['issue_id'])).fetchall()
@@ -139,3 +140,40 @@ def qualify(b, source):
                     or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()):
                 raise ValueError('source changed during read-only qualification')
             return value
+
+
+def register(b, source):
+    """Atomically enter planning; repeats observe the same durable intent."""
+    with b.LOCK:
+        with b.db() as con:
+            plans.initialize(con)
+            prior = con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?', (source,)).fetchone()
+            if prior:
+                config, state = map(json.loads, prior)
+                if config.get('intake_kind') != 'exhausted_frozen_suite_v1':
+                    raise ValueError('foreign existing remediation registration')
+                return state
+            row = con.execute('SELECT * FROM delivery_handoffs WHERE source_task=?', (source,)).fetchone()
+            if not row:
+                raise ValueError('source handoff required')
+            observed = dict(row)
+            route = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?', (row['issue_id'],)).fetchone()[0])
+        value = qualify(b, source)
+        state = dict(stage='issue_intent', owner=value['cto'], execution_authorized=False, release_homologated=False)
+        with b.db() as con:
+            current = con.execute('SELECT * FROM delivery_handoffs WHERE source_task=?', (source,)).fetchone()
+            current_route = con.execute('SELECT config FROM delivery_routes WHERE issue_id=?', (value['source_issue'],)).fetchone()
+            if (not current or dict(current) != observed or json.loads(current_route[0]) != route
+                    or con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()):
+                raise ValueError('source changed before planning intent')
+            plans.initialize(con)
+            con.execute('INSERT INTO technical_remediation_plans VALUES(?,?,?)',
+                (source, json.dumps(value, sort_keys=True), json.dumps(state, sort_keys=True)))
+            route['enabled'] = False
+            con.execute('UPDATE delivery_routes SET config=? WHERE issue_id=?', (json.dumps(route, sort_keys=True), value['source_issue']))
+            data = json.loads(current['data'])
+            data.update(exhausted_revision_proposal=data['test_revision_proposal'],
+                technical_remediation_plan=dict(source_task=source, original_depth=2, execution_authorized=False),
+                required_action='cto_propose_distinct_remediation_then_independent_techlead_review')
+            plans.handoffs.save(con, source, value['source_issue'], 'technical_decision_required', value['cto'], data, time.time())
+        return state

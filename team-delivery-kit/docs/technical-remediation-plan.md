@@ -30,11 +30,23 @@ the source attempt count. Missing evidence, changed scope, rebasing, cycles,
 self-review or partial reads fail closed. Returned data has no mutable aliases
 to historical inputs.
 
-This qualifier makes no provider calls, writes no controller state, dispatches
-no worker and grants no test-edit permission. A numeric mismatch remains an
-observation, not a proven test defect. Registration, generic planning transport,
-independent plan review and executor qualification must still be connected and
-validated before it becomes an autonomous recovery path. It is not an exception
+The qualifier makes no provider calls or state writes. Its separate `register`
+operation rechecks the exact source and idle leases, atomically records a single
+planning intent and pauses the old route. Restart observes that same intent;
+it does not repeat qualification or create another revision. Source attempts,
+failure receipt and CTO sponsorship remain unchanged. The existing planning
+supervisor selects only persisted two-generation ancestry for this generic
+entry; non-exhausted revisions retain their normal path. Rejected qualification
+is durably blocked rather than retried identically.
+
+Generic planning uses the existing immutable-source, typed CTO proposal and
+independent Tech Lead review protocol without service-mode-specific guidance.
+Its snapshot mount requires the same complete controller-owned snapshot and
+archived frozen failure. A numeric mismatch remains an observation, not a
+proven test defect. Plan approval grants no test-edit or execution permission;
+the separately qualified executor, new immutable Red, independent test review,
+full Green and all PR/CI/deploy/QA gates remain mandatory. Live generic planning
+and execution still require end-to-end qualification. This is not an exception
 to the revision-depth guard or evidence of product delivery.
 
 ## Implemented path

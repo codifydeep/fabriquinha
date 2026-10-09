@@ -12,6 +12,15 @@ contagem; o próximo ciclo real ainda precisa passar por todos os gates.
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+O supervisor possui uma entrada genérica de planejamento para uma falha de suíte
+congelada após duas revisões de testes novos. Ela preserva a base Git, todos os
+critérios de aceite, recibos e tentativas, pausa a rota anterior e registra um
+único pedido de plano CTO → revisão independente do Tech Lead. Reinício observa
+a mesma intenção. Uma comparação numérica não prova defeito do teste; aprovação
+do plano não autoriza escrita ou entrega. A execução genérica dessa recuperação
+e o ciclo autônomo completo ainda precisam de qualificação. Veja o
+[contrato de remediação](team-delivery-kit/docs/technical-remediation-plan.md).
+
 O limite de novos testes continua em 32 KiB, aplicado também na captura de Red.
 Arquivos de código do produto, cópia da base, snapshots e preservação após reinício
 usam o limite de artefato do contrato (2 MiB). Isso evita que um código válido deixe

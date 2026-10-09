@@ -216,6 +216,22 @@ def instruction(config,state):
         note+='preserving every method/assertion, original base and depth 2. Require harness compilation and '
         note+='behavioral negative controls before genuine Red and independent test review. Historical approvals '
         note+='do not approve this amended submission. All R2/R3 gates and every criterion remain required.'
+    if config.get('intake_kind') == 'exhausted_frozen_suite_v1':
+        if state['stage'] == 'plan_dispatch' and not state.get('plan_revisions'):
+            note = ('CTO: independently diagnose this frozen full-suite failure and propose a DISTINCT '
+                'recovery contract, or retain_hold if NEW-test repair is unsupported. A numeric mismatch '
+                'does not prove a test defect. Read ALL selected immutable source files. Never make '
+                'product generate extra requests to accommodate a contradictory NEW expectation. '
+                'R1 repairs only originally NEW tests in a fresh submission, preserving baseline '
+                'tests and behavioral coverage; require genuine Red on the original Git base and '
+                'independent test review. R2 product implementation follows only approved immutable tests. '
+                'R3 full Green, independent product review, PR/CI, deploy and browser QA on the same SHA. '
+                'ALL acceptance IDs in ALL strictly dependent steps. No edits, third recursive revision, '
+                'depth/attempt reset, execution, delivery approval or CEO technical question. '
+                'Return compact schema JSON or retain_hold with no steps.\n'
+                'DELIVERY_REMEDIATION_PLAN_V1:' + digest(config) + '\n' +
+                ''.join('DELIVERY_REMEDIATION_CRITERION:' + k + '\n' for k in sorted(config['criteria'])) +
+                'DELIVERY_TYPED_REMEDIATION_V1:plan:' + digest(config))
     if state['stage']=='plan_dispatch':
         note+='\nDELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1\n'
     result=common+note
@@ -347,14 +363,19 @@ def mounts(b,binding):
     if s['stage'] not in ('plan_dispatch','review_dispatch','observe_dispatch','awaiting_plan','awaiting_review') or s['owner']!=binding['agent_id']:
         raise ValueError('current readonly recovery role required')
     labels=(b.docker('GET','/volumes/'+c['volume']) or {}).get('Labels',{})
-    completed=c.get('diagnostic_snapshot_kind')=='completed_frozen_validation' and c.get('amendment',{}).get('kind') in ('request_scope','timer_provenance')
+    generic = c.get('intake_kind') == 'exhausted_frozen_suite_v1'
+    completed=c.get('diagnostic_snapshot_kind')=='completed_frozen_validation' and (generic or c.get('amendment',{}).get('kind') in ('request_scope','timer_provenance'))
     if completed:
         with b.db() as con:
             snapshot=con.execute('SELECT volume,status FROM snapshots WHERE task_id=?',(c['source_task'],)).fetchone()
-            diagnosis=con.execute('SELECT receipt FROM completed_validation_diagnoses WHERE source_task=?',(c['source_task'],)).fetchone()
+            if generic:
+                diagnosis=con.execute('SELECT receipt FROM frozen_suite_failures WHERE task_id=?',(c['source_task'],)).fetchone()
+            else:
+                diagnosis=con.execute('SELECT receipt FROM completed_validation_diagnoses WHERE source_task=?',(c['source_task'],)).fetchone()
         if (not snapshot or snapshot['volume']!=c['volume'] or snapshot['status']!='complete'
                 or not diagnosis or json.loads(diagnosis[0]).get('volume')!=c['volume']
-                or json.loads(diagnosis[0]).get('status')!='diagnostic_only_not_approved'):
+                or (not generic and json.loads(diagnosis[0]).get('status')!='diagnostic_only_not_approved')
+                or (generic and any(c.get('historical_failure',{}).get(k)!=v for k,v in json.loads(diagnosis[0]).items()))):
             raise ValueError('exact completed validation diagnostic evidence required')
     if (labels.get('delivery-kit.owner')!=b.OWNER or labels.get('delivery-kit.source-task')!=c['source_task']
             or not completed and labels.get('delivery-kit.diagnostic-only')!='true'):
@@ -518,9 +539,24 @@ def tick(b):
         candidates=con.execute("SELECT source_task,data FROM delivery_handoffs WHERE stage='test_revision_required'").fetchall() if not busy else []
     for candidate in candidates:
         data=json.loads(candidate['data'])
-        if not data.get('service_mode_schema_evidence'):continue
+        generic = not data.get('service_mode_schema_evidence')
+        if generic:
+            try:import exhausted_suite_intake
+            except ImportError:from broker import exhausted_suite_intake
+            with b.db() as con:
+                if con.execute('SELECT 1 FROM technical_remediation_plans WHERE source_task=?',(candidate['source_task'],)).fetchone():continue
+                if not con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='test_revision_trials'").fetchone():continue
+                row=con.execute('SELECT issue_id FROM delivery_handoffs WHERE source_task=?',(candidate['source_task'],)).fetchone()
+                base_row=con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(row[0],)).fetchone()
+                if not base_row:continue
+                def load_trial(issue):
+                    trial=con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()
+                    return json.loads(trial[0]) if trial else None
+                try:exhausted_suite_intake.ancestry(row[0],json.loads(base_row[0])['base_sha'],load_trial)
+                except (ValueError,KeyError):continue
         try:
-            register(b,candidate['source_task'])
+            if generic:exhausted_suite_intake.register(b,candidate['source_task'])
+            else:register(b,candidate['source_task'])
         except Exception as error:
             with b.db() as con:
                 initialize(con)
