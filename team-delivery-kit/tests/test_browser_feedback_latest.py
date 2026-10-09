@@ -1,5 +1,6 @@
 import ast
 import inspect
+import hashlib
 import unittest
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
@@ -87,7 +88,9 @@ class LatestRecipeTests(unittest.TestCase):
         names=[ast.literal_eval(kw.value) for call in calls for kw in call.keywords if kw.arg=='name']
         self.assertIn('Submit feedback',names);self.assertNotIn('Add',names)
 
-    def test_not_enabled_until_real_browser_qualification(self):
+    def test_enabled_recipe_matches_browser_calibrated_hash(self):
         for scenario in ('feedback-board-latest-api-v1','feedback-board-latest-ui-v1'):
-            with self.assertRaisesRegex(ValueError,'unqualified'):recipe_for(scenario)
+            path=recipe_for(scenario)
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),
+                             '9d1b0b775c47e6b28eb61a37aea4a85d92af0d99dfe67d913a4f566c9b233119')
         with self.assertRaises(ValueError):run('../arbitrary.py')

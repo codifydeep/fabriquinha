@@ -1,0 +1,5 @@
+# Expand only the fixed, offline-calibrated browser scenario catalogue.
+# Native isolation, tool permissions and delivery gates remain unchanged.
+# Verify this local base equals sha256:0a0cbefc1f2ca08012ac8a0bed6cd8d7f81d4ce906b8e1f22bd83ff1705255a7 before build.
+FROM delivery-kit-execution-broker:20261009.402
+COPY browser_qa_recipes.py /browser_qa_recipes.py

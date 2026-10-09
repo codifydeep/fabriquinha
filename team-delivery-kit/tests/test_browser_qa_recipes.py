@@ -1,5 +1,5 @@
 import unittest
-from browser_qa_recipes import LEGACY_SCENARIOS, DETAIL_SCENARIOS, COUNT_SCENARIOS, recipe_for, baseline_for
+from browser_qa_recipes import LEGACY_SCENARIOS, DETAIL_SCENARIOS, COUNT_SCENARIOS, LATEST_SCENARIOS, recipe_for, baseline_for
 
 
 class FixedRecipeTests(unittest.TestCase):
@@ -29,3 +29,15 @@ class FixedRecipeTests(unittest.TestCase):
             self.assertLessEqual(len(recipe.read_bytes()),32768)
             self.assertEqual(baseline_for(name),'feedback-board-detail-ui-v1')
             self.assertEqual(baseline_for(baseline_for(name)),'feedback-board-demo-mode-ui-v1')
+
+    def test_latest_composes_all_three_preexisting_regression_layers(self):
+        for name in LATEST_SCENARIOS:
+            recipe=recipe_for(name)
+            self.assertEqual(recipe.name,'browser_feedback_latest.py')
+            self.assertLessEqual(len(recipe.read_bytes()),32768)
+            chain=[]
+            while name:
+                self.assertNotIn(name,chain);chain.append(name);name=baseline_for(name)
+            self.assertEqual(chain[1:],['feedback-board-count-ui-v1',
+                                      'feedback-board-detail-ui-v1','feedback-board-demo-mode-ui-v1'])
+            self.assertEqual(len(chain),4)

@@ -102,7 +102,8 @@ class QaArtifactTests(unittest.TestCase):
         from browser_qa_recipes import SCENARIOS, LEGACY_SCENARIOS
         scenarios=set(SCENARIOS)
         self.assertEqual(len(LEGACY_SCENARIOS),14)
-        self.assertEqual(len(scenarios),18)
+        self.assertEqual(len(scenarios),20)
+        self.assertTrue({'feedback-board-latest-api-v1','feedback-board-latest-ui-v1'}<=scenarios)
         config=self.payload['browser_receipt']['identity']['config']
         for scenario in scenarios:
             config['scenario']=scenario

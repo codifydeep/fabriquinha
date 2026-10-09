@@ -2,6 +2,14 @@
 
 Uma equipe de agentes de IA para transformar um brief de produto em software revisado, testado e entregue em homologação, usando GitHub e infraestrutura própria.
 
+O detector de navegador para o feedback mais recente foi calibrado em Chromium
+isolado e sem rede: aceitou uma referência sintética correta e rejeitou 16 defeitos
+conhecidos, incluindo filtros, Unicode, mutação indevida, schema, resposta obsoleta
+transitória, acessibilidade, bloqueio do formulário e ausência de polling. Essa
+referência é somente um controle de teste, nunca implementação ou evidência de
+entrega do produto. O novo cenário compõe as regressões de modo demo, detalhe e
+contagem; o próximo ciclo real ainda precisa passar por todos os gates.
+
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
 Uma recuperação de falha funcional detectada no navegador percorreu diagnóstico

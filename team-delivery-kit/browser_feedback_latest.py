@@ -61,8 +61,11 @@ def observe_ui(a,b,items,expect,guard):
         expect(indicator).to_have_text('Newest matching: #'+str(items[2]['id']))
     title=a.get_by_label('Title',exact=True);title.fill('Latest preserved draft')
     query=a.get_by_role('searchbox',name='Search feedback',exact=True)
-    query.fill('Latest QA');query.press('Enter');a.get_by_role('button',name='Open',exact=True).click()
+    query.fill('Latest QA');query.press('Enter')
     indicator=a.locator('#feedback-latest-match')
+    a.get_by_role('button',name='Completed',exact=True).click()
+    expect(indicator).to_have_text('Newest matching: #'+str(items[0]['id']))
+    a.get_by_role('button',name='Open',exact=True).click()
     expect(indicator).to_have_text('Newest matching: #'+str(items[1]['id']))
     expect(b.locator('#feedback-latest-match')).to_have_text('Newest matching: #'+str(items[2]['id']))
     a.get_by_role('combobox',name='Sort feedback',exact=True).select_option(label='Oldest first')
@@ -91,7 +94,17 @@ def observe_ui(a,b,items,expect,guard):
     expect(a.get_by_role('button',name='Submit feedback',exact=True)).to_be_enabled()
     current=search('latest-probe-current');replies['latest-probe-current']=json.dumps({'latest_id':None})
     answer(current,replies['latest-probe-current']);expect(indicator).to_have_text('Newest matching: —')
+    a.evaluate("""() => {
+      window.latestQaObserved=[];
+      window.latestQaObserver=new MutationObserver(() => {
+        window.latestQaObserved.push(document.getElementById('feedback-latest-match').textContent);
+      });
+      window.latestQaObserver.observe(document.getElementById('feedback-latest-match'),
+        {childList:true,characterData:true,subtree:true});
+    }""")
     answer(stale,json.dumps({'latest_id':999}));a.wait_for_timeout(200)
+    assert 'Newest matching: #999' not in a.evaluate('() => window.latestQaObserved'),'stale response briefly rendered'
+    a.evaluate('() => window.latestQaObserver.disconnect()')
     expect(indicator).to_have_text('Newest matching: —')
     for index,invalid in enumerate((True,0,-1,1.5,'1')):
         needle='latest-probe-invalid-'+str(index);route=search(needle)

@@ -16,19 +16,23 @@ LEGACY_SCENARIOS = (
 )
 DETAIL_SCENARIOS = ('feedback-board-detail-api-v1', 'feedback-board-detail-ui-v1')
 COUNT_SCENARIOS = ('feedback-board-count-api-v1', 'feedback-board-count-ui-v1')
-SCENARIOS = LEGACY_SCENARIOS + DETAIL_SCENARIOS + COUNT_SCENARIOS
+LATEST_SCENARIOS = ('feedback-board-latest-api-v1', 'feedback-board-latest-ui-v1')
+SCENARIOS = LEGACY_SCENARIOS + DETAIL_SCENARIOS + COUNT_SCENARIOS + LATEST_SCENARIOS
 
 
 def recipe_for(scenario):
     if not isinstance(scenario, str) or scenario not in SCENARIOS:
         raise ValueError('unqualified browser QA recipe')
-    filename = ('browser_feedback_count.py' if scenario in COUNT_SCENARIOS else
+    filename = ('browser_feedback_latest.py' if scenario in LATEST_SCENARIOS else
+                'browser_feedback_count.py' if scenario in COUNT_SCENARIOS else
                 'browser_feedback_detail.py' if scenario in DETAIL_SCENARIOS else
                 'browser_feedback_acceptance.py')
     return Path(__file__).with_name(filename)
 
 
 def baseline_for(scenario):
+    if scenario in LATEST_SCENARIOS:
+        return 'feedback-board-count-ui-v1'
     if scenario in COUNT_SCENARIOS:
         return 'feedback-board-detail-ui-v1'
     if scenario in DETAIL_SCENARIOS:
