@@ -610,6 +610,32 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(len(self.effects.created),1)
         self.assertEqual(execution.load(self.con,'issue')['wakeup_id'],wake['id'])
 
+    def test_frontend_inventory_precondition_recovery_waits_without_spending_author_attempts(self):
+        from broker.validation_job import Pending
+        execution=self.bounded_replan_setup()
+        data=json.loads(handoffs.load(self.con,'source')['data'])
+        data.update(error='failed_candidate_admission_rejected',
+            admission_error='one exact immutable validator inventory with unchanged Red and baseline required',
+            required_action='CTO resolve missing actual replan evidence; no identical admission replay')
+        handoffs.save(self.con,'source','issue','technical_decision_required','cto',data,90)
+        self.effects.candidate_inventory_ready=lambda:'sha256:'+'a'*64
+        delegate=self.effects.failed_candidate_admission
+        calls=[]
+        def admit(con,route,value):
+            calls.append(1)
+            if len(calls)<=2:raise Pending('observe existing metadata job')
+            return delegate(con,route,value)
+        self.effects.failed_candidate_admission=admit
+        for now in (100,110):
+            self.assertEqual(self.tick(now=now),'technical_decision_required')
+            saved=json.loads(handoffs.load(self.con,'source')['data'])
+            self.assertEqual(saved['attempts'],2)
+            self.assertFalse(self.effects.created)
+            self.assertIsNone(execution.load(self.con,'issue'))
+            self.assertTrue(saved['inventory_wait'])
+        self.assertEqual(self.tick(now=120),'awaiting_acceptance')
+        self.assertEqual(len(self.effects.created),1)
+
     def test_diagnosis_receives_existing_red_instead_of_inventing_missing_tests(self):
         self.effects.phase_evidence = lambda _: {'phase': 'implementation', 'red_manifest': 'a' * 64,
                                                 'independent_test_review': 'approved'}

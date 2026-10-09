@@ -40,13 +40,14 @@ class FailedCandidateAdmissionTests(unittest.TestCase):
             decision=lambda _:self.decision,
             read_evidence=lambda _:{'/evidence/candidate/app.js':{'lines':2,'total_lines':2}},
             author_edit_scope=lambda _:['app.js'],test_first_red=lambda *a,**k:{'red':{'frozen':'red'}})
-        def inventory(con,source,*args):
+        def inventory(con,source,*args,**kwargs):
             return dict(manifest_sha256='a'*64,product_sha256={'app.js':('b' if source.startswith('prior') else 'c')*64},
                 test_sha256={'tests/test_new.py':'d'*64},baseline_test_sha256={'tests/test_old.py':'e'*64})
         for target,value in [('native.task_record',lambda settings,task,actor:self.tasks[task]),
                 ('native.issue_task_runs',lambda *_:list(self.tasks.values())),
                 ('bound_failure_context.verified_failed_diagnostic',lambda *_:True),
-                ('handoffs.repeated_corrections',lambda *_:2),('execution.validator_inventory',inventory)]:
+                ('handoffs.repeated_corrections',lambda *_:2),('execution.validator_inventory',inventory),
+                ('candidate_inventory_jobs.ensure',lambda *_:'sha256:'+'f'*64)]:
             patcher=patch('broker.failed_candidate_admission.'+target,side_effect=value)
             patcher.start();self.addCleanup(patcher.stop)
 

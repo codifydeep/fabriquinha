@@ -12,6 +12,29 @@ from broker.failed_candidate_plan import digest
 
 
 class FailedCandidateExecutionTests(unittest.TestCase):
+    def test_frontend_receipt_requires_original_manifest_and_metadata_only_outcome(self):
+        self.con.execute('CREATE TABLE validation_jobs(identity TEXT,state TEXT)')
+        red=dict(base_manifest_sha256='a'*64,baseline_test_sha256={'old.py':'b'*64},test_sha256={'new.py':'c'*64})
+        proof=dict(base_manifest_sha256=red['base_manifest_sha256'],baseline_test_sha256=red['baseline_test_sha256'],
+            new_test_sha256=red['test_sha256'],baseline_tests_intact=True,manifest_sha256='d'*64,
+            product_file_sha256={'app.js':'e'*64},delivery_approval=False,tests_executed=False)
+        def store(value):
+            output=json.dumps(value)
+            identity=dict(task='source',kind='candidate_inventory',payload=dict(Image='fixed',
+                HostConfig=dict(Mounts=[dict(Source='frozen',ReadOnly=True)])))
+            state=dict(stage='complete',result=dict(exit_code=0,output=output,
+                output_sha256=hashlib.sha256(output.encode()).hexdigest()))
+            self.con.execute('DELETE FROM validation_jobs')
+            self.con.execute('INSERT INTO validation_jobs VALUES(?,?)',(json.dumps(identity),json.dumps(state)))
+        store(proof)
+        actual=execution.validator_inventory(self.con,'source','frozen','fixed',red,['app.js'],
+            kind='candidate_inventory',expected_manifest='d'*64)
+        self.assertEqual(actual['product_sha256'],{'app.js':'e'*64})
+        for changed in ({**proof,'manifest_sha256':'f'*64},{**proof,'delivery_approval':True},{**proof,'tests_executed':True}):
+            store(changed)
+            with self.assertRaises(ValueError):execution.validator_inventory(self.con,'source','frozen','fixed',red,
+                ['app.js'],kind='candidate_inventory',expected_manifest='d'*64)
+
     def test_seed_selection_requires_exact_durable_grant_and_volume_ownership(self):
         self.route['enabled']=True
         grant=execution.register(self.con,self.route,self.data,self.facts)

@@ -17,6 +17,7 @@ FIXED_SOURCE_SHA = 'e4fd3719fab26bc5a3cc2ac2732fe0617e50f8e9dfdc77cbe039056ab029
 FAILED_DIAGNOSTIC_TRANSPORT_SHA = 'b3c2d2d8d9199a5e4cd4b3c30a1e28d0ad1e18a7b1c9fbd0f78fa50a1bd0e33e'
 FAILED_CANDIDATE_PLAN_SHA = '77aeb327bd48ddb615b22a5b2c7f274d1dc7dc08598ae01a1821b983cff92903'
 BOUNDED_SCOPE_TRANSPORT_SHA = '073c21b3808388df2f641f4d913c101832d926beddb402399c7edb2f8a89b131'
+CANDIDATE_INVENTORY_ADMISSION_SHA = 'ab0f97cac6ca5c192c5f37c848052611a3c780ac0cea273e5001983ed87a50a4'
 PRE_REVIEW_INFRA_SOURCE_SHA = '67c222d0e0c4e1b205fc32eb0d04d8dd022ab5c60eb904b44eeade2cd82ff63b'
 VALIDATION_PENDING_SOURCE_SHA = '3e8c3c5f0c422b3ae9c0a5b825288af60a0904ce6c4bf400db49ec68fd272c45'
 LEGACY_SOURCE_SHA = 'd911f64499a5ae44fd0c1583d2f3de092376933353ea1cbc856339e3a23ec718'
@@ -72,7 +73,7 @@ def register_format(b, payload):
     for value in payload.values():
         if str(uuid.UUID(value)) != value: raise ValueError('canonical identity required')
     issue, source, failed = (payload[k] for k in ('issue_id', 'source_task', 'failed_task'))
-    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {BOUNDED_SCOPE_TRANSPORT_SHA, FAILED_CANDIDATE_PLAN_SHA, FAILED_DIAGNOSTIC_TRANSPORT_SHA, REVIEW_PRECONDITIONS_SOURCE_SHA, SCOPED_INSPECTION_SOURCE_SHA, FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, VALIDATION_PENDING_SOURCE_SHA, PRE_REVIEW_INFRA_SOURCE_SHA, FINALIZATION_SOURCE_SHA, DEPENDENCY_DIAGNOSTIC_SOURCE_SHA}:
+    if hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest() not in {CANDIDATE_INVENTORY_ADMISSION_SHA, BOUNDED_SCOPE_TRANSPORT_SHA, FAILED_CANDIDATE_PLAN_SHA, FAILED_DIAGNOSTIC_TRANSPORT_SHA, REVIEW_PRECONDITIONS_SOURCE_SHA, SCOPED_INSPECTION_SOURCE_SHA, FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, VALIDATION_PENDING_SOURCE_SHA, PRE_REVIEW_INFRA_SOURCE_SHA, FINALIZATION_SOURCE_SHA, DEPENDENCY_DIAGNOSTIC_SOURCE_SHA}:
         raise ValueError('pinned diagnosis contract required')
     with b.LOCK:
         with b.db() as c:
@@ -97,7 +98,7 @@ def register_format(b, payload):
                     or data.get('validation_failure') or data.get('execution_repair')
                     or data.get('execution_diagnosis_format_repair')
                     or 'DELIVERY_EXECUTION_DIAGNOSIS_V1' not in data.get('instruction', '')
-                    or repair.get('installed_source_sha') not in {BOUNDED_SCOPE_TRANSPORT_SHA, FAILED_CANDIDATE_PLAN_SHA, FAILED_DIAGNOSTIC_TRANSPORT_SHA, REVIEW_PRECONDITIONS_SOURCE_SHA, SCOPED_INSPECTION_SOURCE_SHA, FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, FINALIZATION_SOURCE_SHA, DEPENDENCY_DIAGNOSTIC_SOURCE_SHA}
+                    or repair.get('installed_source_sha') not in {CANDIDATE_INVENTORY_ADMISSION_SHA, BOUNDED_SCOPE_TRANSPORT_SHA, FAILED_CANDIDATE_PLAN_SHA, FAILED_DIAGNOSTIC_TRANSPORT_SHA, REVIEW_PRECONDITIONS_SOURCE_SHA, SCOPED_INSPECTION_SOURCE_SHA, FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, FINALIZATION_SOURCE_SHA, DEPENDENCY_DIAGNOSTIC_SOURCE_SHA}
                     or repair.get('request', {}).get('source_task') != source
                     or repair.get('request', {}).get('issue_id') != issue
                     or repair.get('author_retry_authorized') is not False
@@ -152,7 +153,7 @@ def register(b, payload):
             raise ValueError('canonical diagnostic replay identity required')
     issue, source, failed = (payload[k] for k in ('issue_id', 'source_task', 'failed_task'))
     source_sha = hashlib.sha256(Path(handoffs.__file__).read_bytes()).hexdigest()
-    if source_sha not in {BOUNDED_SCOPE_TRANSPORT_SHA, FAILED_CANDIDATE_PLAN_SHA, FAILED_DIAGNOSTIC_TRANSPORT_SHA, REVIEW_PRECONDITIONS_SOURCE_SHA, SCOPED_INSPECTION_SOURCE_SHA, FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, VALIDATION_PENDING_SOURCE_SHA, PRE_REVIEW_INFRA_SOURCE_SHA, FINALIZATION_SOURCE_SHA, DEPENDENCY_DIAGNOSTIC_SOURCE_SHA}:
+    if source_sha not in {CANDIDATE_INVENTORY_ADMISSION_SHA, BOUNDED_SCOPE_TRANSPORT_SHA, FAILED_CANDIDATE_PLAN_SHA, FAILED_DIAGNOSTIC_TRANSPORT_SHA, REVIEW_PRECONDITIONS_SOURCE_SHA, SCOPED_INSPECTION_SOURCE_SHA, FIXED_SOURCE_SHA, LEGACY_SOURCE_SHA, VALIDATION_PENDING_SOURCE_SHA, PRE_REVIEW_INFRA_SOURCE_SHA, FINALIZATION_SOURCE_SHA, DEPENDENCY_DIAGNOSTIC_SOURCE_SHA}:
         raise ValueError('pinned typed execution diagnosis repair required')
     with b.LOCK:
         with b.db() as c:

@@ -124,6 +124,11 @@ def task_base(broker, issue_id, task_id):
 
 
 class Effects:
+    def candidate_inventory_ready(self):
+        try:import candidate_inventory_jobs
+        except ImportError:from broker import candidate_inventory_jobs
+        return candidate_inventory_jobs.image(self.b)
+
     def failed_candidate_admission(self,con,route,data):
         """Internal only; fixed validators and native records qualify the grant."""
         try:import failed_candidate_admission

@@ -18,14 +18,16 @@ def initialize(con):
                 'issue_id TEXT PRIMARY KEY,body TEXT NOT NULL)')
 
 
-def validator_inventory(con,source,volume,offline_image,red,edit_files):
+def validator_inventory(con,source,volume,offline_image,red,edit_files,*,kind='structure',expected_manifest=None,manifest_only=False):
     """Read actual completed fixed-validator receipts, never agent assertions."""
-    if not edit_files or len(set(edit_files))!=len(edit_files):
+    if kind not in ('structure','candidate_inventory') or (manifest_only and kind!='structure'):
+        raise ValueError('fixed structural or candidate metadata receipt required')
+    if (not edit_files and not manifest_only) or len(set(edit_files))!=len(edit_files):
         raise ValueError('exact installed product edit scope required')
     candidates=[]
     for row in con.execute('SELECT identity,state FROM validation_jobs'):
         identity,state=map(json.loads,row)
-        if identity.get('task')!=source or identity.get('kind')!='structure':continue
+        if identity.get('task')!=source or identity.get('kind')!=kind:continue
         payload=identity.get('payload') or {};result=state.get('result') or {}
         if (state.get('stage')!='complete' or result.get('exit_code')!=0
                 or payload.get('Image')!=offline_image
@@ -34,11 +36,13 @@ def validator_inventory(con,source,volume,offline_image,red,edit_files):
         output=result.get('output','')
         if hashlib.sha256(output.encode()).hexdigest()!=result.get('output_sha256'):continue
         proof=json.loads(output)
+        if kind=='candidate_inventory' and (proof.get('delivery_approval') is not False or proof.get('tests_executed') is not False):continue
+        if kind=='candidate_inventory' and (not expected_manifest or proof.get('manifest_sha256')!=expected_manifest):continue
         if (proof.get('baseline_tests_intact') is not True
                 or proof.get('base_manifest_sha256')!=red.get('base_manifest_sha256')
                 or proof.get('baseline_test_sha256')!=red.get('baseline_test_sha256')
                 or proof.get('new_test_sha256')!=red.get('test_sha256')):continue
-        inventory=proof.get('diagnostic_file_sha256') or {}
+        inventory=(proof.get('product_file_sha256') if kind=='candidate_inventory' else proof.get('diagnostic_file_sha256')) or {}
         if not set(edit_files)<=set(inventory):continue
         value=dict(manifest_sha256=proof.get('manifest_sha256'),
             product_sha256={p:inventory[p] for p in edit_files},

@@ -995,6 +995,9 @@ e calcula hashes dos arquivos de produto editáveis, inclusive JavaScript, HTML 
 CSS. Ele preserva os recibos diagnósticos Python existentes, não executa testes e
 não aprova entregas. Sua ligação à admissão exige recibos duráveis de execução;
 um canário ou metadados isolados não autorizam o autor.
+Os jobs de inventário são duráveis e vinculados aos hashes dos manifestos
+originais. A admissão espera o mesmo job pendente, sem consumir tentativas do
+autor, e confere a preservação do Red e da base antes de criar uma autorização.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.

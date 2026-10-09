@@ -674,10 +674,26 @@ def reconcile(con, route, runs, effects, *, now=None):
                           'control_error', 'control_error_count', 'instruction'):
                 data.pop(field, None)
             stage = save(con, key, issue, 'diagnose_cto', route['cto'], data, now)
+    if (stage=='technical_decision_required' and data.get('error')=='failed_candidate_admission_rejected'
+            and data.get('admission_error')=='one exact immutable validator inventory with unchanged Red and baseline required'
+            and data.get('failed_candidate_plan_review') and not data.get('candidate_inventory_precondition_recovery')
+            and not data.get('failed_candidate_execution') and hasattr(effects,'candidate_inventory_ready')
+            and bound_failure_context.verified_failed_diagnostic(con,key,data)):
+        inventory_image=effects.candidate_inventory_ready()
+        data['candidate_inventory_precondition_recovery']=dict(image=inventory_image,
+            previous_admission_error=data['admission_error'],delivery_approval=False,author_restarted=False)
+        data['required_action']='execute_reviewed_failed_candidate_replan_with_preserved_retry_history'
+        save(con,key,issue,stage,route['cto'],data,now)
     if (stage=='technical_decision_required' and data.get('required_action')==
             'execute_reviewed_failed_candidate_replan_with_preserved_retry_history'
             and hasattr(effects,'failed_candidate_admission')):
+        try:import validation_job
+        except ImportError:from broker import validation_job
         try:admitted=effects.failed_candidate_admission(con,route,data)
+        except validation_job.Pending as error:
+            data['inventory_wait']=dict(operation='observe_durable_candidate_inventory',
+                reason=str(error)[:300],delivery_approval=False,author_restarted=False)
+            return save(con,key,issue,stage,route['cto'],data,now)
         except ValueError as error:
             data.update(error='failed_candidate_admission_rejected',admission_error=str(error)[:300],
                 required_action='CTO resolve missing actual replan evidence; no identical admission replay')
@@ -686,6 +702,7 @@ def reconcile(con, route, runs, effects, *, now=None):
             finding=data['failed_candidate_plan_review']['decision']['reason'],
             trigger_task=data['failed_candidate_plan_review']['techlead_task'],
             diagnostic_revision=data['diagnostic_revision']+':bounded-replan:'+admitted['grant_sha256'])
+        data.pop('inventory_wait',None);data.pop('required_action',None)
         for field in ('recipient_task','wakeup_id','dispatched_at','dispatch_marker','dispatch_stage','target','instruction','alerted'):
             data.pop(field,None)
         stage=save(con,key,issue,'correct_author',route['author'],data,now)

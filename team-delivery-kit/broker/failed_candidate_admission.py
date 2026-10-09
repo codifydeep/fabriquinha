@@ -5,9 +5,9 @@ the caller owns the controller lock and must persist dispatch intent separately.
 """
 import json
 try:
-    from . import native,bound_failure_context,handoffs,failed_candidate_execution as execution
+    from . import native,bound_failure_context,handoffs,candidate_inventory_jobs,failed_candidate_execution as execution
 except ImportError:
-    import native,bound_failure_context,handoffs,failed_candidate_execution as execution
+    import native,bound_failure_context,handoffs,candidate_inventory_jobs,failed_candidate_execution as execution
 
 
 def facts(con,route,data,effects):
@@ -56,14 +56,20 @@ def facts(con,route,data,effects):
         raise ValueError('controller-owned failed snapshot required')
     red=effects.test_first_red(source,diagnostic=True)
     if not red or not isinstance(red.get('red'),dict):raise ValueError('durable historical Red required')
-    inventory=execution.validator_inventory(con,source,volume,b.OFFLINE_IMAGE,red['red'],scope)
+    anchor=execution.validator_inventory(con,source,volume,b.OFFLINE_IMAGE,red['red'],[],manifest_only=True)
+    inventory_image=candidate_inventory_jobs.ensure(b,issue,source,volume)
+    inventory=execution.validator_inventory(con,source,volume,inventory_image,red['red'],scope,
+        kind='candidate_inventory',expected_manifest=anchor['manifest_sha256'])
     previous=[]
     for row in con.execute('SELECT s.task_id,s.volume FROM snapshots s '
             'JOIN delivery_handoffs h ON h.source_task=s.task_id '
             'WHERE h.issue_id=? AND s.task_id<>? AND s.status=?',(issue,source,'complete')):
         record=native.task_record(effects.settings,row[0],route['author'])
         if record.get('agent_id')!=route['author'] or record.get('issue_id')!=issue:continue
-        old=execution.validator_inventory(con,row[0],row[1],b.OFFLINE_IMAGE,red['red'],scope)
+        old_anchor=execution.validator_inventory(con,row[0],row[1],b.OFFLINE_IMAGE,red['red'],[],manifest_only=True)
+        candidate_inventory_jobs.ensure(b,issue,row[0],row[1])
+        old=execution.validator_inventory(con,row[0],row[1],inventory_image,red['red'],scope,
+            kind='candidate_inventory',expected_manifest=old_anchor['manifest_sha256'])
         previous.append(old['product_sha256'])
     count=handoffs.repeated_corrections(con,issue,data)
     if count<2 or len(previous)<count:
