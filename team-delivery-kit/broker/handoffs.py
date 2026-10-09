@@ -430,6 +430,18 @@ def reconcile(con, route, runs, effects, *, now=None):
         return 'waiting_author'
     source = max(authors, key=lambda r: (r.get('created_at') or '', r['id']))
     key = source['id']
+    try:import failed_candidate_execution
+    except ImportError:from broker import failed_candidate_execution
+    grant=failed_candidate_execution.load(con,issue)
+    recovery=None
+    if grant and grant['status'] in ('dispatch_intent','execution_bound') and key!=grant['source_task']:
+        if not grant.get('wakeup_id'):
+            origin=load(con,grant['source_task']);original=json.loads(origin['data']) if origin else {}
+            wake=effects.ensure_wakeup(issue,route['author'],original['trigger_task'],
+                grant['dispatch_marker'],original['instruction'],allow_create=False)
+            if wake is None:return 'recovery_wakeup_observation'
+            failed_candidate_execution.record_wakeup(con,issue,grant['dispatch_marker'],wake['id'])
+        recovery=failed_candidate_execution.observe_author(con,route,source)
     for old in con.execute("SELECT * FROM delivery_handoffs WHERE issue_id=? AND source_task<>? "
                            "AND stage NOT IN ('approved','superseded')", (issue, key)).fetchall():
         previous_data = json.loads(old['data'])
@@ -442,6 +454,13 @@ def reconcile(con, route, runs, effects, *, now=None):
     if data['contract_sha256'] != route['contract_sha256']:
         raise ValueError('handoff contract revision drift')
     stage = prior['stage'] if prior else 'observed'
+    if recovery:
+        data['bounded_replan_origin']=dict(source_task=recovery['source_task'],grant_sha256=recovery['grant_sha256'])
+        data['attempts']=max(data['attempts'],recovery['prior_attempts'])
+        if recovery['status']=='blocked_technical_recovery':
+            data.update(error='bounded_replan_execution_failed',
+                required_action='CTO diagnose new execution evidence and plan a distinct experiment; no identical respawn')
+            return save(con,key,issue,'technical_decision_required',route['cto'],data,now)
     if stage=='approved' and hasattr(effects,'scope_inspection'):
         inspection=effects.scope_inspection(issue,key,data['review'])
         if inspection and inspection['missing_read_paths']:
@@ -655,6 +674,21 @@ def reconcile(con, route, runs, effects, *, now=None):
                           'control_error', 'control_error_count', 'instruction'):
                 data.pop(field, None)
             stage = save(con, key, issue, 'diagnose_cto', route['cto'], data, now)
+    if (stage=='technical_decision_required' and data.get('required_action')==
+            'execute_reviewed_failed_candidate_replan_with_preserved_retry_history'
+            and hasattr(effects,'failed_candidate_admission')):
+        try:admitted=effects.failed_candidate_admission(con,route,data)
+        except ValueError as error:
+            data.update(error='failed_candidate_admission_rejected',admission_error=str(error)[:300],
+                required_action='CTO resolve missing actual replan evidence; no identical admission replay')
+            return save(con,key,issue,'technical_decision_required',route['cto'],data,now)
+        data.update(failed_candidate_execution=dict(grant_sha256=admitted['grant_sha256']),
+            finding=data['failed_candidate_plan_review']['decision']['reason'],
+            trigger_task=data['failed_candidate_plan_review']['techlead_task'],
+            diagnostic_revision=data['diagnostic_revision']+':bounded-replan:'+admitted['grant_sha256'])
+        for field in ('recipient_task','wakeup_id','dispatched_at','dispatch_marker','dispatch_stage','target','instruction','alerted'):
+            data.pop(field,None)
+        stage=save(con,key,issue,'correct_author',route['author'],data,now)
     if source['status'] in ('queued', 'dispatched', 'running'):
         if stage != 'author_active':
             return save(con, key, issue, 'author_active', route['author'], data, now)
@@ -764,7 +798,15 @@ def reconcile(con, route, runs, effects, *, now=None):
     if stage == 'budget_paused':
         stage = data['resume_stage']
     if stage in ('ready_review', 'diagnose', 'correct_author', 'diagnose_cto'):
-        if stage == 'correct_author' and repeated_corrections(con, issue, data) >= 2:
+        authorized_replan=(grant is not None and grant['source_task']==key
+            and grant['status'] in ('admitted_not_dispatched','dispatch_intent','execution_bound')
+            and data.get('failed_candidate_execution',{}).get('grant_sha256')==grant['grant_sha256'])
+        if data.get('failed_candidate_execution'):
+            grant=failed_candidate_execution.load(con,issue)
+            authorized_replan=bool(grant and grant['source_task']==key
+                and grant['status'] in ('admitted_not_dispatched','dispatch_intent','execution_bound')
+                and data['failed_candidate_execution'].get('grant_sha256')==grant['grant_sha256'])
+        if stage == 'correct_author' and repeated_corrections(con, issue, data) >= 2 and not authorized_replan:
             data.update(error='repeated_correction_without_new_delivery_evidence',
                         required_action='diagnose_and_change_preconditions_before_another_author_attempt')
             return save(con, key, issue, 'technical_decision_required', route['cto'], data, now)
@@ -822,6 +864,13 @@ def reconcile(con, route, runs, effects, *, now=None):
                            + '\nRespect the current controller phase. If Red is already '
                              'captured, do NOT recreate Red or edit the frozen test; '
                              'resume product implementation using that existing evidence.')
+            if data.get('failed_candidate_execution'):
+                instruction+=('\nONE BOUNDED INDEPENDENTLY REVIEWED REPLAN: '+grant['plan_sha256']+
+                    '. Resume the controller-seeded partial product in the assigned workspace. '
+                    'Use actual edit tools, execute Green and the entire installed suite, '
+                    'and submit through the normal immutable independent review path. '
+                    'Tests, acceptance criteria and prior attempts remain unchanged. '
+                    'Worker completion is not delivery approval.')
         else:
             summary = {k: data[k] for k in ('source_task', 'contract_sha256', 'error',
                        'error_type', 'attempts', 'evidence', 'failed_dispatch_stage',
@@ -1090,6 +1139,8 @@ def reconcile(con, route, runs, effects, *, now=None):
             instruction=failed_candidate_plan.instruction(route,data)
         data.update(dispatch_marker=marker, dispatch_stage=stage,
                     target=target, trigger_task=trigger)
+        if stage=='correct_author' and data.get('failed_candidate_execution'):
+            failed_candidate_execution.dispatch_intent(con,issue,data['failed_candidate_execution']['grant_sha256'],marker)
         save(con, key, issue, 'dispatch_intent', target, data, now)
         # A crash here is recovered using exactly the same marker and trigger.
         data['instruction'] = instruction
@@ -1105,6 +1156,8 @@ def reconcile(con, route, runs, effects, *, now=None):
             data['resume_stage'] = 'dispatch_intent'
             return save(con, key, issue, 'budget_paused', 'budget', data, now)
         data['wakeup_id'] = wakeup['id']
+        if data.get('dispatch_stage')=='correct_author' and data.get('failed_candidate_execution'):
+            failed_candidate_execution.record_wakeup(con,issue,data['dispatch_marker'],wakeup['id'])
         data.setdefault('dispatched_at', now)
         stage = save(con, key, issue, 'awaiting_acceptance', data['target'], data, now)
     if stage in ('awaiting_acceptance', 'accepted'):

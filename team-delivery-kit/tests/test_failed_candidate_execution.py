@@ -3,12 +3,37 @@ import hashlib
 import json
 import sqlite3
 import unittest
+from contextlib import contextmanager
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from broker import failed_candidate_execution as execution
 from broker.failed_candidate_plan import digest
 
 
 class FailedCandidateExecutionTests(unittest.TestCase):
+    def test_seed_selection_requires_exact_durable_grant_and_volume_ownership(self):
+        self.route['enabled']=True
+        grant=execution.register(self.con,self.route,self.data,self.facts)
+        execution.dispatch_intent(self.con,'issue',grant['grant_sha256'],'marker')
+        self.con.execute('CREATE TABLE delivery_handoffs(source_task TEXT,data TEXT)')
+        self.con.execute('CREATE TABLE delivery_routes(issue_id TEXT,config TEXT)')
+        data={**self.data,'dispatch_marker':'marker',
+              'failed_candidate_execution':{'grant_sha256':grant['grant_sha256']}}
+        self.con.execute('INSERT INTO delivery_handoffs VALUES(?,?)',('source',json.dumps(data)))
+        self.con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps(self.route)))
+        @contextmanager
+        def db():yield self.con
+        b=SimpleNamespace(db=db,OWNER='owner',docker=lambda *_:{'Labels':{
+            'delivery-kit.owner':'owner','delivery-kit.source-task':'source'}})
+        with patch('broker.bound_failure_context.verified_failed_diagnostic',return_value=True):
+            selected=execution.seed_source(b,'issue')
+            self.assertEqual(selected,grant['seed'])
+            self.assertTrue(selected['mount']['ReadOnly'])
+            self.assertEqual(selected['selection']['product_sha256'],self.facts['product_sha256'])
+            b.docker=lambda *_:{'Labels':{'delivery-kit.owner':'other'}}
+            with self.assertRaises(ValueError):execution.seed_source(b,'issue')
+
     def test_validator_inventory_requires_executed_fixed_image_and_exact_frozen_tests(self):
         self.con.execute('CREATE TABLE validation_jobs(identity TEXT,state TEXT)')
         red=dict(base_manifest_sha256='a'*64,baseline_test_sha256={'tests/test_old.py':'b'*64},

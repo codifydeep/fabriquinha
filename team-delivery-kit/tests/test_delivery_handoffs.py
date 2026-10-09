@@ -545,6 +545,57 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(saved['attempts'],2)
         self.assertFalse(any(w['target']=='author' for w in self.effects.created.values()))
 
+    def bounded_replan_setup(self):
+        from broker import failed_candidate_plan as plans,failed_candidate_execution as execution
+        data=self.failed_plan_setup();data['author_edit_files']=['app.js']
+        data.update(target='cto',wakeup_id='cto-wake')
+        decision=self.effects.decision(None)
+        cto=dict(id='cto-task',issue_id='issue',agent_id='cto',status='completed',wakeup_id='cto-wake')
+        data['failed_candidate_plan']=plans.prepare(self.route,data,cto,decision,self.effects.read_evidence(None))
+        data.update(target='lead',wakeup_id='lead-wake')
+        lead=dict(id='lead-task',issue_id='issue',agent_id='lead',status='completed',wakeup_id='lead-wake')
+        data['failed_candidate_plan_review']=plans.review(self.route,data,lead,decision,self.effects.read_evidence(None))
+        data['required_action']='execute_reviewed_failed_candidate_replan_with_preserved_retry_history'
+        facts=dict(source_task='source',issue_id='issue',contract_sha256=self.route['contract_sha256'],
+            manifest_sha256='a'*64,product_sha256={'app.js':'b'*64},
+            test_sha256={'tests/test_new.py':'c'*64},baseline_test_sha256={'tests/test_old.py':'d'*64},
+            previous_product_sha256=[{'app.js':'e'*64},{'app.js':'e'*64}],volume='failed-frozen',
+            source_status='failed',diagnostic_only=True,baseline_tests_intact=True,frozen_tests_intact=True,
+            independent_tasks_verified=True,active_leases=0,identical_corrections=2)
+        self.effects.failed_candidate_admission=lambda con,route,value:execution.register(con,route,value,facts)
+        handoffs.save(self.con,'source','issue','technical_decision_required','cto',data,90)
+        return execution
+
+    def test_reviewed_replan_dispatches_once_and_failure_does_not_rearm(self):
+        from unittest.mock import patch
+        execution=self.bounded_replan_setup()
+        with patch.object(handoffs,'repeated_corrections',return_value=2):
+            self.assertEqual(self.tick(now=100),'awaiting_acceptance')
+            self.assertEqual(self.tick(now=101),'awaiting_acceptance')
+        self.assertEqual(len(self.effects.created),1)
+        old=json.loads(handoffs.load(self.con,'source')['data'])
+        author=dict(id='new-author',issue_id='issue',agent_id='author',status='running',
+            wakeup_id=old['wakeup_id'],created_at='9999')
+        self.assertEqual(self.tick([author],now=110),'author_active')
+        self.assertEqual(execution.load(self.con,'issue')['dispatch']['task_id'],'new-author')
+        self.assertEqual(self.tick([dict(author,status='failed')],now=120),'technical_decision_required')
+        row=handoffs.load(self.con,'new-author');data=json.loads(row['data'])
+        self.assertEqual(row['owner'],'cto');self.assertEqual(data['attempts'],2)
+        self.assertEqual(data['error'],'bounded_replan_execution_failed')
+        self.assertEqual(self.tick([dict(author,status='failed')],now=130),'technical_decision_required')
+        self.assertEqual(len(self.effects.created),1)
+
+    def test_unknown_replan_post_ack_observes_same_wakeup_before_new_author_binding(self):
+        execution=self.bounded_replan_setup();self.effects.lose_response=True
+        with self.assertRaises(OSError):self.tick(now=100)
+        self.assertEqual(execution.load(self.con,'issue')['status'],'dispatch_intent')
+        wake=next(iter(self.effects.created.values()))
+        author=dict(id='new-author',issue_id='issue',agent_id='author',status='running',
+            wakeup_id=wake['id'],created_at='9999')
+        self.assertEqual(self.tick([author],now=110),'author_active')
+        self.assertEqual(len(self.effects.created),1)
+        self.assertEqual(execution.load(self.con,'issue')['wakeup_id'],wake['id'])
+
     def test_diagnosis_receives_existing_red_instead_of_inventing_missing_tests(self):
         self.effects.phase_evidence = lambda _: {'phase': 'implementation', 'red_manifest': 'a' * 64,
                                                 'independent_test_review': 'approved'}

@@ -459,6 +459,10 @@ def seed_source(broker, issue_id):
     Legacy executions are never retroactively reseeded. The source is mounted
     solely in the offline seed container, not in the author's worker.
     """
+    try:import failed_candidate_execution
+    except ImportError:from broker import failed_candidate_execution
+    recovery_seed=failed_candidate_execution.seed_source(broker,issue_id)
+    if recovery_seed is not None:return recovery_seed
     try:
         import remediation_runtime_guard
     except ImportError:

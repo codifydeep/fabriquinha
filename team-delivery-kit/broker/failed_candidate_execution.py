@@ -105,6 +105,11 @@ def register(con,route,data,facts):
         candidate_facts_sha256=digest(facts),prior_attempts=data['attempts'],author=route['author'],
         prior_identical_corrections=facts['identical_corrections'],
         attempt_limit=1,retry_budget_reset=False,delivery_approval=False,tests_may_change=False,
+        contract_sha256=route['contract_sha256'],
+        seed=dict(mount=dict(Type='volume',Source=facts['volume'],Target='/previous',ReadOnly=True),
+            selection=dict(manifest_sha256=facts['manifest_sha256'],test_sha256=facts['test_sha256'],
+                product_sha256=facts['product_sha256'],bounded_execution=dict(
+                    operation='reviewed_failed_candidate_seed_v1',source_task=data['source_task'],plan_sha256=digest(plan)))),
         status='admitted_not_dispatched')
     grant['grant_sha256']=digest(grant)
     old=load(con,route['issue_id'])
@@ -140,6 +145,55 @@ def bind_dispatch(con,issue,grant_sha,marker,task):
         raise ValueError('one exact active recovery execution required')
     state.update(status='execution_bound',dispatch=binding)
     return persist(con,issue,state)
+
+
+def record_wakeup(con,issue,marker,wakeup):
+    state=load(con,issue)
+    if (not state or state.get('dispatch_marker')!=marker or not wakeup
+            or state['status'] not in ('dispatch_intent','execution_bound')
+            or state.get('wakeup_id',wakeup)!=wakeup):
+        raise ValueError('exact recovery wakeup required')
+    state['wakeup_id']=wakeup
+    return persist(con,issue,state)
+
+
+def observe_author(con,route,source):
+    state=load(con,route['issue_id'])
+    if not state or state['status'] not in ('dispatch_intent','execution_bound') or source['id']==state['source_task']:
+        return None
+    if (source.get('agent_id')!=state['author'] or state['author']!=route['author']
+            or source.get('issue_id')!=route['issue_id'] or not state.get('wakeup_id')
+            or source.get('wakeup_id')!=state['wakeup_id']):
+        raise ValueError('unrelated author cannot consume bounded recovery')
+    state=bind_dispatch(con,route['issue_id'],state['grant_sha256'],state['dispatch_marker'],source['id'])
+    if source.get('status') in ('failed','completed'):
+        state=finish(con,route['issue_id'],source['id'],source['status'],'native-task:'+source['id'])
+    return state
+
+
+def seed_source(b,issue):
+    """One hash-bound candidate; this does not restart or approve an author."""
+    try:
+        from . import bound_failure_context
+    except ImportError:
+        import bound_failure_context
+    with b.db() as con:
+        if not con.execute("SELECT 1 FROM sqlite_master WHERE name='failed_candidate_execution_grants'").fetchone():return None
+        state=load(con,issue)
+        if not state or state['status'] not in ('dispatch_intent','execution_bound'):return None
+        row=con.execute('SELECT data FROM delivery_handoffs WHERE source_task=?',(state['source_task'],)).fetchone()
+        installed=con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()
+        data=json.loads(row[0]) if row else {};route=json.loads(installed[0]) if installed else {}
+        if (route.get('enabled') is not True or route.get('author')!=state['author']
+                or route.get('contract_sha256')!=state['contract_sha256']
+                or data.get('failed_candidate_execution',{}).get('grant_sha256')!=state['grant_sha256']
+                or data.get('dispatch_marker')!=state.get('dispatch_marker')
+                or not bound_failure_context.verified_failed_diagnostic(con,state['source_task'],data)):
+            raise ValueError('current durable recovery seed binding required')
+    labels=(b.docker('GET','/volumes/'+state['seed']['mount']['Source']) or {}).get('Labels',{})
+    if labels.get('delivery-kit.owner')!=b.OWNER or labels.get('delivery-kit.source-task')!=state['source_task']:
+        raise ValueError('immutable recovery seed ownership drift')
+    return state['seed']
 
 
 def finish(con,issue,task,status,evidence_reference):

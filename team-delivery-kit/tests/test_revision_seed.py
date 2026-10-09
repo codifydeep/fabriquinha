@@ -13,6 +13,37 @@ from test_portable_contract import contract
 
 
 class RevisionSeedTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('RUN_REVISION_SEED_DOCKER_TEST')=='1',
+                         'Docker reviewed partial-product seed runs explicitly')
+    def test_real_offline_container_seeds_reviewed_product_without_resetting_progress(self):
+        from docker_grouping import args as grouped_args
+        product=b'# actual preserved partial product\n'+b'x'*40000
+        selection=self.candidate_selection({'app.py':product})
+        for directory in (self.base,self.previous):directory.chmod(0o755)
+        self.work.chmod(0o777)
+        image=os.environ['REVISION_SEED_TEST_IMAGE']
+        def run():
+            command=['docker','run','--rm',*grouped_args('reviewed-product-seed','delivery-kit-port2'),
+                '--network','none','--read-only','--user','10000:10000','--cap-drop','ALL',
+                '--security-opt','no-new-privileges','--memory','96m','--pids-limit','16',
+                '--mount',f'type=bind,source={self.base},target=/base,readonly',
+                '--mount',f'type=bind,source={self.previous},target=/previous,readonly',
+                '--mount',f'type=bind,source={self.work},target=/workspace',
+                '--env','BASE_MANIFEST_SHA256='+self.env['BASE_MANIFEST_SHA256'],
+                '--env','REVISION_SEED_JSON='+json.dumps(selection),
+                '--entrypoint','python',image,'/seed_workspace.py']
+            result=subprocess.run(command,text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        run()
+        self.assertEqual((self.work/'app.py').read_bytes(),product)
+        self.assertEqual((self.work/self.name).read_bytes(),self.data)
+        self.assertEqual((self.work/'tests/test_old.py').read_bytes(),b'def test_old(): assert True')
+        (self.work/'app.py').write_bytes(b'author continued progress')
+        run()
+        self.assertEqual((self.work/'app.py').read_bytes(),b'author continued progress')
+        self.assertEqual((self.previous/'app.py').read_bytes(),product)
+        self.assertEqual((self.previous/self.name).read_bytes(),self.data)
+
     def candidate_selection(self, products):
         files={self.name:self.data, **products}
         for name,data in products.items():

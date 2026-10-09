@@ -1,0 +1,11 @@
+FROM delivery-kit-execution-broker:20261009.411
+COPY broker/handoffs.py /handoffs.py
+COPY broker/handoff_runtime.py /handoff_runtime.py
+COPY broker/failed_candidate_plan.py /failed_candidate_plan.py
+COPY broker/failed_candidate_execution.py /failed_candidate_execution.py
+COPY broker/failed_candidate_admission.py /failed_candidate_admission.py
+COPY broker/test_revision_review.py /test_revision_review.py
+COPY broker/seed_workspace.py /seed_workspace.py
+COPY broker/execution_diagnosis_recovery.py /execution_diagnosis_recovery.py
+COPY broker/worker_recovery_transport.py /worker_recovery_transport.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import handoffs,handoff_runtime,failed_candidate_plan,failed_candidate_execution,failed_candidate_admission,seed_workspace"

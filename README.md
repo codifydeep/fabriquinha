@@ -983,8 +983,13 @@ ativar esse ledger; ele não é uma ferramenta disponível aos agentes.
 O adaptador interno de admissão consulta a rota instalada, o recibo diagnóstico,
 leases, decisões nativas, leituras completas e inventários dos validadores para
 o candidato e as tentativas anteriores. Recibos ausentes não são convertidos em
-evidência positiva. O despacho automático e o seeding desse caminho ainda não
-estão ativados na instalação de referência.
+evidência positiva. O código de despacho e preparação está conectado ao
+controlador: intenção durável antes do efeito nativo, observação do mesmo wakeup
+após respostas desconhecidas e transporte separado dos hashes de código e testes.
+A imagem de referência incorpora esse caminho e passou no canário real de
+preparação isolada. A retomada CTO → Tech Lead → autor e a entrega posterior ainda
+precisam de evidência ponta a ponta; instalação ou testes verdes não comprovam
+autonomia completa.
 
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.
