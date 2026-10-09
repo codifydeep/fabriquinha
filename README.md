@@ -950,6 +950,14 @@ Resumo público e limites: [VALIDATION.md](docs/VALIDATION.md). O diário comple
 
 ## Retirada de recursos de teste
 
+Pausas financeiras/de acesso do provedor não são falhas do produto. Após resolução
+explicitamente autorizada pelo operador, `provider_pause_resolution.py` verifica
+saldo e limite pelos endpoints oficiais, arquiva a pausa e mantém o contador de
+chamadas. A recuperação administrativa do broker exige manutenção selada e
+execuções inativas; preserva o incidente, o trabalho parcial e os testes Red,
+e encaminha evidências executadas ao CTO. Não aprova entrega, reinicia o autor
+às cegas, altera limites financeiros ou concede ferramentas aos agentes.
+
 Cada ciclo deve inventariar e retirar recursos obsoletos antes de começar e após
 terminar, somente com execuções inativas e efeitos Docker anteriores resolvidos.
 Os serviços são agrupados por Compose; homologação atual, evidências, volumes e

@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261009.408
+COPY broker/provider_access_recovery.py /provider_access_recovery.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import provider_access_recovery"
