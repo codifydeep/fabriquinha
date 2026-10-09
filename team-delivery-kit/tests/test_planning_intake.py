@@ -1,10 +1,23 @@
 import json
 import unittest
 
-from planning_intake import parse_proposal, safe_path
+from planning_intake import parse_proposal, safe_path,brief_body
 
 
 class PlanningIntakeTests(unittest.TestCase):
+    def test_authority_heading_alias_preserves_exact_ceo_body(self):
+        body='## CEO request\n\n'+('Concrete acceptance. '*10)
+        for heading in ('Decisions delegated to the team','Team authority'):
+            self.assertEqual(brief_body('# Brief\n\n'+body+'\n\n## '+heading+'\nTech Lead decides.'),body.strip())
+
+    def test_missing_reordered_or_ambiguous_headings_are_rejected(self):
+        body='## CEO request\n'+('Concrete acceptance. '*10)
+        for text in (body,'## Team authority\n'+body,
+                     body+'\n## Team authority\n## Decisions delegated to the team',
+                     body+'\n'+body+'\n## Team authority'):
+            with self.subTest(text=text),self.assertRaisesRegex(ValueError,'unambiguous'):
+                brief_body(text)
+
     def test_product_plan_is_structured_and_requires_acceptance(self):
         proposal = {'role': 'product', 'stories': [
             {'title': 'Add suggestion', 'acceptance': ['Title is required']}],

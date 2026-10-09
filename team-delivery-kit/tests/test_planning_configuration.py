@@ -16,7 +16,7 @@ class PlanningConfigurationTests(unittest.TestCase):
         self.projects = self.root / 'projects'
         self.projects.mkdir()
         self.brief = self.projects / 'filter-1.brief.md'
-        self.brief.write_text('A disposable brief.')
+        self.brief.write_text('## CEO request\n\n'+('Disposable concrete acceptance. '*8)+'\n\n## Team authority\nTechnical decisions delegated.')
         self.path = self.projects / 'filter-1.planning.json'
         self.config = {'name': 'FILTER-1', 'brief': self.brief.name,
                        'minimum_calls': 192, 'base_sha': 'a' * 40}

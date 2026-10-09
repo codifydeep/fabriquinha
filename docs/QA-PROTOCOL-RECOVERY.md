@@ -107,6 +107,14 @@ a cached second attempt is not needed to bind the baseline. An expected failure
 on an image missing a feature qualifies the detector, never that feature or a
 release.
 
+The bounded planning pilot validates Markdown request boundaries during input
+registration, before creating a native service or consuming model calls. It
+accepts one `## CEO request` followed by one `## Decisions delegated to the team`
+or `## Team authority`, preserving the exact request text and its existing size
+bound. Missing, reversed or ambiguous sections are rejected rather than guessed
+or truncated. A rejected registration is not an agent execution or a qualified
+autonomy trial; a new attempt retains its own identity and the earlier evidence.
+
 This mechanism is bounded recovery, not general zero-intervention autonomous
 delivery. A disposable brief with two dependent cards has completed an actual
 TDD product repair, complete independent inspection and reviewer-owned suite,

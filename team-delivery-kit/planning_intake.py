@@ -49,13 +49,22 @@ def intake_configuration(path=None):
         raise ValueError('invalid planning budget reserve')
     if not isinstance(config['base_sha'], str) or not re.fullmatch(r'[a-f0-9]{40}', config['base_sha']):
         raise ValueError('invalid planning base SHA')
+    # Validate before registration can start a native service or consume model
+    # calls. The execution path must not discover malformed Markdown later.
+    brief_body(brief.read_text())
     return {**config, 'brief': brief,
             'configuration_sha256': hashlib.sha256(raw).hexdigest()}
 
 
 def brief_body(text):
-    start = text.index('## CEO request')
-    end = text.index('## Decisions delegated to the team')
+    if not isinstance(text,str):
+        raise ValueError('bounded CEO request and team authority sections required')
+    headings=list(re.finditer(r'^## (CEO request|Decisions delegated to the team|Team authority)\s*$',text,re.M))
+    ceo=[match for match in headings if match.group(1)=='CEO request']
+    authority=[match for match in headings if match.group(1)!='CEO request']
+    if len(ceo)!=1 or len(authority)!=1 or authority[0].start()<=ceo[0].start():
+        raise ValueError('unambiguous CEO request followed by team authority required')
+    start,end=ceo[0].start(),authority[0].start()
     result = text[start:end].strip()
     if not 100 < len(result) <= 2200:
         raise ValueError('pilot brief size outside bounds')

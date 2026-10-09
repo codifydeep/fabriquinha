@@ -27,7 +27,8 @@ class BriefDeliveryConfigurationTests(unittest.TestCase):
         self.save('repo.json', {'repository': 'codifydeep/descartavel2', 'checkout': 'sandbox-github2'})
         self.save('new-1.planning.json', {'name': 'NEW-1', 'brief': 'new-1.brief.md',
                                         'minimum_calls': 64, 'base_sha': 'a' * 40})
-        (self.projects / 'new-1.brief.md').write_text('An approved disposable brief.')
+        self.body='## CEO request\n\n'+('Approved concrete acceptance. '*8)+'\n\n## Team authority\nTechnical decisions delegated.'
+        (self.projects / 'new-1.brief.md').write_text(self.body)
         self.template = json.loads((ROOT / 'projects/descartavel2-autoloss-3.contract.json').read_text())
         run = json.loads((ROOT / 'projects/descartavel2-autoloss-3.run.json').read_text())
         for index, name in enumerate(('api', 'ui')):
@@ -48,7 +49,7 @@ class BriefDeliveryConfigurationTests(unittest.TestCase):
     def test_hash_binds_actual_templates_brief_and_project_not_just_names(self):
         first = self.read()
         self.assertEqual(first['selection']['base_sha'], 'a' * 40)
-        (self.projects / 'new-1.brief.md').write_text('Changed approved disposable brief.')
+        (self.projects / 'new-1.brief.md').write_text(self.body.replace('concrete','changed concrete'))
         self.assertNotEqual(first['sha256'], self.read()['sha256'])
         second = self.read()
         modified = copy.deepcopy(self.template)
@@ -61,6 +62,11 @@ class BriefDeliveryConfigurationTests(unittest.TestCase):
         self.config['stages'][0]['contract'] = '../foreign.json'
         self.save(self.path.name, self.config)
         with self.assertRaises(ValueError):
+            self.read()
+
+    def test_invalid_brief_fails_at_configuration_before_native_registration(self):
+        (self.projects / 'new-1.brief.md').write_text('Missing required request boundaries.')
+        with self.assertRaisesRegex(ValueError,'unambiguous'):
             self.read()
 
     def test_rejects_unapproved_reserve_and_unknown_fields(self):
