@@ -450,6 +450,42 @@ class TypedDecisionTests(unittest.TestCase):
         prose=json.dumps({'choices':[{'message':{'content':json.dumps(self.decision)},'finish_reason':'stop'}]}).encode()
         with self.assertRaises(StructuredResponseRejected):translate(self.body,prose,'application/json')
 
+    def test_typed_rejection_exports_constraints_without_values_or_paths(self):
+        body=copy.deepcopy(self.body)
+        spec=body['tools'][0]['function']['parameters']
+        spec['properties']['reason']={'anyOf':[{'type':'string','maxLength':2},
+            {'type':'integer'}]}
+        raw=self.wire({**self.decision,'reason':'PRIVATE_SENTINEL_VALUE'})
+        with self.assertRaises(StructuredResponseRejected) as caught:
+            translate(body,raw,'application/json')
+        diagnostic=caught.exception.diagnostic
+        self.assertEqual(diagnostic['constraints'],['anyOf','maxLength','type'])
+        self.assertEqual(diagnostic['version'],'typed-constraint-v1')
+        self.assertEqual(diagnostic['upstream_sha256'],caught.exception.receipt['upstream_sha256'])
+        self.assertEqual(caught.exception.receipt['constraint_diagnostic'],diagnostic)
+        encoded=json.dumps(caught.exception.receipt)
+        self.assertNotIn('PRIVATE_SENTINEL_VALUE',encoded)
+        self.assertNotIn('reason',encoded)
+        self.assertFalse(caught.exception.receipt['worker_tool_executed'])
+        self.assertFalse(caught.exception.receipt['delivery_approval'])
+
+    def test_constraint_receipt_is_durable_and_never_repairs_a_decision(self):
+        from typed_decision_contract import record
+        from deterministic_read_dispatch import ledger
+        with self.assertRaises(StructuredResponseRejected) as caught:
+            translate(self.body,self.wire({**self.decision,'action':'PRIVATE_INVALID'}),'application/json')
+        self.assertEqual(caught.exception.diagnostic['constraints'],['enum'])
+        self.assertFalse(hasattr(caught.exception,'length_feedback'))
+        f=fixtures.ReadStreamRecoveryTests();f.setUp();self.addCleanup(f.doCleanups)
+        execution='19372d53-18ed-4104-b534-c03a556ad353'
+        record(f.counter,execution,caught.exception.receipt)
+        record(f.counter,execution,caught.exception.receipt)
+        with ledger(f.counter) as con:
+            rows=con.execute('SELECT receipt FROM typed_decision_rejections').fetchall()
+        self.assertEqual(len(rows),1)
+        self.assertEqual(json.loads(rows[0][0]),caught.exception.receipt)
+        self.assertNotIn('PRIVATE_INVALID',json.dumps(caught.exception.receipt))
+
     def test_no_review_approval_schema_can_be_converted_to_typed_submission(self):
         body={'messages':[{'role':'user','content':'DELIVERY_TYPED_DECISION_V1\n'}],
             'response_format':{'type':'json_schema','json_schema':{'name':'delivery_decision_v1','schema':{

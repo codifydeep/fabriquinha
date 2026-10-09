@@ -37,6 +37,16 @@ Isso não instala automaticamente o broker, a equipe nem um fluxo completo.
 `status` também verifica serviços opcionais e pode retornar não-zero quando
 eles ainda não foram instalados; não é uma declaração de autonomia.
 
+### Diagnóstico de decisões rejeitadas
+
+O proxy mantém recibos correlacionados por execução e hash da resposta. Uma
+decisão tipada inválida registra as restrições JSON Schema violadas, incluindo
+restrições internas de `anyOf`, sem publicar valores, caminhos de instância ou
+mensagens do validador. O diagnóstico é persistido junto ao recibo de rejeição;
+não executa ferramentas, não corrige argumentos e não aprova entregas.
+Recibos antigos sem essa informação permanecem incompletos: não se deve inferir
+a restrição ausente nem convertê-los retroativamente em evidência de recuperação.
+
 ## Convenções
 
 `broker/` concentra isolamento, autorização, handoffs e recuperação.

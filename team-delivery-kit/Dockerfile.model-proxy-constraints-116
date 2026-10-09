@@ -1,0 +1,5 @@
+# Installed base identity must match before building this local overlay:
+# sha256:21c907277ddd08f31e11555f5edc9dc44f1cf8565ae51a5f3a5f16d21ac868eb
+FROM delivery-kit-model-proxy:20261009.115
+COPY typed_decision_contract.py /typed_decision_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import typed_decision_contract"

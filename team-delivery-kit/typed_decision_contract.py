@@ -613,9 +613,24 @@ def response_shape(body,data,media_type):
     except Exception:return result
 
 
+def constraint_diagnostic(violations,schema,data):
+    """Fixed keywords only, including nested anyOf errors; never instance data."""
+    allowed={'type','enum','const','required','additionalProperties','minLength',
+             'maxLength','minItems','maxItems','uniqueItems','pattern',
+             'minimum','maximum','anyOf','oneOf','allOf','not'}
+    pending=list(violations);constraints=set()
+    while pending:
+        error=pending.pop()
+        constraints.add(error.validator if error.validator in allowed else 'other')
+        pending.extend(error.context)
+    return dict(version='typed-constraint-v1',constraints=sorted(constraints),
+        schema_sha256=hashlib.sha256(json.dumps(schema,sort_keys=True).encode()).hexdigest(),
+        upstream_sha256=hashlib.sha256(data).hexdigest())
+
+
 def translate(body,data,media_type):
     if not selected(body):return data,media_type,None
-    phase='envelope'
+    phase='envelope';diagnostic=None
     def reject(category):
         raise StructuredResponseRejected('typed_'+category)
     try:
@@ -672,6 +687,7 @@ def translate(body,data,media_type):
             parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
         violations=list(Draft202012Validator(schema).iter_errors(decision))
         if violations:
+            diagnostic=constraint_diagnostic(violations,schema,data)
             if (r3_length_feedback_enabled(body) and len(violations)==1
                     and violations[0].validator=='maxLength' and list(violations[0].path)==['reason']
                     and isinstance(decision.get('reason'),str) and 600<len(decision['reason'])<=4000):
@@ -778,10 +794,14 @@ def translate(body,data,media_type):
     except Exception as error:
         if not isinstance(error,StructuredResponseRejected):
             error=StructuredResponseRejected('typed_'+phase+'_invalid')
+        if diagnostic is not None:
+            error.diagnostic=diagnostic
         error.receipt=dict(operation='rejected_typed_decision_adapter_v1',
             category=error.category,upstream_sha256=hashlib.sha256(data).hexdigest(),
             delivery_approval=False,worker_tool_executed=False,
             response_shape=response_shape(body,data,media_type))
+        if diagnostic is not None:
+            error.receipt['constraint_diagnostic']=diagnostic
         raise error from None
 
 
