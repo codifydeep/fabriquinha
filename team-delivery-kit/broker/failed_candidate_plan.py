@@ -40,6 +40,30 @@ def prepare(route,data,task,decision,reads):
         author_execution_authorized=False,tests_may_change=False,delivery_approval=False)
 
 
+def proposal_instruction(route,data):
+    """Dedicated CTO protocol: durable failure reference, never copied history."""
+    proof=data['failed_execution_diagnostic']
+    if proof.get('failure')!=data['validation_failure'] or not data.get('author_edit_files'):
+        raise ValueError('exact failed candidate and installed scope required')
+    previous=data['scope_inspection_recovery']['previous_decision']
+    note=('DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'
+        'You are the CTO. Independently inspect the immutable failed candidate and frozen tests. '
+        'The installed author product edit scope is '+json.dumps(data['author_edit_files'])+'. '
+        'Previous diagnosis (hypothesis, not authority): '+previous['reason']+'\n'
+        'A verified product fix within this scope may use request_correction; this creates '
+        'a proposal for independent Tech Lead review, not an author restart. Otherwise '
+        'use escalate_cto with one concrete experiment or missing evidence. Do not '
+        'self-escalate merely because your diagnostic workspace is read-only. Never '
+        'edit candidate/tests, replay Red, weaken acceptance criteria, reset attempts '
+        'or approve delivery. Read ALL listed files completely before deciding. '
+        'Return ONLY JSON action(request_correction|escalate_cto), reason(one actionable '
+        'sentence <=300 chars, hard limit1200), optional_files=[].\n'
+        'Frozen failure: DELIVERY_BOUND_FAILURE_CONTEXT_V1:'+data['source_task']+':'+digest(data['validation_failure'])+'\n')
+    for path in paths(route,data):note+='DELIVERY_REVIEW_READ_PATH:'+path+'\n'
+    if len(note)>3800:raise ValueError('split CTO scope inspection before dispatch')
+    return note
+
+
 def instruction(route,data):
     plan=data['failed_candidate_plan']
     if (plan['diagnostic_sha256']!=digest(data['failed_execution_diagnostic'])

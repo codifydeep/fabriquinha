@@ -1137,6 +1137,10 @@ def reconcile(con, route, runs, effects, *, now=None):
             try:import failed_candidate_plan
             except ImportError:from broker import failed_candidate_plan
             instruction=failed_candidate_plan.instruction(route,data)
+        if stage=='diagnose_cto' and data.get('scope_inspection_recovery') and bound_failure_context.verified_failed_diagnostic(con,key,data):
+            try:import failed_candidate_plan
+            except ImportError:from broker import failed_candidate_plan
+            instruction=failed_candidate_plan.proposal_instruction(route,data)
         data.update(dispatch_marker=marker, dispatch_stage=stage,
                     target=target, trigger_task=trigger)
         if stage=='correct_author' and data.get('failed_candidate_execution'):
@@ -1147,6 +1151,19 @@ def reconcile(con, route, runs, effects, *, now=None):
         save(con, key, issue, 'dispatch_intent', target, data, now)
         stage = 'dispatch_intent'
     if stage == 'dispatch_intent':
+        if (data.get('control_error')=='ValueError:handoff instruction too large'
+                and data.get('dispatch_stage')=='diagnose_cto' and data.get('scope_inspection_recovery')
+                and not data.get('wakeup_id') and not data.get('recipient_task')
+                and not data.get('compact_scope_transport')
+                and bound_failure_context.verified_failed_diagnostic(con,key,data)):
+            try:import failed_candidate_plan
+            except ImportError:from broker import failed_candidate_plan
+            previous=data['instruction']
+            data['instruction']=failed_candidate_plan.proposal_instruction(route,data)
+            data['compact_scope_transport']=dict(previous_instruction_sha256=hashlib.sha256(previous.encode()).hexdigest(),
+                delivery_approval=False,author_restarted=False,attempts_preserved=True)
+            data.pop('control_error',None);data.pop('control_error_count',None)
+            save(con,key,issue,'dispatch_intent',data['target'],data,now)
         if 'instruction' not in data:
             return save(con, key, issue, data['dispatch_stage'], data['target'], data, now)
         wakeup = effects.ensure_wakeup(issue, data['target'], data['trigger_task'],

@@ -529,6 +529,20 @@ class HandoffTests(unittest.TestCase):
         self.assertIn('You are the CTO',saved['instruction'])
         self.assertFalse(saved['scope_inspection_recovery']['author_restarted'])
 
+    def test_oversized_scope_intent_is_repaired_once_without_new_marker_or_author_restart(self):
+        data=self.failed_plan_setup()
+        data.update(author_edit_files=['app.js'],scope_inspection_recovery={'previous_decision':self.effects.decision(None)},
+            dispatch_stage='diagnose_cto',target='cto',trigger_task='source',dispatch_marker='same-marker',
+            instruction='x'*4082,control_error='ValueError:handoff instruction too large',control_error_count=1)
+        handoffs.save(self.con,'source','issue','dispatch_intent','cto',data,90)
+        self.assertEqual(self.tick(now=100),'awaiting_acceptance')
+        saved=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertLess(len(saved['instruction']),3800)
+        self.assertEqual(saved['dispatch_marker'],'same-marker');self.assertEqual(saved['attempts'],2)
+        self.assertTrue(saved['compact_scope_transport']['attempts_preserved'])
+        self.assertEqual(self.tick(now=101),'awaiting_acceptance')
+        self.assertEqual(len(self.effects.created),1)
+
     def test_failed_candidate_correction_receives_independent_plan_review_not_author_grant(self):
         data=self.failed_plan_setup();data['author_edit_files']=['app.js']
         handoffs.save(self.con,'source','issue','diagnose_cto','cto',data,90)

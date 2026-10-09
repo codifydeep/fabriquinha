@@ -1,9 +1,20 @@
 import copy
 import unittest
-from broker.failed_candidate_plan import prepare,review,instruction,paths
+from broker.failed_candidate_plan import prepare,review,instruction,paths,proposal_instruction,digest
 
 
 class FailedCandidatePlanTests(unittest.TestCase):
+    def test_cto_proposal_references_large_failure_without_copying_or_truncating_it(self):
+        data=copy.deepcopy(self.data)
+        data['validation_failure']['details']='x'*10000
+        data['failed_execution_diagnostic']['failure']=copy.deepcopy(data['validation_failure'])
+        data['scope_inspection_recovery']={'previous_decision':self.decision}
+        note=proposal_instruction(self.route,data)
+        self.assertLess(len(note),3800)
+        self.assertIn(digest(data['validation_failure']),note)
+        self.assertNotIn('x'*10000,note)
+        self.assertEqual(len(data['validation_failure']['details']),10000)
+        for path in paths(self.route,data):self.assertIn('DELIVERY_REVIEW_READ_PATH:'+path,note)
     def setUp(self):
         self.route=dict(issue_id='issue',author='author',cto='cto',techlead='lead',
                         contract_sha256='hash',test_first_files=['tests/test_new.py'])
