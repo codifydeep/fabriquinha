@@ -1,5 +1,5 @@
 import unittest
-from browser_qa_recipes import LEGACY_SCENARIOS, DETAIL_SCENARIOS, recipe_for, baseline_for
+from browser_qa_recipes import LEGACY_SCENARIOS, DETAIL_SCENARIOS, COUNT_SCENARIOS, recipe_for, baseline_for
 
 
 class FixedRecipeTests(unittest.TestCase):
@@ -21,3 +21,11 @@ class FixedRecipeTests(unittest.TestCase):
         for name in ('/tmp/scenario.py', '../scenario.py', 'shell', None, {}):
             with self.assertRaisesRegex(ValueError, 'unqualified'):
                 recipe_for(name)
+
+    def test_count_retains_detail_and_legacy_regressions(self):
+        for name in COUNT_SCENARIOS:
+            recipe=recipe_for(name)
+            self.assertEqual(recipe.name,'browser_feedback_count.py')
+            self.assertLessEqual(len(recipe.read_bytes()),32768)
+            self.assertEqual(baseline_for(name),'feedback-board-detail-ui-v1')
+            self.assertEqual(baseline_for(baseline_for(name)),'feedback-board-demo-mode-ui-v1')

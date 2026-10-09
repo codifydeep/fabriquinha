@@ -15,6 +15,30 @@ CONFIG = {'scenario': 'feedback-board-v1', 'browser_image': 'sha256:' + 'b' * 64
 
 
 class BrowserQaTests(unittest.TestCase):
+    def test_fresh_receipt_is_json_stable_and_can_bind_baseline_without_retry(self):
+        import subprocess
+        import browser_qa_composition as composition
+        deployed={'Image':'sha256:'+'a'*64,'Id':'id','State':{'Running':True}}
+        metadata={'Config':{'Labels':{'delivery-kit.source-sha':'a'*40}}}
+        output={'status':'passed','source_sha':'a'*40,'screenshot_base64':'cG5n'}
+        def docker(*args,**kwargs):
+            body=json.dumps(output) if args[0]=='run' and '/scenario.py' in args else ''
+            return subprocess.CompletedProcess(args,0,body,'')
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(qa,'inspect',side_effect=lambda target,kind='container': deployed if kind=='container' else metadata), \
+             patch.object(qa,'docker',side_effect=docker) as transport,patch.object(qa,'cleanup'):
+            receipt=qa.qualify(config=CONFIG,deployed_container='app',source_sha='a'*40,
+                    evidence_dir=directory,runtime_env={'FEEDBACK_DB_PATH':'/tmp/feedback.db'})
+            saved=json.loads(next(Path(directory).glob('*.json')).read_text())
+            self.assertEqual(receipt,saved)
+            proof=composition.reference(directory,receipt)
+            self.assertEqual(proof['receipt_key'],composition.receipt_key(receipt['identity']))
+            calls=transport.call_count
+            cached=qa.qualify(config=CONFIG,deployed_container='app',source_sha='a'*40,
+                    evidence_dir=directory,runtime_env={'FEEDBACK_DB_PATH':'/tmp/feedback.db'})
+            self.assertEqual(cached,receipt)
+            self.assertEqual(transport.call_count,calls)
+
     def test_filter_scenarios_are_explicit_fixed_operations(self):
         for name in ('feedback-board-status-filter-api-v1', 'feedback-board-filter-v1',
                      'feedback-board-search-api-v1', 'feedback-board-search-v1'):

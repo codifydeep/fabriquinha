@@ -1,0 +1,19 @@
+{
+  "browser_qa": {
+    "browser_image": "sha256:72cb1ba338b9f4047a52a8fea4702ebebebc7eb9dac11aba9c1becf605c12b4b",
+    "scenario": "feedback-board-count-api-v1"
+  },
+  "container_port": 8080,
+  "description": "Replaced by the validated agent-authored plan; not permission to dispatch. DELIVERY_TYPED_TEST_SOURCE_V1",
+  "dockerfile": "Dockerfile.feedback-bootstrap",
+  "implementer_registry": "pilot-backend-data.json",
+  "label": "COUNTAPI-1",
+  "qa_host_port": 19463,
+  "review_instruction": "Review immutable delivery and full TDD evidence independently. No edits or generic commands. Require all acceptance and unchanged baseline tests. Run ONLY cd /delivery && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s . -q 2>&1. Finish with Decision: APPROVE or Decision: REQUEST_CHANGES;Reason: <specific finding>.",
+  "reviewer_registry": "pilot-techlead-reviewer.json",
+  "runtime_env": {
+    "FEEDBACK_DB_PATH": "/tmp/feedback.db"
+  },
+  "title": "Operator-owned QA template, not a worker card"
+}
+

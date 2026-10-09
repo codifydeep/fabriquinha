@@ -154,14 +154,26 @@ def qualify(*, config, deployed_container, source_sha, evidence_dir, runtime_env
     validate(config)
     parameters = dict(deployed_container=deployed_container, source_sha=source_sha,
                       evidence_dir=evidence_dir, runtime_env=runtime_env)
-    baseline = baseline_for(config['scenario'])
-    if not baseline:
-        return _qualify_one(config=config, **parameters)
-    baseline_config = {**config, 'scenario': baseline}
-    baseline_receipt = _qualify_one(config=baseline_config, **parameters)
-    proof = composition.reference(evidence_dir, baseline_receipt)
-    return _qualify_one(config=config, baseline_proof=proof,
-                        baseline_config=baseline_config, **parameters)
+    # A new feature may depend on an already composed feature. Never bypass
+    # that feature's own regression baseline or trust a local terminal flag.
+    chain, scenario = [], config['scenario']
+    while scenario:
+        if scenario in chain or len(chain) >= 4:
+            raise ValueError('cyclic or unbounded fixed browser QA dependency')
+        validate({**config, 'scenario': scenario})
+        chain.append(scenario)
+        scenario = baseline_for(scenario)
+    previous, receipt = None, None
+    for scenario in reversed(chain):
+        selected = {**config, 'scenario': scenario}
+        if previous is None:
+            receipt = _qualify_one(config=selected, **parameters)
+        else:
+            proof = composition.reference(evidence_dir, receipt)
+            receipt = _qualify_one(config=selected, baseline_proof=proof,
+                                   baseline_config=previous, **parameters)
+        previous = selected
+    return receipt
 
 
 def _qualify_one(*, config, deployed_container, source_sha, evidence_dir, runtime_env,
@@ -211,7 +223,9 @@ def _qualify_one(*, config, deployed_container, source_sha, evidence_dir, runtim
         save_receipt(path, existing)
         raise ValueError('post-deploy browser QA previous attempt blocked')
     owner = 'delivery-kit-browser-' + uuid.uuid4().hex
-    resources = [('network', owner), ('container', owner + '-app'), ('container', owner + '-browser')]
+    # JSON-native values make first-run and persisted receipts byte-equivalent
+    # in meaning. Tuples became lists on disk and broke fresh baseline binding.
+    resources = [['network', owner], ['container', owner + '-app'], ['container', owner + '-browser']]
     receipt = {'status': 'running', 'identity': identity, 'owner': owner,
                'resources': resources, 'started_at': time.time(), 'automated': True}
     if baseline_proof is not None:

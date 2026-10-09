@@ -98,6 +98,15 @@ infrastructure.
 
 ## Qualification boundary
 
+Fixed browser recipes may compose a bounded chain of regressions. Every link
+executes or revalidates its own same-image, same-commit receipt and screenshot;
+the count feature retains detail and legacy checks rather than replacing them.
+Cycles fail before creating Docker resources. Newly produced receipts use
+JSON-native resource lists so their first-run values equal their durable form:
+a cached second attempt is not needed to bind the baseline. An expected failure
+on an image missing a feature qualifies the detector, never that feature or a
+release.
+
 This mechanism is bounded recovery, not general zero-intervention autonomous
 delivery. A disposable brief with two dependent cards has completed an actual
 TDD product repair, complete independent inspection and reviewer-owned suite,

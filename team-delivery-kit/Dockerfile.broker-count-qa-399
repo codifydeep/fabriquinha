@@ -1,0 +1,3 @@
+# Only expand controller-owned QA scenario names; no worker permission changes.
+FROM delivery-kit-execution-broker:20261009.398
+COPY browser_qa_recipes.py /browser_qa_recipes.py

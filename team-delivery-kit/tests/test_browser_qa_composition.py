@@ -61,7 +61,7 @@ class ComposedQaTests(unittest.TestCase):
             with self.assertRaises(ValueError):self.verify(proof=proof)
 
     def test_baseline_failure_prevents_feature_execution(self):
-        with patch.object(qa,'baseline_for',return_value=self.baseline_config['scenario']), \
+        with patch.object(qa,'baseline_for',side_effect=lambda name: self.baseline_config['scenario'] if name==self.config['scenario'] else None), \
              patch.object(qa,'_qualify_one',side_effect=ValueError('baseline failed')) as runner:
             with self.assertRaisesRegex(ValueError,'baseline failed'):
                 qa.qualify(config=self.config,deployed_container='app',source_sha='a'*40,
@@ -69,7 +69,7 @@ class ComposedQaTests(unittest.TestCase):
             self.assertEqual(runner.call_count,1)
 
     def test_wrapper_runs_baseline_first_and_passes_durable_binding(self):
-        with patch.object(qa,'baseline_for',return_value=self.baseline_config['scenario']), \
+        with patch.object(qa,'baseline_for',side_effect=lambda name: self.baseline_config['scenario'] if name==self.config['scenario'] else None), \
              patch.object(qa,'_qualify_one',side_effect=[self.baseline,{'status':'passed'}]) as runner:
             qa.qualify(config=self.config,deployed_container='app',source_sha='a'*40,
                        evidence_dir=self.folder,runtime_env=self.identity['runtime_env'])
@@ -89,3 +89,24 @@ class ComposedQaTests(unittest.TestCase):
                     evidence_dir=self.folder,runtime_env=self.identity['runtime_env'],
                     baseline_proof=self.proof,baseline_config=self.baseline_config)
             docker.assert_not_called()
+
+    def test_nested_baselines_are_revalidated_in_order_on_same_deployment(self):
+        config={**self.config,'scenario':'feedback-board-count-ui-v1'}
+        detail={**config,'scenario':'feedback-board-detail-ui-v1'}
+        legacy={**config,'scenario':'feedback-board-demo-mode-ui-v1'}
+        with patch.object(qa,'_qualify_one',side_effect=[self.baseline,{'status':'passed'},{'status':'passed'}]) as runner, \
+             patch.object(composition,'reference',side_effect=[{'legacy':'proof'},{'detail':'proof'}]):
+            qa.qualify(config=config,deployed_container='app',source_sha='a'*40,
+                       evidence_dir=self.folder,runtime_env=self.identity['runtime_env'])
+            self.assertEqual([call.kwargs['config'] for call in runner.call_args_list],[legacy,detail,config])
+            self.assertEqual(runner.call_args_list[1].kwargs['baseline_config'],legacy)
+            self.assertEqual(runner.call_args_list[2].kwargs['baseline_config'],detail)
+            self.assertEqual(runner.call_args_list[2].kwargs['baseline_proof'],{'detail':'proof'})
+
+    def test_fixed_dependency_cycle_fails_before_docker_execution(self):
+        with patch.object(qa,'baseline_for',return_value=self.config['scenario']), \
+             patch.object(qa,'_qualify_one') as runner:
+            with self.assertRaisesRegex(ValueError,'cyclic'):
+                qa.qualify(config=self.config,deployed_container='app',source_sha='a'*40,
+                           evidence_dir=self.folder,runtime_env=self.identity['runtime_env'])
+            runner.assert_not_called()
