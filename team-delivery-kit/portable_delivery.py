@@ -180,7 +180,12 @@ def drive_qa_repair(incident, contract, *, stop_after_cto_dispatch=False):
             from portable_qa_protocol_recovery import recover
             recovery=recover(PRIVATE,cli,incident=incident,original=original,
                              parent_contract=contract,budget_ready=ready)
-            if recovery:return recovery
+            if recovery:original=recovery
+        if original['dispatch']=='cto_started':
+            from portable_qa_observation import recover as recover_observation
+            observed=recover_observation(PRIVATE,cli,incident=incident,prior=original,
+                                         parent_contract=contract,budget_ready=ready)
+            if observed:return observed
         return original
     def diagnosis_output(issue_id, agent_id):
         completed = [run for run in cli('runs', issue_id)

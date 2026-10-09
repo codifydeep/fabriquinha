@@ -37,6 +37,11 @@ def resume(ledger,plan,private,cli,*,query=None):
             cto_id=original['cto_id'],reason=original['reason'],budget_ready=True)
         recovery=recover(private,cli,incident=incident,original=original,
             parent_contract=stage['contract'],budget_ready=True)
+        if recovery and recovery.get('dispatch')=='cto_started':
+            from portable_qa_observation import recover as recover_observation
+            observed=recover_observation(private,cli,incident=incident,prior=recovery,
+                parent_contract=stage['contract'],budget_ready=True)
+            if observed:recovery=observed
         if not recovery or recovery.get('dispatch')!='cto_started':return None
         runs=cli('runs',recovery['child_issue_id'])
         if (len(runs)!=1 or runs[0].get('agent_id')!=original['cto_id']

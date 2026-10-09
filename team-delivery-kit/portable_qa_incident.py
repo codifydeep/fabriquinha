@@ -241,7 +241,7 @@ def record(private, cli, *, context, label, phase, source_sha, error,
     if child.get('assignee_id') is None:
         cli('assign', child['id'], '--to-id', techlead_id, '--no-start')
     from portable_qa_evidence import bind
-    if budget_ready:
+    if budget_ready and not cli('runs', child['id']):
         bind(private, incident, child['id'], techlead_id)
     if child['status'] == 'done':
         if not any(run.get('agent_id') == techlead_id for run in cli('runs', child['id'])):

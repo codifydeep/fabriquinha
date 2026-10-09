@@ -41,6 +41,16 @@ The defect requires a new TDD delivery and independent review. Combined feature
 states must be exercised: separate filter and search checks do not prove their
 composition works.
 
+After an evidence-read, completed blocked CTO diagnosis, the supervisor may
+create one separate `O1` read-only diagnosis for a new failed observation. The
+current scenario hash must differ, while commit, application image, deployment,
+browser configuration and temporary runtime environment must remain identical.
+Cleanup must have passed. A frozen proof binds both observations and the prior
+decision; changed proof or another observation requires technical replanning,
+not another identical execution. Existing diagnostic artifacts are never rebound
+once their card has a run. An `O1` repair proposal still passes through the normal
+TDD contract derivation, independent review, CI and QA gates.
+
 ## Qualification boundary
 
 This mechanism is bounded provider recovery, not general zero-intervention

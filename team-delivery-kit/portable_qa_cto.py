@@ -14,7 +14,7 @@ def find(private, key):
 
 
 def record(private, cli, *, incident, parent_contract, cto_id, reason,
-           budget_ready, protocol_recovery=None):
+           budget_ready, protocol_recovery=None, observation_recovery=None):
     """Create/dispatch one read-only CTO card; never start a second run."""
     if (not isinstance(reason, str) or not 0 < len(reason) <= 300
             or not isinstance(cto_id, str) or not cto_id):
@@ -23,6 +23,15 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
     title = 'QA-CTO-' + key[:8].upper()
     path = Path(private) / 'qa-cto-escalations' / (key + '.json')
     original=find(private,key)
+    if protocol_recovery is not None and observation_recovery is not None:
+        raise ValueError('distinct diagnostic recovery modes required')
+    if observation_recovery is not None:
+        from portable_qa_observation import validate
+        validate(private,incident,observation_recovery)
+        if observation_recovery.get('cto_id') != cto_id:
+            raise ValueError('observation diagnostic owner drift')
+        title+='-O1'
+        path=Path(private)/'qa-observation-recoveries'/(key+'.json')
     if protocol_recovery is not None:
         from portable_qa_protocol_recovery import validate
         if not original:raise ValueError('historical CTO execution required')
@@ -33,6 +42,7 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
                 'parent_issue_id': incident['child_issue_id'],
                 'cto_id': cto_id, 'reason': reason, 'title': title}
     if protocol_recovery is not None:identity['protocol_recovery']=protocol_recovery
+    if observation_recovery is not None:identity['observation_recovery']=observation_recovery
     if path.is_symlink():raise ValueError('unsafe QA CTO receipt')
     prior = json.loads(path.read_text()) if path.exists() else None
     if prior:
@@ -66,6 +76,8 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
     description += evidence_description(incident)
     if protocol_recovery is not None:
         description+=' Protocol recovery P1: prior CTO execution remains failed. A counted protocol fixture passed after the controller transport correction. Inspect the SAME immutable artifacts anew; this authorizes diagnosis only, not product writes, retry, QA waiver or release approval.'
+    if observation_recovery is not None:
+        description+=' Observation recovery O1: the prior diagnosis remains preserved. The controller corrected its browser scenario and obtained a NEW failed observation on the SAME product SHA and image. Read the new immutable QA artifacts; decide whether this is a real product defect. This grants diagnosis only, never writes, release approval or permission to weaken tests.'
     matches = [item for item in cli('search', title, '--include-closed',
                                     '--limit', '100')['issues']
                if item.get('title') == title]
@@ -89,12 +101,14 @@ def record(private, cli, *, incident, parent_contract, cto_id, reason,
     _set_metadata(cli, child['id'], 'qa_incident_key', key)
     _set_metadata(cli, child['id'], 'qa_source_sha', incident['source_sha'])
     _set_metadata(cli, incident['child_issue_id'],
+                  'qa_cto_observation_issue_id' if observation_recovery else
                   'qa_cto_protocol_issue_id' if protocol_recovery else 'qa_cto_issue_id', child['id'])
     if child['assignee_id'] is None:
         cli('assign', child['id'], '--to-id', cto_id, '--no-start')
-    if budget_ready:
-        bind(private, incident, child['id'], cto_id)
     runs = cli('runs', child['id'])
+    # Never rebind a historical diagnosis to a newer scenario observation.
+    if budget_ready and not runs:
+        bind(private, incident, child['id'], cto_id)
     if any(run.get('agent_id') != cto_id for run in runs):
         raise ValueError('QA CTO card has foreign agent run')
     if any(run.get('status') == 'failed' for run in runs):
