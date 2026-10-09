@@ -20,6 +20,16 @@ aprovações antigas nem permissões. A memória semântica de decisões e apren
 com curadoria independente, e o uso desse histórico por agentes em um novo ciclo
 continuam pendentes de qualificação.
 
+A fundação da memória de decisões aceita somente indicações originadas em uma
+proposta nativa do CTO concluída e hash-verificada. A indicação fica privada e
+não aparece no contexto compartilhado antes de uma decisão independente do
+Tech Lead sobre seu hash exato. Rejeição é terminal; substituição exige nova
+revisão, mesma identidade de assunto e preservação da versão anterior. Retomar
+uma indicação não renova sua validade. O adaptador confere o modo de planejamento,
+o agente e o lease encerrado diretamente no controlador. O contrato estruturado
+de curadoria ainda precisa ser instalado no proxy e testado com um revisor real;
+nenhuma indicação foi promovida automaticamente.
+
 No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
 formal comprovada podem abrir um diagnóstico independente do CTO. O controlador
 confere identidade, configuração, base, leases encerrados e hashes das propostas;

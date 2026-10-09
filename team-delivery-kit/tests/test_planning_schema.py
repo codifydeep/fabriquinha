@@ -27,6 +27,17 @@ class PlanningSchemaTests(unittest.TestCase):
         self.assertEqual(props['stories']['maxItems'], 5)
         self.assertEqual(set(props['stories']['items']['properties']), {'title', 'acceptance'})
 
+    def test_memory_review_is_exact_hash_bound_and_has_no_execution_tools(self):
+        body=apply(self.body('memory_review'))
+        schema=body['response_format']['json_schema']
+        props=schema['schema']['properties']
+        self.assertEqual(schema['name'],'planning_memory_review_v1')
+        self.assertEqual(set(props),{'role','decision','entry_sha256','reason'})
+        self.assertEqual(props['role']['enum'],['techlead'])
+        self.assertEqual(props['decision']['enum'],['approve','reject'])
+        self.assertEqual(props['entry_sha256']['pattern'],'^[a-f0-9]{64}$')
+        self.assertEqual(body['tools'],[])
+
     def test_model_sees_same_unweakened_schema_as_validator(self):
         for role in ('product','cto','techlead'):
             body=apply(self.body(role))
