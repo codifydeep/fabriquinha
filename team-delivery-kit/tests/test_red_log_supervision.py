@@ -1,5 +1,9 @@
 import unittest
-from red_log_supervision import qualify
+import json
+import hashlib
+from pathlib import Path
+import tempfile
+from red_log_supervision import qualify,resume
 
 
 class RedLogSupervisionTests(unittest.TestCase):
@@ -26,3 +30,19 @@ class RedLogSupervisionTests(unittest.TestCase):
         for key,value in [('cto_authorized',False),('cto_task',None),('host_restarted_author',True),
                           ('source_task','old'),('tests_reexecuted',False),('output_sha256','b'*64)]:
             with self.subTest(key=key):self.assertFalse(qualify(status,{'issue_id':'issue'},dict(proof,**{key:value})))
+
+    def test_sequence_refresh_is_identity_bound_and_never_completes_card(self):
+        plan=dict(sha256='a'*64,stages=[dict(spec={'label':'CARD-1'},contract={'files':['a']})])
+        ledger=dict(stage='blocked',plan_sha256='a'*64,active='CARD-1',completed=[],issues={'CARD-1':'issue'},
+            category='RuntimeError:technical_decision_required:RuntimeError:validator output unavailable')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'autonomy-status').mkdir()
+            context=dict(issue_id='issue',contract_sha256=hashlib.sha256(json.dumps(plan['stages'][0]['contract'],sort_keys=True,separators=(',',':')).encode()).hexdigest())
+            (root/'portable-context-CARD-1.json').write_text(json.dumps(context))
+            (root/'autonomy-status'/'CARD-1.json').write_text('{}')
+            result=resume(ledger,plan,root,query=lambda *args:True)
+            self.assertEqual(result['stage'],'working');self.assertEqual(result['completed'],[])
+            self.assertEqual(result['active'],'CARD-1');self.assertEqual(ledger['stage'],'blocked')
+            self.assertFalse(result['prior_incidents'][0]['delivery_approval'])
+            self.assertIsNone(resume(ledger,plan,root,query=lambda *args:False))
+            self.assertIsNone(resume(dict(ledger,issues={'CARD-1':'other'}),plan,root,query=lambda *args:True))

@@ -947,6 +947,9 @@ def run_sequence():
             if not resumed:
                 from qa_protocol_supervision import resume as resume_qa_protocol
                 resumed = resume_qa_protocol(ledger, plan, PRIVATE, cli)
+            if not resumed:
+                from red_log_supervision import resume as resume_red_log
+                resumed = resume_red_log(ledger,plan,PRIVATE)
         except Exception as error:
             print(json.dumps({'stage': 'blocked', 'sequence': plan['name'],
                               'recovery_verification': (type(error).__name__ + ':' + str(error))[:160]}), flush=True)

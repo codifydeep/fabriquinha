@@ -1,7 +1,10 @@
 """Refresh a host blocker only from the same controller-validated Red receipt."""
 import json
+import hashlib
+from pathlib import Path
 import re
 import subprocess
+import time
 
 
 def qualify(status,context,proof):
@@ -57,3 +60,30 @@ with b.db() as c:
 '''
     proof=json.loads(subprocess.check_output(['docker','exec','-w','/',name,'python','-c',program,context['issue_id']],text=True,timeout=20))
     return qualify(status,context,proof)
+
+
+def resume(ledger,plan,private,*,query=eligible):
+    from dependent_sequence import read_json,read_stage_delivery,receipt_identity,verify_predecessor,verify_recovery_ci
+    labels=[s['spec']['label'] for s in plan['stages']];label=ledger.get('active')
+    if (ledger.get('stage')!='blocked' or ledger.get('plan_sha256')!=plan['sha256']
+            or ledger.get('category')!='RuntimeError:technical_decision_required:RuntimeError:validator output unavailable'
+            or label not in labels): return None
+    index=labels.index(label)
+    if ledger.get('completed')!=labels[:index]:return None
+    stage=plan['stages'][index]
+    context=read_json(Path(private)/('portable-context-'+label+'.json'))
+    status=read_json(Path(private)/'autonomy-status'/(label+'.json'))
+    if (not context or context.get('issue_id')!=ledger.get('issues',{}).get(label)
+            or context.get('contract_sha256')!=hashlib.sha256(json.dumps(stage['contract'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            or not query(status,context)):return None
+    if index:
+        previous=plan['stages'][index-1];receipt=read_stage_delivery(private,previous)
+        if not receipt_identity(receipt,previous) or receipt.get('merge_sha')!=context['base_sha']:return None
+        verify_predecessor(receipt,previous,allow_advanced_main=False,require_live_qa=True)
+        verify_recovery_ci(receipt,previous)
+    resumed=dict(ledger,stage='working',updated_at=time.time(),
+        prior_incidents=[*ledger.get('prior_incidents',[]),dict(category=ledger['category'],
+            label=label,issue_id=context['issue_id'],operation='verified_red_log_status_refresh_v1',
+            delivery_approval=False)])
+    for key in ('category','owner','next_action','board_notification_error'):resumed.pop(key,None)
+    return resumed
