@@ -783,6 +783,23 @@ class RevisionReviewTests(unittest.TestCase):
             {'reviewer':'lead','initial_review':True},state,protocol_task='bad-review')
         self.assertEqual(len(self.created),2)
 
+    def test_admitted_schema_recovery_dispatches_fresh_readonly_diagnosis_once(self):
+        self.initial_submission();revision.reconcile(self.broker,self.route,[],self.effects,self.red)
+        with self.db() as con:state=json.loads(con.execute('SELECT state FROM test_revision_trials').fetchone()[0])
+        state.update(status='blocked',reason='Observed coverage lost',review_task='independent-review',
+            rejection_diagnosis=dict(status='dispatch_intent',target='cto',schema_recovery={
+                'failed_task':'failed-schema-cto','attempt_limit':1,'delivery_approval':False}))
+        revision.reconcile_rejection(self.broker,self.route,[],self.effects,self.red,
+            {'reviewer':'lead','initial_review':True},state)
+        self.assertIn('ONE FRESH READ-ONLY DIAGNOSIS',self.last_instruction)
+        self.assertIn('No missing legacy constraint is inferred',self.last_instruction)
+        self.assertIn('/evidence/candidate/tests/test_new.py',self.last_instruction)
+        self.assertEqual(state['rejection_diagnosis']['status'],'awaiting_cto')
+        count=len(self.created)
+        revision.reconcile_rejection(self.broker,self.route,[],self.effects,self.red,
+            {'reviewer':'lead','initial_review':True},state)
+        self.assertEqual(len(self.created),count)
+
     def test_cto_compares_rejected_revision_with_previous_readonly(self):
         self.rejected()
         with self.db() as con:

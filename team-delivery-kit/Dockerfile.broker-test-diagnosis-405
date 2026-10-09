@@ -1,0 +1,4 @@
+# Qualified local base: sha256:bc608f90e570865622021eb6dcbe680bd7a7625347ea0344517a65a09136baf9
+FROM delivery-kit-execution-broker:20261009.404
+COPY broker/test_diagnosis_recovery.py /test_diagnosis_recovery.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_diagnosis_recovery"

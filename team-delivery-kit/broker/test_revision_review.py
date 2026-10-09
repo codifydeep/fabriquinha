@@ -875,10 +875,12 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
     paths = ['/evidence/' + tree + '/' + name
              for tree in trees for name in route['test_first_files']]
     if 'wakeup_id' not in diagnosis:
-        source=protocol_task or state['review_task']
+        schema_recovery=diagnosis.get('schema_recovery')
+        source=schema_recovery['failed_task'] if schema_recovery else (protocol_task or state['review_task'])
         marker = hashlib.sha256((route['issue_id'] + ':' + source +
                                  ':test-review-cto:' + state['manifest_sha256']+
-                                 (':typed-transport:1' if diagnosis.get('typed_transport_recovery') else '')).encode()).hexdigest()
+                                 (':typed-schema:1' if schema_recovery else
+                                  ':typed-transport:1' if diagnosis.get('typed_transport_recovery') else '')).encode()).hexdigest()
         instruction = (
             ('CONTROLLER INVALID REVIEW PROTOCOL. Two reviews cited invalid locations. '
              'Neither verdict was accepted; do not treat either as a valid rejection. '
@@ -907,6 +909,14 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
         if state.get('evidence_policy'):
             instruction += evidence_instruction(state)
             instruction += '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+        if schema_recovery:
+            instruction += ('\nONE FRESH READ-ONLY DIAGNOSIS after a schema-rejected submission. '
+                'The old invalid decision is not recovered. No missing legacy constraint is inferred. '
+                'Read both trees again; submit exactly one schema-valid decision with action, reason, '
+                'optional_files and findings. reason target400characters/max1200; findings1-3; '
+                'quote/expected/observed target200characters/max500, line integer. Use only actual '
+                'observed locations. No prose outside the typed submission; no approval or writes. '
+                'If this fails, preserve the incident; no identical repeat is admitted.\n')
         diagnosis.update(status='dispatch_intent', marker=marker, target=cto)
         _save_rejection(broker, route, state)
         wakeup = effects.ensure_wakeup(route['issue_id'], cto, source,

@@ -47,6 +47,15 @@ não executa ferramentas, não corrige argumentos e não aprova entregas.
 Recibos antigos sem essa informação permanecem incompletos: não se deve inferir
 a restrição ausente nem convertê-los retroativamente em evidência de recuperação.
 
+`test_diagnosis_recovery_cli.py` admite uma única nova decisão read-only do CTO
+após rejeição tipada comprovada. É uma operação administrativa, sem endpoint
+para workers, e exige manutenção selada, execução terminal, correlação nativa,
+recibo persistido no proxy e leituras completas dos snapshots atuais. Preserva
+o diagnóstico anterior e a revisão independente; não reinicia o autor nem
+converte a tentativa em aprovação. O reconciliador normal valida a nova decisão.
+Nova falha permanece bloqueada, sem repetição idêntica. Esse caminho não prova
+recuperação autônoma: sua admissão inicial ainda requer o operador.
+
 ## Convenções
 
 `broker/` concentra isolamento, autorização, handoffs e recuperação.

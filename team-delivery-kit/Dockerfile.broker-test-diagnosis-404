@@ -1,0 +1,6 @@
+# Verify installed base identity before building:
+# sha256:197f4c827501eeabc9e2d03e80902c8e2be25bc3e50d736fb7a5e30e142f6816
+FROM delivery-kit-execution-broker:20261009.403
+COPY broker/test_diagnosis_recovery.py /test_diagnosis_recovery.py
+COPY broker/test_revision_review.py /test_revision_review.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_diagnosis_recovery,test_revision_review"
