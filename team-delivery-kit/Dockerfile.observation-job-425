@@ -1,0 +1,5 @@
+# Verified local base: sha256:6ef038d3065bc7fc0788ce589bdaa8a96fdba65fbcf9097d939a42363990a513
+FROM delivery-kit-execution-broker:20261009.424
+COPY broker/test_first_job.py /test_first_job.py
+COPY broker/patch_observation_replan.py /patch_observation_replan.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_first_job,patch_observation_replan"

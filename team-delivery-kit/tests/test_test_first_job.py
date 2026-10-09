@@ -82,6 +82,17 @@ class TestFirstJobTests(unittest.TestCase):
         self.info['HostConfig']['NetworkMode']='bridge'
         with self.assertRaises(ValueError):self.call(now=2)
 
+    def test_omitted_legacy_network_flag_requires_exact_none_network(self):
+        payload={k:v for k,v in self.payload.items() if k!='NetworkDisabled'}
+        with self.assertRaises(TimeoutError):self.call(payload=payload)
+        self.info['Config']['NetworkDisabled']=None
+        self.info['State']['Status']='exited'
+        self.assertEqual(self.call(now=2,payload=payload)['exit_code'],0)
+        self.info['HostConfig']['NetworkMode']='bridge'
+        with self.assertRaises(ValueError):verify(self.b,self.info,payload)
+        self.info['HostConfig']['NetworkMode']='none'
+        with self.assertRaises(ValueError):verify(self.b,self.info,self.payload)
+
     def test_repository_digest_matches_only_resolved_immutable_image_id(self):
         payload={**self.payload,'Image':'delivery-kit-runtime@sha256:'+'a'*64}
         # The actual Engine returns a canonical ID, not the requested reference.

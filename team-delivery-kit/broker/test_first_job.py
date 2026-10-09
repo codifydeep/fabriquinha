@@ -29,6 +29,10 @@ def normalized_mounts(mounts):
 def verify(b,info,expected):
     config=info.get('Config',{});host=info.get('HostConfig',{})
     image=b.docker('GET','/images/'+expected['Image']+'/json') or {}
+    # Engine may omit this legacy Config field when it was not requested.
+    # HostConfig.NetworkMode remains mandatory and independently exact below.
+    omitted_network_flag=('NetworkDisabled' not in expected
+        and config.get('NetworkDisabled') is None and host.get('NetworkMode')=='none')
     if (not re.fullmatch(r'sha256:[a-f0-9]{64}',image.get('Id',''))
             or info.get('Image')!=image['Id'] or
             any(config.get(k)!=expected[k] for k in ('User','Entrypoint','Cmd'))
@@ -36,7 +40,7 @@ def verify(b,info,expected):
             or any(config.get('Labels',{}).get(k)!=v for k,v in expected['Labels'].items())
             or any((normalized_mounts(host.get(k))!=normalized_mounts(v) if k=='Mounts'
                     else host.get(k)!=v) for k,v in expected['HostConfig'].items())
-            or config.get('NetworkDisabled') not in (True,False)
+            or (config.get('NetworkDisabled') not in (True,False) and not omitted_network_flag)
             or host.get('NetworkMode')!='none'):
         raise ValueError('fixed test-first job isolation drift')
     inherited=image.get('Config',{}).get('Env',[])

@@ -104,3 +104,10 @@ path. A refusal or repeated failure remains a technical hold. Previous source
 attempts, original depth, accepted brief, write fences, fresh Red and independent
 review are not reset or waived. No agent supplies arbitrary probe commands or
 can self-register a certificate.
+
+An Engine-omitted legacy `Config.NetworkDisabled` field is accepted only when it
+was not requested and the independently verified `HostConfig.NetworkMode` is
+exactly `none`. Bridge/host networks and omission of an explicitly requested flag
+remain rejected. A verifier-only update observes the original registered probe
+image and handle; it cannot recreate the job or reset its deadline. The original
+image's probe/handler source hashes must still match the installed qualification.

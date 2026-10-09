@@ -82,7 +82,11 @@ def register(b,route,source,incident,state,fx):
     matches=[t for t in task if t['id']==recovery['task_id']]
     if (len(matches)!=1 or matches[0].get('status')!='completed' or matches[0].get('agent_id')!=route['cto']
             or fx.decision(matches[0])!=recovery['recommendation']):raise ValueError('actual preserved CTO recommendation required')
-    payload=dict(Image=b.IMAGE,User='0:0',Entrypoint=['python'],Cmd=['/probe_patch_persistence.py'],WorkingDir='/tmp',
+    with b.db() as c:
+        test_first_job.initialize(c)
+        old_job=c.execute('SELECT identity FROM test_first_jobs WHERE job_key=?',(recovery['task_id']+':copy',)).fetchone()
+    job_image=json.loads(old_job[0])['payload']['Image'] if old_job else b.IMAGE
+    payload=dict(Image=job_image,User='0:0',Entrypoint=['python'],Cmd=['/probe_patch_persistence.py'],WorkingDir='/tmp',
         Env=['PYTHONDONTWRITEBYTECODE=1','HERMES_HOME=/tmp/hermes','HERMES_WRITE_SAFE_ROOT=/workspace',
              'TERMINAL_ENV=local','TERMINAL_CWD=/workspace','DELIVERY_EXECUTION_MODE=implementation',
              'HERMES_FENCED_INPLACE_WRITES=1','DELIVERY_PROBE_REQUIRE_OBSERVATION=1'],
@@ -97,12 +101,14 @@ def register(b,route,source,incident,state,fx):
     validate_probe(value,hashlib.sha256(program.read_bytes()).hexdigest(),
                    hashlib.sha256(Path('/opt/hermes/tools/file_tools.py').read_bytes()).hexdigest())
     proof=dict(operation='qualified_patch_observation_replan_v1',source_task=source,issue_id=route['issue_id'],
-        image=b.IMAGE,plan_source=parent,plan_binding=bound,incident_identity_sha256=digest(incident),
+        image=b.IMAGE,job_image=job_image,plan_source=parent,plan_binding=bound,incident_identity_sha256=digest(incident),
         recommendation_task=recovery['task_id'],probe=value,job_output_sha256=result['output_sha256'],
         previous_handoff=previous,attempt_limit=1,author_retry_authorized=False,delivery_approval=False)
     data={**previous,'patch_observation_replan':proof,
         'required_action':'CTO decide one observed tests-only correction under original approved plan'}
     for field in ('cto_task','decision','test_first_cto_wakeup','dispatched_at'):data.pop(field,None)
+    # Resolved inspection errors remain in previous_handoff, not the active view.
+    for field in ('control_error','control_error_count'):data.pop(field,None)
     with b.db() as c:
         current=handoffs.load(c,source)
         if not current or current['data']!=json.dumps(previous,sort_keys=True):
