@@ -24,6 +24,11 @@ admite leitura do mesmo job registrado, com identidade e isolamento revalidados;
 não recria contêiner, reexecuta testes nem reinicia o autor. Logs acima do limite
 continuam bloqueados, nunca truncados para produzir evidência válida. A retomada
 do supervisor exige recibo Red durável correspondente, sem aprovação de entrega.
+Se o CTO já encaminhou uma correção antes da instalação, a tentativa antiga não é
+recapturada por cima dela. A projeção de status só retoma após provar a conclusão
+nativa do CTO e do autor corrigido, a identidade do wakeup e o novo Red validado.
+Essa trilha registra que os testes foram reexecutados por decisão do CTO, sem
+atribuir falsamente essa execução à recuperação de logs do mesmo contêiner.
 
 Correções de planos rejeitados usam referências a registros completos do controlador,
 vinculadas ao card, CTO, wakeup ativo e hash da revisão. O gateway expande esses
