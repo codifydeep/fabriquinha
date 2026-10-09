@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261009.430
+COPY broker/planning_review_observation.py /planning_review_observation.py
+COPY broker/test_first_job.py /test_first_job.py
