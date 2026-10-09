@@ -29,7 +29,7 @@ def validate(body,data,media_type):
         if not isinstance(schema,dict):raise ValueError('schema missing')
         Draft202012Validator.check_schema(schema)
         if media_type.startswith('text/event-stream'):
-            parts=[];finished=False;done=False
+            parts=[];finished=False;done=False;terminal_trailer=False
             for line in data.decode().splitlines():
                 if not line.startswith('data:'):continue
                 raw=line[5:].strip()
@@ -45,8 +45,18 @@ def validate(body,data,media_type):
                 entry=choices[0];delta=entry.get('delta',{})
                 if delta.get('tool_calls') or delta.get('function_call'):raise ValueError('unexpected tool call')
                 content=delta.get('content')
+                if finished:
+                    # OpenRouter can repeat stop in a final empty usage trailer.
+                    # Permit exactly one empty terminal choice; never accept new
+                    # text, role changes/tools, a different finish or another trailer.
+                    if (terminal_trailer or entry.get('finish_reason')!='stop'
+                            or set(delta)-{'content','role'} or content not in (None,'')
+                            or ('role' in delta and delta['role']!='assistant')):
+                        raise ValueError('data after decision terminal')
+                    terminal_trailer=True
+                    continue
                 if content is not None:
-                    if finished or not isinstance(content,str):raise ValueError('invalid content')
+                    if not isinstance(content,str):raise ValueError('invalid content')
                     parts.append(content)
                 finish=entry.get('finish_reason')
                 if finish is not None:

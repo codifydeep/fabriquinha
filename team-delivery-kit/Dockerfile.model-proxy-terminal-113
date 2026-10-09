@@ -1,0 +1,4 @@
+# Qualification overlay. Verify this exact base before building.
+# Expected: sha256:e1b75e76e7bafc53a0f71dffdd3cac82a8b433e0f02935bb2b21e0ada04d04ce
+FROM delivery-kit-model-proxy:20261009.112
+COPY structured_response_contract.py /structured_response_contract.py

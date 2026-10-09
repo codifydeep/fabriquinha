@@ -63,6 +63,31 @@ class StructuredResponseTests(unittest.TestCase):
         self.assertIsNone(validate(self.body,raw,'text/event-stream'))
         with self.assertRaises(StructuredResponseRejected):validate(self.body,raw.replace(b'data: [DONE]',b''),'text/event-stream')
 
+    def test_single_empty_repeated_stop_trailer_preserves_exact_decision(self):
+        def frame(delta,finish):
+            return 'data: '+json.dumps({'choices':[{'index':0,'delta':delta,
+                'finish_reason':finish}]})+'\n\n'
+        prefix=frame({'content':json.dumps(self.decision)},None)+frame({},'stop')
+        trailer=frame({'content':'','role':'assistant'},'stop')
+        raw=(prefix+trailer+'data: [DONE]\n\n').encode()
+        validate(self.body,raw,'text/event-stream')
+        for late in (frame({'content':'PRIVATE_NEW_CONTENT'},'stop'),
+                     frame({'role':'user'},'stop'),
+                     frame({},'length'),trailer+trailer,
+                     frame({'tool_calls':[{'id':'unexpected'}]},'stop')):
+            with self.assertRaises(StructuredResponseRejected):
+                validate(self.body,(prefix+late+'data: [DONE]\n\n').encode(),'text/event-stream')
+        with self.assertRaises(StructuredResponseRejected):
+            validate(self.body,(prefix+trailer).encode(),'text/event-stream')
+
+    def test_empty_usage_trailer_cannot_make_invalid_json_or_schema_valid(self):
+        for text in ('PRIVATE_TEXT',json.dumps({**self.decision,'override':True})):
+            frames=[{'choices':[{'index':0,'delta':{'content':text},'finish_reason':None}]},
+                    {'choices':[{'index':0,'delta':{},'finish_reason':'stop'}]},
+                    {'choices':[{'index':0,'delta':{'content':''},'finish_reason':'stop'}]}]
+            raw=(''.join('data: '+json.dumps(f)+'\n\n' for f in frames)+'data: [DONE]\n\n').encode()
+            with self.assertRaises(StructuredResponseRejected):validate(self.body,raw,'text/event-stream')
+
     def test_proxy_rejects_response_before_forwarding_without_identical_retry(self):
         fixture=fixtures.ReadStreamRecoveryTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
         body=fixtures.request_body();body['messages'][0]['content']='DELIVERY_STRUCTURED_DECISION_V1:technical\n'
