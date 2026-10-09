@@ -422,6 +422,17 @@ def main():
         if recovered:
             existing=recovered
             save_receipt(ledger_path,existing)
+    from planning_semantic_escalation import observe as observe_semantic,advance as diagnose_semantic
+    escalation=observe_semantic(existing,selection,registry,cli)
+    if escalation is not None:
+        existing=escalation
+        save_receipt(ledger_path,existing)
+    if (existing and existing.get('stage')=='planning_technical_diagnosis'
+            and existing.get('semantic_escalation',{}).get('stage')=='diagnosing'):
+        existing=diagnose_semantic(existing,body,capability_context(selection),registry,ledger_path,name)
+        if existing.get('stage')=='planning_technical_diagnosis':
+            print(json.dumps({'stage':existing['stage'],'owner':'cto','observation':'pending'}))
+            return 1
     if (existing and existing.get('stage') == 'blocked'
             and existing.get('active') in ROLES
             and existing.get('category', '').startswith(('JSONDecodeError:', 'ValueError:'))
@@ -612,10 +623,22 @@ def main():
                         '"acceptance":["API tests pass"],"files":["app/server.js"],'
                         '"test_command":["node","--test"]}],"integration_order":["C1"]}.')
         context += capabilities
+        semantic=ledger.get('semantic_escalation') or {}
+        if role=='techlead' and semantic.get('stage')=='awaiting_replan':
+            context += ('\nINDEPENDENT CTO DIAGNOSIS OF YOUR REJECTED PLAN: '+
+                json.dumps(semantic['diagnosis']['proposal'],separators=(',',':'))+
+                '\nActual rejected constraint: '+semantic['proof']['constraint']+
+                '. Return a NEW execution plan, not promises. Each card.files must include '
+                'its product path(s) AND exactly one uniquely named NEW discoverable '
+                'tests/test_<name>.py. Do not claim to have created those tests. '
+                'All unchanged compiler, frozen-test and TDD gates remain binding. '
+                'A repeated invalid plan remains a CTO incident, not a CEO question.')
         answer = None
         try:
             issue_id = issue_for(role, context, registry['agents'][role],
-                                 retry=retry, recovery=recovery, schema=schema, run_name=name, wire=wire, capability=capability,
+                                 retry=retry, recovery=recovery, schema=schema,
+                                 run_name=name+'-S1' if role=='techlead' and semantic.get('stage')=='awaiting_replan' else name,
+                                 wire=wire, capability=capability,
                                  clarification=clarification, ceo_answer=ceo_answer,
                                  source_review=ledger.get('source_review_product_attempt',1) if reviewed else False)
             ledger['issues'][role] = issue_id
@@ -627,6 +650,9 @@ def main():
                 validate_execution_plan(proposal, tracked_base(selection))
             ledger['outputs'][role] = {'task_id': task_id, 'proposal': proposal,
                                        'content_sha256': hashlib.sha256(answer.encode()).hexdigest()}
+            if role=='techlead' and semantic.get('stage')=='awaiting_replan':
+                semantic.update(stage='plan_validated',replan_task_id=task_id,
+                    execution_plan_sha256=hashlib.sha256(answer.encode()).hexdigest(),delivery_approval=False)
             ledger['stage'] = 'completed_' + role
             save_receipt(ledger_path, ledger)
             if role == 'product' and proposal['business_questions']:
@@ -649,7 +675,10 @@ def main():
                               rejected_category=(type(error).__name__ + ':' + str(error))[:180])
                 save_receipt(ledger_path, ledger)
                 return main()
-            ledger.update(stage='blocked', owner='techlead' if role != 'cto' else 'cto',
+            escalated=role=='techlead' and semantic.get('stage')=='awaiting_replan'
+            if escalated:
+                semantic.update(stage='blocked',error=(type(error).__name__+':'+str(error))[:180])
+            ledger.update(stage='blocked', owner='cto' if escalated or role=='cto' else 'techlead',
                           category=(type(error).__name__ + ':' + str(error))[:180],
                           next_action='Diagnose planning task and resume from its durable issue',
                           active=role)

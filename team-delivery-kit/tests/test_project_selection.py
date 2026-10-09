@@ -21,6 +21,12 @@ class ProjectSelectionTests(unittest.TestCase):
         self.assertEqual(config['repository'], 'codifydeep/descartavel2')
         self.assertEqual(config['checkout'].name, 'sandbox-github2')
 
+    def test_explicit_selection_does_not_fall_back_to_parent_service_environment(self):
+        path=project_selection.ROOT/'projects'/'descartavel2.json'
+        with patch.dict('os.environ',{},clear=True):config=project_selection.current(path)
+        self.assertEqual(config['repository'],'codifydeep/descartavel2')
+        self.assertEqual(config['checkout'].name,'sandbox-github2')
+
     def test_traversal_and_untrusted_fields_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'project.json'

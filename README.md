@@ -4,6 +4,15 @@ Uma equipe de agentes de IA para transformar um brief de produto em software rev
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+No planejamento, duas propostas encerradas do Tech Lead com a mesma rejeição
+formal comprovada podem abrir um diagnóstico independente do CTO. O controlador
+confere identidade, configuração, base, leases encerrados e hashes das propostas;
+preserva o plano recusado e exige outra proposta do Tech Lead passar pelo compilador
+inalterado. Ele não inventa testes, responde pelo CEO ou concede aprovação.
+O diagnóstico tem uma tentativa; uma nova falha permanece visível com o CTO.
+Um prazo de observação expirado retoma a mesma issue, sem reiniciar o agente.
+Essa recuperação ainda precisa de qualificação ponta a ponta por agentes reais.
+
 Correções de planos rejeitados usam referências a registros completos do controlador,
 vinculadas ao card, CTO, wakeup ativo e hash da revisão. O gateway expande esses
 registros sem truncamento e guarda um recibo de apresentação; referências antigas

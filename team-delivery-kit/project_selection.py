@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT = {'repository': 'codifydeep/descartavel', 'checkout': 'sandbox-github'}
 
 
-def current():
-    selected = os.environ.get('DELIVERY_KIT_PROJECT_CONFIG')
+def current(selected=None):
+    selected = selected or os.environ.get('DELIVERY_KIT_PROJECT_CONFIG')
     if selected:
         path = Path(selected)
         if not path.is_absolute() or path.is_symlink() or not path.is_file():
