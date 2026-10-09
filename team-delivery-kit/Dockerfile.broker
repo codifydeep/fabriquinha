@@ -131,6 +131,7 @@ COPY broker/product_scope_task_binding.py /product_scope_task_binding.py
 COPY broker/product_scope_worker.py /product_scope_worker.py
 COPY broker/product_scope_author.py /product_scope_author.py
 COPY broker/product_scope_delivery.py /product_scope_delivery.py
+COPY broker/product_scope_review.py /product_scope_review.py
 COPY broker/product_scope_bootstrap.py /product_scope_bootstrap.py
 COPY broker/product_scope_pipeline.py /product_scope_pipeline.py
 COPY broker/product_scope_envelope_recovery.py /product_scope_envelope_recovery.py

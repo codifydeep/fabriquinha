@@ -442,6 +442,26 @@ def reconcile(con, route, runs, effects, *, now=None):
     if data['contract_sha256'] != route['contract_sha256']:
         raise ValueError('handoff contract revision drift')
     stage = prior['stage'] if prior else 'observed'
+    if stage=='approved' and hasattr(effects,'scope_inspection'):
+        inspection=effects.scope_inspection(issue,key,data['review'])
+        if inspection and inspection['missing_read_paths']:
+            if (inspection.get('operation')!='qualified_scoped_review_inspection_v1'
+                    or inspection.get('source_task')!=key
+                    or inspection.get('review_task')!=data['review']['review_task_id']
+                    or inspection.get('manifest_sha256')!=data['evidence']['manifest_sha256']
+                    or inspection.get('delivery_approval') is not False or inspection.get('author_restarted') is not False
+                    or not set(inspection['missing_read_paths'])<=set(inspection['read_paths'])):
+                raise ValueError('exact nonauthorizing inspection revalidation required')
+            if data.get('inspection_revalidation'):
+                data.update(error='scoped_review_inspection_incomplete',
+                    required_action='Tech Lead diagnose incomplete inspection; no author restart or identical review replay')
+                return save(con,key,issue,'technical_decision_required',route['techlead'],data,now)
+            data.update(inspection_revalidation=inspection,policy_revalidation=True,
+                        previous_review=data['review'],review_retries=data.get('review_retries',0)+1)
+            for field in ('review','wakeup_id','recipient_task','dispatched_at','alerted','instruction',
+                          'dispatch_marker','dispatch_stage','target'):
+                data.pop(field,None)
+            stage=save(con,key,issue,'ready_review',route['reviewer'],data,now)
     # A diagnosed dependency is not write authority. Once, expose the missing
     # installed edit boundary to a completed CTO diagnostic; never replay the
     # author, clear functional attempt counts, or broaden that boundary.
@@ -779,6 +799,10 @@ def reconcile(con, route, runs, effects, *, now=None):
                     'is the exact full-suite command from the issue with /workspace replaced by '
                     '/delivery, including its 2>&1 suffix. Controller Red is historical evidence, '
                     'not an instruction to re-execute it. Finish with the requested explicit decision.')
+            if data.get('inspection_revalidation'):
+                instruction+='\nInspect code and frozen tests before executing the suite. Read consecutive pages with explicit offset and limit <=100.\n'
+                instruction+=''.join('DELIVERY_REVIEW_READ_PATH:'+path+'\n'
+                    for path in data['inspection_revalidation']['read_paths'])
         elif stage == 'correct_author':
             if not effects.implementation_available(issue, route['author']):
                 data.setdefault('capacity_wait_at', now)

@@ -496,6 +496,10 @@ def config(request_id, scenario):
             try:import u3_delivery_review
             except ImportError:from broker import u3_delivery_review
             read_paths=u3_delivery_review.read_contract(handoff_context(),request_id)
+            try:import product_scope_review
+            except ImportError:from broker import product_scope_review
+            scope_paths=product_scope_review.read_contract(handoff_context(),request_id)
+            if scope_paths:read_paths=sorted(set(read_paths or [])|set(scope_paths))
             if read_paths:
                 image=docker('GET','/containers/'+PREFIX+'-execution-broker-1/json')['Image']
                 if not re.fullmatch(r'sha256:[0-9a-f]{64}',image):

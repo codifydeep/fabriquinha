@@ -198,3 +198,10 @@ request do reviewer pelo transporte do controlador. Afirmações textuais ou
 transcrições truncadas da interface não substituem essas leituras. Aprovações
 anteriores sem inspeção permanecem históricas, mas não são prova suficiente
 para liberar merge ou implantação; exigem revalidação independente.
+`product_scope_review.py` deriva a lista de inspeção da base registrada e do
+vínculo exato entre request, reviewer, autor e snapshot. O worker recebe essa
+lista no contrato do handler: a suíte fixa é negada até que as páginas reais
+estejam completas. O loop reabre uma única revisão do mesmo snapshot quando
+detecta uma aprovação histórica sem inspeção, com marcador novo e evidência
+anterior preservada. Não reinicia a implementação nem muda o Red. Uma segunda
+revisão incompleta é um impedimento técnico visível, não outra retentativa.

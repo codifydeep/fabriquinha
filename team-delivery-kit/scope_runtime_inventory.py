@@ -12,12 +12,13 @@ import subprocess
 from docker_grouping import args as group_args
 
 ROOT=Path(__file__).resolve().parent
-BROKER=['server','native','native_scope_note','handoff_runtime','adapted_test_review',
+BROKER=['server','native','native_scope_note','handoffs','handoff_runtime','adapted_test_review',
         'test_revision_review','validation_job','test_first_job','review_context_recovery',
+        'execution_diagnosis_recovery','worker_recovery_transport',
         'product_scope_revision','product_scope_ledger','product_scope_execution',
         'product_scope_materialize','product_scope_job','product_scope_base_verify',
         'product_scope_registration','product_scope_task_binding','product_scope_worker',
-        'product_scope_author','product_scope_delivery','product_scope_bootstrap',
+        'product_scope_author','product_scope_delivery','product_scope_review','product_scope_bootstrap',
         'product_scope_pipeline','product_scope_envelope_recovery','product_scope_mount_recovery']
 PROXY=['product_scope_contract','decision_schema','typed_decision_contract']
 PROGRAM='''import sys,json,hashlib

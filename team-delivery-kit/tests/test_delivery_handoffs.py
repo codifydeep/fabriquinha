@@ -55,6 +55,37 @@ class Effects:
 
 
 class HandoffTests(unittest.TestCase):
+    def test_scoped_tests_only_approval_reopens_review_once_without_author_restart(self):
+        review=dict(review_task_id='old-review',source_task_id='source',reviewer_agent_id='reviewer',
+                    manifest_sha256='a'*64,status='approved')
+        evidence=self.effects.validate(None,None);snapshot=self.effects.freeze('source')
+        data=dict(source_task='source',contract_sha256=self.route['contract_sha256'],
+                  snapshot=snapshot,evidence=evidence,review=review,attempts=0)
+        report=dict(operation='qualified_scoped_review_inspection_v1',source_task='source',
+                    review_task='old-review',manifest_sha256='a'*64,
+                    read_paths=['/delivery/app.py','/delivery/tests/test_new.py'],
+                    missing_read_paths=['/delivery/app.py'],delivery_approval=False,author_restarted=False)
+        self.effects.scope_inspection=lambda *args:report
+        handoffs.save(self.con,'source','issue','approved','reviewer',data,1)
+        self.tick([])
+        saved=json.loads(handoffs.load(self.con,'source')['data'])
+        self.assertEqual(saved['dispatch_stage'],'ready_review');self.assertEqual(saved['review_retries'],1)
+        self.assertEqual(saved['previous_review'],review);self.assertEqual(saved['evidence'],evidence)
+        self.assertEqual(saved['snapshot'],snapshot)
+        self.assertIn('DELIVERY_REVIEW_READ_PATH:/delivery/app.py',saved['instruction'])
+        first=dict(self.effects.created);self.tick([]);self.assertEqual(self.effects.created,first)
+        repeated=dict(saved,review=review)
+        handoffs.save(self.con,'source','issue','approved','reviewer',repeated,3)
+        self.assertEqual(self.tick([]),'technical_decision_required')
+        self.assertEqual(self.effects.created,first)
+
+    def test_complete_scoped_inspection_does_not_reopen_or_dispatch(self):
+        review=dict(review_task_id='review',manifest_sha256='a'*64)
+        data=dict(source_task='source',contract_sha256=self.route['contract_sha256'],review=review)
+        self.effects.scope_inspection=lambda *args:dict(missing_read_paths=[])
+        handoffs.save(self.con,'source','issue','approved','reviewer',data,1)
+        self.assertEqual(self.tick([]),'approved');self.assertFalse(self.effects.created)
+
     def test_validation_observation_preserves_attempts_and_never_wakes_author(self):
         from broker.validation_job import Pending
         self.effects.failure=Pending('same validation execution still running')

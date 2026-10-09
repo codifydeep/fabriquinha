@@ -428,6 +428,11 @@ class Effects:
             raise ValueError('test-first diagnostic identity mismatch')
         return diagnostic
 
+    def scope_inspection(self,issue,source,review):
+        try:import product_scope_review
+        except ImportError:from broker import product_scope_review
+        return product_scope_review.inspection(self.b,issue,source,review)
+
     def review_result(self, review, source):
         with self.b.db() as con:
             row = con.execute('SELECT * FROM reviews WHERE review_task_id=? AND source_task_id=?',
