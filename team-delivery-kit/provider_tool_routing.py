@@ -5,6 +5,7 @@ canonical schema remains intact for local validation; no verdict is accepted
 by this adapter. Unsupported provider unions never waive local constraints.
 """
 import copy
+import json
 import re
 
 
@@ -13,6 +14,27 @@ def project_unions(value):
     if isinstance(value,dict):return {k:project_unions(v) for k,v in value.items() if k!='anyOf'}
     if isinstance(value,list):return [project_unions(v) for v in value]
     return value
+
+
+def explain_unions(result,schema):
+    """Expose removed choice constraints, never select a verdict or citation."""
+    actions=[]
+    for branch in schema['anyOf']:
+        props=branch['properties']; findings=props['findings']
+        actions.append(dict(action=props['action']['enum'],
+            minItems=findings.get('minItems',0),maxItems=findings.get('maxItems',3),
+            kinds=findings['items']['properties']['kind']['enum']))
+    locations=schema['properties']['findings']['items'].get('anyOf',[])
+    hints=dict(actions=actions,locations=locations,verdict_accepted=False)
+    encoded=json.dumps(hints,separators=(',',':'),ensure_ascii=True)
+    if len(encoded)>550000:raise ValueError('union explanation exceeds fixed bound')
+    result['messages'].append(dict(role='system',content=
+        'PROVIDER_UNION_CONSTRAINTS_V1\n'
+        'The wire schema omits unions, but the unchanged local validator requires these choices. '
+        'Respect the action-specific findings count and kinds. Each citation must copy tree/path/test/line/quote '
+        'from ONE complete location choice, not mix choices or paraphrase its quote. '
+        'These are observed locations, not findings or approval. Decide independently from the read artifacts. '
+        'Do not invent a finding to fill the schema. No verdict has been accepted.\n'+encoded))
 
 
 def wire(body):
@@ -81,6 +103,7 @@ def wire(body):
                 or schema['properties']['action'].get('enum')!=['request_test_revision','escalate_cto','request_review_reconsideration']):
             raise ValueError('canonical read-only mediation required for union projection')
         function['parameters']=project_unions(schema)
+        explain_unions(result,schema)
     if name=='submit_test_review':
         function=next(t['function'] for t in result['tools'] if t.get('function',{}).get('name')==name)
         schema=function.get('parameters',{})
@@ -90,8 +113,15 @@ def wire(body):
                 or schema['properties']['action'].get('enum')!=['approve_test_revision','reject_test_revision']
                 ):
             raise ValueError('canonical immutable review required for union projection')
+        from decision_schema import apply as decision_schema
+        from typed_decision_contract import apply as typed_contract
+        canonical=typed_contract(decision_schema(copy.deepcopy(body)))
+        expected=canonical.get('tools',[{}])[0].get('function',{})
+        if expected.get('name')!=name or expected.get('parameters')!=schema:
+            raise ValueError('complete canonical immutable review required')
         # Haiku rejects anyOf tool schemas even with strict=False. Only the
         # upstream projection omits unions; translate() validates the original
         # schema, including observed citations and action/finding consistency.
         function['parameters']=project_unions(schema)
+        explain_unions(result,schema)
     return result

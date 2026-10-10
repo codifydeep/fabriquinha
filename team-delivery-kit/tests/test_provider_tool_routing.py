@@ -32,7 +32,8 @@ class ProviderToolRoutingTests(unittest.TestCase):
                          original['properties']['findings']['items']['properties'])
         self.assertEqual(schema['required'],original['required'])
         self.assertFalse(schema['additionalProperties'])
-        self.assertEqual(projected['messages'],body['messages'])
+        self.assertEqual(projected['messages'][:-1],body['messages'])
+        self.assertIn('PROVIDER_UNION_CONSTRAINTS_V1',projected['messages'][-1]['content'])
         self.assertTrue(projected['tools'][0]['function']['strict'])
         self.assertEqual(schema['properties']['action'],body['tools'][0]['function']['parameters']['properties']['action'])
         from test_typed_decision_contract import TypedDecisionTests
@@ -85,6 +86,9 @@ class ProviderToolRoutingTests(unittest.TestCase):
             transmitted=json.loads(connection.request.call_args.args[2])
             self.assertNotIn('anyOf',json.dumps(transmitted['tools']))
             self.assertEqual(transmitted['tool_choice']['function']['name'],'submit_delivery_decision')
+            hints=json.loads(transmitted['messages'][-1]['content'].split('\n',2)[2])
+            self.assertTrue(hints['locations'])
+            self.assertFalse(hints['verdict_accepted'])
             if status==200:
                 output=json.loads(result.wfile.getvalue())
                 self.assertEqual(json.loads(output['choices'][0]['message']['content'])['action'],valid['action'])
@@ -167,13 +171,11 @@ class ProviderToolRoutingTests(unittest.TestCase):
         with self.assertRaises(ValueError):wire(body)
 
     def test_review_projection_does_not_mutate_canonical_union_constraints(self):
-        body=self.body();body['tool_choice']['function']['name']='submit_test_review'
-        function=body['tools'][0]['function'];function['name']='submit_test_review'
-        properties={'action':{'type':'string','enum':['approve_test_revision','reject_test_revision']},
-            'reason':{'type':'string','maxLength':1200},'optional_files':{'type':'array','maxItems':0},
-            'manifest_sha256':{'type':'string','enum':['a'*64]},
-            'findings':{'type':'array','items':{'type':'object','anyOf':[{'properties':{'line':{'enum':[3]}}}]}}}
-        function['parameters']={'type':'object','properties':properties,'anyOf':[{'type':'object'}]}
+        import json
+        from test_typed_decision_contract import TypedDecisionTests
+        body=TypedDecisionTests().review_body(findings=True,observed=True)
+        body['model']='anthropic/claude-haiku-5.5'
+        properties=body['tools'][0]['function']['parameters']['properties']
         before=copy.deepcopy(body);result=wire(body)
         self.assertEqual(body,before)
         schema=result['tools'][0]['function']['parameters']
@@ -181,7 +183,36 @@ class ProviderToolRoutingTests(unittest.TestCase):
         self.assertNotIn('anyOf',schema['properties']['findings']['items'])
         self.assertEqual(schema['properties']['manifest_sha256'],properties['manifest_sha256'])
         self.assertTrue(result['tools'][0]['function']['strict'])
-        self.assertEqual(result['messages'],body['messages'])
+        self.assertEqual(result['messages'][:-1],body['messages'])
+        hints=json.loads(result['messages'][-1]['content'].split('\n',2)[2])
+        self.assertEqual(hints['locations'],properties['findings']['items']['anyOf'])
+        self.assertEqual(hints['actions'][0]['action'],['approve_test_revision'])
+        self.assertEqual(hints['actions'][0]['maxItems'],0)
+        self.assertEqual(hints['actions'][1]['minItems'],1)
+        self.assertFalse(hints['verdict_accepted'])
+
+    def test_review_projection_rejects_forged_union_even_with_matching_fields(self):
+        from test_typed_decision_contract import TypedDecisionTests
+        body=TypedDecisionTests().review_body(findings=True,observed=True)
+        body['model']='anthropic/claude-haiku-5.5'
+        body['tools'][0]['function']['parameters']['anyOf'][0]['properties']['findings']['maxItems']=3
+        with self.assertRaises(ValueError):wire(body)
+
+    def test_explained_locations_never_accept_invalid_approval_or_fabricated_quote(self):
+        from test_typed_decision_contract import TypedDecisionTests
+        from typed_decision_contract import translate
+        from structured_response_contract import StructuredResponseRejected
+        fixture=TypedDecisionTests();body=fixture.review_body(findings=True,observed=True)
+        body['model']='anthropic/claude-haiku-5.5';wire(body)
+        finding=dict(kind='missing_coverage',tree='candidate',path='tests/test_new.py',test='__module__',
+            line=1,quote='assert value',expected='Check behavior',observed='Missing condition')
+        base=dict(action='reject_test_revision',reason='Missing case',optional_files=[],
+            manifest_sha256='a'*64,findings=[finding])
+        for invalid in ({**base,'action':'approve_test_revision'},
+                        {**base,'findings':[{**finding,'quote':'fabricated'}]},
+                        {**base,'findings':[]}):
+            with self.assertRaises(StructuredResponseRejected):
+                translate(body,fixture.wire(invalid),'application/json')
 
     def test_unrecognized_review_schema_cannot_project(self):
         body=self.body();body['tool_choice']['function']['name']='submit_test_review'

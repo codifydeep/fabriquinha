@@ -296,6 +296,13 @@ exposto ao worker foi gerado por essa rejeição local; não comprova indisponib
 do provedor. Nenhum parecer foi aceito e a entrega não foi aprovada. Recuperar
 esse caso exige correção limitada de formato com recibo durável e preservação
 do schema, não repetição cega nem alteração das evidências.
+O código de transporte agora explica ao modelo as combinações de citações e
+as restrições por ação omitidas do schema upstream, sem escolher citações,
+fabricar findings ou aceitar decisões. A projeção de revisão exige igualdade
+com o contrato canônico regenerado; o validador local permanece inalterado.
+Essa extensão passou pela suíte offline, mas ainda não foi instalada ou
+qualificada com o provedor real. A recuperação limitada da revisão falha e a
+continuação ponta a ponta permanecem pendentes.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
