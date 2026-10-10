@@ -12,6 +12,27 @@ from broker.test_diagnosis_recovery import prepare
 
 
 class DiagnosisRecoveryTests(unittest.TestCase):
+    def test_automatic_admission_requires_idle_and_never_rearms(self):
+        from broker.test_diagnosis_recovery import automatic
+        args=list(copy.deepcopy(self.fixture()))
+        args[6]['category']='typed_arguments_invalid'
+        args[6]['response_shape'].update(arguments_json_valid=False,arguments_schema_valid=None)
+        saved=[]
+        fx=SimpleNamespace(idle=lambda:True,candidate=lambda issue:args,
+            persist=lambda issue,prior,updated:saved.append(updated))
+        self.assertEqual(automatic(None,'child',fx)['stage'],'fresh_diagnosis_admitted')
+        self.assertEqual(len(saved),1)
+        self.assertFalse(saved[0]['rejection_diagnosis']['schema_recovery']['delivery_approval'])
+        args[0]=saved[0]
+        self.assertEqual(automatic(None,'child',fx)['stage'],'recovery_consumed')
+        self.assertEqual(len(saved),1)
+        fx.idle=lambda:False
+        self.assertEqual(automatic(None,'child',fx)['stage'],'awaiting_capacity')
+        bad=list(copy.deepcopy(self.fixture()));bad[6]['category']='typed_wrong_tool_name'
+        fx.idle=lambda:True;fx.candidate=lambda issue:bad
+        with self.assertRaises(ValueError):automatic(None,'child',fx)
+        self.assertEqual(len(saved),1)
+
     def fixture(self):
         task=dict(id='cto-task',issue_id='child',agent_id='cto',wakeup_id='old-wake',status='failed')
         red=dict(task_id='author-task',red={'manifest_sha256':'a'*64})
@@ -61,6 +82,20 @@ class DiagnosisRecoveryTests(unittest.TestCase):
         self.assertEqual(prepare(result,*args[1:]),result)
         args[2]['id']='new-failed-task'
         with self.assertRaises(ValueError):prepare(result,*args[1:])
+
+    def test_malformed_single_submission_can_only_sponsor_fresh_diagnosis(self):
+        args=list(copy.deepcopy(self.fixture()))
+        args[6]['category']='typed_arguments_invalid'
+        args[6]['response_shape'].update(arguments_json_valid=False,arguments_schema_valid=None)
+        result=prepare(*args)
+        self.assertEqual(result['status'],'blocked')
+        proof=result['rejection_diagnosis']['schema_recovery']
+        self.assertEqual(proof['rejection_receipt'],args[6])
+        self.assertFalse(proof['delivery_approval'])
+        for field,value in (('expected_tool',False),('terminal',False),('submissions',2),
+                            ('arguments_schema_valid',True),('arguments_rejection','argument_size')):
+            changed=copy.deepcopy(args);changed[6]['response_shape'][field]=value
+            with self.assertRaises(ValueError,msg=field):prepare(*changed)
 
     def test_operator_admission_atomically_updates_trial_and_handoff(self):
         from broker import handoffs,test_revision_review,native,handoff_runtime,controller_maintenance

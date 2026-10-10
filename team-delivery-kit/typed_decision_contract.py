@@ -36,13 +36,30 @@ def format_feedback_enabled(body):
     if body.get('tool_choice') != {'type':'function','function':{'name':NAME}}:return False
     tools=body.get('tools',[])
     if len(tools)!=1:return False
-    props=tools[0].get('function',{}).get('parameters',{}).get('properties',{})
+    function=tools[0].get('function',{})
+    spec=function.get('parameters',{});props=spec.get('properties',{})
+    marked=any(m.get('role')=='user' and isinstance(m.get('content'),str)
+        and re.search(r'^'+FORMAT_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[]))
+    if not marked:return False
+    if set(props)=={'action','reason','optional_files','findings'}:
+        if (function.get('strict') is not True or spec.get('additionalProperties') is not False
+                or set(spec.get('required',[]))!=set(props)
+                or props['action'].get('enum')!=['request_test_revision','escalate_cto']
+                or props['optional_files'].get('maxItems')!=0
+                or not any(m.get('role')=='user' and isinstance(m.get('content'),str)
+                    and re.search(r'^'+TEST_DIAGNOSIS_MARKER+r'$',m['content'],re.M)
+                    for m in body.get('messages',[]))):return False
+        # Regenerate the controller's contract from its actual read evidence.
+        # Foreign schemas, missing reads and permission expansion cannot opt in.
+        from decision_schema import apply as decision_schema
+        try:canonical=decision_schema(copy.deepcopy(body)).get('response_format',{}).get('json_schema',{}).get('schema')
+        except (ValueError,KeyError,TypeError):return False
+        return canonical==spec
     return (set(props)=={'action','reason','optional_files'}
         and bool(props['action'].get('enum'))
         and set(props['action']['enum'])<={'request_correction','request_test_revision','escalate_cto'}
         and props['optional_files'].get('maxItems')==0
-        and any(m.get('role')=='user' and isinstance(m.get('content'),str)
-            and re.search(r'^'+FORMAT_MARKER+r'$',m['content'],re.M) for m in body.get('messages',[])))
+        and marked)
 
 
 def format_feedback_preflight(counter_path,execution_id,body):
@@ -59,17 +76,20 @@ def claim_format_feedback(counter_path,execution_id,error,body,first_call):
     if not format_feedback_enabled(body):return None
     shape=error.receipt['response_shape']
     r3=r3_length_feedback_enabled(body)
-    if r3:
+    malformed=error.category=='typed_arguments_invalid'
+    if r3 or malformed:
         if (error.category!='typed_arguments_invalid' or shape.get('parsed') is not True
                 or shape.get('terminal') is not True or shape.get('submissions')!=1
                 or shape.get('expected_tool') is not True or shape.get('arguments_json_valid') is not False
-                or shape.get('legacy_function_call') is not False or shape.get('content_shape')!='empty'):return None
+                or shape.get('legacy_function_call') is not False or shape.get('content_shape')!='empty'
+                or shape.get('arguments_rejection') in ('argument_type','argument_size')):return None
     elif (error.category not in ('typed_mixed_content','typed_nonterminal') or not shape['parsed']
             or shape['submissions']!=0 or shape['legacy_function_call']
             or shape['content_shape']!='nonempty' or not 1<=shape['content_chars']<=1200):return None
     if not isinstance(execution_id,str) or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',execution_id):return None
     from deterministic_read_dispatch import ledger
-    receipt=dict(operation='r3_json_format_feedback_v1' if r3 else 'technical_format_feedback_v1',first_call=first_call,
+    receipt=dict(operation='r3_json_format_feedback_v1' if r3 else
+        'technical_json_format_feedback_v1' if malformed else 'technical_format_feedback_v1',first_call=first_call,
         rejected_upstream_sha256=error.receipt['upstream_sha256'],attempt_limit=1,
         worker_tool_executed=False,delivery_approval=False)
     with ledger(counter_path) as con:
@@ -79,7 +99,7 @@ def claim_format_feedback(counter_path,execution_id,error,body,first_call):
     revised=copy.deepcopy(body)
     revised['messages'].append(dict(role='user',content=
         ('The previous tool submission was rejected: its arguments were not valid JSON. '
-         if r3 else 'The previous response was rejected: prose without the required structured submission. ')+
+         if r3 or malformed else 'The previous response was rejected: prose without the required structured submission. ')+
         'Submit exactly one '+(R3_NAME if r3 else NAME)+' tool call with all fields of the unchanged schema. '
         'Do not add prose. No files, tests, permissions or delivery approval are authorized. '
         'This is the only format correction attempt.'))

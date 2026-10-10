@@ -235,6 +235,15 @@ flowchart TB
 
 Multica é o plano de colaboração; Hermes executa os agentes; os controladores e o broker implementam as restrições e a recuperação que não podem depender apenas de prompts. **Temporal foi estudado, mas não está integrado ao runtime atual.** Telegram pertence à instalação Hermes anterior, não é requisito deste caminho de avaliação.
 
+Diagnósticos de revisões imutáveis têm uma recuperação de formato limitada,
+qualificada offline: recibo sanitizado do proxy fixado, execução encerrada,
+leitura completa dos snapshots e revisão original preservada permitem um novo
+diagnóstico somente leitura. O proxy admite uma única correção JSON sob o mesmo
+schema, sem executar ferramentas, ecoar argumentos inválidos ou aprovar a entrega.
+O controlador não renova essa recuperação após outra falha. Este caminho ainda
+precisa de validação com agentes reais; não comprova autonomia nem resolve,
+sozinho, disputas sobre o conteúdo de uma revisão.
+
 O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
 wakeup do Multica, sem tratá-lo como outro contrato ou autorização. Quando Tech
 Lead e CTO falharam por essa incompatibilidade local, recibos ACP e rejeições

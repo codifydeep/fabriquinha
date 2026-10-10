@@ -855,6 +855,20 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
     if cto in (route['author'], config['reviewer']):
         raise ValueError('independent CTO required for rejected test review')
     diagnosis = state.setdefault('rejection_diagnosis', {})
+    if (not protocol_task and state.get('evidence_policy')==1
+            and state.get('terminal_contract')=='typed-review-v1'
+            and diagnosis.get('status')=='blocked' and not diagnosis.get('schema_recovery')
+            and diagnosis.get('failure',{}).get('operation')=='task_completion'):
+        try:import test_diagnosis_recovery
+        except ImportError:from broker import test_diagnosis_recovery
+        try:
+            recovered=test_diagnosis_recovery.automatic(broker,route['issue_id'])
+            if recovered['stage']=='fresh_diagnosis_admitted':return
+        except (TimeoutError,ConnectionError):return  # Observe; never replay a worker.
+        except Exception as error:
+            diagnosis['automatic_format_hold']=dict(category=type(error).__name__,
+                detail_sha256=hashlib.sha256(str(error).encode()).hexdigest(),delivery_approval=False)
+            _save_rejection(broker,route,state)
     if diagnosis.get('status') in ('revision_required', 'blocked'):
         if (diagnosis.get('status')!='blocked' or not protocol_task or not state.get('protocol_diagnosis')
                 or diagnosis.get('typed_transport_recovery')
@@ -980,7 +994,8 @@ def schema_recovery_instruction(state,paths):
         'DELIVERY_STRUCTURED_DECISION_V1:technical\n'+
         ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in paths)+
         evidence_instruction(state)+
-        '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n')
+        '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+        'DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1\n')
 
 
 def evidence_instruction(state):

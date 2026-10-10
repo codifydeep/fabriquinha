@@ -10,6 +10,40 @@ from structured_response_contract import StructuredResponseRejected
 
 
 class TypedDecisionTests(unittest.TestCase):
+    def test_observed_diagnosis_json_feedback_is_once_only_and_nonexecuting(self):
+        import sqlite3
+        from typed_decision_contract import FORMAT_MARKER,format_feedback_enabled
+        source=self.review_body(findings=True,observed=True)
+        messages=copy.deepcopy(source['messages'])
+        messages[0]['content']=messages[0]['content'].replace(
+            'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+'a'*64,
+            'DELIVERY_STRUCTURED_DECISION_V1:technical').replace(
+            'DELIVERY_TYPED_REVIEW_V1:'+'a'*64,
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'+FORMAT_MARKER)
+        # Keep the controller-generated observed-location schema, never a
+        # model-created schema or synthetic artifact read result.
+        body=apply(schema({'messages':messages}))
+        self.assertTrue(format_feedback_enabled(body))
+        f=fixtures.ReadStreamRecoveryTests();f.setUp();self.addCleanup(f.doCleanups)
+        incoming=fixtures.request_body();incoming['messages']=messages
+        bad=json.loads(self.wire());bad['choices'][0]['message']['tool_calls'][0]['function']['arguments']='PRIVATE_INVALID_JSON'
+        malformed=json.dumps(bad).encode()
+        decision=dict(action='escalate_cto',reason='No valid correction proven',optional_files=[],findings=[])
+        with patch.object(proxy,'forward',side_effect=[(200,malformed,'application/json'),
+                (200,self.wire(decision),'application/json')]) as forward:
+            reply=f.request(incoming)
+        self.assertEqual(reply.status,200);self.assertEqual(forward.call_count,2)
+        revised=forward.call_args_list[1].args[0]
+        self.assertNotIn('PRIVATE_INVALID_JSON',json.dumps(revised))
+        self.assertEqual(revised['tools'],forward.call_args_list[0].args[0]['tools'])
+        with sqlite3.connect(f.counter.with_name('deterministic-reads.sqlite')) as c:
+            receipt=json.loads(c.execute('SELECT receipt FROM technical_format_feedback').fetchone()[0])
+        self.assertFalse(receipt['worker_tool_executed']);self.assertFalse(receipt['delivery_approval'])
+        with patch.object(proxy,'forward') as again:
+            self.assertEqual(f.request(incoming).status,502);again.assert_not_called()
+        altered=copy.deepcopy(body);altered['tools'][0]['function']['parameters']['properties']['action']['enum'].append('approve')
+        self.assertFalse(format_feedback_enabled(altered))
+
     def test_argument_shape_distinguishes_size_syntax_and_policy_without_values(self):
         cases=[('PRIVATE', 'json_syntax'), ('x'*5001, 'argument_size'),
                ('{"reason":"PRIVATE","reason":"PRIVATE"}', 'json_policy'),
