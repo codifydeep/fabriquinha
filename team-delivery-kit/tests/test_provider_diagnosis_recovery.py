@@ -4,6 +4,26 @@ from broker import provider_diagnosis_recovery as r
 
 
 class ProviderDiagnosisTests(unittest.TestCase):
+    def test_optional_qualification_binds_flag_sources_and_nonauthorizing_scope(self):
+        event={'optional_files_format_feedback':True}
+        receipt={'model_values_preserved':True,'worker_tool_executed':False,'delivery_approval':False}
+        sources={name:'a'*64 for name in r.OPTIONAL_SOURCE_NAMES}
+        metadata={'optional_feedback_enabled':True,'optional_sources':sources,
+                  'routing_sha256':'e982dafa69291d7efe979081e6594ef4d3bc9fa2bd321d4be2dba1d6b87ec668'}
+        r.validate_optional_canary(event,receipt,metadata,sources)
+        invalid=[({},receipt,metadata,sources),
+                 (event,receipt,{**metadata,'optional_feedback_enabled':False},sources),
+                 (event,receipt,{**metadata,'optional_sources':{}},sources),
+                 (event,receipt,{**metadata,'routing_sha256':'b'*64},sources),
+                 (event,{**receipt,'delivery_approval':True},metadata,sources),
+                 (event,{**receipt,'worker_tool_executed':True},metadata,sources),
+                 (event,{**receipt,'model_values_preserved':False},metadata,sources),
+                 (event,{**receipt,'manifest_sha256':'b'*64},metadata,sources),
+                 (event,{**receipt,'mode':'test_review'},metadata,sources),
+                 (event,receipt,metadata,{**sources,'model_proxy':'b'*64})]
+        for args in invalid:
+            with self.subTest(args=args),self.assertRaises(ValueError):r.validate_optional_canary(*args)
+
     def test_mediation_canary_requires_projected_canonical_schema_and_pinned_routing(self):
         sha='e982dafa69291d7efe979081e6594ef4d3bc9fa2bd321d4be2dba1d6b87ec668'
         event={'provider_schema_projection':'haiku_mediation_union_v1','canonical_schema_validation_preserved':True}

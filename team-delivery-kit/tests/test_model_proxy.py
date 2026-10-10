@@ -191,7 +191,7 @@ class ModelProxyTests(unittest.TestCase):
                 'max_tokens': 4096, 'reasoning': {'effort': 'low'}}
         metrics = model_proxy.safe_request_metrics(body)
         self.assertEqual(metrics, {'artifact_contract_present': False, 'artifact_selected_tool': None,
-            'output_limit': 4096, 'reasoning_effort': 'low',
+            'output_limit': 4096, 'reasoning_effort': 'low', 'optional_files_format_feedback': False,
             'structured_format': None, 'decision_schema': None, 'strict_schema': False,
             'require_parameters': False, 'tool_count': 0})
         self.assertNotIn('secret', json.dumps(metrics))

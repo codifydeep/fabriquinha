@@ -337,6 +337,13 @@ O limite persistente é compartilhado com correções de comprimento para impedi
 renovação de tentativas, e toda chamada continua sujeita ao teto pago. A extensão
 passou nos testes offline; instalação, qualificação real e recuperação do
 diagnóstico de suíte que falhou por esse formato ainda estão pendentes.
+O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
+entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
+habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.
+HTTP 200 sozinho, uma imagem diferente ou leituras incompletas não bastam.
+Os testes negativos preservam a recusa a leituras com offset inválido e a
+qualificações que aleguem edição, revisão de produto ou aprovação. O registro
+não reativa autores e ainda não substitui a recuperação automática do incidente.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 

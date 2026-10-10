@@ -1,0 +1,7 @@
+# Keep qualified routing; opt-in format feedback with an observable admission flag.
+FROM delivery-kit-model-proxy:20261009.122
+USER root
+COPY model_proxy.py /model_proxy.py
+COPY typed_decision_contract.py /typed_decision_contract.py
+COPY technical_optional_files_feedback.py /technical_optional_files_feedback.py
+USER 10000:10000

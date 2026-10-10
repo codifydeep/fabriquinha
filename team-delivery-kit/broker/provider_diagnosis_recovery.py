@@ -34,12 +34,30 @@ def proxy_info(b):
     return info
 
 
-def register(b,payload,*,review=False,mediation=False):
+OPTIONAL_SOURCE_NAMES=('model_proxy','typed_decision_contract','technical_optional_files_feedback')
+
+
+def validate_optional_canary(event,receipt,metadata,expected_sources):
+    """A synthetic format probe proves transport, never product evidence."""
+    sources=metadata.get('optional_sources',{})
+    if (event.get('optional_files_format_feedback') is not True
+            or metadata.get('optional_feedback_enabled') is not True
+            or set(sources)!=set(OPTIONAL_SOURCE_NAMES) or sources!=expected_sources
+            or any(not isinstance(v,str) or not re.fullmatch(r'[a-f0-9]{64}',v) for v in sources.values())
+            or metadata.get('routing_sha256')!='e982dafa69291d7efe979081e6594ef4d3bc9fa2bd321d4be2dba1d6b87ec668'
+            or receipt.get('mode') not in (None,'technical') or 'manifest_sha256' in receipt
+            or receipt.get('model_values_preserved') is not True
+            or receipt.get('worker_tool_executed') is not False
+            or receipt.get('delivery_approval') is not False):
+        raise ValueError('exact installed opt-in optional-files transport qualification required')
+
+
+def register(b,payload,*,review=False,mediation=False,optional_files=False):
     """Operator-only registration, using actual owned proxy logs and its ledger."""
     if not isinstance(payload,dict) or set(payload)!={'execution_id','response_sha256'}:
         raise ValueError('exact synthetic transport receipt required')
     execution=payload['execution_id'];sha=payload['response_sha256']
-    if review and mediation:raise ValueError('one transport qualification mode required')
+    if sum(map(bool,(review,mediation,optional_files)))>1:raise ValueError('one transport qualification mode required')
     if str(uuid.UUID(execution))!=execution or not re.fullmatch(r'[a-f0-9]{64}',sha):
         raise ValueError('canonical qualification identity required')
     try:import artifact_rejection_evidence as logs
@@ -54,10 +72,17 @@ from pathlib import Path
 p=Path(model_proxy.COUNTER_PATH).with_name("deterministic-reads.sqlite")
 with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True) as c:
  rows=[json.loads(r[0]) for r in c.execute("SELECT receipt FROM typed_decisions WHERE execution_id=?",(sys.argv[1],))]
-print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Path(provider_tool_routing.__file__).read_bytes()).hexdigest(),"receipts":rows}))
+value={"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Path(provider_tool_routing.__file__).read_bytes()).hexdigest(),"receipts":rows}
+if sys.argv[2]=="optional_files":
+ import os,importlib.util
+ value.update(optional_feedback_enabled=os.environ.get("MODEL_PROXY_OPTIONAL_FILES_FEEDBACK")=="1",
+  optional_sources={name:hashlib.sha256(Path(importlib.util.find_spec(name).origin).read_bytes()).hexdigest()
+   for name in ("model_proxy","typed_decision_contract","technical_optional_files_feedback")})
+print(json.dumps(value))
 '''
         entry=b.docker('POST','/containers/'+proxy['Id']+'/exec',dict(AttachStdout=True,
-            AttachStderr=False,Tty=True,Env=['PYTHONPATH=/'],Cmd=['python','-c',script,execution]))
+            AttachStderr=False,Tty=True,Env=['PYTHONPATH=/'],Cmd=['python','-c',script,execution,
+                'optional_files' if optional_files else 'default']))
         conn=b.DockerConnection('localhost',timeout=10)
         try:
             conn.request('POST','/v1.45/exec/'+entry['Id']+'/start',json.dumps(dict(Detach=False,Tty=True)),
@@ -83,7 +108,10 @@ print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Pat
             if event.get('event')=='model_proxy_request' and event.get('execution_id')==execution:events.append(event)
         if len(events)!=1:raise ValueError('one correlated actual request required')
         from decision_schema import apply
-        if mediation:
+        if optional_files:
+            from optional_files_transport_fixture import body
+            expected=apply(body())
+        elif mediation:
             from mediation_transport_fixture import body
             expected=apply(body())
         elif review:
@@ -100,15 +128,25 @@ print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Pat
                 or value['receipts'][0].get('review_acceptance_by_proxy') is not False):
             raise ValueError('synthetic projected review receipt required')
         if mediation:validate_mediation_canary(events[0],value['receipts'][0],value['routing_sha256'])
+        if optional_files:
+            import importlib.util
+            from pathlib import Path
+            expected_sources={name:hashlib.sha256(Path(importlib.util.find_spec(name).origin).read_bytes()).hexdigest()
+                              for name in OPTIONAL_SOURCE_NAMES}
+            validate_optional_canary(events[0],value['receipts'][0],value,expected_sources)
         if proxy_info(b)['Id']!=proxy['Id']:raise ValueError('proxy changed during qualification')
         proof=dict(operation='provider_diagnosis_transport_qualification_v1',execution_id=execution,
             model=value['model'],proxy_image=proxy['Image'],routing_sha256=value['routing_sha256'],
             response_sha256=sha,event=events[0],adapter_receipt=value['receipts'][0],
             worker_tool_executed=False,delivery_approval=False)
-        table=('provider_mediation_qualifications' if mediation else
+        table=('provider_optional_files_qualifications' if optional_files else
+               'provider_mediation_qualifications' if mediation else
                'provider_review_qualifications' if review else 'provider_diagnosis_qualifications')
         if review:proof.update(operation='provider_review_transport_qualification_v1',actual_artifact_read=False)
         if mediation:proof.update(operation='provider_mediation_transport_qualification_v1',actual_artifact_read=False)
+        if optional_files:proof.update(operation='provider_optional_files_transport_qualification_v1',
+            actual_artifact_read=False,author_retry_authorized=False,test_change_authorized=False,
+            optional_sources=value['optional_sources'],optional_feedback_enabled=True)
         with b.db() as c:
             c.execute('CREATE TABLE IF NOT EXISTS '+table+'('
                       'execution_id TEXT PRIMARY KEY,proof TEXT,at REAL)')

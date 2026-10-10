@@ -183,6 +183,7 @@ def safe_request_metrics(body):
     fmt = body.get('response_format') or {}
     schema = fmt.get('json_schema') or {}
     return {**artifact_metrics(typed_test_source.validation_body(body)), 'output_limit': body.get('max_completion_tokens', body.get('max_tokens')),
+            'optional_files_format_feedback': technical_optional_files_feedback.enabled(body),
             'reasoning_effort': effort,
             'structured_format': fmt.get('type') if fmt.get('type') in ('json_schema', 'json_object') else None,
             'decision_schema': schema.get('name') if schema.get('name') in (
