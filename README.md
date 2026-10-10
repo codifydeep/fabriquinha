@@ -289,6 +289,13 @@ reason limitado; a revalidação administrativa usa a mesma tarefa concluída,
 sem nova chamada ao modelo. Essa correção foi instalada e a revalidação passou,
 preservando o snapshot e registrando intenção persistente de nova revisão.
 O despacho foi liberado; a conclusão da revisão independente continua pendente.
+A nova revisão foi criada automaticamente e leu integralmente as duas versões.
+Sua submissão terminal foi rejeitada pelo validador canônico, com diagnóstico
+de seleção de localização e consistência entre ação e findings. O HTTP 502
+exposto ao worker foi gerado por essa rejeição local; não comprova indisponibilidade
+do provedor. Nenhum parecer foi aceito e a entrega não foi aprovada. Recuperar
+esse caso exige correção limitada de formato com recibo durável e preservação
+do schema, não repetição cega nem alteração das evidências.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
