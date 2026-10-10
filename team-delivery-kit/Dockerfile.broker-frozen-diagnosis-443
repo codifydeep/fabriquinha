@@ -1,0 +1,4 @@
+# Preserve installed handlers; add one atomic evidence-qualified CTO dispatch intent.
+FROM delivery-kit-execution-broker:20261010.441
+COPY broker/frozen_diagnosis_format_recovery.py /frozen_diagnosis_format_recovery.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py

@@ -339,14 +339,22 @@ passou nos testes offline e foi instalada no proxy `.124`, mantendo o roteamento
 anterior. O controlador `.441` adiciona somente o registro da qualificação; seus
 handlers de handoff permanecem inalterados. Uma chamada sintética real passou,
 com evento e recibo persistente conferidos no ambiente instalado. A recuperação
-automática do diagnóstico de suíte que falhou por esse formato ainda está pendente.
+automática usa agora um consumidor separado no controlador `.443`. Ele confere a
+falha da suíte executada, snapshot completo, autor concluído, CTO falho com lease
+fechado, leituras reais, rejeição exclusiva de cardinalidade, qualificação do
+proxy exato e capacidade disponível. Só então grava uma intenção de despacho
+atômica, uma vez por entrega. O handoff normal cria ou observa o mesmo wakeup.
+Reinícios não renovam essa tentativa; a entrega e contadores antigos permanecem
+preservados. A nova inspeção exige também os testes da árvore anterior. Preview
+elegível não é execução nem aprovação; conclusão real e entrega ponta a ponta
+continuam sendo evidências obrigatórias posteriores.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.
 HTTP 200 sozinho, uma imagem diferente ou leituras incompletas não bastam.
 Os testes negativos preservam a recusa a leituras com offset inválido e a
 qualificações que aleguem edição, revisão de produto ou aprovação. O registro
-não reativa autores e ainda não substitui a recuperação automática do incidente.
+não reativa autores; a recuperação depende do consumidor de incidente separado.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 

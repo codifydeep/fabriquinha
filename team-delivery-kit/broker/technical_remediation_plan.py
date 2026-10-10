@@ -663,6 +663,9 @@ def reconcile_correction_context(b,source):
 
 
 def tick(b):
+    try:import frozen_diagnosis_format_recovery
+    except ImportError:from broker import frozen_diagnosis_format_recovery
+    frozen_diagnosis_format_recovery.tick(b)
     try:import planning_review_observation
     except ImportError:from broker import planning_review_observation
     planning_review_observation.tick(b)
