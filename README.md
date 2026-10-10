@@ -268,9 +268,12 @@ O transporte da mediação possui uma projeção específica para Haiku, assim c
 a revisão imutável: somente o schema enviado ao provedor omite `anyOf`. A
 validação local mantém os combinadores, as citações observadas e a consistência
 entre ação e findings. Schemas estrangeiros ou sem leitura completa não podem
-usar essa projeção. A extensão está testada no código, inclusive pelo handler
-do proxy com upstream simulado; sua instalação e aceitação pelo provedor real
-ainda estão pendentes. HTTP 400 histórico comprova recusa de transporte, mas
+usar essa projeção. A extensão está instalada e testada, inclusive pelo handler
+do proxy com upstream simulado. `model_mediation_smoke.py` recebeu HTTP 200 do
+provedor real para uma fixture sintética, com validação canônica e recibo
+persistente; isso não representa leitura real de artefatos nem aprovação do
+produto. A retomada qualificada do diagnóstico real ainda está pendente.
+HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
 O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
