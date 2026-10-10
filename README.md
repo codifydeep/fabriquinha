@@ -1345,6 +1345,16 @@ e política em destinos novos do controlador; não executa testes nem sobrescrev
 arquivos divergentes. Esses componentes ainda aguardam o despacho nativo e a
 materialização Docker duráveis do fluxo de proposta/revisão: não representam
 uma política instalada ou uma entrega autônoma já validada.
+O despacho de proposta possui agora uma máquina persistente em
+`broker/generic_calibration_workflow.py`, conectada aos hooks do supervisor e
+dos mounts de planejamento no código-fonte. Intenções precedem wakeups; após
+resposta incerta, só é permitida observação. A tarefa exata do CTO lê candidato
+e histórico somente para leitura, e sua proposta é coletada pela identidade
+nativa. Falhas mantêm responsável e próxima ação; uma proposta válida aguarda
+materialização de controles, sem reacionar o autor ou aprovar a entrega.
+Esse caminho ainda não está instalado: entrada no gate de Red, materialização
+durável e despacho das aprovações independentes precisam ser integrados antes
+da retomada do ensaio.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

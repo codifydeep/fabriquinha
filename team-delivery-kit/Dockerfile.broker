@@ -23,6 +23,7 @@ COPY broker/harness_qualification.py /harness_qualification.py
 COPY broker/generic_calibration_gate.py /generic_calibration_gate.py
 COPY broker/generic_calibration_registration.py /generic_calibration_registration.py
 COPY broker/generic_calibration_proposal.py /generic_calibration_proposal.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
 COPY generic_harness_calibration.py /generic_harness_calibration.py
 COPY service_mode_harness_qualification.py /service_mode_harness_qualification.py
 COPY inherited_harness_probe.py /inherited_harness_probe.py

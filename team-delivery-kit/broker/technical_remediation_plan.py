@@ -425,6 +425,10 @@ class Effects:
 
 
 def mounts(b,binding):
+    try:import generic_calibration_workflow
+    except ImportError:from broker import generic_calibration_workflow
+    calibration=generic_calibration_workflow.mounts(b,binding)
+    if calibration:return calibration
     with b.db() as con:
         initialize(con)
         matches=[(json.loads(r[0]),json.loads(r[1])) for r in con.execute('SELECT config,state FROM technical_remediation_plans')
@@ -669,6 +673,9 @@ def reconcile_correction_context(b,source):
 
 
 def tick(b):
+    try:import generic_calibration_workflow
+    except ImportError:from broker import generic_calibration_workflow
+    generic_calibration_workflow.tick(b)
     try:import frozen_diagnosis_format_recovery
     except ImportError:from broker import frozen_diagnosis_format_recovery
     frozen_diagnosis_format_recovery.tick(b)
