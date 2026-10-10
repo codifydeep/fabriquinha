@@ -64,6 +64,25 @@ class RemediationAuthorContextTests(unittest.TestCase):
         self.assertEqual(capsule['description'].count('ORIGINAL BRIEF DATA:'),1)
         self.assertIn(first['sha256'],capsule['description'])
 
+    def test_marker_inside_quoted_history_is_not_another_control_record(self):
+        import json
+        brief='Historical R1 data.\nORIGINAL BRIEF DATA: "CEO objective"'
+        outer=freeze('CURRENT TASK: R2 PRODUCT ONLY.\nORIGINAL BRIEF DATA: '+json.dumps(brief), 'review')
+        value={**self.value,'context_sha256':outer['sha256'],
+            'amendment':{'operation':'inherited_harness_contract_amendment_v1'}}
+        result=context.capsule(value,{**self.route,'execution_context':outer})
+        self.assertIn(json.dumps(brief),result['description'])
+        self.assertEqual(result['description'].count('\nORIGINAL BRIEF DATA: '),1)
+
+    def test_second_feedback_round_keeps_provenance_outside_json_payload(self):
+        first=context.capsule(self.value,self.route)
+        value={**self.value,'context_sha256':first['sha256'],'r1_feedback':{'round':1}}
+        second=context.capsule(value,{**self.route,'execution_context':first})
+        third=context.capsule({**value,'context_sha256':second['sha256'],'r1_feedback':{'round':2}},
+            {**self.route,'execution_context':second})
+        self.assertIn('Entire original product brief.',third['description'])
+        self.assertEqual(third['description'].count('CURRENT TASK: R1'),1)
+
     def test_amendment_unwraps_only_controller_phase_prose_preserving_full_original_brief(self):
         import json
         brief='Entire approved original brief. '+('detailed product scope '*300)

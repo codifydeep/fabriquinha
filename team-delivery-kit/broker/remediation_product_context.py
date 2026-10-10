@@ -1,5 +1,7 @@
 """Lossless paused R2 context and product-only runtime; never dispatch from prose."""
 import json
+try:from phase_history import decode as decode_history
+except ImportError:from broker.phase_history import decode as decode_history
 import time
 import urllib.error
 from execution_context import freeze,reference,validate
@@ -30,13 +32,7 @@ def historical_data(value,original):
             ('description','CURRENT TASK: R2 PRODUCT ONLY.\n','ORIGINAL BRIEF DATA: '),
             ('review_instruction','CURRENT REVIEW: independent immutable product delivery for R2.\n','ORIGINAL REVIEW DATA: ')):
         text=original[field]
-        if not text.startswith(prefix) or text.count(marker)!=1:
-            raise ValueError('exact controller R2 historical wrapper required')
-        tail=text.split(marker,1)[1]
-        item,end=json.JSONDecoder().raw_decode(tail)
-        if not isinstance(item,str) or not item.strip() or tail[end:].strip():
-            raise ValueError('complete lossless historical data required')
-        data.append(item)
+        data.append(decode_history(text,prefix,marker))
     provenance='\nPreserved superseded R2 context SHA: '+original['sha256']+'. '
     provenance+='Original capsule stays immutable; only phase instructions are replaced.\n'
     return *data,provenance

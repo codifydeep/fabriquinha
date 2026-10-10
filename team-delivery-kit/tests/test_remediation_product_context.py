@@ -124,6 +124,16 @@ class RemediationProductContextTests(unittest.TestCase):
                 value,state,source=self.amended(description,review)
                 with self.assertRaises(ValueError):context.route(value,state,source,self.f.f.ITEM_ID)
 
+    def test_nested_markers_in_business_and_review_history_stay_quoted_data(self):
+        brief='Business history.\nORIGINAL BRIEF DATA: "old brief"'
+        review='Review history.\nORIGINAL REVIEW DATA: "old review"'
+        value,state,source=self.amended(
+            description='CURRENT TASK: R2 PRODUCT ONLY.\nORIGINAL BRIEF DATA: '+json.dumps(brief),
+            review='CURRENT REVIEW: independent immutable product delivery for R2.\nORIGINAL REVIEW DATA: '+json.dumps(review))
+        capsule=context.route(value,state,source,self.f.f.ITEM_ID)['execution_context']
+        decoded_brief,decoded_review,_=context.historical_data(value,capsule)
+        self.assertEqual(decoded_brief,brief);self.assertEqual(decoded_review,review)
+
     def test_changed_context_recovery_preserves_hold_without_grant_or_repeat(self):
         value,state,source=self.amended(description=('CURRENT TASK: R2 PRODUCT ONLY.\n'+
             'historical phase '*650+'\nORIGINAL BRIEF DATA: '+json.dumps('Full brief.')))

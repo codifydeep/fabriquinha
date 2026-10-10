@@ -64,6 +64,28 @@ class GenericRemediationDriverTests(unittest.TestCase):
             with self.subTest(change=change),self.assertRaises(ValueError):
                 driver.changed_base_binding_state(self.config,self.approved,p,b,c,**flags)
 
+    def test_context_parser_repair_cannot_overwrite_partial_runtime_or_restart_worker(self):
+        import copy
+        self.config['amendment']={'kind':'inherited_frozen_suite'}
+        prior=dict(stage='technical_hold',action='prepare_context',category='ValueError')
+        bound=driver.binding(self.config,self.approved)
+        execution=dict(stage='r1_base_qualified',execution_authorized=False)
+        result=driver.changed_context_state(self.config,self.approved,prior,bound,execution,
+            active=False,effects_present=False)
+        self.assertEqual(result['action'],'prepare_context');self.assertFalse(result['execution_authorized'])
+        for change in ('active','partial','runtime','gate','authority','stage','binding','category'):
+            p,b,e=copy.deepcopy((prior,bound,execution));flags=dict(active=False,effects_present=False)
+            if change=='active':flags['active']=True
+            if change=='partial':flags['effects_present']=True
+            if change=='runtime':e['r1_runtime']={'registered':True}
+            if change=='gate':e['r1_gate']={'approved':True}
+            if change=='authority':e['execution_authorized']=True
+            if change=='stage':e['stage']='r1_base_job_running'
+            if change=='binding':b['plan_sha256']='f'*64
+            if change=='category':p['category']='TimeoutError'
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                driver.changed_context_state(self.config,self.approved,p,b,e,**flags)
+
     def test_restart_follows_adapter_ledger_not_previous_operation_text(self):
         first=driver.advance(self.b,'source',self.fx)
         self.assertEqual(first['action'],'register_execution')

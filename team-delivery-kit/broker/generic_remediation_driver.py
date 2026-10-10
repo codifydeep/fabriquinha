@@ -118,6 +118,68 @@ def reconcile_base_binding(b, source):
         return receipt
 
 
+def changed_context_state(config, plan, prior, recorded_binding, execution_state, *, active, effects_present):
+    """A changed parser may resume only a pre-registration context rejection."""
+    if (active or effects_present or config.get('amendment',{}).get('kind')!='inherited_frozen_suite'
+            or prior.get('stage')!='technical_hold' or prior.get('action')!='prepare_context'
+            or prior.get('category')!='ValueError' or recorded_binding!=binding(config,plan)
+            or execution_state.get('stage')!='r1_base_qualified'
+            or execution_state.get('execution_authorized') is not False
+            or execution_state.get('r1_runtime') or execution_state.get('r1_gate')):
+        raise ValueError('unchanged approved inherited context hold before runtime registration required')
+    return dict(stage='operation_pending',action='prepare_context',owner=config['reviewer'],
+        execution_authorized=False,release_homologated=False,
+        required_action='supervisor register bounded lossless historical context with changed parser')
+
+
+def reconcile_context(b, source):
+    """Maintenance only. Never edit a registered context or wake a worker."""
+    try:import controller_maintenance,native,remediation_author_context as author
+    except ImportError:from broker import controller_maintenance,native,remediation_author_context as author
+    with b.LOCK:
+        with b.db() as c:
+            c.execute('CREATE TABLE IF NOT EXISTS generic_context_repairs(source_task TEXT PRIMARY KEY,receipt TEXT)')
+            maintenance=controller_maintenance.current(c)
+            if not maintenance or maintenance['stage']!='sealed':raise ValueError('sealed maintenance required')
+            old=c.execute('SELECT receipt FROM generic_context_repairs WHERE source_task=?',(source,)).fetchone()
+            if old:return json.loads(old[0])
+            recorded,prior=map(json.loads,c.execute('SELECT binding,state FROM generic_remediation_drivers WHERE source_task=?',(source,)).fetchone())
+            value,state=map(json.loads,c.execute('SELECT contract,state FROM remediation_executions WHERE source_task=?',(source,)).fetchone())
+            route=json.loads(c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(value['source_issue'],)).fetchone()[0])
+            active=bool(c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone())
+            def partial():
+                return any(c.execute(query,(state['issue_id'],)).fetchone() for query in (
+                    'SELECT 1 FROM delivery_routes WHERE issue_id=?','SELECT 1 FROM issue_editables WHERE issue_id=?',
+                    'SELECT 1 FROM issue_test_commands WHERE issue_id=?','SELECT 1 FROM native_bindings WHERE issue_id=?'))
+            effects_present=partial()
+        config,plan=Effects(b).approved(source)
+        settings=json.loads((b.STATE/'native.json').read_text())
+        for issue in (config['source_issue'],plan['issue_id'],state['issue_id']):
+            if any(t.get('status') in ('queued','running','dispatched') for t in native.issue_task_runs(settings,issue)):
+                raise ValueError('idle native context scope required')
+        updated=changed_context_state(config,plan,prior,recorded,state,active=active,effects_present=effects_present)
+        if (value.get('source_task')!=source or state.get('contract_sha256')!=plans.digest(value)
+                or value.get('plan_sha256')!=plan['plan_sha256']):raise ValueError('exact approved execution required')
+        preparation.validate_proof(value,state['preparation']['proof'])
+        capsule=author.capsule(value,route)  # Pure construction; frozen route remains untouched.
+        receipt=dict(operation='lossless_phase_history_context_reconciliation_v1',previous_state=prior,
+            binding=recorded,execution_contract_sha256=plans.digest(value),
+            context_sha256=capsule['sha256'],
+            adapter_sha256=hashlib.sha256(Path(author.__file__).read_bytes()).hexdigest(),
+            execution_authorized=False,approvals_changed=False,author_restarted=False,
+            history_truncated=False,jobs_replayed=False,revision_depth_reset=False)
+        with b.db() as c:
+            if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
+            if (controller_maintenance.current(c)!=maintenance
+                    or list(map(json.loads,c.execute('SELECT binding,state FROM generic_remediation_drivers WHERE source_task=?',(source,)).fetchone()))!=[recorded,prior]
+                    or list(map(json.loads,c.execute('SELECT contract,state FROM remediation_executions WHERE source_task=?',(source,)).fetchone()))!=[value,state]
+                    or partial() or c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
+                raise ValueError('context pre-registration hold changed')
+            c.execute('INSERT INTO generic_context_repairs VALUES(?,?)',(source,json.dumps(receipt,sort_keys=True)))
+            c.execute('UPDATE generic_remediation_drivers SET state=? WHERE source_task=?',(json.dumps(updated,sort_keys=True),source))
+        return receipt
+
+
 class Effects:
     def __init__(self,b):self.b=b
     def approved(self,source):return admission.Effects(self.b).plan(source)

@@ -930,6 +930,15 @@ adaptador só pode reconciliar um impedimento antigo durante manutenção selada
 com aprovações nativas revalidadas e ausência comprovada de execução ou job
 pendente. O recibo anterior é preservado; nenhum teste, parecer ou contador é resetado.
 
+A memória de fases R1/R2 usa um único delimitador de controle em linha própria
+seguido de uma string JSON completa. Marcadores dentro da string continuam sendo
+dados históricos, nunca comandos. A procedência fica antes desse registro,
+permitindo novas rodadas de feedback sem quebrar o JSON ou resumir o brief.
+Wrappers desconhecidos, múltiplos registros de controle, conteúdo extra e dados
+incompletos permanecem rejeitados. A correção de um contexto antigo só pode
+retomar uma preparação ainda não registrada, durante manutenção selada, com
+base e plano revalidados; contextos já instalados não são sobrescritos.
+
 Uma recuperação de bootstrap pré-prompt exige ausência comprovada de eventos ACP
 e ferramentas, lease encerrado, identidade nativa exata, replan independente
 inalterado e imagem antiga auditada com incompatibilidade de limite de arquivo.

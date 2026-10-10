@@ -1,0 +1,6 @@
+# Quoted historical markers are data; retain the complete authenticated capsule.
+FROM delivery-kit-execution-broker:20261010.452
+COPY broker/phase_history.py /phase_history.py
+COPY broker/remediation_author_context.py /remediation_author_context.py
+COPY broker/remediation_product_context.py /remediation_product_context.py
+COPY broker/generic_remediation_driver.py /generic_remediation_driver.py
