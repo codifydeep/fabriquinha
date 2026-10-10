@@ -317,7 +317,10 @@ plano CTO/TL original. `broker/review_successor_resolution.py` preserva o hold,
 o sucessor arquivado e a rodada consumida; não reabre R1 ou concede permissões
 de produto. As verificações comuns de contexto, orçamento e capacidade ainda
 precedem qualquer ativação de R2. A suíte offline e o preflight com os registros
-reais passaram; a continuação autônoma após essa resolução ainda deve ser observada.
+reais passaram. O controlador resolveu o hold automaticamente e admitiu R2
+após os gates normais; implementação, revisão de produto e homologação ainda
+precisam de evidências próprias. Esse avanço não transforma o ensaio assistido
+em prova de entrega integral sem intervenção.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
