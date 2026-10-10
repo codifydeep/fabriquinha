@@ -12,6 +12,13 @@ from broker.test_diagnosis_recovery import prepare
 
 
 class DiagnosisRecoveryTests(unittest.TestCase):
+    def test_automatic_json_recovery_pins_the_installed_qualified_proxy_not_a_retired_image(self):
+        from broker.test_diagnosis_recovery import JSON_FEEDBACK_PROXY
+        self.assertEqual(JSON_FEEDBACK_PROXY,
+            'sha256:7b21bc9b5df472dfdf08f025153b28045b1ccf02e39dd4fdf27b3939c372d193')
+        self.assertNotEqual(JSON_FEEDBACK_PROXY,
+            'sha256:723efcc5a745f67047bf8478773036d8bb82ca2031441718c161916f6fa45953')
+
     def test_automatic_admission_requires_idle_and_never_rearms(self):
         from broker.test_diagnosis_recovery import automatic
         args=list(copy.deepcopy(self.fixture()))

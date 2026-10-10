@@ -321,6 +321,11 @@ reais passaram. O controlador resolveu o hold automaticamente e admitiu R2
 após os gates normais; implementação, revisão de produto e homologação ainda
 precisam de evidências próprias. Esse avanço não transforma o ensaio assistido
 em prova de entrega integral sem intervenção.
+A recuperação automática de JSON inválido do diagnóstico deve usar o proxy
+qualificado atualmente instalado, não uma imagem aposentada. O pin foi alinhado
+no código e validado offline; sua instalação ainda está pendente. Identidade,
+leituras completas, rejeição correlacionada e tentativa única continuam
+obrigatórias; o alinhamento não aceita um parecer nem renova recuperações.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
