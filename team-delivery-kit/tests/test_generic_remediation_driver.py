@@ -41,6 +41,29 @@ class GenericRemediationDriverTests(unittest.TestCase):
         self.assertEqual(driver.next_action(ready,dict(stage='published'),dict(stage='awaiting_budget')),'await_delivery_gates')
         self.assertEqual(driver.next_action(dict(stage='r1_preparation_blocked'),None,None),'technical_hold')
 
+    def test_changed_base_adapter_only_reopens_proven_pre_effect_hold(self):
+        import copy
+        self.config.update(amendment={'kind':'inherited_frozen_suite'},
+            base=dict(issue_id='old',volume='old-volume',base_sha='a'*40,manifest_sha256='b'*64),
+            source_issue='new',diagnostic_snapshot_kind='completed_frozen_validation')
+        current={**self.config['base'],'issue_id':'new','volume':'new-volume'}
+        prior=dict(stage='technical_hold',action='register_execution',category='ValueError')
+        bound=driver.binding(self.config,self.approved)
+        result=driver.changed_base_binding_state(self.config,self.approved,prior,bound,current,
+            active=False,effects_present=False)
+        self.assertEqual(result['stage'],'operation_pending');self.assertFalse(result['execution_authorized'])
+        self.assertEqual(prior['stage'],'technical_hold')
+        for change in ('active','effects','category','action','binding','base'):
+            p,b,c=copy.deepcopy((prior,bound,current));flags=dict(active=False,effects_present=False)
+            if change=='active':flags['active']=True
+            if change=='effects':flags['effects_present']=True
+            if change=='category':p['category']='TimeoutError'
+            if change=='action':p['action']='provision_issue'
+            if change=='binding':b['plan_sha256']='f'*64
+            if change=='base':c['base_sha']='f'*40
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                driver.changed_base_binding_state(self.config,self.approved,p,b,c,**flags)
+
     def test_restart_follows_adapter_ledger_not_previous_operation_text(self):
         first=driver.advance(self.b,'source',self.fx)
         self.assertEqual(first['action'],'register_execution')
@@ -83,6 +106,7 @@ class GenericRemediationDriverTests(unittest.TestCase):
         self.fx.perform=reject
         state=driver.advance(self.b,'source',self.fx)
         self.assertEqual(state['stage'],'technical_hold')
+        self.assertEqual(state['owner'],'cto')
         self.fx.approved=lambda _:self.fail('hold must not requalify and retry')
         self.assertEqual(driver.advance(self.b,'source',self.fx),state)
         self.assertFalse(state['release_homologated'])

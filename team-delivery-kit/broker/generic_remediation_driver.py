@@ -5,6 +5,8 @@ own source-bound intents, observation handles and fail-closed permission gates.
 """
 import json
 import time
+import hashlib
+from pathlib import Path
 try:
     import technical_remediation_plan as plans, remediation_execution as execution
     import remediation_preparation as preparation, remediation_author_context as author
@@ -55,6 +57,65 @@ def next_action(state, context, requested):
     if not context or context.get('stage') != 'published':return 'publish_context'
     if requested is None:return 'request_full_chain'
     return 'await_delivery_gates'
+
+
+def changed_base_binding_state(config, plan, prior, recorded_binding, current, *, active, effects_present):
+    """Pure qualification of a known pre-job adapter capability rejection."""
+    try:import base_equivalence
+    except ImportError:from broker import base_equivalence
+    if (active or effects_present or config.get('amendment',{}).get('kind')!='inherited_frozen_suite'
+            or prior.get('stage')!='technical_hold' or prior.get('action')!='register_execution'
+            or prior.get('category')!='ValueError' or recorded_binding!=binding(config,plan)):
+        raise ValueError('unchanged approved inherited plan and pre-effect adapter hold required')
+    base_equivalence.validate_bindings(config,current)
+    return dict(stage='operation_pending',action='register_execution',owner=config['reviewer'],
+        execution_authorized=False,release_homologated=False,
+        required_action='supervisor qualify full original-base byte equivalence with changed adapter')
+
+
+def reconcile_base_binding(b, source):
+    """Maintenance-only repair; preserve the hold and approvals, never run them."""
+    try:import controller_maintenance,base_equivalence,native
+    except ImportError:from broker import controller_maintenance,base_equivalence,native
+    with b.LOCK:
+        with b.db() as c:
+            c.execute('CREATE TABLE IF NOT EXISTS generic_base_binding_repairs(source_task TEXT PRIMARY KEY,receipt TEXT)')
+            maintenance=controller_maintenance.current(c)
+            if not maintenance or maintenance['stage']!='sealed':raise ValueError('sealed maintenance required')
+            saved=c.execute('SELECT receipt FROM generic_base_binding_repairs WHERE source_task=?',(source,)).fetchone()
+            if saved:return json.loads(saved[0])
+            row=c.execute('SELECT binding,state FROM generic_remediation_drivers WHERE source_task=?',(source,)).fetchone()
+            if not row:raise ValueError('exact driver hold required')
+            recorded,prior=map(json.loads,row)
+            active=bool(c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone())
+            effects_present=bool(c.execute('SELECT 1 FROM remediation_executions WHERE source_task=?',(source,)).fetchone())
+            if c.execute("SELECT 1 FROM sqlite_master WHERE name='original_base_equivalences_v2'").fetchone():
+                effects_present=effects_present or bool(c.execute('SELECT 1 FROM original_base_equivalences_v2 WHERE source_task=?',(source,)).fetchone())
+        fx=Effects(b);config,plan=fx.approved(source)  # Actual completed independent native approvals.
+        settings=json.loads((b.STATE/'native.json').read_text())
+        for issue in (config['source_issue'],plan['issue_id']):
+            if any(t.get('status') in ('queued','running','dispatched') for t in native.issue_task_runs(settings,issue)):
+                raise ValueError('idle native recovery scope required')
+        name=b.PREFIX+'-base-equivalence-v2-'+source
+        effects_present=effects_present or bool(b.docker('GET','/containers/'+name+'/json'))
+        current=b.issue_base(config['source_issue'])
+        updated=changed_base_binding_state(config,plan,prior,recorded,current,
+            active=active,effects_present=effects_present)
+        receipt=dict(operation='changed_base_binding_adapter_reconciliation_v1',previous_state=prior,
+            binding=recorded,current_base=current,
+            adapter_sha256=hashlib.sha256(Path(base_equivalence.__file__).read_bytes()).hexdigest(),
+            execution_authorized=False,approvals_changed=False,author_restarted=False,
+            jobs_replayed=False,revision_depth_reset=False)
+        with b.db() as c:
+            if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
+            if (controller_maintenance.current(c)!=maintenance
+                    or list(map(json.loads,c.execute('SELECT binding,state FROM generic_remediation_drivers WHERE source_task=?',(source,)).fetchone()))!=[recorded,prior]
+                    or c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()
+                    or c.execute('SELECT 1 FROM remediation_executions WHERE source_task=?',(source,)).fetchone()):
+                raise ValueError('adapter hold changed before reconciliation')
+            c.execute('INSERT INTO generic_base_binding_repairs VALUES(?,?)',(source,json.dumps(receipt,sort_keys=True)))
+            c.execute('UPDATE generic_remediation_drivers SET state=? WHERE source_task=?',(json.dumps(updated,sort_keys=True),source))
+        return receipt
 
 
 class Effects:
@@ -108,6 +169,7 @@ def advance(b, source, effects=None):
             transient= isinstance(error,(TimeoutError,ConnectionError)) or type(error).__name__ in (
                 'URLError','DockerOperationTimeout','BudgetStatusUnavailable')
             state.update(stage='observe_existing_operation' if transient else 'technical_hold',
+                owner=config['reviewer'] if transient else config['cto'],
                 category=type(error).__name__,required_action='Observe adapter-owned exact intent/handle; no repeated uncertain POST' if transient else
                 'CTO diagnose exact execution-adapter rejection; no identical retry')
             with b.db() as con:

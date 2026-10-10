@@ -243,14 +243,37 @@ def tick(b):
         plans.initialize(c)
         if controller_maintenance.current(c):return
         if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():return
-        rows=c.execute("SELECT source_task,data FROM delivery_handoffs WHERE stage='technical_decision_required'").fetchall()
-    for source,raw in rows:
-        data=json.loads(raw)
+        rows=c.execute("SELECT * FROM delivery_handoffs WHERE stage='technical_decision_required'").fetchall()
+    for observed in rows:
+        row=dict(observed);source=row['source_task'];data=json.loads(row['data'])
         if (data.get('technical_remediation_plan') or not data.get('unsupported_experiment_recovery')
                 or not data.get('diagnostic_evidence_context') or data.get('decision',{}).get('action')!='escalate_cto'):
             continue
+        with b.db() as c:
+            registered=c.execute('SELECT 1 FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
+            route=c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(row['issue_id'],)).fetchone()
+        if registered or not route:continue
+        fingerprint=plans.digest(dict(source=source,issue=row['issue_id'],stage=row['stage'],owner=row['owner'],
+            route=json.loads(route[0]),inputs={k:data.get(k) for k in (
+                'validation_failure','diagnostic_evidence_context','completed_validation_diagnostic',
+                'decision','recipient_task','wakeup_id','unsupported_experiment_recovery')}))
+        if data.get('inherited_suite_intake_hold',{}).get('input_sha256')==fingerprint:continue
         try:register(b,source)
-        except (ValueError,KeyError,TypeError):
-            # Preserve the technical hold. No alternative recipe, native write
-            # or authority is inferred from failed qualification.
-            continue
+        except (ValueError,KeyError,TypeError) as error:
+            with b.LOCK,b.db() as c:
+                if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
+                if (controller_maintenance.current(c) or handoffs.load(c,source)!=row
+                        or c.execute('SELECT 1 FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()):
+                    continue
+                # No error text: upstream messages can contain private data.
+                # Preserve the prior hold, and qualify again only on changed
+                # bound evidence, native identity or registered route.
+                history=data.get('inherited_suite_intake_history',[])
+                if data.get('inherited_suite_intake_hold'):
+                    history=[*history,data['inherited_suite_intake_hold']]
+                data.update(inherited_suite_intake_history=history,inherited_suite_intake_hold=dict(
+                    operation='inherited_suite_qualification_hold_v1',input_sha256=fingerprint,
+                    category=type(error).__name__,execution_authorized=False,author_restarted=False,
+                    model_replayed=False,release_homologated=False),
+                    required_action='CTO resolve inherited-suite qualification mismatch with new bound evidence; no identical replay')
+                handoffs.save(c,source,row['issue_id'],row['stage'],row['owner'],data,time.time(),commit=False)

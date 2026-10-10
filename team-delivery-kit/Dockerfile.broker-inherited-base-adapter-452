@@ -1,0 +1,5 @@
+# Complete the already qualified generic inherited-suite adapter.
+FROM delivery-kit-execution-broker:20261010.451
+COPY broker/inherited_suite_intake.py /inherited_suite_intake.py
+COPY broker/base_equivalence.py /base_equivalence.py
+COPY broker/generic_remediation_driver.py /generic_remediation_driver.py

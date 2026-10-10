@@ -921,6 +921,15 @@ uma aprovação futura continua sujeita a Red real, revisão dos testes, Green,
 PR/CI e QA no mesmo commit. Essa entrada possui validação offline e qualificação
 por leitura do caso instalado; sua execução com agentes ainda não comprova autonomia.
 
+Uma rejeição dessa qualificação permanece visível com o fingerprint da entrada,
+responsável e próxima ação; entradas idênticas não repetem a qualificação.
+A equivalência de bases entre fases também atende ao contrato genérico herdado,
+mas continua exigindo o mesmo commit, manifesto e comparação integral dos bytes
+em volumes pertencentes ao controlador. Uma correção de compatibilidade do
+adaptador só pode reconciliar um impedimento antigo durante manutenção selada,
+com aprovações nativas revalidadas e ausência comprovada de execução ou job
+pendente. O recibo anterior é preservado; nenhum teste, parecer ou contador é resetado.
+
 Uma recuperação de bootstrap pré-prompt exige ausência comprovada de eventos ACP
 e ferramentas, lease encerrado, identidade nativa exata, replan independente
 inalterado e imagem antiga auditada com incompatibilidade de limite de arquivo.

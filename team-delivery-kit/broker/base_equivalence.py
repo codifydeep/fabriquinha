@@ -52,7 +52,7 @@ def resume_format(b,source):
 
 def validate_bindings(config,current):
     approved=config['base']
-    if (config.get('amendment',{}).get('kind') not in ('request_scope','timer_provenance')
+    if (config.get('amendment',{}).get('kind') not in ('request_scope','timer_provenance','inherited_frozen_suite')
             or config.get('diagnostic_snapshot_kind')!='completed_frozen_validation'
             or set(approved)!=set(current) or approved==current
             or any(approved[k]!=current[k] for k in approved if k not in ('issue_id','volume'))

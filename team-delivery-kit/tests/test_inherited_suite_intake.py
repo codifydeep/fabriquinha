@@ -143,3 +143,23 @@ class InheritedSuiteIntakeTests(unittest.TestCase):
             if change=='approval':s['result']['approval']=True
             with self.subTest(change=change),self.assertRaises(ValueError):
                 intake.verify_hash_receipt(i,s,source,volume,red,image,'owner')
+
+    def test_rejected_intake_is_visible_and_not_identically_requalified(self):
+        args=self.fixture();row,route=args[:2]
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
+        intake.handoffs.initialize(con);con.execute('CREATE TABLE leases(status TEXT)')
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',(row['issue_id'],json.dumps(route)))
+        intake.handoffs.save(con,row['source_task'],row['issue_id'],row['stage'],row['owner'],json.loads(row['data']),0)
+        @contextmanager
+        def db():
+            with con:yield con
+        b=SimpleNamespace(db=db,LOCK=threading.RLock())
+        with patch.object(intake,'register',side_effect=ValueError('source mismatch')) as register:
+            intake.tick(b);intake.tick(b)
+            self.assertEqual(register.call_count,1)
+        current=intake.handoffs.load(con,row['source_task']);data=json.loads(current['data'])
+        self.assertEqual(current['owner'],'cto')
+        self.assertEqual(data['inherited_suite_intake_hold']['category'],'ValueError')
+        self.assertFalse(data['inherited_suite_intake_hold']['execution_authorized'])
+        self.assertIn('qualification',data['required_action'])
+        self.assertEqual(data['validation_failure'],json.loads(row['data'])['validation_failure'])
