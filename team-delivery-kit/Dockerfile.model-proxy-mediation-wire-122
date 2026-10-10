@@ -1,0 +1,4 @@
+# Provider-only union projection; canonical validation remains unchanged.
+FROM delivery-kit-model-proxy:20261009.121
+COPY provider_tool_routing.py /provider_tool_routing.py
+COPY model_proxy.py /model_proxy.py

@@ -343,7 +343,9 @@ class Handler(BaseHTTPRequestHandler):
                 request_metrics['routing_compatibility']='haiku_named_tool_v1'
                 request_metrics['upstream_require_parameters']=False
                 if upstream.get('tools')!=body.get('tools'):
-                    request_metrics['provider_schema_projection']='haiku_review_union_v1'
+                    request_metrics['provider_schema_projection']=('haiku_mediation_union_v1'
+                        if body['tool_choice'].get('function',{}).get('name')=='submit_delivery_decision'
+                        else 'haiku_review_union_v1')
                     request_metrics['canonical_schema_validation_preserved']=True
             stage = 'read_dispatch'
             dispatch=deterministic_read_dispatch.make(body,execution_id)

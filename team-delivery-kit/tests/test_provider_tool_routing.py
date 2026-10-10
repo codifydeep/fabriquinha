@@ -4,6 +4,91 @@ from provider_tool_routing import wire
 
 
 class ProviderToolRoutingTests(unittest.TestCase):
+    def mediation_body(self):
+        from test_typed_decision_contract import TypedDecisionTests
+        from decision_schema import apply
+        from typed_decision_contract import apply as typed
+        body=TypedDecisionTests().review_body(findings=True,observed=True)
+        messages=copy.deepcopy(body['messages'])
+        messages[0]['content']=messages[0]['content'].replace(
+            'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+'a'*64,
+            'DELIVERY_STRUCTURED_DECISION_V1:technical').replace(
+            'DELIVERY_TYPED_REVIEW_V1:'+'a'*64,
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\nDELIVERY_REVIEW_RECONSIDERATION_V1')
+        return typed(apply({'model':'anthropic/claude-haiku-5.5','messages':messages}))
+
+    def test_mediation_wire_projection_keeps_canonical_validation_and_decision_authority(self):
+        import json
+        from typed_decision_contract import translate
+        from structured_response_contract import StructuredResponseRejected
+        body=self.mediation_body();before=copy.deepcopy(body);projected=wire(body)
+        self.assertEqual(body,before)
+        schema=projected['tools'][0]['function']['parameters']
+        self.assertNotIn('anyOf',json.dumps(schema))
+        original=body['tools'][0]['function']['parameters']
+        for field in ('action','reason','optional_files'):
+            self.assertEqual(schema['properties'][field],original['properties'][field])
+        self.assertEqual(schema['properties']['findings']['items']['properties'],
+                         original['properties']['findings']['items']['properties'])
+        self.assertEqual(schema['required'],original['required'])
+        self.assertFalse(schema['additionalProperties'])
+        self.assertEqual(projected['messages'],body['messages'])
+        self.assertTrue(projected['tools'][0]['function']['strict'])
+        self.assertEqual(schema['properties']['action'],body['tools'][0]['function']['parameters']['properties']['action'])
+        from test_typed_decision_contract import TypedDecisionTests
+        decision=dict(action='request_review_reconsideration',reason='The check exists',optional_files=[],
+            findings=[dict(kind='review_disagreement',tree='candidate',path='tests/test_new.py',
+                test='__module__',line=1,quote='assert value',expected='Retain check',observed='Retained')])
+        _,_,receipt=translate(body,TypedDecisionTests().wire(decision),'application/json')
+        self.assertFalse(receipt['delivery_approval']);self.assertFalse(receipt['worker_tool_executed'])
+        for invalid in ({**decision,'action':'approve_test_revision'}, {**decision,'findings':[]},
+                        {**decision,'findings':[{**decision['findings'][0],'quote':'invented evidence'}]},
+                        {**decision,'action':'request_test_revision'}):
+            with self.assertRaises(StructuredResponseRejected):
+                translate(body,TypedDecisionTests().wire(invalid),'application/json')
+
+    def test_mediation_projection_rejects_forged_schema_or_missing_observed_reads(self):
+        for change in ('schema','strict','read'):
+            body=self.mediation_body()
+            if change=='schema':body['tools'][0]['function']['parameters']['anyOf']=[]
+            if change=='strict':body['tools'][0]['function']['strict']=False
+            if change=='read':body['messages']=[body['messages'][0]]
+            with self.assertRaises(ValueError):wire(body)
+
+    def test_proxy_uses_projected_wire_but_rejects_forged_mediation_locally(self):
+        import json
+        import io
+        from pathlib import Path
+        from unittest.mock import patch,MagicMock
+        import model_proxy as proxy
+        from test_read_stream_recovery import ReadStreamRecoveryTests,request_body
+        from test_typed_decision_contract import TypedDecisionTests
+        f=ReadStreamRecoveryTests();f.setUp();self.addCleanup(f.doCleanups)
+        incoming=request_body();incoming['model']='anthropic/claude-haiku-5.5'
+        incoming['messages']=self.mediation_body()['messages']
+        valid=dict(action='request_review_reconsideration',reason='The check exists',optional_files=[],
+            findings=[dict(kind='review_disagreement',tree='candidate',path='tests/test_new.py',
+                test='__module__',line=1,quote='assert value',expected='Retain check',observed='Retained')])
+        for decision,status in ((valid,200),({**valid,'action':'approve_test_revision'},502)):
+            response=io.BytesIO(TypedDecisionTests().wire(decision));response.status=200
+            response.getheader=lambda *_:'application/json'
+            connection=MagicMock();connection.getresponse.return_value=response
+            original_read=Path.read_text
+            def read_text(path,*args,**kwargs):
+                return 'synthetic-credential-not-real' if str(path)=='/secret/openrouter.key' else original_read(path,*args,**kwargs)
+            with patch.object(proxy,'MODEL','anthropic/claude-haiku-5.5'), \
+                    patch.object(proxy.http.client,'HTTPSConnection',return_value=connection), \
+                    patch.object(Path,'read_text',read_text):
+                result=f.request(incoming)
+            self.assertEqual(result.status,status)
+            connection.request.assert_called_once()
+            transmitted=json.loads(connection.request.call_args.args[2])
+            self.assertNotIn('anyOf',json.dumps(transmitted['tools']))
+            self.assertEqual(transmitted['tool_choice']['function']['name'],'submit_delivery_decision')
+            if status==200:
+                output=json.loads(result.wfile.getvalue())
+                self.assertEqual(json.loads(output['choices'][0]['message']['content'])['action'],valid['action'])
+
     def qa_body(self):
         import json
         from decision_schema import apply

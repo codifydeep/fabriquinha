@@ -5,6 +5,14 @@ canonical schema remains intact for local validation; no verdict is accepted
 by this adapter. Unsupported provider unions never waive local constraints.
 """
 import copy
+import re
+
+
+def project_unions(value):
+    """Provider-only representation; never replace the local validator input."""
+    if isinstance(value,dict):return {k:project_unions(v) for k,v in value.items() if k!='anyOf'}
+    if isinstance(value,list):return [project_unions(v) for v in value]
+    return value
 
 
 def wire(body):
@@ -56,6 +64,23 @@ def wire(body):
         raise ValueError('exact forced tool registry required for routing compatibility')
     result=copy.deepcopy(body)
     result['provider']['require_parameters']=False
+    if name=='submit_delivery_decision' and any(m.get('role')=='user' and isinstance(m.get('content'),str)
+            and re.search(r'^DELIVERY_REVIEW_RECONSIDERATION_V1$',m['content'],re.M)
+            for m in body.get('messages',[])):
+        from decision_schema import apply as decision_schema
+        from typed_decision_contract import apply as typed_contract
+        function=next(t['function'] for t in result['tools'] if t.get('function',{}).get('name')==name)
+        schema=function.get('parameters',{})
+        # Compare with the whole regenerated contract, not only field names.
+        # Mandatory observed reads and action/citation unions remain canonical.
+        canonical=typed_contract(decision_schema(copy.deepcopy(body)))
+        expected=canonical.get('tools',[{}])[0].get('function',{})
+        if (function.get('strict') is not True or expected.get('name')!=name
+                or expected.get('parameters')!=schema or not schema.get('anyOf')
+                or set(schema.get('properties',{}))!={'action','reason','optional_files','findings'}
+                or schema['properties']['action'].get('enum')!=['request_test_revision','escalate_cto','request_review_reconsideration']):
+            raise ValueError('canonical read-only mediation required for union projection')
+        function['parameters']=project_unions(schema)
     if name=='submit_test_review':
         function=next(t['function'] for t in result['tools'] if t.get('function',{}).get('name')==name)
         schema=function.get('parameters',{})
@@ -68,9 +93,5 @@ def wire(body):
         # Haiku rejects anyOf tool schemas even with strict=False. Only the
         # upstream projection omits unions; translate() validates the original
         # schema, including observed citations and action/finding consistency.
-        def project(value):
-            if isinstance(value,dict):return {k:project(v) for k,v in value.items() if k!='anyOf'}
-            if isinstance(value,list):return [project(v) for v in value]
-            return value
-        function['parameters']=project(schema)
+        function['parameters']=project_unions(schema)
     return result
