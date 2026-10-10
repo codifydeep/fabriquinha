@@ -258,7 +258,9 @@ class Effects:
             if current!=config['previous_handoff']:raise ValueError('source changed before SPIKE handoff')
             if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():
                 raise TimeoutError('wait for diagnostic capacity')
-            instruction=(data['instruction']+'\nYOU ARE THE CTO AND FINAL TECHNICAL OWNER, not a third party to consult. '
+            try:import bound_failure_context
+            except ImportError:from broker import bound_failure_context
+            instruction=('YOU ARE THE CTO AND FINAL TECHNICAL OWNER, not a third party to consult. '
                 'The controller completed a read-only SPIKE; the plain and traced suites failed identically. '
                 'Use the actual observations and bound source to adjudicate the product-versus-test question. '
                 'These observations prove neither a test defect nor acceptance. No assertion may be weakened. '
@@ -266,10 +268,14 @@ class Effects:
                 'request_test_revision requires evidence of a defective NEW test and fresh independent gates. '
                 'If genuinely unresolved, escalate_cto naming ONE missing experiment or constraint; do not ask '
                 'the CTO in the third person or the CEO for a technical decision. No edits, Green or approval. '
-                'SPIKE card: '+spike_issue+'\nController experiment receipt (lossless dictionary encoding): '+
-                json.dumps(compact_receipt(proof),sort_keys=True)+'\nEach report event_indices lists the exact events '+
-                'from events.dictionary in execution order, including repetitions. No event or report was dropped.\n')
-            if len(instruction)>28000:raise ValueError('bounded complete SPIKE evidence required; no truncation')
+                'SPIKE card: '+spike_issue+'\n'
+                'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'
+                'DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1\n'
+                'DELIVERY_BOUND_FAILURE_CONTEXT_V1:'+config['source_task']+':'+bound_failure_context.digest(data['validation_failure'])+'\n')
+            for path in sorted(config['failure']['diagnostic_read_files']):
+                instruction+='DELIVERY_REVIEW_READ_PATH:/evidence/candidate/'+path+'\n'
+                if path.startswith('tests/'):instruction+='DELIVERY_REVIEW_READ_PATH:/evidence/previous/'+path+'\n'
+            if len(instruction)>3500:raise ValueError('bounded complete SPIKE evidence reference required; no truncation')
             updated=copy.deepcopy(data)
             for field in ('recipient_task','wakeup_id','dispatched_at','alerted','decision','recipient_error',
                           'failed_dispatch_stage','control_error','control_error_count','adjudication_spike_failure'):
@@ -279,6 +285,9 @@ class Effects:
                 diagnostic_revision=data['diagnostic_revision']+':'+OPERATION,trigger_task=config['diagnostic_task'],
                 error='technical_adjudication_unresolved',required_action='CTO adjudicate completed read-only SPIKE',
                 dispatch_marker=marker,dispatch_stage='diagnose_cto',target=config['cto'],instruction=instruction)
+            updated['diagnostic_evidence_context']=dict(operation='bound_diagnostic_experiment_context_v1',
+                source_task=config['source_task'],failure_sha256=digest(data['validation_failure']),
+                proof_sha256=digest(proof),receipt=compact_receipt(proof))
             handoffs.save(c,config['source_task'],config['issue_id'],'dispatch_intent',config['cto'],updated,time.time(),commit=False)
 
 
@@ -479,3 +488,6 @@ def tick(b):
                 with b.db() as c:latest=json.loads(c.execute('SELECT state FROM frozen_adjudication_spikes WHERE source_task=?',(source_id,)).fetchone()[0])
                 persist(dict(latest,stage='blocked',category=type(error).__name__,owner=config['cto'],
                     required_action='CTO diagnose SPIKE state; preserve handles, no identical retry',delivery_approval=False))
+    try:import diagnostic_evidence_context
+    except ImportError:from broker import diagnostic_evidence_context
+    diagnostic_evidence_context.tick(b)

@@ -5,6 +5,7 @@ COPY broker/validation_job.py /validation_job.py
 COPY broker/validation_recovery.py /validation_recovery.py
 COPY broker/test_first_job.py /test_first_job.py
 COPY broker/worker_creation_intent.py /worker_creation_intent.py
+COPY broker/diagnostic_evidence_context.py /diagnostic_evidence_context.py
 COPY broker/acp_startup.py /acp_startup.py
 COPY broker/remediation_runtime_guard.py /remediation_runtime_guard.py
 COPY broker/remediation_test_review.py /remediation_test_review.py

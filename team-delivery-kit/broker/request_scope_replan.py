@@ -18,6 +18,18 @@ from service_mode_harness_qualification import TEST,PRODUCT
 IMAGE='sha256:2ed20c7d541c5738aeb413ef6dfbd58e04c0e4de32feb993762d8e3a1d22a715'
 
 
+def supports_request_scope(failure,reference):
+    """This legacy recipe qualifies only its three service-mode failures."""
+    methods={'test_client_requests_service_mode_once_at_load',
+        'test_exactly_one_request_per_page_load_across_all_loads',
+        'test_pending_probe_shows_checking_then_terminal_demo'}
+    names={f.get('qualified_name') for f in failure.get('failures',[])}
+    expected={'tests.test_service_mode_indicator.ServiceModeClientTests.'+m for m in methods}
+    return (failure.get('category')=='executed_test_failure' and names==expected
+        and TEST in failure.get('diagnostic_read_files',[])
+        and TEST in reference.get('red',{}).get('red',{}).get('test_sha256',{}))
+
+
 def config(proposal,peer,result,reference,previous,route,volume):
     supported(result)
     if (peer.get('stage')!='peer_reviewed' or peer.get('execution_authorized') is not False
@@ -205,6 +217,22 @@ def advance(b,proposal,peer):
     reference=refs.qualified(b,issue)
     if reference is None or plans.digest(reference)!=proposal['reference_sha256']:
         raise ValueError('unchanged approved origin required for request-scope experiment')
+    if not row and not supports_request_scope(data.get('validation_failure',{}),reference):
+        # No speculative Docker create for an unrelated harness. Existing remote
+        # intents remain observable through their original identity below.
+        with b.LOCK,b.db() as con:
+            actual=handoffs.load(con,source)
+            if actual!=current:raise ValueError('source changed before unsupported recipe routing')
+            updated=json.loads(actual['data'])
+            updated.update(unsupported_recipe_route=dict(operation='request_scope_recipe_not_applicable_v1',
+                recipe='service_mode_request_scope',source_task=source,docker_effects_executed=False,
+                test_edits_authorized=False,delivery_approval=False),
+                required_action='CTO select a qualified experiment for the actual failure; service-mode recipe does not apply')
+            updated['trigger_task']=peer['task_id']
+            for field in ('recipient_task','wakeup_id','dispatch_marker','dispatch_stage','dispatched_at','instruction','decision'):
+                updated.pop(field,None)
+            handoffs.save(con,source,issue,'diagnose_cto',route['cto'],updated,time.time())
+        return
     labels=(b.docker('GET','/volumes/'+volume) or {}).get('Labels',{})
     if labels.get('delivery-kit.owner')!=b.OWNER or labels.get('delivery-kit.source-task')!=source:
         raise ValueError('owned frozen experiment volume required')

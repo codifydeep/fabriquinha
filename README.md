@@ -386,6 +386,15 @@ tamanho bloquear o transporte, uma retomada exige comparação válida, ambos os
 jobs concluídos, hashes conferidos, source inalterada exceto pela anotação do
 próprio bloqueio e ausência de handoff já aceito. Ela arquiva o estado anterior
 e retoma apenas `decision_pending`, sem repetir testes nem renovar tentativas.
+Notas nativas de handoff têm um limite menor que o prompt: os novos retornos de
+SPIKE enviam um marcador autenticado, não o recibo inteiro na mensagem de wakeup.
+O broker expande esse marcador com a falha e o experimento completos antes do
+modelo, vinculando source, wakeup e hash do recibo. O contexto permanece no
+estado durável e acompanha diagnósticos posteriores que usam o mesmo marcador.
+Uma recuperação por evidência antes ausente preserva o diagnóstico anterior e
+permite somente uma nova inspeção CTO, sem repetir jobs ou ampliar autoridade.
+A receita legada de request-scope exige as três falhas qualificadas de
+`service-mode`; uma revisão de teste de outro domínio não autoriza sua execução.
 O reconciliador de bootstrap deixa de consultar externamente workers históricos
 somente quando o start foi reconhecido, a lease é terminal e há recibo `gone`
 do mesmo contêiner, vinculado ao payload por observação de política ou fato

@@ -1,0 +1,6 @@
+# Keep fixed recipe admission scoped and expand durable evidence at prompt time.
+FROM delivery-kit-execution-broker:20261010.448
+COPY broker/request_scope_replan.py /request_scope_replan.py
+COPY broker/diagnostic_evidence_context.py /diagnostic_evidence_context.py
+COPY broker/bound_failure_context.py /bound_failure_context.py
+COPY broker/frozen_adjudication_spike.py /frozen_adjudication_spike.py

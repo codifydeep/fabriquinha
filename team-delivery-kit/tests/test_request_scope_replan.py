@@ -1,11 +1,46 @@
 import copy
 import unittest
-from broker.request_scope_replan import config,payload
+from broker.request_scope_replan import config,payload,supports_request_scope
 from broker.technical_remediation_plan import digest,instruction
 from service_mode_harness_qualification import TEST,CASES
 
 
 class RequestScopeReplanTests(unittest.TestCase):
+    def test_unrelated_failure_routes_to_cto_before_any_docker_effect(self):
+        import json,sqlite3,threading
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from broker import request_scope_replan as module,handoffs
+        proposal,peer,_,reference,_,route,_=self.fixture()
+        con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
+        handoffs.initialize(con);con.execute('CREATE TABLE snapshots(task_id TEXT,volume TEXT,status TEXT)')
+        con.execute('CREATE TABLE leases(status TEXT)');con.execute("INSERT INTO snapshots VALUES('source','frozen','complete')")
+        con.execute('INSERT INTO delivery_routes VALUES(?,?)',('r2',json.dumps(route)))
+        data=dict(inherited_test_replan=proposal,inherited_peer_review=peer,
+            completed_validation_diagnostic=dict(volume='frozen'),validation_failure=dict(
+                category='executed_test_failure',diagnostic_read_files=['tests/test_feedback_latest_ui.py'],
+                failures=[dict(qualified_name='tests.test_feedback_latest_ui.FeedbackLatestMatchClientTest.test_poll_and_filter_change_request_latest')]))
+        handoffs.save(con,'source','r2','inherited_replan_required','cto',data,0)
+        @contextmanager
+        def db():
+            with con:yield con
+        def docker(*args):raise AssertionError('unsupported recipe must not touch Docker')
+        b=SimpleNamespace(db=db,LOCK=threading.RLock(),docker=docker,OWNER='owner',PREFIX='delivery-kit-port2')
+        with patch.object(module.refs,'qualified',return_value=reference):module.advance(b,proposal,peer)
+        current=handoffs.load(con,'source');self.assertEqual(current['stage'],'diagnose_cto')
+        self.assertFalse(json.loads(current['data'])['unsupported_recipe_route']['docker_effects_executed'])
+        self.assertEqual(con.execute('SELECT count(*) FROM request_scope_experiments').fetchone()[0],0)
+    def test_fixed_recipe_does_not_accept_an_unrelated_peer_test_revision_vote(self):
+        failure=dict(category='executed_test_failure',diagnostic_read_files=[TEST],failures=[
+            dict(qualified_name='tests.test_service_mode_indicator.ServiceModeClientTests.'+name) for name in (
+                'test_client_requests_service_mode_once_at_load','test_exactly_one_request_per_page_load_across_all_loads',
+                'test_pending_probe_shows_checking_then_terminal_demo')])
+        reference=dict(red=dict(red=dict(test_sha256={TEST:'a'*64})))
+        self.assertTrue(supports_request_scope(failure,reference))
+        failure['failures']=[dict(qualified_name='tests.test_feedback_latest_ui.FeedbackLatestMatchClientTest.test_poll_and_filter_change_request_latest')]
+        self.assertFalse(supports_request_scope(failure,reference))
+        self.assertFalse(supports_request_scope({},reference))
     def fixture(self):
         good=dict(tests=15,failures=0,errors=0,skipped=0,unexpected_successes=0,expected_failures=0,failed_methods=[])
         bad={**good,'tests':1,'failures':1}
