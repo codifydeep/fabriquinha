@@ -303,6 +303,14 @@ com o contrato canônico regenerado; o validador local permanece inalterado.
 Essa extensão passou pela suíte offline, mas ainda não foi instalada ou
 qualificada com o provedor real. A recuperação limitada da revisão falha e a
 continuação ponta a ponta permanecem pendentes.
+A recuperação já instalada consumiu sua única tentativa de nova observação de
+transporte e criou outra tarefa independente, que concluiu a revisão. Sua
+decisão nativa coincide com a decisão persistida, as duas leituras estão completas
+e o manifesto imutável foi revalidado. Isso aprova somente o gate de testes R1;
+não autoriza R2, PR, implantação ou homologação. O recibo ACP da falha anterior
+continua com causa desconhecida, embora o ledger do proxy comprove rejeição
+local de schema; essa distinção não deve ser apagada do histórico. A extensão
+de explicação das unions acima ainda não participou dessa recuperação real.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
