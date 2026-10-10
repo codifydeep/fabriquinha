@@ -1,0 +1,6 @@
+# Recovery qualification does not approve product or restart its author.
+FROM delivery-kit-execution-broker:20261009.436
+COPY broker/provider_diagnosis_recovery.py /provider_diagnosis_recovery.py
+COPY broker/mediation_diagnosis_recovery.py /mediation_diagnosis_recovery.py
+COPY broker/test_revision_review.py /test_revision_review.py
+COPY mediation_transport_fixture.py /mediation_transport_fixture.py

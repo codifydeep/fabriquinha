@@ -273,6 +273,12 @@ do proxy com upstream simulado. `model_mediation_smoke.py` recebeu HTTP 200 do
 provedor real para uma fixture sintética, com validação canônica e recibo
 persistente; isso não representa leitura real de artefatos nem aprovação do
 produto. A retomada qualificada do diagnóstico real ainda está pendente.
+O código `broker/mediation_diagnosis_recovery.py` permite uma única nova análise
+após qualificação durável do transporte: preserva o diagnóstico falho, os
+recuperadores já consumidos e os snapshots. Exige leitura completa, CTO
+independente, modo de planejamento, lease encerrada e proxy qualificado exato.
+Não afirma a causa histórica quando o recibo ACP a registra como desconhecida.
+A instalação e a retomada real dessa política ainda não foram qualificadas.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 

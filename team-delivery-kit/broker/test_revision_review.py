@@ -912,6 +912,10 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
                                   ':typed-transport:1' if diagnosis.get('typed_transport_recovery') else '')).encode()).hexdigest()
         if state.get('review_mediation_upgrade'):
             marker=hashlib.sha256((marker+':mediation-upgrade:'+state['review_mediation_upgrade']['decision_sha256']).encode()).hexdigest()
+        if diagnosis.get('provider_mediation_recovery'):
+            recovery=diagnosis['provider_mediation_recovery']
+            marker=hashlib.sha256((marker+':mediation-transport:'+recovery['failed_task']+':'+
+                hashlib.sha256(json.dumps(recovery['qualification'],sort_keys=True).encode()).hexdigest()).encode()).hexdigest()
         instruction = (
             ('CONTROLLER INVALID REVIEW PROTOCOL. Two reviews cited invalid locations. '
              'Neither verdict was accepted; do not treat either as a valid rejection. '

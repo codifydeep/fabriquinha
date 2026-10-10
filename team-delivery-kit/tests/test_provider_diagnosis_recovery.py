@@ -4,6 +4,15 @@ from broker import provider_diagnosis_recovery as r
 
 
 class ProviderDiagnosisTests(unittest.TestCase):
+    def test_mediation_canary_requires_projected_canonical_schema_and_pinned_routing(self):
+        sha='e982dafa69291d7efe979081e6594ef4d3bc9fa2bd321d4be2dba1d6b87ec668'
+        event={'provider_schema_projection':'haiku_mediation_union_v1','canonical_schema_validation_preserved':True}
+        receipt={'worker_tool_executed':False,'delivery_approval':False}
+        r.validate_mediation_canary(event,receipt,sha)
+        for changed_event,changed_receipt,changed_sha in (({},receipt,sha),(event,{**receipt,'delivery_approval':True},sha),
+                (event,{**receipt,'manifest_sha256':'a'*64},sha),(event,{**receipt,'mode':'test_review'},sha),
+                (event,receipt,'b'*64)):
+            with self.assertRaises(ValueError):r.validate_mediation_canary(changed_event,changed_receipt,changed_sha)
     def evidence(self):
         return dict(source_task='author-task',failed_cto='cto-task',old_wakeup='old',
             issue='issue',actor='cto',cto='cto',author='author',enabled=True,test_first=True,

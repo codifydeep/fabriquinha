@@ -207,6 +207,8 @@ COPY broker/provider_diagnosis_recovery.py /provider_diagnosis_recovery.py
 COPY broker/review_provider_recovery.py /review_provider_recovery.py
 COPY broker/watchdog_fault.py /watchdog_fault.py
 COPY review_transport_fixture.py /review_transport_fixture.py
+COPY mediation_transport_fixture.py /mediation_transport_fixture.py
+COPY broker/mediation_diagnosis_recovery.py /mediation_diagnosis_recovery.py
 COPY broker/bound_failure_context.py /bound_failure_context.py
 COPY broker/inherited_test_replan.py /inherited_test_replan.py
 COPY broker/inherited_harness_amendment.py /inherited_harness_amendment.py

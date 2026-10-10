@@ -34,11 +34,12 @@ def proxy_info(b):
     return info
 
 
-def register(b,payload,*,review=False):
+def register(b,payload,*,review=False,mediation=False):
     """Operator-only registration, using actual owned proxy logs and its ledger."""
     if not isinstance(payload,dict) or set(payload)!={'execution_id','response_sha256'}:
         raise ValueError('exact synthetic transport receipt required')
     execution=payload['execution_id'];sha=payload['response_sha256']
+    if review and mediation:raise ValueError('one transport qualification mode required')
     if str(uuid.UUID(execution))!=execution or not re.fullmatch(r'[a-f0-9]{64}',sha):
         raise ValueError('canonical qualification identity required')
     try:import artifact_rejection_evidence as logs
@@ -82,7 +83,10 @@ print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Pat
             if event.get('event')=='model_proxy_request' and event.get('execution_id')==execution:events.append(event)
         if len(events)!=1:raise ValueError('one correlated actual request required')
         from decision_schema import apply
-        if review:
+        if mediation:
+            from mediation_transport_fixture import body
+            expected=apply(body())
+        elif review:
             from review_transport_fixture import body
             expected=apply(body())
         else:
@@ -95,13 +99,16 @@ print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Pat
                 or value['receipts'][0].get('manifest_sha256')!='a'*64
                 or value['receipts'][0].get('review_acceptance_by_proxy') is not False):
             raise ValueError('synthetic projected review receipt required')
+        if mediation:validate_mediation_canary(events[0],value['receipts'][0],value['routing_sha256'])
         if proxy_info(b)['Id']!=proxy['Id']:raise ValueError('proxy changed during qualification')
         proof=dict(operation='provider_diagnosis_transport_qualification_v1',execution_id=execution,
             model=value['model'],proxy_image=proxy['Image'],routing_sha256=value['routing_sha256'],
             response_sha256=sha,event=events[0],adapter_receipt=value['receipts'][0],
             worker_tool_executed=False,delivery_approval=False)
-        table='provider_review_qualifications' if review else 'provider_diagnosis_qualifications'
+        table=('provider_mediation_qualifications' if mediation else
+               'provider_review_qualifications' if review else 'provider_diagnosis_qualifications')
         if review:proof.update(operation='provider_review_transport_qualification_v1',actual_artifact_read=False)
+        if mediation:proof.update(operation='provider_mediation_transport_qualification_v1',actual_artifact_read=False)
         with b.db() as c:
             c.execute('CREATE TABLE IF NOT EXISTS '+table+'('
                       'execution_id TEXT PRIMARY KEY,proof TEXT,at REAL)')
@@ -110,6 +117,16 @@ print(json.dumps({"model":model_policy.MODEL,"routing_sha256":hashlib.sha256(Pat
             if not old:c.execute('INSERT INTO '+table+' VALUES(?,?,?)',
                                  (execution,json.dumps(proof,sort_keys=True),time.time()))
         return proof
+
+
+def validate_mediation_canary(event,receipt,routing_sha):
+    if (event.get('provider_schema_projection')!='haiku_mediation_union_v1'
+            or event.get('canonical_schema_validation_preserved') is not True
+            or routing_sha!='e982dafa69291d7efe979081e6594ef4d3bc9fa2bd321d4be2dba1d6b87ec668'
+            or receipt.get('mode') not in (None,'technical') or 'manifest_sha256' in receipt
+            or receipt.get('worker_tool_executed') is not False
+            or receipt.get('delivery_approval') is not False):
+        raise ValueError('synthetic nonauthorizing mediation transport receipt required')
 
 
 def qualify(e):
