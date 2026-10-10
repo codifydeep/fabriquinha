@@ -255,6 +255,11 @@ contrato ampliado; não transforma a decisão anterior em contestação ou aprov
 O contrato isolado não comprova resolução autônoma de disputas. Se um plano
 sucessor já estiver registrado, a migração recusa reativar a rota original:
 essa linhagem deve ser reconciliada explicitamente, nunca apagada ou contornada.
+O código de reconciliação aceita apenas um sucessor ainda em `plan_dispatch`,
+sem tarefas, wakeups ou registro de execução/admissão. Ele preserva o plano e a
+rodada consumida, bloqueia seu despacho e migra a revisão em uma transação;
+a admissão do autor permanece bloqueada. Essa extensão ainda não foi instalada
+nem validada na linhagem real do ensaio.
 
 O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
 wakeup do Multica, sem tratá-lo como outro contrato ou autorização. Quando Tech

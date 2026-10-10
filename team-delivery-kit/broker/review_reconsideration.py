@@ -6,6 +6,8 @@ All prior verdicts, diagnoses and recovery counters remain in the durable proof.
 import copy
 import hashlib
 import json
+import time
+import urllib.request
 
 
 def digest(value):
@@ -39,7 +41,7 @@ def upgrade_state(state,red,task):
     return result
 
 
-def upgrade(b,issue,operation):
+def upgrade(b,issue,operation,*,withdraw_pending_successor=False):
     """Administrative contract migration under sealed maintenance, no worker API."""
     try:import controller_maintenance as maintenance,native,handoff_runtime,test_revision_review,test_review_replan_certificate
     except ImportError:from broker import controller_maintenance as maintenance,native,handoff_runtime,test_revision_review,test_review_replan_certificate
@@ -51,8 +53,23 @@ def upgrade(b,issue,operation):
             config,state=map(json.loads,con.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone())
             route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()[0])
             red=json.loads(con.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()[0])
-            if not route.get('enabled') or con.execute('SELECT 1 FROM technical_remediation_plans WHERE source_task=?',(red['task_id'],)).fetchone():
+            successor=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(red['task_id'],)).fetchone()
+            if (not route.get('enabled') or successor) and not withdraw_pending_successor:
                 raise ValueError('unsuperseded original review required; preserve existing follow-up')
+            if state.get('review_mediation_upgrade',{}).get('successor_withdrawal'):
+                raise ValueError('successor withdrawal already consumed; observe persisted mediation')
+            parent_source=parent=admission=None
+            if successor:
+                successor_config,successor_state=map(json.loads,successor)
+                for table in ('remediation_executions','remediation_admissions','generic_remediation_drivers'):
+                    if (con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone()
+                            and con.execute('SELECT 1 FROM '+table+' WHERE source_task=?',(red['task_id'],)).fetchone()):
+                        raise ValueError('successor already has execution effects; preserve active lineage')
+                parent_source=successor_config.get('r1_feedback',{}).get('previous_source')
+                parent=json.loads(con.execute('SELECT state FROM remediation_executions WHERE source_task=?',(parent_source,)).fetchone()[0])
+                admission=json.loads(con.execute('SELECT state FROM remediation_admissions WHERE source_task=?',(parent_source,)).fetchone()[0])
+            elif not route.get('enabled'):
+                raise ValueError('disabled route without exact successor cannot migrate')
             if con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone():
                 raise ValueError('idle upgrade required')
         if maintenance.native_active(b):raise ValueError('native idle required')
@@ -70,10 +87,41 @@ def upgrade(b,issue,operation):
             fx.read_evidence(task),config.get('initial_review',False))
         if original.get('technical_replan_certificate')!=proof:raise ValueError('qualified original diagnosis required')
         updated=upgrade_state(state,red,task)
+        withdrawal=None
+        if successor:
+            try:import review_successor_withdrawal
+            except ImportError:from broker import review_successor_withdrawal
+            # A stored plan_dispatch alone does not prove absence of remote
+            # effects. Query actual native tasks and *all* wakeups, even disabled.
+            runs=native.issue_task_runs(settings,successor_state['issue_id'])
+            request=urllib.request.Request('http://backend:8080/api/issues/'+successor_state['issue_id']+'/wakeups',
+                headers={'Authorization':'Bearer '+settings['token'],'X-Workspace-ID':settings['workspace_id']})
+            with urllib.request.urlopen(request,timeout=5) as response:wakeups=json.load(response)
+            held,withdrawal=review_successor_withdrawal.prepare(successor_config,successor_state,
+                route,red,original,parent_source,parent,admission,runs,wakeups)
+            updated['review_mediation_upgrade']['successor_withdrawal']=withdrawal
+        try:import handoffs
+        except ImportError:from broker import handoffs
         with b.db() as con:
             if json.loads(con.execute('SELECT state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()[0])!=state:
                 raise ValueError('review changed during upgrade')
-        test_revision_review._save_rejection(b,route,updated)
+            if json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()[0])!=route:
+                raise ValueError('route changed during upgrade')
+            if withdrawal:
+                current=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(red['task_id'],)).fetchone()
+                if (tuple(current)!=tuple(successor)
+                        or json.loads(con.execute('SELECT state FROM remediation_executions WHERE source_task=?',(parent_source,)).fetchone()[0])!=parent
+                        or json.loads(con.execute('SELECT state FROM remediation_admissions WHERE source_task=?',(parent_source,)).fetchone()[0])!=admission):
+                    raise ValueError('successor lineage changed before migration')
+                con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',
+                    (json.dumps(held,sort_keys=True),red['task_id']))
+                con.execute('UPDATE delivery_routes SET config=? WHERE issue_id=?',
+                    (json.dumps({**route,'enabled':True},sort_keys=True),issue))
+            # Trial, successor hold, route and handoff form one SQLite commit.
+            # The parent execution/admission stay held, not restarted.
+            con.execute('UPDATE test_revision_trials SET state=? WHERE issue_id=?',(json.dumps(updated,sort_keys=True),issue))
+            handoffs.save(con,red['task_id'],issue,'test_review_cto_diagnosis',route['cto'],
+                {**updated,'target':route['cto']},time.time(),commit=False)
     return dict(stage='dispatch_intent',limits_increased=False,delivery_approval=False,author_restarted=False)
 
 

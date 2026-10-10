@@ -1,0 +1,4 @@
+# Local qualified parent; migration still requires sealed idle maintenance.
+FROM delivery-kit-execution-broker:20261009.434
+COPY broker/review_reconsideration.py /review_reconsideration.py
+COPY broker/review_successor_withdrawal.py /review_successor_withdrawal.py
