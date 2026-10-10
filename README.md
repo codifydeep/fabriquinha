@@ -335,8 +335,11 @@ permite ao proxy habilitar esse marcador somente após leitura completa das duas
 não remove campos por conta própria, não muda o parecer e não edita testes.
 O limite persistente é compartilhado com correções de comprimento para impedir
 renovação de tentativas, e toda chamada continua sujeita ao teto pago. A extensão
-passou nos testes offline; instalação, qualificação real e recuperação do
-diagnóstico de suíte que falhou por esse formato ainda estão pendentes.
+passou nos testes offline e foi instalada no proxy `.124`, mantendo o roteamento
+anterior. O controlador `.441` adiciona somente o registro da qualificação; seus
+handlers de handoff permanecem inalterados. Uma chamada sintética real passou,
+com evento e recibo persistente conferidos no ambiente instalado. A recuperação
+automática do diagnóstico de suíte que falhou por esse formato ainda está pendente.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.

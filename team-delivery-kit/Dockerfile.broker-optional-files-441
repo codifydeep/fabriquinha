@@ -1,0 +1,7 @@
+# Add qualification only. Existing handoff handlers and execution permissions stay unchanged.
+FROM delivery-kit-execution-broker:20261009.440
+COPY broker/provider_diagnosis_recovery.py /provider_diagnosis_recovery.py
+COPY optional_files_transport_fixture.py /optional_files_transport_fixture.py
+COPY model_proxy.py /model_proxy.py
+COPY typed_decision_contract.py /typed_decision_contract.py
+COPY technical_optional_files_feedback.py /technical_optional_files_feedback.py
