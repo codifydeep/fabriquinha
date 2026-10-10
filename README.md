@@ -272,7 +272,7 @@ usar essa projeção. A extensão está instalada e testada, inclusive pelo hand
 do proxy com upstream simulado. `model_mediation_smoke.py` recebeu HTTP 200 do
 provedor real para uma fixture sintética, com validação canônica e recibo
 persistente; isso não representa leitura real de artefatos nem aprovação do
-produto. A retomada qualificada do diagnóstico real ainda está pendente.
+produto. A retomada qualificada do diagnóstico real foi executada.
 O código `broker/mediation_diagnosis_recovery.py` permite uma única nova análise
 após qualificação durável do transporte: preserva o diagnóstico falho, os
 recuperadores já consumidos e os snapshots. Exige leitura completa, CTO
@@ -281,13 +281,14 @@ Não afirma a causa histórica quando o recibo ACP a registra como desconhecida.
 A política foi instalada e a qualificação registrada a partir dos logs e ledger
 do proxy real. A retomada administrativa foi conferida: snapshot e contadores
 preservados, nenhum reinício do autor ou aprovação. O novo diagnóstico pelos
-agentes ainda precisa ser comprovado; esta admissão não equivale à sua conclusão.
+agentes foi concluído; esta admissão não equivale à aprovação da entrega.
 O CTO concluiu a tarefa retomada com `request_review_reconsideration`, mas o
 leitor central legado recusou a nova ação. A correção no código exige os três
 marcadores de mediação, findings de divergência, nenhum arquivo opcional e
 reason limitado; a revalidação administrativa usa a mesma tarefa concluída,
-sem nova chamada ao modelo. Essa correção ainda não foi instalada, e a nova
-revisão independente continua pendente.
+sem nova chamada ao modelo. Essa correção foi instalada e a revalidação passou,
+preservando o snapshot e registrando intenção persistente de nova revisão.
+O despacho foi liberado; a conclusão da revisão independente continua pendente.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
