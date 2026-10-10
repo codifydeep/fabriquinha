@@ -1,0 +1,4 @@
+# Correct fixed diagnostic discovery and archive one incomplete recipe revision.
+FROM delivery-kit-execution-broker:20261010.445
+COPY broker/frozen_adjudication_spike.py /frozen_adjudication_spike.py
+COPY broker/runtime_assertion_probe.py /runtime_assertion_probe.py

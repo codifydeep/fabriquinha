@@ -371,8 +371,14 @@ de escrita, não uma política de repetir POSTs incertos nem uma retomada do aut
 O primeiro experimento real foi bloqueado pelo controle de cobertura: o probe
 descobria somente `tests/`, omitindo testes na raiz e em pacotes irmãos. A fonte
 corrigida usa a raiz e só admite a receita qualificada `unittest discover -s .`;
-essa correção ainda exige instalação e um novo experimento vinculado. Recibos
-parciais antigos permanecem inválidos e não autorizam edição ou aprovação.
+O controlador `.446` instala essa receita. Uma única substituição diagnóstica
+exige ambos os jobs antigos concluídos, recibos íntegros e equivalentes exceto
+pela cobertura incompleta, entrega/Red inalterados, requalificação do diagnóstico
+e hash exato do probe novo. Configuração e recibos antigos são arquivados numa
+tabela histórica; um novo card e novos handles identificam a receita corrigida.
+Isso não renova tentativas do autor nem os gates de revisão. Recibos parciais
+antigos permanecem inválidos; a nova execução ainda precisa comprovar cobertura
+integral antes do retorno ao CTO.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.

@@ -13,6 +13,7 @@ import uuid
 
 OPERATION='frozen_suite_adjudication_spike_v1'
 BACKEND_REFERENCE='ghcr.io/multica-ai/multica-backend@sha256:60dc856bc44c01a3c73e8153e211be6c22cc6cbb66dde8b20e01de5b6e75e41f'
+ROOT_PROBE_SHA256='43e118b170cff23ee67b71c2cd5a4a99fd2059b38fb8e727d1170e7b5e169286'
 
 
 def digest(value):
@@ -148,6 +149,38 @@ def advance(config,state,effects,persist):
 
 def initialize(c):
     c.execute('CREATE TABLE IF NOT EXISTS frozen_adjudication_spikes(source_task TEXT PRIMARY KEY,config TEXT,state TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS frozen_adjudication_spike_history(source_task TEXT,revision TEXT,config TEXT,state TEXT,PRIMARY KEY(source_task,revision))')
+
+
+def repair_discovery(config,state,qualified,jobs,probe_hash):
+    """A single changed diagnostic recipe; no author/test retry or gate reset."""
+    if (config.get('recipe_revision') or state.get('stage')!='blocked'
+            or state.get('category')!='trace_contamination_or_incomplete_evidence'
+            or not state.get('spike_issue') or probe_hash!=ROOT_PROBE_SHA256
+            or config.get('operation')!=OPERATION or qualified.get('operation')!=OPERATION
+            or any(config.get(k)!=qualified.get(k) for k in
+                   ('source_task','issue_id','cto','diagnostic_task','volume','failure','hashes','manifest_sha256'))):
+        raise ValueError('unchanged source and qualified corrected probe required')
+    count=state.get('plain',{}).get('suite',{}).get('tests')
+    if type(count) is not int or not 0<count<config['failure']['tests_executed']:
+        raise ValueError('strictly incomplete old discovery required')
+    partial=copy.deepcopy(config);partial['failure']['tests_executed']=count
+    validate_pair(partial,state.get('plain',{}),state.get('traced',{}))
+    if set(jobs)!={'plain','traced'}:raise ValueError('both original jobs must be settled')
+    for variant,job in jobs.items():
+        result=job.get('result',{})
+        if (job.get('stage')!='complete' or result.get('exit_code')!=0
+                or hashlib.sha256(result.get('output','').encode()).hexdigest()!=result.get('output_sha256')
+                or json.loads(result.get('output','{}'))!=state[variant]):
+            raise ValueError('captured original diagnostic receipts required')
+    updated=copy.deepcopy(qualified)
+    updated.update(recipe_revision='root_unittest_discovery_v2',probe_sha256=probe_hash,
+        supersedes_config_sha256=digest(config),supersedes_state_sha256=digest(state))
+    return updated,dict(stage='registered',owner=config['cto'],delivery_approval=False,
+        recipe_repair=dict(operation='incomplete_discovery_recipe_repair_v1',
+            previous_issue=state['spike_issue'],previous_count=count,
+            required_count=config['failure']['tests_executed'],previous_config_sha256=digest(config),
+            author_retry_authorized=False,test_change_authorized=False,delivery_approval=False))
 
 
 class Effects:
@@ -205,7 +238,16 @@ def register(b,source_id):
             initialize(c)
             if controller_maintenance.current(c):return None
             old=c.execute('SELECT config,state FROM frozen_adjudication_spikes WHERE source_task=?',(source_id,)).fetchone()
-            if old:return tuple(map(json.loads,old))
+            replacing=False;old_jobs={}
+            if old:
+                old_config,old_state=map(json.loads,old)
+                replacing=(not old_config.get('recipe_revision') and old_state.get('stage')=='blocked'
+                    and old_state.get('category')=='trace_contamination_or_incomplete_evidence')
+                if not replacing:return old_config,old_state
+                for variant in ('plain','traced'):
+                    task=str(uuid.uuid5(uuid.NAMESPACE_URL,OPERATION+':'+digest(old_config)+':'+variant))
+                    stored=c.execute('SELECT state FROM test_first_jobs WHERE job_key=?',(task+':copy',)).fetchone()
+                    if stored:old_jobs[variant]=json.loads(stored[0])
             row=handoffs.load(c,source_id)
             if not row or row['stage']!='technical_decision_required':return None
             data=json.loads(row['data']);failure=data.get('validation_failure',{})
@@ -252,6 +294,11 @@ def register(b,source_id):
             latest_author=max(authors,key=lambda t:(t.get('created_at') or '',t['id']))['id'],
             active=active,pending=any(t.get('status') in ('queued','running','dispatched') for t in runs),consumed=False))
         except ValueError:return None
+        if replacing:
+            from pathlib import Path
+            probe_hash=hashlib.sha256(Path('/runtime_assertion_probe.py').read_bytes()).hexdigest()
+            config,state=repair_discovery(old_config,old_state,config,old_jobs,probe_hash)
+        else:state=dict(stage='registered',owner=config['cto'],delivery_approval=False)
         try:from incremental_provisioning import NativeIssues
         except ImportError:from broker.incremental_provisioning import NativeIssues
         parent=NativeIssues(fx.settings).request('/issues/'+row['issue_id'])
@@ -264,12 +311,18 @@ def register(b,source_id):
                 '\nExecution is controller-owned; CTO diagnosis stays bound to the parent issue. '+
                 'No author/test change, Green, CI waiver or release approval. No agent assignment before bound permissions.',
             parent_issue_id=row['issue_id'],project_id=parent.get('project_id'),stage=1,status='todo')
-        state=dict(stage='registered',owner=config['cto'],delivery_approval=False)
         with b.db() as c:
             if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
             if controller_maintenance.current(c) or handoffs.load(c,source_id)!=row:return None
             if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():return None
-            c.execute('INSERT INTO frozen_adjudication_spikes VALUES(?,?,?)',(source_id,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
+            if replacing:
+                current=c.execute('SELECT config,state FROM frozen_adjudication_spikes WHERE source_task=?',(source_id,)).fetchone()
+                if tuple(current)!=tuple(old):raise ValueError('SPIKE changed before recipe replacement')
+                c.execute('INSERT INTO frozen_adjudication_spike_history VALUES(?,?,?,?)',
+                    (source_id,digest(old_config),old[0],old[1]))
+                c.execute('UPDATE frozen_adjudication_spikes SET config=?,state=? WHERE source_task=?',
+                    (json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True),source_id))
+            else:c.execute('INSERT INTO frozen_adjudication_spikes VALUES(?,?,?)',(source_id,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
         return config,state
 
 

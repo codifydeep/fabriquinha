@@ -7,6 +7,30 @@ import test_frozen_diagnosis_format_recovery as prior
 
 
 class AdjudicationSpikeTests(unittest.TestCase):
+    def test_changed_discovery_preserves_old_receipts_and_cannot_repeat_or_waive_gates(self):
+        config=r.qualify(self.evidence());plain,traced=self.proofs(config)
+        for proof in (plain,traced):proof['suite']['tests']=2
+        state=dict(stage='blocked',category='trace_contamination_or_incomplete_evidence',
+            spike_issue='old-card',plain=plain,traced=traced)
+        jobs={}
+        for variant in ('plain','traced'):
+            raw=json.dumps(state[variant]);jobs[variant]=dict(stage='complete',result=dict(
+                exit_code=0,output=raw,output_sha256=hashlib.sha256(raw.encode()).hexdigest()))
+        before=copy.deepcopy((config,state,jobs));qualified=copy.deepcopy(config);qualified['image']='sha256:'+'d'*64
+        updated,next_state=r.repair_discovery(config,state,qualified,jobs,r.ROOT_PROBE_SHA256)
+        self.assertEqual((config,state,jobs),before)
+        self.assertEqual(updated['supersedes_config_sha256'],r.digest(config))
+        self.assertEqual(next_state['recipe_repair']['previous_issue'],'old-card')
+        self.assertFalse(next_state['recipe_repair']['author_retry_authorized'])
+        for change in ('consumed','hash','source','live','count','corrupt'):
+            cfg=copy.deepcopy(config);s=copy.deepcopy(state);q=copy.deepcopy(qualified);j=copy.deepcopy(jobs);h=r.ROOT_PROBE_SHA256
+            if change=='consumed':cfg['recipe_revision']='already-used'
+            if change=='hash':h='e'*64
+            if change=='source':q['source_task']='other'
+            if change=='live':j['traced']['stage']='running'
+            if change=='count':s['plain']['suite']['tests']=4
+            if change=='corrupt':j['plain']['result']['output']='{}'
+            with self.subTest(change=change),self.assertRaises(ValueError):r.repair_discovery(cfg,s,q,j,h)
     def test_changed_stage_requires_exact_backend_proof_and_absence_of_any_accepted_effect(self):
         config=dict(operation=r.OPERATION,cto='cto',desired=dict(stage=0,title='unchanged title'))
         state=dict(stage='issue_intent',issue_attempted=True,issue_observation_error='HTTPError')
