@@ -1,0 +1,4 @@
+# Release only the exact withdrawn-successor admission hold after live R1 proof.
+FROM delivery-kit-execution-broker:20261009.439
+COPY broker/remediation_admission.py /remediation_admission.py
+COPY broker/review_successor_resolution.py /review_successor_resolution.py

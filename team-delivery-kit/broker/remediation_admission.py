@@ -77,6 +77,11 @@ def reconcile(b,source):
             value,parent=map(json.loads,con.execute('SELECT contract,state FROM remediation_executions WHERE source_task=?',(source,)).fetchone())
         if (intent['execution_contract_sha256']!=planning.digest(value) or value.get('original_depth')!=2
                 or intent.get('release_homologated') is not False):raise ValueError('admission contract drift')
+        if (state.get('stage')=='blocked' and state.get('category')=='superseded_by_r1_feedback'
+                and parent.get('r1_gate')):
+            try:import review_successor_resolution
+            except ImportError:from broker import review_successor_resolution
+            state=review_successor_resolution.resolve(b,source,fx)
         if state['stage']=='blocked':
             # A dependency incident remains preserved, but its resolved hold
             # must not permanently starve an already authorized full chain.

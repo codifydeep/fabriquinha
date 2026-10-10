@@ -311,6 +311,13 @@ não autoriza R2, PR, implantação ou homologação. O recibo ACP da falha ante
 continua com causa desconhecida, embora o ledger do proxy comprove rejeição
 local de schema; essa distinção não deve ser apagada do histórico. A extensão
 de explicação das unions acima ainda não participou dessa recuperação real.
+O controlador instalado resolve a admissão suspensa por um sucessor retirado
+somente após aprovação independente R1 no mesmo manifesto e revalidação do
+plano CTO/TL original. `broker/review_successor_resolution.py` preserva o hold,
+o sucessor arquivado e a rodada consumida; não reabre R1 ou concede permissões
+de produto. As verificações comuns de contexto, orçamento e capacidade ainda
+precedem qualquer ativação de R2. A suíte offline e o preflight com os registros
+reais passaram; a continuação autônoma após essa resolução ainda deve ser observada.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
