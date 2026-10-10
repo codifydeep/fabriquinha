@@ -1337,6 +1337,14 @@ que exige esse registro e o recibo do mesmo candidato; revisão não reexecuta
 a calibração. Esse caminho permanece **não instalado**, até validar o produtor
 durável dos controles/intents e o fluxo real de proposta e revisão pelos agentes.
 Não há aprovação implícita quando uma dessas entradas está ausente.
+O produtor `broker/generic_calibration_proposal.py` coleta dados da tarefa nativa
+do CTO, exige leitura completa e leases encerrados, e calcula os vínculos com o
+plano e a cópia imutável do autor. Não aceita comandos ou declarações de aprovação
+na proposta. `generic_calibration_bundle_writer.py` materializa somente controles
+e política em destinos novos do controlador; não executa testes nem sobrescreve
+arquivos divergentes. Esses componentes ainda aguardam o despacho nativo e a
+materialização Docker duráveis do fluxo de proposta/revisão: não representam
+uma política instalada ou uma entrega autônoma já validada.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
