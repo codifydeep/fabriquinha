@@ -1319,8 +1319,13 @@ Métodos históricos não podem desaparecer; erros, skips, seleção parcial,
 manifestos divergentes e comandos arbitrários são rejeitados.
 
 Esse motor ainda **não está integrado nem autorizado no fluxo instalado**.
-Faltam produção e revisão independente do conjunto de controles, registro
-durável da política, execução Docker isolada e consumo do mesmo recibo nos gates
+As primitivas em `broker/generic_calibration_gate.py` verificam proposta e revisão
+independentes com leitura completa, mantêm registro imutável e executam um job
+Docker de comando fixo com intenções duráveis. Respostas incertas observam o
+mesmo job; não repetem criação ou início. Um canário Docker real verifica mounts
+somente leitura e ausência de socket, sem aprovar uma política instalada.
+Faltam a produção dos controles pelos agentes, a coleta autenticada dos fatos
+nativos e dos inventários anteriores, e o consumo do mesmo recibo nos gates
 de Red e revisão. O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

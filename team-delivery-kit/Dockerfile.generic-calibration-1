@@ -1,0 +1,4 @@
+# Offline only. Runtime authorization remains with the controller's reviewed
+# policy; this image must never receive network, credentials or a Docker socket.
+FROM delivery-kit-execution-broker:20261009.426
+COPY generic_harness_calibration.py r3_snapshot_probe.py /
