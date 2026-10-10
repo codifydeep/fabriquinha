@@ -8,6 +8,7 @@ intents remain a prerequisite hold, never an implied approval.
 import hashlib
 import json
 import re
+import time
 
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
@@ -82,6 +83,86 @@ def initialize(con):
         'issue_id TEXT,author_task TEXT,config TEXT,PRIMARY KEY(issue_id,author_task))')
     con.execute('CREATE TABLE IF NOT EXISTS generic_calibration_input_jobs('
         'job_key TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+
+
+def run_inputs(b,con,intake,value,route,*,now=None):
+    """Controller-only read/AST job; requires an exact durable intake.
+
+    This is not admission or approval. The caller holds the controller lock;
+    register still authenticates native approvals after the probe completes.
+    Persist effects before sending them and never replay an uncertain POST.
+    """
+    try:import harness_qualification,test_first_job
+    except ImportError:from broker import harness_qualification,test_first_job
+    initialize(con);context=intake['context'];key=intake['probe_job_key']
+    stored=con.execute('SELECT config FROM generic_calibration_intakes WHERE issue_id=? AND author_task=?',
+        (context['issue_id'],context['author_task'])).fetchone()
+    gate.require(stored and json.loads(stored[0])==intake)
+    expected=input_payload(b,intake)
+    expected['Env']=harness_qualification.image_environment(
+        gate.SimpleNamespace(IMAGE=expected['Image'],docker=b.docker))
+    identity=dict(name=b.PREFIX+'-calibration-inputs-'+digest(intake)[:24],
+        payload=expected,intake_sha256=digest(intake))
+    row=con.execute('SELECT identity,state FROM generic_calibration_input_jobs WHERE job_key=?',(key,)).fetchone()
+    now=time.time() if now is None else now
+    if row:
+        gate.require(json.loads(row[0])==identity);state=json.loads(row[1])
+        gate.require(state['stage']!='blocked')
+        if state['stage']=='complete':
+            result=state['result'];raw=result['output']
+            gate.require(result['approval'] is False and result['exit_code']==0
+                and hashlib.sha256(raw.encode()).hexdigest()==result['output_sha256'])
+            context_from_inputs(value,route,intake,json.loads(raw))
+            return result
+    else:
+        gate.require(b.docker('GET','/containers/'+identity['name']+'/json') is None)
+        state=dict(stage='prepared',deadline=now+600,delivery_approval=False)
+        con.execute('INSERT INTO generic_calibration_input_jobs VALUES(?,?,?)',
+            (key,json.dumps(identity,sort_keys=True),json.dumps(state,sort_keys=True)));con.commit()
+    def save(**changes):
+        state.update(changes)
+        con.execute('UPDATE generic_calibration_input_jobs SET state=? WHERE job_key=?',
+            (json.dumps(state,sort_keys=True),key));con.commit()
+    if now>=state['deadline']:
+        save(stage='blocked',category='input_observation_deadline')
+        raise ValueError('input deadline; retain exact job for diagnosis')
+    # Ownership is checked before every effect, not inferred from volume names.
+    record=dict(policy=intake['policy'],policy_sha256=digest(intake['policy']),context=context)
+    gate.validate_volumes(b,record)
+    previous=b.docker('GET','/volumes/'+intake['previous']['volume']) or {}
+    tags=previous.get('Labels',{})
+    gate.require(tags.get('delivery-kit.owner')==b.OWNER
+        and tags.get('delivery-kit.test-first-task')==intake['previous']['task_id'])
+    if state['stage']=='prepared':
+        save(stage='create_intent')
+        try:b.docker('POST','/containers/create?name='+identity['name'],expected)
+        except TimeoutError:raise TimeoutError('observe exact input create; never repeat POST') from None
+    info=b.docker('GET','/containers/'+identity['name']+'/json')
+    if info is None:raise TimeoutError('observe exact input handle; never recreate')
+    test_first_job.verify(b,info,expected)
+    if state['stage']=='create_intent':save(stage='created',container_id=info['Id'])
+    gate.require(info['Id']==state['container_id'])
+    if state['stage']=='created':
+        gate.require(info['State']['Status']=='created');save(stage='start_intent')
+        try:b.docker('POST','/containers/'+info['Id']+'/start')
+        except TimeoutError:raise TimeoutError('observe exact input start; never repeat POST') from None
+        info=b.docker('GET','/containers/'+info['Id']+'/json')
+        if info is None:raise TimeoutError('observe recorded input start')
+        test_first_job.verify(b,info,expected)
+        gate.require(info['Id']==state['container_id'])
+    if info['State']['Status']!='exited':raise TimeoutError('input pending; observe same handle')
+    raw=b.docker_stdout(info['Id'],include_stderr=info['State']['ExitCode']!=0,limit=65536)
+    sha=hashlib.sha256(raw.encode()).hexdigest()
+    try:
+        gate.require(info['State']['ExitCode']==0)
+        context_from_inputs(value,route,intake,json.loads(raw))
+    except (ValueError,KeyError,TypeError):
+        save(stage='blocked',category='executed_input_rejected',output_sha256=sha,
+            exit_code=info['State']['ExitCode'])
+        raise ValueError('actual input rejected; no identical retry') from None
+    result=dict(container_id=info['Id'],exit_code=0,approval=False,output=raw,output_sha256=sha)
+    save(stage='complete',result=result)
+    return result
 
 
 def register(b,issue,author_task):

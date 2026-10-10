@@ -1327,7 +1327,12 @@ somente leitura e ausência de socket, sem aprovar uma política instalada.
 O coletor `broker/generic_calibration_registration.py` consulta tarefas e leituras
 nativas, exige leases de planejamento encerrados e vincula o candidato ao job
 de cópia concluído. O probe de entradas verifica os manifestos e extrai métodos
-por AST, sem executar testes. Os gates de Red e revisão têm um caminho genérico
+por AST, sem executar testes.
+O job de entradas possui intenções persistentes próprias: uma perda de resposta
+na criação ou no início observa o mesmo contêiner, sem repetir a operação.
+Recibos inválidos e prazos vencidos preservam o job para diagnóstico, e um
+recibo concluído só é reutilizado para a mesma entrada e execução vinculadas.
+Os gates de Red e revisão têm um caminho genérico
 que exige esse registro e o recibo do mesmo candidato; revisão não reexecuta
 a calibração. Esse caminho permanece **não instalado**, até validar o produtor
 durável dos controles/intents e o fluxo real de proposta e revisão pelos agentes.
