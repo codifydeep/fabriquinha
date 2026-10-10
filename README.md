@@ -244,6 +244,13 @@ O controlador não renova essa recuperação após outra falha. Este caminho ain
 precisa de validação com agentes reais; não comprova autonomia nem resolve,
 sozinho, disputas sobre o conteúdo de uma revisão.
 
+O contrato `broker/review_reconsideration.py` foi validado offline para uma
+contestação do CTO com leitura completa e citações nos dois snapshots. Ele
+preserva o parecer anterior e pede uma única nova revisão independente do mesmo
+snapshot; não aprova a entrega nem autoriza mudanças nos testes. Sua ligação ao
+schema dos agentes e ao despacho ainda está pendente; o contrato isolado não
+comprova resolução autônoma de disputas.
+
 O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
 wakeup do Multica, sem tratá-lo como outro contrato ou autorização. Quando Tech
 Lead e CTO falharam por essa incompatibilidade local, recibos ACP e rejeições

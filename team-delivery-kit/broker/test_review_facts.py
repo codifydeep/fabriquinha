@@ -80,7 +80,9 @@ def validate_findings(decision, report):
     for finding in findings:
         if not isinstance(finding, dict) or set(finding) != fields:
             raise ValueError('exact finding fields required')
-        if finding['kind'] not in ('removed_method', 'removed_assertion', 'semantic_regression', 'missing_coverage', 'invalid_harness'):
+        disputing=(decision['action']=='request_review_reconsideration')
+        if (finding['kind'] not in ('removed_method', 'removed_assertion', 'semantic_regression', 'missing_coverage', 'invalid_harness')
+                and not (disputing and finding['kind']=='review_disagreement')):
             raise ValueError('unknown finding kind')
         tree = report.get(finding['tree']) if finding['tree'] in ('candidate', 'previous') else None
         file = (tree or {}).get('files', {}).get(finding['path'])
