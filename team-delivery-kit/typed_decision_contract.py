@@ -10,6 +10,7 @@ import re
 from jsonschema import Draft202012Validator
 from structured_response_contract import StructuredResponseRejected,_unique
 import plan_length_feedback
+import technical_optional_files_feedback
 
 NAME='submit_delivery_decision'
 MARKER='DELIVERY_TYPED_DECISION_V1'
@@ -238,7 +239,7 @@ def validate_remediation_feedback_identity(body,decision):
 
 
 def length_feedback_preflight(counter_path,execution_id,body):
-    if not length_feedback_enabled(body):return
+    if not (length_feedback_enabled(body) or technical_optional_files_feedback.enabled(body)):return
     from deterministic_read_dispatch import ledger
     with ledger(counter_path) as con:
         con.execute('CREATE TABLE IF NOT EXISTS technical_length_feedback(execution_id TEXT PRIMARY KEY,receipt TEXT)')
@@ -248,12 +249,15 @@ def length_feedback_preflight(counter_path,execution_id,body):
 
 def claim_length_feedback(counter_path,execution_id,error,body,first_call):
     feedback=getattr(error,'length_feedback',None)
-    if not feedback or not length_feedback_enabled(body):return None
+    if not feedback or not (length_feedback_enabled(body) or
+            getattr(error,'optional_files_feedback',False) and technical_optional_files_feedback.enabled(body)):return None
     if not isinstance(execution_id,str) or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',execution_id):return None
     from deterministic_read_dispatch import ledger
     receipt={'operation':'review_length_feedback_v1' if review_length_feedback_enabled(body) else 'technical_length_feedback_v1','first_call':first_call,
         'rejected_upstream_sha256':error.receipt['upstream_sha256'],'attempt_limit':1,
         'worker_tool_executed':False,'delivery_approval':False}
+    if getattr(error,'optional_files_feedback',False):
+        receipt['operation']='technical_optional_files_feedback_v1'
     if review_length_feedback_enabled(body):
         receipt['review_acceptance_by_proxy']=False
         receipt['manifest_sha256']=body['tools'][0]['function']['parameters']['properties']['manifest_sha256']['enum'][0]
@@ -741,6 +745,11 @@ def translate(body,data,media_type):
         violations=list(Draft202012Validator(schema).iter_errors(decision))
         if violations:
             diagnostic=constraint_diagnostic(violations,schema,data)
+            optional_feedback=technical_optional_files_feedback.make(body,violations,decision,schema,arguments,data)
+            if optional_feedback:
+                error=StructuredResponseRejected('typed_schema_maxItems');error.length_feedback=optional_feedback
+                error.optional_files_feedback=True
+                raise error
             if (r3_length_feedback_enabled(body) and len(violations)==1
                     and violations[0].validator=='maxLength' and list(violations[0].path)==['reason']
                     and isinstance(decision.get('reason'),str) and 600<len(decision['reason'])<=4000):
@@ -802,6 +811,7 @@ def translate(body,data,media_type):
             allowed={'type','required','additionalProperties','enum','minLength','maxLength','maxItems'}
             keyword=next(iter(violations)).validator
             reject('schema_'+(keyword if keyword in allowed else 'violation'))
+        technical_optional_files_feedback.validate_identity(body,decision)
         validate_review_feedback_identity(body,decision)
         validate_remediation_feedback_identity(body,decision)
         validate_r3_feedback_identity(body,decision)

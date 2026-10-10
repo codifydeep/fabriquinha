@@ -19,6 +19,7 @@ import read_stream_recovery
 import forced_tool_feedback
 import deterministic_read_dispatch
 import typed_decision_contract
+import technical_optional_files_feedback
 import typed_test_source
 import planning_schema
 import provider_tool_routing
@@ -164,7 +165,10 @@ def validate_request(body):
         body['reasoning'] = ({'enabled': False}
                              if reasoning_off or REASONING_EFFORT == 'disabled'
                              else {'effort': REASONING_EFFORT})
-    return typed_test_source.apply(typed_decision_contract.apply(apply_test_artifact_schema(apply_write_tool_schema(apply_decision_schema(body)))))
+    result=typed_test_source.apply(typed_decision_contract.apply(apply_test_artifact_schema(apply_write_tool_schema(apply_decision_schema(body)))))
+    if os.environ.get('MODEL_PROXY_OPTIONAL_FILES_FEEDBACK')=='1':
+        result=technical_optional_files_feedback.opt_in(result)
+    return result
 
 
 def safe_request_metrics(body):

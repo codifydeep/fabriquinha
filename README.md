@@ -326,6 +326,17 @@ qualificado atualmente instalado, não uma imagem aposentada. O pin foi alinhado
 no código e validado offline; sua instalação ainda está pendente. Identidade,
 leituras completas, rejeição correlacionada e tentativa única continuam
 obrigatórias; o alinhamento não aceita um parecer nem renova recuperações.
+O código também oferece correção única de `optional_files` não vazio em
+propostas técnicas não autorizadoras. O marcador explícito e a igualdade com
+o schema canônico são obrigatórios. `MODEL_PROXY_OPTIONAL_FILES_FEEDBACK=1`
+permite ao proxy habilitar esse marcador somente após leitura completa das duas
+árvores; a opção permanece desligada por padrão. O modelo deve ressubmeter
+`optional_files=[]` mantendo ação e justificativa exatamente iguais. O adapter
+não remove campos por conta própria, não muda o parecer e não edita testes.
+O limite persistente é compartilhado com correções de comprimento para impedir
+renovação de tentativas, e toda chamada continua sujeita ao teto pago. A extensão
+passou nos testes offline; instalação, qualificação real e recuperação do
+diagnóstico de suíte que falhou por esse formato ainda estão pendentes.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
