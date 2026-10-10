@@ -278,7 +278,10 @@ após qualificação durável do transporte: preserva o diagnóstico falho, os
 recuperadores já consumidos e os snapshots. Exige leitura completa, CTO
 independente, modo de planejamento, lease encerrada e proxy qualificado exato.
 Não afirma a causa histórica quando o recibo ACP a registra como desconhecida.
-A instalação e a retomada real dessa política ainda não foram qualificadas.
+A política foi instalada e a qualificação registrada a partir dos logs e ledger
+do proxy real. A retomada administrativa foi conferida: snapshot e contadores
+preservados, nenhum reinício do autor ou aprovação. O novo diagnóstico pelos
+agentes ainda precisa ser comprovado; esta admissão não equivale à sua conclusão.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 
