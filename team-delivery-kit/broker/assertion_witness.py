@@ -76,7 +76,8 @@ def extract_trace(root,hashes,output):
         path,number=frame;tree=trees[path]
         methods=[n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name==current[0] and n.lineno<=number<=n.end_lineno]
         calls=[n for m in methods for n in ast.walk(m) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
-               and n.func.attr in ('assertTrue','assertFalse','assertEqual','assertIn','assertNotIn','assertIsNone','assertIsNotNone','assertNotEqual')
+               and n.func.attr in ('assertTrue','assertFalse','assertEqual','assertIn','assertNotIn','assertIsNone','assertIsNotNone','assertNotEqual',
+                                   'assertGreaterEqual','assertGreater','assertLessEqual','assertLess')
                and n.lineno<=number<=n.end_lineno]
         if len(methods)!=1 or len(calls)!=1:continue
         call=calls[0]

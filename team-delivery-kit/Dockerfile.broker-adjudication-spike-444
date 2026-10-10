@@ -1,0 +1,7 @@
+# Fixed read-only experiment; no implementation/review handler changes.
+FROM delivery-kit-execution-broker:20261010.443
+COPY broker/frozen_adjudication_spike.py /frozen_adjudication_spike.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+COPY broker/assertion_witness.py /assertion_witness.py
+COPY broker/runtime_assertion_probe.py /runtime_assertion_probe.py
+COPY broker/event_trace.cjs /event_trace.cjs

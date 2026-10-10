@@ -67,6 +67,18 @@ class AssertionWitnessTests(unittest.TestCase):
         self.assertNotIn('private message',json.dumps(r))
         self.assertEqual(extract_trace(self.root,self.hashes,output.replace('line 4','line 3'))['anchors'],[])
 
+    def test_numeric_inequality_anchors_preserve_assertion_and_redact_arbitrary_messages(self):
+        for assertion in ('assertGreaterEqual','assertGreater','assertLessEqual','assertLess'):
+            raw=('import unittest\nclass Case(unittest.TestCase):\n def test_x(self):\n  self.'+
+                 assertion+'(self.report["poll_requests"], 3)\n').encode()
+            self.path.write_bytes(raw);self.hashes={'tests/test_new.py':hashlib.sha256(raw).hexdigest()}
+            (self.root/'manifest.json').write_text(json.dumps({'files':{p:{'sha256':h} for p,h in self.hashes.items()}}))
+            output='FAIL: test_x (tests.test_new.Case.test_x)\n  File "/delivery/tests/test_new.py", line 4, in test_x\nAssertionError: 2 not greater than or equal to 3 : private\n'
+            result=extract_trace(self.root,self.hashes,output)
+            self.assertEqual(result['anchors'][0]['assertion'],assertion)
+            self.assertEqual(result['anchors'][0]['fields'],['poll_requests'])
+            self.assertNotIn('private',json.dumps(result))
+
     def test_membership_operands_only_publish_literals_from_same_assertion(self):
         raw=b'import unittest\nOTHER="other-fixture"\nclass Case(unittest.TestCase):\n def test_x(self):\n  self.assertIn("fixture-item", report["rendered"])\n'
         self.path.write_bytes(raw);self.hashes={'tests/test_new.py':hashlib.sha256(raw).hexdigest()}

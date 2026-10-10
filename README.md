@@ -353,6 +353,16 @@ completas das duas árvores e parecer validado. Isso comprova recuperação de
 transporte, não resolução técnica: um parecer que ainda pede adjudicação ao
 próprio CTO permanece bloqueado e precisa de experimento/decisão técnica
 fundamentada. Não libera o autor nem conta como entrega autônoma.
+O controlador `.444` acrescenta um SPIKE não-mutante para esse impasse. A receita
+atual é limitada a suítes Python com harness Node: observa as assertions reais,
+repete a suíte com tracing de eventos e exige mesmo manifesto, falhas e
+observações, sem skips, erros de infraestrutura ou truncamento. Registra um card
+filho de acompanhamento, sem atribuir um agente antes das permissões; os jobs são
+do controlador e o diagnóstico do CTO permanece vinculado ao pai. Resultados e
+intenção de retorno são duráveis. Uma execução ambígua é observada pelo mesmo
+handle. Evidência contaminada bloqueia o SPIKE; resultado equivalente não
+classifica automaticamente o defeito nem concede edição. Outras stacks exigem
+receitas qualificadas próprias, não comandos arbitrários fornecidos pelo modelo.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.
@@ -1013,6 +1023,12 @@ flowchart TD
     E --> F[Design, Backend/Data, Frontend ou Mobile conforme escopo]
     F --> CG{Calibração aplicável válida?}
     CG -->|Sim / não aplicável| G[TDD: Red registrado, Green e suíte completa]
+    G -->|Suíte congelada falha| AD[Tech Lead e CTO: diagnóstico da entrega imutável]
+    AD -->|CTO ainda não adjudicou| SP[SPIKE fixo: suíte sem tracing e com tracing]
+    SP -->|Observações equivalentes| AJ[CTO decide com evidência; sem autorização implícita]
+    SP -->|Contaminação ou evidência incompleta| RB
+    AJ -->|Proposta de correção| CP
+    AJ -->|Ainda inconclusivo; tentativa consumida| RB
     CG -->|Não| CD[CTO: diagnosticar snapshot imutável]
     CD --> CP[Tech Lead: inspeção independente do retrabalho]
     CP -->|Patrocínio válido| F

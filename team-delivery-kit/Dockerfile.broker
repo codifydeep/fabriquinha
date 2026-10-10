@@ -206,6 +206,7 @@ COPY broker/red_log_recovery.py /red_log_recovery.py
 COPY broker/cto_prompt_bound_recovery.py /cto_prompt_bound_recovery.py
 COPY broker/provider_diagnosis_recovery.py /provider_diagnosis_recovery.py
 COPY broker/frozen_diagnosis_format_recovery.py /frozen_diagnosis_format_recovery.py
+COPY broker/frozen_adjudication_spike.py /frozen_adjudication_spike.py
 COPY optional_files_transport_fixture.py /optional_files_transport_fixture.py
 COPY broker/review_provider_recovery.py /review_provider_recovery.py
 COPY broker/watchdog_fault.py /watchdog_fault.py

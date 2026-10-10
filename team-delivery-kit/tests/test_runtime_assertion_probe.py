@@ -53,3 +53,22 @@ class RuntimeProbeTests(unittest.TestCase):
         self.assertEqual(result['runtime_observations'][0]['reports']['report']['private'],{'redacted_type':'str'})
         self.assertEqual(result['runtime_observations'][0]['reports']['self_report'],{'stale':False})
         self.assertIs(unittest.TestCase.assertTrue,original)
+
+    def test_numeric_failure_observation_does_not_weaken_threshold_or_suppress_failure(self):
+        class Fixture(unittest.TestCase):
+            def id(self):return 'tests.new.Case.test_x'
+            def runTest(self):
+                self.report={'poll_requests':2}
+                self.assertGreaterEqual(self.report['poll_requests'],3)
+        original=unittest.TestCase.assertGreaterEqual
+        with tempfile.TemporaryDirectory() as temp:
+            root=pathlib.Path(temp);(root/'tests').mkdir();raw=b'VALUE=3\n';(root/'tests/new.py').write_bytes(raw)
+            digest=hashlib.sha256(raw).hexdigest();(root/'manifest.json').write_text(json.dumps(dict(files={'tests/new.py':{'sha256':digest}})))
+            proof=dict(manifest_sha256='a'*64,output_sha256='b'*64,anchors=[dict(qualified_name='tests.new.Case.test_x',
+                assertion='assertGreaterEqual',line=Fixture.runTest.__code__.co_firstlineno+2,fields=['poll_requests'])])
+            with patch.object(self.probe,'extract_trace',return_value=proof),patch.object(unittest.defaultTestLoader,'discover',return_value=unittest.TestSuite([Fixture()])):
+                result=self.probe.run(root,{'tests/new.py':digest},'')
+        self.assertEqual(result['suite']['failures'],1);self.assertEqual(result['suite']['errors'],0)
+        self.assertEqual(result['runtime_observations'][0]['operands'],[2,3])
+        self.assertEqual(result['runtime_observations'][0]['reports']['self_report'],{'poll_requests':2})
+        self.assertFalse(result['approval']);self.assertIs(unittest.TestCase.assertGreaterEqual,original)

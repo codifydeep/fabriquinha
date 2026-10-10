@@ -666,6 +666,9 @@ def tick(b):
     try:import frozen_diagnosis_format_recovery
     except ImportError:from broker import frozen_diagnosis_format_recovery
     frozen_diagnosis_format_recovery.tick(b)
+    try:import frozen_adjudication_spike
+    except ImportError:from broker import frozen_adjudication_spike
+    frozen_adjudication_spike.tick(b)
     try:import planning_review_observation
     except ImportError:from broker import planning_review_observation
     planning_review_observation.tick(b)
