@@ -110,6 +110,24 @@ def tick(b):
         c.execute('CREATE TABLE IF NOT EXISTS diagnostic_evidence_recoveries(source_task TEXT PRIMARY KEY,previous_handoff TEXT,receipt TEXT)')
         if controller_maintenance.current(c):return
         rows=c.execute("SELECT source_task,config,state FROM frozen_adjudication_spikes WHERE json_extract(state,'$.stage')='dispatched'").fetchall()
+        recoveries=c.execute('SELECT source_task,receipt FROM diagnostic_evidence_recoveries').fetchall()
+    for source,raw_receipt in recoveries:
+        with b.db() as c:
+            row=handoffs.load(c,source)
+            if not row:continue
+            data=json.loads(row['data'])
+            if data.get('control_error')!="KeyError:'dispatch_marker'":continue
+            route=json.loads(c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(row['issue_id'],)).fetchone()[0])
+            active=bool(c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone())
+        runs=native.issue_task_runs(settings,row['issue_id'])
+        try:updated=repair_unmarked_intake(row,json.loads(raw_receipt),route['cto'],active=active,
+            pending=any(t.get('status') in ('queued','running','dispatched') for t in runs))
+        except ValueError:continue
+        with b.LOCK,b.db() as c:
+            if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
+            if controller_maintenance.current(c) or handoffs.load(c,source)!=row:continue
+            if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():continue
+            handoffs.save(c,source,row['issue_id'],'diagnose_cto',route['cto'],updated,time.time(),commit=False)
     for source,raw_config,raw_state in rows:
         with b.db() as c:
             row=handoffs.load(c,source)
@@ -135,4 +153,27 @@ def tick(b):
             if c.execute('SELECT 1 FROM diagnostic_evidence_recoveries WHERE source_task=?',(source,)).fetchone():continue
             c.execute('INSERT INTO diagnostic_evidence_recoveries VALUES(?,?,?)',
                 (source,json.dumps(row,sort_keys=True),json.dumps(updated['diagnostic_evidence_recovery'],sort_keys=True)))
-            handoffs.save(c,source,row['issue_id'],'dispatch_intent',route['cto'],updated,time.time(),commit=False)
+            # Standard handoff machinery generates marker and durable intent.
+            handoffs.save(c,source,row['issue_id'],'diagnose_cto',route['cto'],updated,time.time(),commit=False)
+
+
+def repair_unmarked_intake(row,receipt,cto,*,active,pending):
+    """Repair a proven pre-call KeyError, not an uncertain native POST."""
+    data=json.loads(row['data']);context=data.get('diagnostic_evidence_context')
+    if (active or pending or row['stage'] not in ('dispatch_intent','technical_decision_required')
+            or row['owner']!=cto or data.get('target')!=cto or data.get('dispatch_stage')!='diagnose_cto'
+            or data.get('control_error')!="KeyError:'dispatch_marker'" or data.get('context_intake_repair')
+            or data.get('dispatch_marker') or data.get('recipient_task') or data.get('wakeup_id')
+            or not context or data.get('diagnostic_evidence_recovery')!=receipt
+            or receipt.get('operation')!='new_durable_experiment_context_v1'
+            or receipt.get('jobs_reexecuted') is not False or receipt.get('delivery_approval') is not False):
+        raise ValueError('exact unmarked pre-native context intent required')
+    verify_context(context,row['source_task'],data['validation_failure'],data.get('adjudication_spike',{}))
+    updated=copy.deepcopy(data)
+    updated['context_intake_repair']=dict(operation='unmarked_diagnostic_intake_repair_v1',
+        previous_handoff_sha256=hashlib.sha256(json.dumps(row,sort_keys=True).encode()).hexdigest(),
+        previous_error=data['control_error'],previous_error_count=data.get('control_error_count'),
+        native_post_attempted=False,jobs_reexecuted=False,author_retry_authorized=False,delivery_approval=False)
+    for key in ('control_error','control_error_count','dispatch_stage'):
+        updated.pop(key,None)
+    return updated

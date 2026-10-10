@@ -7,6 +7,26 @@ import test_frozen_adjudication_spike as prior
 
 
 class DiagnosticEvidenceTests(unittest.TestCase):
+    def test_pre_native_missing_marker_returns_to_standard_intake_only_once(self):
+        _,_,row,route,task,binding,decision,reads,context=self.fixture()
+        data=memory.prepare_recovery(row,route,task,binding,decision,reads,context,
+            active=False,pending=False,consumed=False)
+        data.update(control_error="KeyError:'dispatch_marker'",control_error_count=2)
+        failed={**row,'data':json.dumps(data)};receipt=data['diagnostic_evidence_recovery']
+        repaired=memory.repair_unmarked_intake(failed,receipt,'cto',active=False,pending=False)
+        self.assertNotIn('dispatch_stage',repaired);self.assertNotIn('dispatch_marker',repaired)
+        self.assertFalse(repaired['context_intake_repair']['native_post_attempted'])
+        self.assertEqual(repaired['diagnostic_evidence_context'],context)
+        for change in ('active','pending','accepted','marker','error','consumed','receipt'):
+            r=copy.deepcopy(failed);d=json.loads(r['data']);rec=copy.deepcopy(receipt);flags=dict(active=False,pending=False)
+            if change in flags:flags[change]=True
+            if change=='accepted':d['wakeup_id']='accepted'
+            if change=='marker':d['dispatch_marker']='e'*64
+            if change=='error':d['control_error']='TimeoutError'
+            if change=='consumed':d['context_intake_repair']={'used':True}
+            if change=='receipt':rec['proof_sha256']='e'*64
+            r['data']=json.dumps(d)
+            with self.subTest(change=change),self.assertRaises(ValueError):memory.repair_unmarked_intake(r,rec,'cto',**flags)
     def fixture(self):
         sample=prior.AdjudicationSpikeTests();config=spike.qualify(sample.evidence())
         plain,traced=sample.proofs(config);proof=spike.validate_pair(config,plain,traced)

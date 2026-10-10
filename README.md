@@ -393,6 +393,11 @@ modelo, vinculando source, wakeup e hash do recibo. O contexto permanece no
 estado durável e acompanha diagnósticos posteriores que usam o mesmo marcador.
 Uma recuperação por evidência antes ausente preserva o diagnóstico anterior e
 permite somente uma nova inspeção CTO, sem repetir jobs ou ampliar autoridade.
+Essa inspeção entra em `diagnose_cto`: o mecanismo padrão gera marcador e
+intenção antes do wakeup. A correção de um intake antigo sem marcador exige o
+`KeyError` exato anterior à chamada nativa, registro da recuperação, ausência de
+wakeup/tarefa e nenhuma execução pendente; não se aplica a timeouts ou resultados
+incertos. A falha fica registrada e não renova tentativas funcionais.
 A receita legada de request-scope exige as três falhas qualificadas de
 `service-mode`; uma revisão de teste de outro domínio não autoriza sua execução.
 O reconciliador de bootstrap deixa de consultar externamente workers históricos

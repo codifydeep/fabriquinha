@@ -1,0 +1,4 @@
+# Enter standard diagnosis state; retain proof of the rejected pre-native intake.
+FROM delivery-kit-execution-broker:20261010.449
+COPY broker/diagnostic_evidence_context.py /diagnostic_evidence_context.py
+COPY broker/bound_failure_context.py /bound_failure_context.py
