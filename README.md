@@ -348,6 +348,11 @@ Reinícios não renovam essa tentativa; a entrega e contadores antigos permanece
 preservados. A nova inspeção exige também os testes da árvore anterior. Preview
 elegível não é execução nem aprovação; conclusão real e entrega ponta a ponta
 continuam sendo evidências obrigatórias posteriores.
+A recuperação real de CTO já produziu uma execução única concluída, com leituras
+completas das duas árvores e parecer validado. Isso comprova recuperação de
+transporte, não resolução técnica: um parecer que ainda pede adjudicação ao
+próprio CTO permanece bloqueado e precisa de experimento/decisão técnica
+fundamentada. Não libera o autor nem conta como entrega autônoma.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.
