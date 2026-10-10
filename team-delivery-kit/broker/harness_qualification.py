@@ -192,6 +192,14 @@ def capture(b,con,issue,task,volume,prepared):
     except ImportError:from broker import remediation_runtime_guard as guard
     value=guard.qualified(b,issue)
     if not value or not value.get('amendment'):return None
+    if value['amendment'].get('kind')=='inherited_frozen_suite':
+        try:import generic_calibration_gate as gate,generic_calibration_registration as registration
+        except ImportError:from broker import generic_calibration_gate as gate,generic_calibration_registration as registration
+        record=registration.register(b,issue,task)
+        gate.require(volume==record['context']['candidate_volume']
+            and prepared['manifest_sha256']==record['policy']['candidate_manifest_sha256']
+            and prepared['test_sha256']==record['policy']['test_sha256'])
+        return gate.run(b,con,record)['receipt']
     background,timers=calibration_policy(value)
     from service_mode_harness_qualification import TEST
     if set(prepared['test_sha256'])!={TEST}:raise ValueError('declared amendment test scope required')
@@ -258,6 +266,12 @@ def require(b,issue,red):
     except ImportError:from broker import remediation_runtime_guard as guard
     value=guard.qualified(b,issue)
     if not value or not value.get('amendment'):return
+    if value['amendment'].get('kind')=='inherited_frozen_suite':
+        try:import generic_calibration_gate as gate,generic_calibration_registration as registration
+        except ImportError:from broker import generic_calibration_gate as gate,generic_calibration_registration as registration
+        record=registration.register(b,issue,red['task_id'])
+        with b.db() as con:gate.require_result(b,con,record,red)
+        return
     background,timers=calibration_policy(value)
     with b.db() as con:
         row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(red['task_id'],)).fetchone()

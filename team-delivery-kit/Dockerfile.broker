@@ -20,6 +20,9 @@ COPY broker/template_admission_recovery.py /template_admission_recovery.py
 COPY broker/template_preservation_probe.py /template_preservation_probe.py
 COPY broker/calibration_preflight_recovery.py /calibration_preflight_recovery.py
 COPY broker/harness_qualification.py /harness_qualification.py
+COPY broker/generic_calibration_gate.py /generic_calibration_gate.py
+COPY broker/generic_calibration_registration.py /generic_calibration_registration.py
+COPY generic_harness_calibration.py /generic_harness_calibration.py
 COPY service_mode_harness_qualification.py /service_mode_harness_qualification.py
 COPY inherited_harness_probe.py /inherited_harness_probe.py
 COPY r3_snapshot_probe.py /r3_snapshot_probe.py

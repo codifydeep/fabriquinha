@@ -1,0 +1,3 @@
+# Add the non-executing immutable input probe; do not change worker/model images.
+FROM delivery-kit-generic-calibration:20261010.1
+COPY generic_calibration_input_probe.py /generic_calibration_input_probe.py

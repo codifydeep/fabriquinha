@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 import time
+import os
 from types import SimpleNamespace
 
 from docker_grouping import labels
@@ -84,7 +85,7 @@ def store(con,record):
 
 def payload(b,record):
     p=record['policy'];context=record['context'];validate_policy(p,record['policy_sha256'])
-    image=b.GENERIC_CALIBRATION_IMAGE
+    image=getattr(b,'GENERIC_CALIBRATION_IMAGE',None) or os.environ.get('BROKER_GENERIC_CALIBRATION_IMAGE')
     require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
     for key in ('candidate_volume','controls_volume','policy_volume'):
         require(isinstance(context[key],str) and context[key].startswith(b.PREFIX+'-')
@@ -178,3 +179,22 @@ def run(b,con,record,*,now=None):
     result=dict(container_id=info['Id'],output_sha256=output_sha256,receipt=receipt,delivery_approval=False)
     save(stage='complete',result=result)
     return result
+
+
+def require_result(b,con,record,red):
+    """Observe the original approved job receipt only; never execute a new job."""
+    initialize(con);context=record['context'];p=record['policy'];sha=record['policy_sha256']
+    require(red['task_id']==context['author_task'] and red['volume']==context['candidate_volume']
+        and red['red']['manifest_sha256']==p['candidate_manifest_sha256']
+        and red['red']['test_sha256']==p['test_sha256'])
+    row=con.execute('SELECT identity,state FROM generic_calibration_jobs WHERE job_key=?',
+        (context['issue_id']+':'+context['author_task'],)).fetchone()
+    require(row is not None);identity,state=map(json.loads,row)
+    expected=payload(b,record)
+    try:import harness_qualification
+    except ImportError:from broker import harness_qualification
+    expected['Env']=harness_qualification.image_environment(SimpleNamespace(IMAGE=expected['Image'],docker=b.docker))
+    require(identity==dict(name=b.PREFIX+'-generic-calibration-'+sha[:24],payload=expected,record_sha256=digest(record))
+        and state.get('stage')=='complete' and state['result'].get('delivery_approval') is False)
+    validate_volumes(b,record)
+    return validate_receipt(state['result']['receipt'],p,sha)

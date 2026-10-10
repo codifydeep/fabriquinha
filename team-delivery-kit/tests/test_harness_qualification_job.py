@@ -11,7 +11,7 @@ class HarnessJobTests(unittest.TestCase):
         from broker import remediation_runtime_guard as guard
         con=sqlite3.connect(':memory:');self.addCleanup(con.close)
         self.b.docker=lambda *a:self.fail('unsupported policy must not produce Docker effects')
-        for kind in ('inherited_frozen_suite','unknown'):
+        for kind in ('unknown',):
             with self.subTest(kind=kind),patch.object(guard,'qualified',return_value={
                     'amendment':{'kind':kind}}):
                 with self.assertRaisesRegex(ValueError,'unsupported harness calibration policy'):
@@ -21,6 +21,18 @@ class HarnessJobTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'unsupported harness calibration policy'):
                     job.require(self.b,'issue',{'task_id':'task'})
         self.assertEqual(con.execute('SELECT count(*) FROM sqlite_master').fetchone()[0],0)
+
+    def test_inherited_policy_must_register_before_capture_or_review_without_bypass(self):
+        from broker import remediation_runtime_guard as guard,generic_calibration_registration as registration
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        self.b.docker=lambda *a:self.fail('missing reviewed intake must not produce Docker effects')
+        with patch.object(guard,'qualified',return_value={'amendment':{'kind':'inherited_frozen_suite'}}),\
+                patch.object(registration,'register',side_effect=ValueError('independently reviewed input intent required')) as register:
+            with self.assertRaisesRegex(ValueError,'independently reviewed'):
+                job.capture(self.b,con,'issue','task','volume',self.prepared)
+            with self.assertRaisesRegex(ValueError,'independently reviewed'):
+                job.require(self.b,'issue',{'task_id':'task'})
+            self.assertEqual(register.call_count,2)
 
     def setUp(self):
         self.b=SimpleNamespace(IMAGE='sha256:'+'a'*64,OWNER='owned',PREFIX='delivery-kit-port2')

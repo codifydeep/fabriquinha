@@ -1324,9 +1324,15 @@ independentes com leitura completa, mantêm registro imutável e executam um job
 Docker de comando fixo com intenções duráveis. Respostas incertas observam o
 mesmo job; não repetem criação ou início. Um canário Docker real verifica mounts
 somente leitura e ausência de socket, sem aprovar uma política instalada.
-Faltam a produção dos controles pelos agentes, a coleta autenticada dos fatos
-nativos e dos inventários anteriores, e o consumo do mesmo recibo nos gates
-de Red e revisão. O controlador não pode executar o código de testes diretamente:
+O coletor `broker/generic_calibration_registration.py` consulta tarefas e leituras
+nativas, exige leases de planejamento encerrados e vincula o candidato ao job
+de cópia concluído. O probe de entradas verifica os manifestos e extrai métodos
+por AST, sem executar testes. Os gates de Red e revisão têm um caminho genérico
+que exige esse registro e o recibo do mesmo candidato; revisão não reexecuta
+a calibração. Esse caminho permanece **não instalado**, até validar o produtor
+durável dos controles/intents e o fluxo real de proposta e revisão pelos agentes.
+Não há aprovação implícita quando uma dessas entradas está ausente.
+O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
 obrigatória. Calibração aprovada não equivale a Red, Green ou homologação.

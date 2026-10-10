@@ -126,3 +126,16 @@ class GenericCalibrationGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):gate.run(b,con,record,now=2)
         self.assertEqual(len(calls),count)
 
+    def test_review_consumes_same_receipt_without_executing_and_rejects_stale_red(self):
+        b,con,record,calls,container=self.job()
+        result=gate.run(b,con,record,now=1)
+        red=dict(task_id=self.context['author_task'],volume=self.context['candidate_volume'],
+            red=dict(manifest_sha256=self.policy['candidate_manifest_sha256'],test_sha256=self.policy['test_sha256']))
+        before=len(calls)
+        self.assertEqual(gate.require_result(b,con,record,red),result['receipt'])
+        self.assertEqual(len(calls),before)
+        for mutate in (lambda r:r.update(task_id='another-author'),lambda r:r.update(volume='another-delivery'),
+                       lambda r:r['red'].update(manifest_sha256='0'*64),lambda r:r['red'].update(test_sha256={})):
+            bad=copy.deepcopy(red);mutate(bad)
+            with self.assertRaises(ValueError):gate.require_result(b,con,record,bad)
+
