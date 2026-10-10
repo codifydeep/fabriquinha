@@ -66,7 +66,7 @@ def upgrade(b,issue,operation,*,withdraw_pending_successor=False):
                             and con.execute('SELECT 1 FROM '+table+' WHERE source_task=?',(red['task_id'],)).fetchone()):
                         raise ValueError('successor already has execution effects; preserve active lineage')
                 parent_source=successor_config.get('r1_feedback',{}).get('previous_source')
-                parent=json.loads(con.execute('SELECT state FROM remediation_executions WHERE source_task=?',(parent_source,)).fetchone()[0])
+                parent_contract,parent=map(json.loads,con.execute('SELECT contract,state FROM remediation_executions WHERE source_task=?',(parent_source,)).fetchone())
                 admission=json.loads(con.execute('SELECT state FROM remediation_admissions WHERE source_task=?',(parent_source,)).fetchone()[0])
             elif not route.get('enabled'):
                 raise ValueError('disabled route without exact successor cannot migrate')
@@ -98,7 +98,7 @@ def upgrade(b,issue,operation,*,withdraw_pending_successor=False):
                 headers={'Authorization':'Bearer '+settings['token'],'X-Workspace-ID':settings['workspace_id']})
             with urllib.request.urlopen(request,timeout=5) as response:wakeups=json.load(response)
             held,withdrawal=review_successor_withdrawal.prepare(successor_config,successor_state,
-                route,red,original,parent_source,parent,admission,runs,wakeups)
+                route,red,original,parent_source,parent,admission,runs,wakeups,parent_contract)
             updated['review_mediation_upgrade']['successor_withdrawal']=withdrawal
         try:import handoffs
         except ImportError:from broker import handoffs
@@ -110,7 +110,7 @@ def upgrade(b,issue,operation,*,withdraw_pending_successor=False):
             if withdrawal:
                 current=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(red['task_id'],)).fetchone()
                 if (tuple(current)!=tuple(successor)
-                        or json.loads(con.execute('SELECT state FROM remediation_executions WHERE source_task=?',(parent_source,)).fetchone()[0])!=parent
+                        or tuple(map(json.loads,con.execute('SELECT contract,state FROM remediation_executions WHERE source_task=?',(parent_source,)).fetchone()))!=(parent_contract,parent)
                         or json.loads(con.execute('SELECT state FROM remediation_admissions WHERE source_task=?',(parent_source,)).fetchone()[0])!=admission):
                     raise ValueError('successor lineage changed before migration')
                 con.execute('UPDATE technical_remediation_plans SET state=? WHERE source_task=?',

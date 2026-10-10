@@ -258,8 +258,11 @@ essa linhagem deve ser reconciliada explicitamente, nunca apagada ou contornada.
 O código de reconciliação aceita apenas um sucessor ainda em `plan_dispatch`,
 sem tarefas, wakeups ou registro de execução/admissão. Ele preserva o plano e a
 rodada consumida, bloqueia seu despacho e migra a revisão em uma transação;
-a admissão do autor permanece bloqueada. Essa extensão ainda não foi instalada
-nem validada na linhagem real do ensaio.
+a admissão do autor permanece bloqueada. A extensão foi instalada e a transição
+administrativa foi conferida na linhagem real do ensaio: sucessor preservado,
+rodada consumida e autor bloqueado. O diagnóstico e a reconsideração pelos
+agentes ainda precisam ser comprovados; essa intervenção não qualifica um ciclo
+autônomo sem operador.
 
 O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
 wakeup do Multica, sem tratá-lo como outro contrato ou autorização. Quando Tech

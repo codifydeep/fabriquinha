@@ -1,0 +1,4 @@
+# Correctly bind predecessor CONTRACT identity, not mutable execution state.
+FROM delivery-kit-execution-broker:20261009.435
+COPY broker/review_reconsideration.py /review_reconsideration.py
+COPY broker/review_successor_withdrawal.py /review_successor_withdrawal.py
