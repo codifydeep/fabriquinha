@@ -10,6 +10,23 @@ from structured_response_contract import StructuredResponseRejected
 
 
 class TypedDecisionTests(unittest.TestCase):
+    def test_argument_shape_distinguishes_size_syntax_and_policy_without_values(self):
+        cases=[('PRIVATE', 'json_syntax'), ('x'*5001, 'argument_size'),
+               ('{"reason":"PRIVATE","reason":"PRIVATE"}', 'json_policy'),
+               ('{"reason":NaN}', 'json_policy')]
+        for arguments,category in cases:
+            with self.subTest(category=category):
+                wire=json.loads(self.wire())
+                wire['choices'][0]['message']['tool_calls'][0]['function']['arguments']=arguments
+                shape=response_shape(self.body,json.dumps(wire).encode(),'application/json')
+                self.assertEqual(shape['arguments_chars'],len(arguments))
+                self.assertEqual(shape['arguments_rejection'],category)
+                self.assertFalse(shape['arguments_json_valid'])
+                self.assertNotIn('PRIVATE',json.dumps(shape))
+        shape=response_shape(self.body,self.wire(),'application/json')
+        self.assertTrue(shape['arguments_json_valid'])
+        self.assertIsNone(shape['arguments_rejection'])
+
     def test_opt_in_prose_feedback_requires_fresh_valid_tool_submission(self):
         import sqlite3
         for valid in (True,False):

@@ -559,7 +559,8 @@ def response_shape(body,data,media_type):
     """Diagnostic only: never accept a decision or export model-supplied text."""
     result=dict(version=1,parsed=False,terminal=False,submissions=0,
                 content_shape='empty',content_chars=0,legacy_function_call=False,
-                expected_tool=False,arguments_json_valid=None,arguments_schema_valid=None)
+                expected_tool=False,arguments_json_valid=None,arguments_schema_valid=None,
+                arguments_chars=None,arguments_rejection=None)
     try:
         contents=[];calls={};finished=False;done=False
         if media_type.startswith('text/event-stream'):
@@ -601,6 +602,9 @@ def response_shape(body,data,media_type):
             name,arguments=next(iter(calls.values()))
             result['expected_tool']=name==body['tool_choice']['function']['name']
             result['arguments_json_valid']=False
+            result['arguments_chars']=len(arguments) if isinstance(arguments,str) else None
+            if not isinstance(arguments,str):result['arguments_rejection']='argument_type'
+            elif not 1<=len(arguments)<=5000:result['arguments_rejection']='argument_size'
             if isinstance(arguments,str) and 1<=len(arguments)<=5000:
                 try:
                     decision=json.loads(arguments,object_pairs_hook=_unique,
@@ -608,7 +612,9 @@ def response_shape(body,data,media_type):
                     result['arguments_json_valid']=True
                     result['arguments_schema_valid']=Draft202012Validator(
                         body['tools'][0]['function']['parameters']).is_valid(decision)
-                except Exception:pass
+                except json.JSONDecodeError:result['arguments_rejection']='json_syntax'
+                except ValueError:result['arguments_rejection']='json_policy'
+                except Exception:result['arguments_rejection']='validation_error'
         return result
     except Exception:return result
 
