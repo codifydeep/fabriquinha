@@ -147,8 +147,24 @@ def failed_experiment_handoff(data, state, peer_task):
         container_id=state['container_id'], exit_code=state['exit_code'],
         output_sha256=state['output_sha256'], cause='unknown',
         test_edits_authorized=False, delivery_approval=False, author_restarted=False)
+    failure = data['validation_failure']
+    names = sorted({f.get('qualified_name') for f in failure.get('failures', [])
+                    if isinstance(f.get('qualified_name'), str) and f['qualified_name']})
+    paths = failure.get('diagnostic_read_files', [])
+    # Missing metadata is not proof of a mismatch. This fixed recipe cannot
+    # establish causality for a different, explicitly identified test module.
+    if (failure.get('category') == 'executed_test_failure' and names and paths
+            and TEST not in paths
+            and all(not n.startswith('tests.test_service_mode_indicator.') for n in names)):
+        result['unsupported_experiment_recovery'].update(
+            cause='recipe_scope_mismatch', recipe_test=TEST,
+            observed_failure_names=names, failure_sha256=plans.digest(failure),
+            causal_evidence_for_delivery=False)
     result.update(request_scope_experiment_state=state, trigger_task=peer_task,
         required_action='CTO reassess failed experiment: supported product correction or explicit technical hold; no test edits')
+    if result['unsupported_experiment_recovery']['cause'] == 'recipe_scope_mismatch':
+        result['required_action'] = ('CTO assess the actual frozen failure; the unrelated fixed recipe '
+            'cannot adjudicate it. Require independently reviewed recovery evidence; no test edits or identical replay')
     result['diagnostic_revision'] = result.get('diagnostic_revision', '') + ':failed-experiment:' + state['container_id']
     for key in ('wakeup_id', 'recipient_task', 'dispatch_marker', 'dispatch_stage', 'dispatched_at', 'instruction', 'decision'):
         result.pop(key, None)
