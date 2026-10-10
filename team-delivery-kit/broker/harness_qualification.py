@@ -174,15 +174,27 @@ def reconcile_rejected(b,con,task):
     con.commit();return retained
 
 
+def calibration_policy(value):
+    """Fixed service-mode controls never qualify a foreign amendment.
+
+    A new amendment needs its own executable, hash-bound control policy. Missing
+    support is an infrastructure capability hold, not evidence of bad tests.
+    Legacy kind-less contracts retain their original fixed-control policy.
+    """
+    kind=value['amendment'].get('kind')
+    if kind not in (None,'request_scope','timer_provenance'):
+        raise ValueError('unsupported harness calibration policy')
+    return kind=='request_scope',kind=='timer_provenance'
+
+
 def capture(b,con,issue,task,volume,prepared):
     try:import remediation_runtime_guard as guard
     except ImportError:from broker import remediation_runtime_guard as guard
     value=guard.qualified(b,issue)
     if not value or not value.get('amendment'):return None
+    background,timers=calibration_policy(value)
     from service_mode_harness_qualification import TEST
     if set(prepared['test_sha256'])!={TEST}:raise ValueError('declared amendment test scope required')
-    background=value['amendment'].get('kind')=='request_scope'
-    timers=value['amendment'].get('kind')=='timer_provenance'
     con.execute('CREATE TABLE IF NOT EXISTS harness_qualifications(task_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
     row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(task,)).fetchone()
     selected=TIMER_BACKGROUND_IMAGE if timers else BACKGROUND_IMAGE
@@ -246,6 +258,7 @@ def require(b,issue,red):
     except ImportError:from broker import remediation_runtime_guard as guard
     value=guard.qualified(b,issue)
     if not value or not value.get('amendment'):return
+    background,timers=calibration_policy(value)
     with b.db() as con:
         row=con.execute('SELECT identity,state FROM harness_qualifications WHERE task_id=?',(red['task_id'],)).fetchone()
     if not row:raise ValueError('actual immutable harness calibration required')
@@ -253,5 +266,4 @@ def require(b,issue,red):
     if (identity['issue_id']!=issue or identity['volume']!=red['volume']
             or identity['manifest_sha256']!=red['red']['manifest_sha256'] or state['stage']!='passed'):
         raise ValueError('same actual Red candidate calibration required')
-    validate_result(state['result'],red['red'],require_background=value['amendment'].get('kind')=='request_scope',
-                    require_timers=value['amendment'].get('kind')=='timer_provenance')
+    validate_result(state['result'],red['red'],require_background=background,require_timers=timers)

@@ -7,6 +7,21 @@ import hashlib
 
 
 class HarnessJobTests(unittest.TestCase):
+    def test_foreign_amendment_never_selects_service_mode_calibration(self):
+        from broker import remediation_runtime_guard as guard
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        self.b.docker=lambda *a:self.fail('unsupported policy must not produce Docker effects')
+        for kind in ('inherited_frozen_suite','unknown'):
+            with self.subTest(kind=kind),patch.object(guard,'qualified',return_value={
+                    'amendment':{'kind':kind}}):
+                with self.assertRaisesRegex(ValueError,'unsupported harness calibration policy'):
+                    job.capture(self.b,con,'issue','task','volume',{
+                        'manifest_sha256':'b'*64,
+                        'test_sha256':{'tests/test_feedback_latest_ui.py':'c'*64}})
+                with self.assertRaisesRegex(ValueError,'unsupported harness calibration policy'):
+                    job.require(self.b,'issue',{'task_id':'task'})
+        self.assertEqual(con.execute('SELECT count(*) FROM sqlite_master').fetchone()[0],0)
+
     def setUp(self):
         self.b=SimpleNamespace(IMAGE='sha256:'+'a'*64,OWNER='owned',PREFIX='delivery-kit-port2')
         self.b.docker=lambda *a:dict(Id=self.b.IMAGE,Config=dict(Env=['PATH=/usr/bin']))
