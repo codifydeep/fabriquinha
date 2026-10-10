@@ -910,6 +910,17 @@ ou manter um impedimento técnico explícito. Essa retomada não autoriza ediç�
 testes, repetição do experimento ou aprovação. O caminho possui testes offline;
 sua recuperação ponta a ponta ainda precisa ser comprovada com os agentes reais.
 
+Falhas identificadas em outro módulo não são evidência causal quando um experimento
+fixo foi aplicado ao cenário errado. Para uma suíte congelada que herdou Red de
+uma recuperação anterior, há uma entrada genérica de planejamento: diagnóstico
+do CTO concluído, leituras integrais do candidato e dos testes anteriores,
+recibos imutáveis e autorização do mesmo projeto precisam corresponder. O CTO
+propõe um novo contrato R1→R2→R3 e o Tech Lead o revisa independentemente.
+O registro não executa testes, não libera implementação nem reinicia contadores;
+uma aprovação futura continua sujeita a Red real, revisão dos testes, Green,
+PR/CI e QA no mesmo commit. Essa entrada possui validação offline e qualificação
+por leitura do caso instalado; sua execução com agentes ainda não comprova autonomia.
+
 Uma recuperação de bootstrap pré-prompt exige ausência comprovada de eventos ACP
 e ferramentas, lease encerrado, identidade nativa exata, replan independente
 inalterado e imagem antiga auditada com incompatibilidade de limite de arquivo.

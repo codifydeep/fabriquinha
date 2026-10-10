@@ -1,0 +1,8 @@
+# Reuse the qualified generic planning and R1/R2/R3 chain for inherited suites.
+# Installation verifies this local tag is image ID
+# sha256:1f8a5b0d1e75a4a20faa09f4a6c3ac811d0d085ce4b0f79ade737d886c40abad.
+FROM delivery-kit-execution-broker:20261010.450
+COPY broker/inherited_suite_intake.py /inherited_suite_intake.py
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+COPY broker/remediation_execution.py /remediation_execution.py
+COPY broker/request_scope_replan.py /request_scope_replan.py

@@ -220,7 +220,7 @@ def instruction(config,state):
         note+='tests-only submission preserving every method/assertion. Require background-traffic calibration, '
         note+='genuine Red on the original base and independent test review. This experiment is not Green. '
         note+='No depth reset, historical approval, product workaround or CEO technical question. All R2/R3 gates remain.'
-    elif config.get('amendment'):
+    elif config.get('amendment') and config['amendment'].get('kind')!='inherited_frozen_suite':
         note+='\nCONTRACT AMENDMENT: the immutable embedded NEW-test harness fails Node syntax compilation; '
         note+='do not rewrite product to accommodate invalid test code. Repair harness only in a NEW submission, '
         note+='preserving every method/assertion, original base and depth 2. Require harness compilation and '
@@ -242,6 +242,12 @@ def instruction(config,state):
                 'DELIVERY_REMEDIATION_PLAN_V1:' + digest(config) + '\n' +
                 ''.join('DELIVERY_REMEDIATION_CRITERION:' + k + '\n' for k in sorted(config['criteria'])) +
                 'DELIVERY_TYPED_REMEDIATION_V1:plan:' + digest(config))
+    if config.get('amendment',{}).get('kind')=='inherited_frozen_suite':
+        note+='\nGENERIC INHERITED-SUITE RECOVERY: the paired immutable experiment reproduced the same '
+        note+='full-suite failure without changing observations. It proves no test defect or Green. '
+        note+='Assess the actual NEW harness and product; do not apply service-mode recipes. '
+        note+='Preserve every existing test method/assertion. Propose behavioral experiment/negative controls '
+        note+='within fresh R1, or retain_hold if unsupported. No baseline edits or weakened expectations.'
     if state['stage']=='plan_dispatch':
         note+='\nDELIVERY_REMEDIATION_PLAN_LENGTH_FEEDBACK_V1\n'
     result=common+note
@@ -669,6 +675,9 @@ def tick(b):
     try:import frozen_adjudication_spike
     except ImportError:from broker import frozen_adjudication_spike
     frozen_adjudication_spike.tick(b)
+    try:import inherited_suite_intake
+    except ImportError:from broker import inherited_suite_intake
+    inherited_suite_intake.tick(b)
     try:import planning_review_observation
     except ImportError:from broker import planning_review_observation
     planning_review_observation.tick(b)

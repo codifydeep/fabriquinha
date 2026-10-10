@@ -80,6 +80,10 @@ def register(b,source):
             initialize(con)
             row=con.execute('SELECT config,state FROM technical_remediation_plans WHERE source_task=?',(source,)).fetchone()
             config,state=map(json.loads,row)
+            if config.get('amendment',{}).get('kind')=='inherited_frozen_suite':
+                try:import inherited_suite_intake
+                except ImportError:from broker import inherited_suite_intake
+                inherited_suite_intake.validate_parent(con,config)
             if config.get('r1_feedback'):
                 try:import remediation_r1_feedback
                 except ImportError:from broker import remediation_r1_feedback
