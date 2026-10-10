@@ -1307,6 +1307,25 @@ de imagens preserva tags `toso-*` e seus aliases, imagens em uso, referências d
 fonte e duas versões recentes por família. Uma exclusão sem confirmação deve ser
 observada, não repetida. As regras port2 não autorizam limpar outra instalação.
 
+## Calibração genérica: limite de qualificação
+
+`team-delivery-kit/generic_harness_calibration.py` fornece um motor offline de
+calibração com contrato e recibo vinculados aos hashes do plano, da execução,
+dos testes e dos controles. O primeiro adaptador suporta `unittest` com uma
+variável de caminho para substituir a referência de produto somente no processo
+descartável. Executa todos os métodos declarados contra a referência positiva e
+exige falhas por assertion nos controles negativos, cobrindo todos os critérios.
+Métodos históricos não podem desaparecer; erros, skips, seleção parcial,
+manifestos divergentes e comandos arbitrários são rejeitados.
+
+Esse motor ainda **não está integrado nem autorizado no fluxo instalado**.
+Faltam produção e revisão independente do conjunto de controles, registro
+durável da política, execução Docker isolada e consumo do mesmo recibo nos gates
+de Red e revisão. O controlador não pode executar o código de testes diretamente:
+deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
+leitura e limites de recursos. A revisão semântica de assertions continua
+obrigatória. Calibração aprovada não equivale a Red, Green ou homologação.
+
 ## Contribuir e reutilizar
 
 O código próprio está sob a [licença MIT](LICENSE), permitindo reutilização e uso comercial com preservação do aviso. Leia [CONTRIBUTING.md](CONTRIBUTING.md) e [os avisos de terceiros](THIRD_PARTY_NOTICES.md). Dependências e patches sobre projetos externos mantêm suas próprias licenças.
