@@ -714,6 +714,8 @@ def reconcile(broker, route, runs, effects, red):
         marker = hashlib.sha256((marker + ':transport-observation:1').encode()).hexdigest()
     if state.get('provider_schema_recovery'):
         marker = hashlib.sha256((marker + ':qualified-provider-schema:1').encode()).hexdigest()
+    if state.get('review_reconsideration'):
+        marker=hashlib.sha256((marker+':cto-reconsideration:'+state['review_reconsideration']['decision_sha256']).encode()).hexdigest()
     initial = config.get('initial_review', False)
     paths = ['/evidence/' + tree + '/' + name
              for tree in (('candidate',) if initial else ('candidate', 'previous'))
@@ -797,6 +799,14 @@ def reconcile(broker, route, runs, effects, red):
             'frozen snapshot and submit your real findings. Local citation and verdict constraints are '
             'unchanged. No author restart or permission to edit. One changed-condition recovery only; '
             'another failure stays visible and blocked. Historical HTTP cause is not asserted.\n')
+    if state.get('review_reconsideration'):
+        proof=state['review_reconsideration']
+        instruction+=('\nCTO REQUESTED RECONSIDERATION of the SAME unchanged snapshot. '
+            'This request is not an approval or proof the reviewer was wrong. Re-read the artifacts, '
+            'assess the objection, then independently approve or reject with actual findings. '
+            'Do not require a new author submission merely to repeat unchanged assertions. '
+            'The original verdict remains preserved; no TDD or delivery gate is waived. '
+            'Objection: '+proof['decision']['reason']+'\n')
     if 'wakeup_id' not in state:
         state.update(status='dispatch_intent', manifest_sha256=digest, terminal_contract='typed-review-v1',
                      source_task=red['task_id'], candidate_volume=red['volume'],
@@ -894,11 +904,14 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
              for tree in trees for name in route['test_first_files']]
     if 'wakeup_id' not in diagnosis:
         schema_recovery=diagnosis.get('schema_recovery')
-        source=schema_recovery['failed_task'] if schema_recovery else (protocol_task or state['review_task'])
+        source=(state['review_mediation_upgrade']['decision_task'] if state.get('review_mediation_upgrade')
+                else schema_recovery['failed_task'] if schema_recovery else (protocol_task or state['review_task']))
         marker = hashlib.sha256((route['issue_id'] + ':' + source +
                                  ':test-review-cto:' + state['manifest_sha256']+
                                  (':typed-schema:1' if schema_recovery else
                                   ':typed-transport:1' if diagnosis.get('typed_transport_recovery') else '')).encode()).hexdigest()
+        if state.get('review_mediation_upgrade'):
+            marker=hashlib.sha256((marker+':mediation-upgrade:'+state['review_mediation_upgrade']['decision_sha256']).encode()).hexdigest()
         instruction = (
             ('CONTROLLER INVALID REVIEW PROTOCOL. Two reviews cited invalid locations. '
              'Neither verdict was accepted; do not treat either as a valid rejection. '
@@ -929,6 +942,9 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
             instruction += '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
         if schema_recovery:
             instruction=schema_recovery_instruction(state,paths)
+        if state.get('evidence_policy') and not protocol_task:
+            diagnosis['mediation_contract']='immutable-review-reconsideration-v1'
+            instruction=mediation_instruction(state,paths)
         diagnosis.update(status='dispatch_intent', marker=marker, target=cto)
         _save_rejection(broker, route, state)
         wakeup = effects.ensure_wakeup(route['issue_id'], cto, source,
@@ -961,6 +977,17 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
             decision = effects.decision(task)
             if isinstance(decision.get('reason'), str):
                 failure['reason_length'] = len(decision['reason'])
+            if decision.get('action')=='request_review_reconsideration':
+                if protocol_task or diagnosis.get('mediation_contract')!='immutable-review-reconsideration-v1':
+                    raise ValueError('registered mediation contract required')
+                validate_evidence(broker,route,state,decision)
+                try:import review_reconsideration,test_review_report
+                except ImportError:from broker import review_reconsideration,test_review_report
+                report=test_review_report.load(broker,route['issue_id'],state['manifest_sha256'])
+                updated=review_reconsideration.prepare(state,red,route,task,decision,reads,report,
+                    initial=config.get('initial_review',False))
+                _save(broker,route,updated)
+                return
             if (decision.get('action') != 'request_test_revision' or decision.get('optional_files') != []
                     or not isinstance(decision.get('reason'), str) or not 0 < len(decision['reason']) <= 1200):
                 raise ValueError('CTO requires technical replan, not approval override')
@@ -977,6 +1004,25 @@ def reconcile_rejection(broker, route, runs, effects, red, config, state, protoc
             diagnosis.update(status='blocked', reason='invalid_cto_test_review_diagnosis:' + type(error).__name__,
                              failure={**failure, 'error_type': type(error).__name__, 'detail': str(error)[:300]})
     _save_rejection(broker, route, state)
+
+
+def mediation_instruction(state,paths):
+    """Bounded independent assessment; no forced author correction or approval."""
+    return ('ONE FRESH READ-ONLY DIAGNOSIS. No missing legacy constraint is inferred. '
+        'CTO REVIEW MEDIATION. Re-read every frozen path and assess the reviewer claim '
+        'against the approved issue criteria; the claim is not unquestionable truth. '
+        'Choose request_test_revision only for a concrete test defect needing an actual author change. '
+        'Choose request_review_reconsideration for an unsupported review claim: cite 1-3 '
+        'review_disagreement findings at actual source locations. This asks the independent reviewer '
+        'to reassess the SAME snapshot; it never approves or authorizes edits. If unresolved choose '
+        'escalate_cto. Preserve coverage; distinguish pre-submit/pending observations and real browser '
+        'dispatch from listener calls. No terminal, writes, fabricated results or redundant resubmission. '
+        'Submit one typed decision with action, reason target400/max1200, optional_files=[], findings. '
+        'Quotes/expected/observed target200/max500. No prose. Claim: '+state['reason']+'\n'
+        'DELIVERY_STRUCTURED_DECISION_V1:technical\n'+
+        ''.join('DELIVERY_REVIEW_READ_PATH:'+p+'\n' for p in paths)+evidence_instruction(state,mediation=True)+
+        '\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+        'DELIVERY_REVIEW_RECONSIDERATION_V1\nDELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1\n')
 
 
 def schema_recovery_instruction(state,paths):
@@ -998,7 +1044,7 @@ def schema_recovery_instruction(state,paths):
         'DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1\n')
 
 
-def evidence_instruction(state):
+def evidence_instruction(state,*,mediation=False):
     compact = {path: {'method_counts': [len(f['previous_methods']), len(f['candidate_methods'])],
                       'assertion_counts': [f['previous_assertions'], f['candidate_assertions']],
                       'removed_methods': f['removed_methods'], 'added_methods': f['added_methods'],
@@ -1022,7 +1068,7 @@ def evidence_instruction(state):
             'added_method_count': sum(len(f['added_methods']) for f in facts),
             'assertion_ast_changed_method_count': sum(len(f['removed_assertion_ast']) for f in facts)
         }, separators=(',', ':'))
-    return ('\nDELIVERY_TEST_FINDINGS_V1\nDELIVERY_OBSERVED_FINDINGS_V1\nController structural facts (method-scoped assertions, not semantic approval): ' + summary +
+    note=('\nDELIVERY_TEST_FINDINGS_V1\nDELIVERY_OBSERVED_FINDINGS_V1\nController structural facts (method-scoped assertions, not semantic approval): ' + summary +
             '\nA summary-only index omits names, not evidence: read all declared immutable test paths. '
             'Counts or digest alone cannot justify approval or rejection. '
             'Include findings: [] for approval; 1-3 concrete findings for rejection/revision. Each has '
@@ -1033,6 +1079,12 @@ def evidence_instruction(state):
             'Byte headroom alone is not a defect. Historical CTO claims are hypotheses, not facts. '
             'AST changes can be assertion diagnostic-message changes, not assertion removal. '
             'Do not invent methods or assertions. Missing semantic coverage still requires a concrete observed location.\n')
+    if mediation:
+        note=note.replace('kind (removed_method,removed_assertion,semantic_regression,missing_coverage,invalid_harness)',
+            'kind (removed_method,removed_assertion,semantic_regression,missing_coverage,invalid_harness,review_disagreement)')
+        note=note.replace('Include findings: [] for approval; 1-3 concrete findings for rejection/revision.',
+            'No approval is available. Use 1-3 concrete findings for revision or reconsideration; escalate unresolved issues.')
+    return note
 
 
 def validate_evidence(broker, route, state, decision):

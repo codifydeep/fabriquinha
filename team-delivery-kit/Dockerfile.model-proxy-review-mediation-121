@@ -1,0 +1,4 @@
+# Local qualified parent; not a public registry digest or portable installer.
+FROM delivery-kit-model-proxy:20261009.120
+COPY typed_decision_contract.py /typed_decision_contract.py
+COPY decision_schema.py /decision_schema.py

@@ -8,7 +8,7 @@ import hashlib
 import json
 import re
 
-JSON_FEEDBACK_PROXY='sha256:d1573331ad679c2846cdfb6bc6074c0de9dd95e8ad48be17bc236bebec88d54b'
+JSON_FEEDBACK_PROXY='sha256:723efcc5a745f67047bf8478773036d8bb82ca2031441718c161916f6fa45953'
 
 
 class AutomaticEffects:

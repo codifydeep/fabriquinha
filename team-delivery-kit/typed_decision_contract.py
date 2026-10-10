@@ -30,6 +30,15 @@ REMEDIATION_LENGTH_MARKER='DELIVERY_REMEDIATION_LENGTH_FEEDBACK_V1'
 FORMAT_MARKER='DELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1'
 
 
+def diagnosis_actions(body):
+    actions=['request_test_revision','escalate_cto']
+    if any(m.get('role')=='user' and isinstance(m.get('content'),str)
+            and re.search(r'^DELIVERY_REVIEW_RECONSIDERATION_V1$',m['content'],re.M)
+            for m in body.get('messages',[])):
+        actions.append('request_review_reconsideration')
+    return actions
+
+
 def format_feedback_enabled(body):
     """One opt-in format correction, restricted to nonauthorizing proposals."""
     if r3_length_feedback_enabled(body):return True
@@ -44,7 +53,7 @@ def format_feedback_enabled(body):
     if set(props)=={'action','reason','optional_files','findings'}:
         if (function.get('strict') is not True or spec.get('additionalProperties') is not False
                 or set(spec.get('required',[]))!=set(props)
-                or props['action'].get('enum')!=['request_test_revision','escalate_cto']
+                or props['action'].get('enum')!=diagnosis_actions(body)
                 or props['optional_files'].get('maxItems')!=0
                 or not any(m.get('role')=='user' and isinstance(m.get('content'),str)
                     and re.search(r'^'+TEST_DIAGNOSIS_MARKER+r'$',m['content'],re.M)
@@ -448,7 +457,7 @@ def apply(body):
              and re.search(r'^'+TEST_DIAGNOSIS_MARKER+r'$',m['content'],re.M) for m in body['messages']):
         props=schema.get('properties',{})
         if (set(props)!={'action','reason','optional_files','findings'}
-                or props['action'].get('enum')!=['request_test_revision','escalate_cto']
+                or props['action'].get('enum')!=diagnosis_actions(body)
                 or props['optional_files'].get('maxItems')!=0
                 or not props['findings'].get('items',{}).get('anyOf')):
             raise ValueError('observed non-approving test diagnosis contract required')

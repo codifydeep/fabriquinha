@@ -10,6 +10,46 @@ from structured_response_contract import StructuredResponseRejected
 
 
 class TypedDecisionTests(unittest.TestCase):
+    def test_mediation_contract_requests_reconsideration_but_cannot_approve(self):
+        source=self.review_body(findings=True,observed=True)
+        messages=copy.deepcopy(source['messages'])
+        messages[0]['content']=messages[0]['content'].replace(
+            'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+'a'*64,
+            'DELIVERY_STRUCTURED_DECISION_V1:technical').replace(
+            'DELIVERY_TYPED_REVIEW_V1:'+'a'*64,
+            'DELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+            'DELIVERY_REVIEW_RECONSIDERATION_V1\nDELIVERY_TECHNICAL_FORMAT_FEEDBACK_V1')
+        body=apply(schema({'messages':messages}))
+        decision=dict(action='request_review_reconsideration',reason='The cited check is present',optional_files=[],
+            findings=[dict(kind='review_disagreement',tree='candidate',path='tests/test_new.py',
+                test='__module__',line=1,quote='assert value',expected='Retain check',observed='Check retained')])
+        output,_,receipt=translate(body,self.wire(decision),'application/json')
+        self.assertEqual(json.loads(json.loads(output)['choices'][0]['message']['content']),decision)
+        self.assertFalse(receipt['worker_tool_executed']);self.assertFalse(receipt['delivery_approval'])
+        from typed_decision_contract import format_feedback_enabled
+        self.assertTrue(format_feedback_enabled(body))
+        with self.assertRaises(StructuredResponseRejected):
+            translate(body,self.wire({**decision,'action':'approve_test_revision'}),'application/json')
+        for invalid in ({**decision,'findings':[]},
+                        {**decision,'action':'request_test_revision'},
+                        {**decision,'findings':[{**decision['findings'][0],'kind':'missing_coverage'}]}):
+            with self.assertRaises(StructuredResponseRejected):translate(body,self.wire(invalid),'application/json')
+        # Semantic action constraints must not replace the observed citation
+        # tuples or permit invented source locations.
+        for change in ({'quote':'invented evidence'}, {'line':999},
+                       {'path':'tests/unread.py'}, {'tree':'previous'}):
+            forged={**decision,'findings':[{**decision['findings'][0],**change}]}
+            with self.assertRaises(StructuredResponseRejected):
+                translate(body,self.wire(forged),'application/json')
+        legacy=copy.deepcopy(messages)
+        legacy[0]['content']=legacy[0]['content'].replace('DELIVERY_REVIEW_RECONSIDERATION_V1\n','')
+        with self.assertRaises(StructuredResponseRejected):
+            translate(apply(schema({'messages':legacy})),self.wire(decision),'application/json')
+        # Reconsideration never replaces mandatory inspection.
+        unread={'messages':[messages[0]],'tools':[{'type':'function','function':{'name':'read_file'}}]}
+        inspecting=apply(schema(unread))
+        self.assertEqual(inspecting['tool_choice']['function']['name'],'read_file')
+
     def test_observed_diagnosis_json_feedback_is_once_only_and_nonexecuting(self):
         import sqlite3
         from typed_decision_contract import FORMAT_MARKER,format_feedback_enabled

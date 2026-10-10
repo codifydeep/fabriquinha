@@ -248,8 +248,11 @@ O contrato `broker/review_reconsideration.py` foi validado offline para uma
 contestação do CTO com leitura completa e citações nos dois snapshots. Ele
 preserva o parecer anterior e pede uma única nova revisão independente do mesmo
 snapshot; não aprova a entrega nem autoriza mudanças nos testes. Sua ligação ao
-schema dos agentes e ao despacho ainda está pendente; o contrato isolado não
-comprova resolução autônoma de disputas.
+schema dos agentes e ao despacho está implementada no código, mas ainda não foi
+instalada nem validada com agentes reais. Uma migração administrativa em
+manutenção selada preserva a decisão antiga e pede um novo diagnóstico sob o
+contrato ampliado; não transforma a decisão anterior em contestação ou aprovação.
+O contrato isolado não comprova resolução autônoma de disputas.
 
 O diagnóstico de incidentes de publicação aceita o envelope nativo exato de
 wakeup do Multica, sem tratá-lo como outro contrato ou autorização. Quando Tech

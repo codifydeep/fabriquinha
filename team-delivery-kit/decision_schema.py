@@ -83,6 +83,14 @@ def apply(body):
             message.get('content') if isinstance(message.get('content'), str) else
             '\n'.join(p.get('text', '') for p in (message.get('content') or []) if isinstance(p, dict)), re.MULTILINE)
         for message in body['messages'])
+    mediation_policy=any(m.get('role')=='user' and isinstance(m.get('content'),str)
+        and re.search(r'^DELIVERY_REVIEW_RECONSIDERATION_V1$',m['content'],re.M)
+        for m in body['messages'])
+    if mediation_policy and (mode!='technical' or not finding_policy or not any(
+            m.get('role')=='user' and isinstance(m.get('content'),str)
+            and re.search(r'^DELIVERY_TYPED_TEST_DIAGNOSIS_V1$',m['content'],re.M)
+            for m in body['messages'])):
+        raise ValueError('observed technical diagnosis required for review mediation')
     capture_policy = any(message.get('role') == 'user' and
         re.search(r'^DELIVERY_CAPTURE_CONSTRAINTS_V1$',
             message.get('content') if isinstance(message.get('content'), str) else
@@ -96,7 +104,7 @@ def apply(body):
                 if isinstance(content, list):
                     content = '\n'.join(p.get('text', '') for p in content if isinstance(p, dict))
                 paths.update(re.findall(r'^DELIVERY_REVIEW_READ_PATH:(/evidence/(?:candidate|previous)/[A-Za-z0-9_./-]+)$', content, re.MULTILINE))
-        if ((mode.startswith('test_review:') or mode == 'qa') and not paths) or any('/../' in p for p in paths):
+        if ((mode.startswith('test_review:') or mode == 'qa' or mediation_policy) and not paths) or any('/../' in p for p in paths):
             raise ValueError('review read contract missing')
         missing = sorted(paths - observations(body['messages'], wire=True).keys())
         if missing:
@@ -159,6 +167,7 @@ def apply(body):
     if mode=='technical' and any(m.get('role')=='user' and isinstance(m.get('content'),str)
             and re.search(r'^DELIVERY_TYPED_TEST_DIAGNOSIS_V1$',m['content'],re.M) for m in body['messages']):
         properties['action']['enum']=['request_test_revision','escalate_cto']
+        if mediation_policy:properties['action']['enum'].append('request_review_reconsideration')
     versions={v for m in body['messages'] if m.get('role')=='user' and isinstance(m.get('content'),str)
         for v in re.findall(r'^DELIVERY_TEST_DECOMPOSITION_(V[12])$',m['content'],re.M)}
     if len(versions)>1:raise ValueError('conflicting decomposition versions')
@@ -244,6 +253,8 @@ def apply(body):
                 'line': {'type': 'integer', 'minimum': 1},
                 **{k: {'type': 'string', 'minLength': 1, 'maxLength': 500} for k in ('quote', 'expected', 'observed')}},
             'required': ['kind', 'tree', 'path', 'test', 'line', 'quote', 'expected', 'observed']}}
+        if mediation_policy:
+            properties['findings']['items']['properties']['kind']['enum'].append('review_disagreement')
         body['messages'].append({'role': 'system', 'content':
             'EVIDENCE FINDINGS: approval requires findings=[]. Rejection or test revision requires 1-3 findings. '
             'Use an actual repository-relative test path, observed test symbol (or __module__ for module/harness), '
@@ -293,6 +304,19 @@ def apply(body):
             branches.append({'type': 'object', 'properties': branch,
                              'required': list(branch), 'additionalProperties': False})
         body['response_format']['json_schema']['schema']['anyOf'] = branches
+    if finding_policy and mediation_policy:
+        branches=[]
+        for action in properties['action']['enum']:
+            branch=json.loads(json.dumps(properties));branch['action']['enum']=[action]
+            if action!='escalate_cto':branch['findings']['minItems']=1
+            items=branch['findings']['items']
+            # Citation choices constrain locations only. Semantic fields remain
+            # on the item itself and apply alongside every observed tuple.
+            kinds=items['properties']['kind']['enum']
+            items['properties']['kind']['enum']=(['review_disagreement']
+                if action=='request_review_reconsideration' else [k for k in kinds if k!='review_disagreement'])
+            branches.append({'type':'object','properties':branch,'required':list(branch),'additionalProperties':False})
+        body['response_format']['json_schema']['schema']['anyOf']=branches
     if mode == 'qa':
         # Model/provider enforcement is NOT the authority boundary. Host-side
         # parse_diagnosis still validates every field and its decision-specific
