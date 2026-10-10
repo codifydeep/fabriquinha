@@ -363,6 +363,16 @@ intenção de retorno são duráveis. Uma execução ambígua é observada pelo 
 handle. Evidência contaminada bloqueia o SPIKE; resultado equivalente não
 classifica automaticamente o defeito nem concede edição. Outras stacks exigem
 receitas qualificadas próprias, não comandos arbitrários fornecidos pelo modelo.
+A entrada de sub-issues usa estágio positivo, conforme a API do commit Multica
+fixado. O controlador `.445` preserva a tentativa antiga com estágio zero e só
+corrige esse intake uma vez após conferir o backend exato, ausência do card e
+nenhum job iniciado. Essa é uma correção de entrada provadamente recusada antes
+de escrita, não uma política de repetir POSTs incertos nem uma retomada do autor.
+O primeiro experimento real foi bloqueado pelo controle de cobertura: o probe
+descobria somente `tests/`, omitindo testes na raiz e em pacotes irmãos. A fonte
+corrigida usa a raiz e só admite a receita qualificada `unittest discover -s .`;
+essa correção ainda exige instalação e um novo experimento vinculado. Recibos
+parciais antigos permanecem inválidos e não autorizam edição ou aprovação.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.

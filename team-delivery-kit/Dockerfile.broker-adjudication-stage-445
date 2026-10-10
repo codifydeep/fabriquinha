@@ -1,0 +1,3 @@
+# Correct API stage before any experiment or author effect; preserve rejected intent.
+FROM delivery-kit-execution-broker:20261010.444
+COPY broker/frozen_adjudication_spike.py /frozen_adjudication_spike.py

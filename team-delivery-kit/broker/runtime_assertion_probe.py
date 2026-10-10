@@ -104,7 +104,10 @@ def run(root,hashes,saved_output,*,event_trace=False):
         for name in {a['assertion'] for a in proof['anchors']}:
             originals[name]=getattr(unittest.TestCase,name);setattr(unittest.TestCase,name,wrap(originals[name]))
         with contextlib.redirect_stdout(stream),contextlib.redirect_stderr(stream):
-            suite=unittest.defaultTestLoader.discover(str(root/'tests'),top_level_dir=str(root))
+            # Match the qualified delivery command: unittest discover -s . .
+            # Restricting discovery to tests/ silently omits root and sibling
+            # packages, even though their files remain hash-intact.
+            suite=unittest.defaultTestLoader.discover(str(root),top_level_dir=str(root))
             result=unittest.TextTestRunner(stream=stream).run(suite)
     finally:
         for name,original in originals.items():setattr(unittest.TestCase,name,original)

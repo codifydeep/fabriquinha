@@ -12,6 +12,7 @@ import time
 import uuid
 
 OPERATION='frozen_suite_adjudication_spike_v1'
+BACKEND_REFERENCE='ghcr.io/multica-ai/multica-backend@sha256:60dc856bc44c01a3c73e8153e211be6c22cc6cbb66dde8b20e01de5b6e75e41f'
 
 
 def digest(value):
@@ -28,6 +29,8 @@ def qualify(e):
     structure=e['structure'];struct_result=structure.get('result',{})
     try:verified=json.loads(struct_result.get('output',''))
     except ValueError:raise ValueError('actual immutable structure receipt required') from None
+    if verified.get('test_command')!=['python3','-m','unittest','discover','-s','.','-q']:
+        raise ValueError('fixed probe requires the actual root unittest discovery contract')
     if (row['stage']!='technical_decision_required' or row['owner']!=route['cto']
             or route.get('enabled') is not True or row['issue_id']!=route['issue_id']
             or route['author']==route['cto'] or data.get('target')!=route['cto']
@@ -153,6 +156,8 @@ class Effects:
     def issue(self,config,*,allow_create):
         try:from incremental_provisioning import NativeIssues
         except ImportError:from broker.incremental_provisioning import NativeIssues
+        if type(config['desired'].get('stage')) is not int or config['desired']['stage']<1:
+            raise ValueError('Multica ordered sub-issue stage must be positive')
         return NativeIssues(self.settings).ensure(config['desired'],allow_create=allow_create)
     def job(self,task,body):
         try:import test_first_job
@@ -258,7 +263,7 @@ def register(b,source_id):
                 'Decision rule: '+config['decision_rule']+
                 '\nExecution is controller-owned; CTO diagnosis stays bound to the parent issue. '+
                 'No author/test change, Green, CI waiver or release approval. No agent assignment before bound permissions.',
-            parent_issue_id=row['issue_id'],project_id=parent.get('project_id'),stage=0,status='todo')
+            parent_issue_id=row['issue_id'],project_id=parent.get('project_id'),stage=1,status='todo')
         state=dict(stage='registered',owner=config['cto'],delivery_approval=False)
         with b.db() as c:
             if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
@@ -266,6 +271,45 @@ def register(b,source_id):
             if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():return None
             c.execute('INSERT INTO frozen_adjudication_spikes VALUES(?,?,?)',(source_id,json.dumps(config,sort_keys=True),json.dumps(state,sort_keys=True)))
         return config,state
+
+
+def repair_stage(config,state,*,backend_verified,existing_issue):
+    """One changed input after a proven pre-write API rejection, not transport retry."""
+    if (not backend_verified or existing_issue is not None or config.get('operation')!=OPERATION
+            or config.get('desired',{}).get('stage')!=0 or state.get('stage')!='issue_intent'
+            or state.get('issue_attempted') is not True or state.get('issue_observation_error')!='HTTPError'
+            or state.get('spike_issue') or state.get('plain') or state.get('traced') or state.get('native_stage_repair')):
+        raise ValueError('verified stage-zero pre-write rejection with no accepted issue required')
+    updated=copy.deepcopy(config);updated['desired']['stage']=1
+    receipt=dict(operation='rejected_native_spike_stage_repair_v1',previous_config_sha256=digest(config),
+        previous_state=copy.deepcopy(state),backend_reference=BACKEND_REFERENCE,
+        api_source_commit='ea94c7cd5bbce9c8e1f28c5fa049c47ee7651d02',
+        previous_stage=0,corrected_stage=1,author_retry_authorized=False,test_change_authorized=False,delivery_approval=False)
+    next_state=dict(stage='registered',owner=config['cto'],native_stage_repair=receipt,delivery_approval=False)
+    return updated,next_state
+
+
+def reconcile_stage_repair(b,config,state):
+    if config.get('desired',{}).get('stage')!=0:return config,state
+    try:from incremental_provisioning import NativeIssues
+    except ImportError:from broker.incremental_provisioning import NativeIssues
+    settings=json.loads((b.STATE/'native.json').read_text())
+    existing=NativeIssues(settings).ensure(config['desired'],allow_create=False)
+    info=b.docker('GET','/containers/'+b.PREFIX+'-backend-1/json')
+    image=b.docker('GET','/images/'+BACKEND_REFERENCE+'/json')
+    labels=info.get('Config',{}).get('Labels',{}) if info else {}
+    verified=bool(info and image and info['Image']==image['Id'] and info.get('State',{}).get('Running')
+        and labels.get('com.docker.compose.project')==b.PREFIX and labels.get('com.docker.compose.service')=='backend')
+    corrected,next_state=repair_stage(config,state,backend_verified=verified,existing_issue=existing)
+    with b.db() as c:
+        if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
+        stored=c.execute('SELECT config,state FROM frozen_adjudication_spikes WHERE source_task=?',(config['source_task'],)).fetchone()
+        if tuple(map(json.loads,stored))!=(config,state):raise ValueError('SPIKE intake changed before API correction')
+        if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():
+            raise TimeoutError('wait for capacity before changed intake')
+        c.execute('UPDATE frozen_adjudication_spikes SET config=?,state=? WHERE source_task=?',
+            (json.dumps(corrected,sort_keys=True),json.dumps(next_state,sort_keys=True),config['source_task']))
+    return corrected,next_state
 
 
 def tick(b):
@@ -282,6 +326,8 @@ def tick(b):
             except ValueError:continue  # An ineligible older incident cannot starve unrelated handoffs.
             if not registered:continue
             config,state=registered
+            try:config,state=reconcile_stage_repair(b,config,state)
+            except (ValueError,TimeoutError):continue
             def persist(value):
                 with b.db() as c:c.execute('UPDATE frozen_adjudication_spikes SET state=? WHERE source_task=?',(json.dumps(value,sort_keys=True),source_id))
             try:

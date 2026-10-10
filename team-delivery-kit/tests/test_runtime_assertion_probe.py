@@ -31,7 +31,7 @@ class RuntimeProbeTests(unittest.TestCase):
     def test_fixed_probe_does_not_suppress_original_assertions(self):
         source=pathlib.Path(self.probe.__file__).read_text()
         self.assertIn('return original(test,*args,**kwargs)',source)
-        self.assertIn("unittest.defaultTestLoader.discover(str(root/'tests')",source)
+        self.assertIn("unittest.defaultTestLoader.discover(str(root),",source)
         self.assertIn("status='experiment_only_not_green_or_approval',approval=False",source)
 
     def test_observation_preserves_actual_failure_and_restores_assertion(self):
@@ -72,3 +72,32 @@ class RuntimeProbeTests(unittest.TestCase):
         self.assertEqual(result['runtime_observations'][0]['operands'],[2,3])
         self.assertEqual(result['runtime_observations'][0]['reports']['self_report'],{'poll_requests':2})
         self.assertFalse(result['approval']);self.assertIs(unittest.TestCase.assertGreaterEqual,original)
+
+    def test_discovery_includes_root_and_sibling_packages_not_only_tests(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as temp:
+            root=pathlib.Path(temp)
+            for package in ('tests','slug_tests'):
+                (root/package).mkdir();(root/package/'__init__.py').write_text('')
+            files={'test_probe_root.py':'import unittest\nclass Root(unittest.TestCase):\n def test_fail(self): self.assertGreaterEqual(2,3)\n',
+                'tests/test_probe_nested.py':'import unittest\nclass Nested(unittest.TestCase):\n def test_pass(self): self.assertTrue(True)\n',
+                'slug_tests/test_probe_sibling.py':'import unittest\nclass Sibling(unittest.TestCase):\n def test_pass(self): self.assertTrue(True)\n'}
+            for name,content in files.items():(root/name).write_text(content)
+            manifest={p.relative_to(root).as_posix():dict(sha256=hashlib.sha256(p.read_bytes()).hexdigest())
+                      for p in root.rglob('*.py')}
+            (root/'manifest.json').write_text(json.dumps(dict(files=manifest)))
+            code="""import json,sys
+from pathlib import Path
+import runtime_assertion_probe as probe
+root=Path(sys.argv[1])
+probe.extract_trace=lambda *args:dict(manifest_sha256='a'*64,output_sha256='b'*64,
+ anchors=[dict(qualified_name='test_probe_root.Root.test_fail',assertion='assertGreaterEqual')])
+print(json.dumps(probe.run(root,{'test_probe_root.py':'unused'},'')))
+"""
+            result=subprocess.run([sys.executable,'-B','-c',code,str(root)],
+                cwd=pathlib.Path(self.probe.__file__).parent,text=True,capture_output=True,check=True)
+            receipt=json.loads(result.stdout)
+        self.assertEqual(receipt['suite'],dict(tests=3,failures=1,errors=0,skipped=0))
+        self.assertEqual(receipt['runtime_observations'][0]['operands'],[2,3])
+        self.assertFalse(receipt['approval'])

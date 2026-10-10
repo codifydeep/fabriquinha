@@ -7,6 +7,23 @@ import test_frozen_diagnosis_format_recovery as prior
 
 
 class AdjudicationSpikeTests(unittest.TestCase):
+    def test_changed_stage_requires_exact_backend_proof_and_absence_of_any_accepted_effect(self):
+        config=dict(operation=r.OPERATION,cto='cto',desired=dict(stage=0,title='unchanged title'))
+        state=dict(stage='issue_intent',issue_attempted=True,issue_observation_error='HTTPError')
+        updated,next_state=r.repair_stage(config,state,backend_verified=True,existing_issue=None)
+        self.assertEqual(updated['desired']['stage'],1);self.assertEqual(updated['desired']['title'],config['desired']['title'])
+        self.assertEqual(next_state['native_stage_repair']['previous_state'],state)
+        self.assertEqual(config['desired']['stage'],0);self.assertFalse(next_state['delivery_approval'])
+        for change in ('backend','existing','accepted','trace','consumed','unrelated'):
+            cfg=copy.deepcopy(config);s=copy.deepcopy(state);backend=True;existing=None
+            if change=='backend':backend=False
+            if change=='existing':existing={'id':'already-created'}
+            if change=='accepted':s['spike_issue']='created'
+            if change=='trace':s['plain']={'proof':'already-executed'}
+            if change=='consumed':s['native_stage_repair']={'used':True}
+            if change=='unrelated':s['issue_observation_error']='TimeoutError'
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                r.repair_stage(cfg,s,backend_verified=backend,existing_issue=existing)
     def evidence(self):
         e=prior.FrozenDiagnosisFormatTests().evidence();data=json.loads(e['row']['data'])
         data['decision']=dict(action='escalate_cto',reason='One observed disagreement requires adjudication',optional_files=[])
@@ -17,7 +34,8 @@ class AdjudicationSpikeTests(unittest.TestCase):
         output='FAIL: test_x (tests.test_new.Case.test_x)\nAssertionError: 2 not greater than or equal to 3\n'
         sha=hashlib.sha256(output.encode()).hexdigest();data['validation_failure']['output_sha256']=sha
         e['row']['data']=json.dumps(data);e['job']['result'].update(output=output,output_sha256=sha)
-        raw=json.dumps(dict(manifest_sha256='a'*64,baseline_tests_intact=True,new_test_sha256=e['red']['red']['test_sha256']))
+        raw=json.dumps(dict(manifest_sha256='a'*64,baseline_tests_intact=True,new_test_sha256=e['red']['red']['test_sha256'],
+            test_command=['python3','-m','unittest','discover','-s','.','-q']))
         e['structure']=dict(stage='complete',result=dict(exit_code=0,approval=False,output=raw,
                             output_sha256=hashlib.sha256(raw.encode()).hexdigest()))
         e['image']='sha256:'+'c'*64
@@ -50,6 +68,13 @@ class AdjudicationSpikeTests(unittest.TestCase):
             with self.subTest(key=key),self.assertRaises(ValueError):r.qualify(e)
         e=self.evidence();e['job']['result']['output']='different actual failure'
         with self.assertRaises(ValueError):r.qualify(e)
+
+    def test_partial_discovery_cannot_qualify_even_with_intact_test_hashes(self):
+        e=self.evidence();receipt=json.loads(e['structure']['result']['output'])
+        receipt['test_command']=['python3','-m','unittest','discover','-s','tests','-q']
+        raw=json.dumps(receipt);e['structure']['result'].update(output=raw,
+            output_sha256=hashlib.sha256(raw.encode()).hexdigest())
+        with self.assertRaisesRegex(ValueError,'root unittest discovery'):r.qualify(e)
         e=self.evidence();e['structure']['result']['output_sha256']='d'*64
         with self.assertRaises(ValueError):r.qualify(e)
 
