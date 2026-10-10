@@ -379,6 +379,12 @@ tabela histórica; um novo card e novos handles identificam a receita corrigida.
 Isso não renova tentativas do autor nem os gates de revisão. Recibos parciais
 antigos permanecem inválidos; a nova execução ainda precisa comprovar cobertura
 integral antes do retorno ao CTO.
+O reconciliador de bootstrap deixa de consultar externamente workers históricos
+somente quando o start foi reconhecido, a lease é terminal e há recibo `gone`
+do mesmo contêiner, vinculado ao payload por observação de política ou fato
+durável. Essa aposentadoria preserva o estado anterior e não aprova a entrega.
+Criação/start incertos, remoção sem confirmação, identidade divergente e leases
+ativas continuam sob observação; encerrar uma lease isoladamente não basta.
 O probe sintético tem um contrato separado: não lê artefatos reais nem aprova
 entrega. Seu registro exige evento e recibo correlacionados, opção de feedback
 habilitada, hashes exatos dos três módulos instalados e o roteamento qualificado.

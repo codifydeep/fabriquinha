@@ -6,6 +6,42 @@ from broker import worker_creation_intent as intent
 
 
 class WorkerCreationIntentTests(unittest.TestCase):
+    def test_only_exact_acknowledged_retirement_stops_bootstrap_observation(self):
+        import hashlib
+        payload,_,info=self.inputs();sha=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
+        state=dict(stage='start_running_observed',fact=dict(container_id=info['Id'],payload_sha256=sha))
+        retirement=dict(container_id=info['Id'],name='owned',state='gone')
+        result=intent.settled_retirement(payload,state,'owned','closed',retirement,[])
+        self.assertEqual(result['stage'],'retired_bootstrap_observed');self.assertFalse(result['delivery_approval'])
+        self.assertEqual(state['stage'],'start_running_observed')
+        for change in ('unknown_start','unknown_create','live_lease','uncertain_delete','other_id','other_name','payload'):
+            s=copy.deepcopy(state);r=copy.deepcopy(retirement);lease='closed';p=copy.deepcopy(payload)
+            if change=='unknown_start':s['stage']='start_outcome_unknown'
+            if change=='unknown_create':s['stage']='create_outcome_unknown'
+            if change=='live_lease':lease='running'
+            if change=='uncertain_delete':r['state']='delete_outcome_unknown'
+            if change=='other_id':r['container_id']='c'*64
+            if change=='other_name':r['name']='other'
+            if change=='payload':p['Cmd']=['changed']
+            with self.subTest(change=change):self.assertIsNone(intent.settled_retirement(p,s,'owned',lease,r,[]))
+
+    def test_retired_acknowledgement_uses_durable_policy_without_external_io(self):
+        payload,_,info=self.inputs();con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE leases(request_id TEXT,name TEXT,status TEXT,deadline REAL)')
+        con.execute("INSERT INTO leases VALUES ('request','owned','closed',0)")
+        con.execute('CREATE TABLE worker_retirement_intents(request_id TEXT,container_id TEXT,name TEXT,state TEXT)')
+        con.execute('INSERT INTO worker_retirement_intents VALUES(?,?,?,?)',('request',info['Id'],'owned','gone'))
+        intent.record(con,'request',payload);intent.start_intent(con,'request');intent.started(con,'request')
+        intent.record_observation(con,'request',payload,info)
+        @contextmanager
+        def db():
+            with con:yield con
+        def docker(*args):raise AssertionError('settled historical bootstrap must not use Docker')
+        b=SimpleNamespace(db=db,LOCK=threading.RLock(),docker=docker,STATE='unused')
+        intent.reconcile(b);intent.reconcile(b)
+        state=json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])
+        self.assertEqual(state['stage'],'retired_bootstrap_observed')
+        self.assertEqual(con.execute('SELECT status FROM leases').fetchone()[0],'closed')
     def test_policy_receipt_survives_reopen_deduplicates_and_excludes_secrets(self):
         import tempfile,os
         payload,_,info=self.inputs();info['Config'].pop('NetworkDisabled')

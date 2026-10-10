@@ -118,14 +118,49 @@ def observe(payload,state,info,native_status,deadline,now):
         'author_retry_authorized':False,'delivery_approval':False},'failed' if terminal else None
 
 
+def settled_retirement(payload,state,name,lease_status,retirement,observations):
+    """Only an acknowledged bootstrap with exact durable retirement may stop IO."""
+    if (state.get('stage') not in ('start_acknowledged','start_running_observed')
+            or lease_status not in ('closed','interrupted','expired','failed','cancelled','passed','lost')
+            or not retirement or retirement.get('state')!='gone' or retirement.get('name')!=name
+            or not re.fullmatch(r'[a-f0-9]{64}',retirement.get('container_id',''))):return None
+    sha=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
+    cid=retirement['container_id'];fact=state.get('fact',{})
+    bound=(fact.get('container_id')==cid and fact.get('payload_sha256')==sha)
+    bound=bound or any(r.get('operation')=='worker_policy_observation_v1'
+        and r.get('container_id')==cid and r.get('payload_sha256')==sha
+        and r.get('worker_image')==payload['Image'] and r.get('normalized_differences')==[]
+        for r in observations)
+    if not bound:return None
+    return {**state,'stage':'retired_bootstrap_observed','previous_stage':state['stage'],
+        'retirement_receipt':dict(container_id=cid,payload_sha256=sha,lease_status=lease_status,state='gone'),
+        'required_action':'bootstrap retired; retain evidence without repeated native or Docker lookup',
+        'author_retry_authorized':False,'delivery_approval':False}
+
+
 def reconcile(b):
     """Watchdog observation only; release capacity only on terminal authority."""
     with b.LOCK,b.db() as con:
         if not con.execute("SELECT 1 FROM sqlite_master WHERE name='worker_creation_intents'").fetchone():return
-        rows=con.execute("SELECT i.request_id,i.payload,i.state,l.name,l.deadline FROM worker_creation_intents i JOIN leases l USING(request_id)").fetchall()
-    for request,raw_payload,raw_state,name,deadline in rows:
+        rows=con.execute("SELECT i.request_id,i.payload,i.state,l.name,l.deadline,l.status FROM worker_creation_intents i JOIN leases l USING(request_id)").fetchall()
+    for request,raw_payload,raw_state,name,deadline,lease_status in rows:
         state=json.loads(raw_state)
         if state.get('stage') not in ('create_intent','create_outcome_unknown','late_container_observed','start_intent','start_outcome_unknown','start_acknowledged','start_running_observed'):continue
+        with b.LOCK,b.db() as con:
+            has_retirement=con.execute("SELECT 1 FROM sqlite_master WHERE name='worker_retirement_intents'").fetchone()
+            retirement=con.execute('SELECT container_id,name,state FROM worker_retirement_intents WHERE request_id=?',(request,)).fetchone() if has_retirement else None
+            observations=[]
+            if retirement:
+                if con.execute("SELECT 1 FROM sqlite_master WHERE name='worker_policy_observations'").fetchone():
+                    observations=[json.loads(r[0]) for r in con.execute('SELECT receipt FROM worker_policy_observations WHERE request_id=?',(request,))]
+                retired=settled_retirement(json.loads(raw_payload),state,name,lease_status,
+                    dict(zip(('container_id','name','state'),retirement)),observations)
+                if retired:
+                    changed=con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=? AND state=? '
+                        'AND EXISTS(SELECT 1 FROM leases WHERE request_id=? AND status=? AND name=?) '
+                        'AND EXISTS(SELECT 1 FROM worker_retirement_intents WHERE request_id=? AND container_id=? AND state=?)',
+                        (json.dumps(retired,sort_keys=True),request,raw_state,request,lease_status,name,request,retirement[0],'gone'))
+                    if changed.rowcount:continue
         native_status=None
         with b.db() as con:
             present=con.execute("SELECT 1 FROM sqlite_master WHERE name='native_bindings'").fetchone()

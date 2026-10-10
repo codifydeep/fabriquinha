@@ -1,0 +1,3 @@
+# Stop historical bootstrap IO only after exact acknowledged retirement proof.
+FROM delivery-kit-execution-broker:20261010.446
+COPY broker/worker_creation_intent.py /worker_creation_intent.py
