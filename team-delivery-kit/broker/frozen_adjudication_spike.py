@@ -103,6 +103,56 @@ def payload(config,traced):
             Mounts=[dict(Type='volume',Source=config['volume'],Target='/delivery',ReadOnly=True)]))
 
 
+def compact_receipt(proof):
+    """Lossless dictionary encoding; retain every event, order and report."""
+    compact=copy.deepcopy(proof);dictionary=[];index={};reports=[]
+    for report in proof['events']:
+        ids=[]
+        for event in report['events']:
+            key=json.dumps(event,sort_keys=True)
+            if key not in index:index[key]=len(dictionary);dictionary.append(copy.deepcopy(event))
+            ids.append(index[key])
+        reports.append({**copy.deepcopy(report),'event_indices':ids})
+        reports[-1].pop('events')
+    compact['events']=dict(encoding='lossless-event-dictionary-v1',dictionary=dictionary,reports=reports)
+    return compact
+
+
+def resume_oversized_handoff(config,state,current,jobs):
+    """Resume only evidence transport; never execute either diagnostic job again."""
+    if (config.get('recipe_revision')!='root_unittest_discovery_v2' or state.get('stage')!='blocked'
+            or state.get('category')!='ValueError' or state.get('handoff_size_repair')
+            or current.get('stage')!='technical_decision_required' or current.get('owner')!=config['cto']):
+        raise ValueError('once-only completed oversized diagnostic handoff required')
+    proof=validate_pair(config,state['plain'],state['traced'])
+    previous=config['previous_handoff']
+    if any(current.get(k)!=v for k,v in previous.items() if k not in ('data','updated')):
+        raise ValueError('source identity changed before evidence transport recovery')
+    data=json.loads(current['data']);old=json.loads(previous['data'])
+    if (any(data.get(k)!=old.get(k) for k in set(data)|set(old)
+            if k not in ('required_action','adjudication_spike_failure'))
+            or data.get('adjudication_spike')
+            or data.get('adjudication_spike_failure')!=dict(category='ValueError',config_sha256=digest(config),delivery_approval=False)
+            or data.get('required_action')!='CTO diagnose SPIKE state; preserve handles, no identical retry'
+            or len(old['instruction'])+len(json.dumps(proof,sort_keys=True))<=28000
+            or len(old['instruction'])+len(json.dumps(compact_receipt(proof),sort_keys=True))+2000>28000
+            or set(jobs)!={'plain','traced'}):
+        raise ValueError('only size failure and lossless bounded replacement may resume')
+    for variant,job in jobs.items():
+        result=job.get('result',{})
+        if (job.get('stage')!='complete' or result.get('exit_code')!=0
+                or hashlib.sha256(result.get('output','').encode()).hexdigest()!=result.get('output_sha256')
+                or json.loads(result.get('output','{}'))!=state[variant]):
+            raise ValueError('preserved complete experiment jobs required')
+    updated=copy.deepcopy(config);updated['previous_handoff']=copy.deepcopy(current)
+    next_state={**copy.deepcopy(state),'stage':'decision_pending','handoff_size_repair':dict(
+        previous_config_sha256=digest(config),previous_state_sha256=digest(state),
+        proof_sha256=digest(proof),encoding='lossless-event-dictionary-v1',
+        jobs_reexecuted=False,author_retry_authorized=False,test_change_authorized=False,delivery_approval=False)}
+    next_state.pop('category',None);next_state.pop('required_action',None)
+    return updated,next_state
+
+
 def advance(config,state,effects,persist):
     """Persist each intent before effects; an uncertain effect is only observed."""
     state=copy.deepcopy(state)
@@ -216,11 +266,13 @@ class Effects:
                 'request_test_revision requires evidence of a defective NEW test and fresh independent gates. '
                 'If genuinely unresolved, escalate_cto naming ONE missing experiment or constraint; do not ask '
                 'the CTO in the third person or the CEO for a technical decision. No edits, Green or approval. '
-                'SPIKE card: '+spike_issue+'\nController experiment receipt: '+json.dumps(proof,sort_keys=True)+'\n')
+                'SPIKE card: '+spike_issue+'\nController experiment receipt (lossless dictionary encoding): '+
+                json.dumps(compact_receipt(proof),sort_keys=True)+'\nEach report event_indices lists the exact events '+
+                'from events.dictionary in execution order, including repetitions. No event or report was dropped.\n')
             if len(instruction)>28000:raise ValueError('bounded complete SPIKE evidence required; no truncation')
             updated=copy.deepcopy(data)
             for field in ('recipient_task','wakeup_id','dispatched_at','alerted','decision','recipient_error',
-                          'failed_dispatch_stage','control_error','control_error_count'):
+                          'failed_dispatch_stage','control_error','control_error_count','adjudication_spike_failure'):
                 updated.pop(field,None)
             updated.update(adjudication_spike=dict(marker=marker,spike_issue=spike_issue,proof_sha256=digest(proof),
                 config_sha256=digest(config),author_retry_authorized=False,test_change_authorized=False,delivery_approval=False),
@@ -365,6 +417,31 @@ def reconcile_stage_repair(b,config,state):
     return corrected,next_state
 
 
+def reconcile_handoff_size(b,config,state):
+    if (state.get('stage')!='blocked' or state.get('category')!='ValueError'
+            or state.get('handoff_size_repair')):return config,state
+    try:import handoffs,controller_maintenance
+    except ImportError:from broker import handoffs,controller_maintenance
+    with b.db() as c:
+        if not c.in_transaction:c.execute('BEGIN IMMEDIATE')
+        if controller_maintenance.current(c):raise TimeoutError('maintenance; preserve completed experiment')
+        if c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone():
+            raise TimeoutError('wait for diagnostic capacity')
+        stored=c.execute('SELECT config,state FROM frozen_adjudication_spikes WHERE source_task=?',(config['source_task'],)).fetchone()
+        if tuple(map(json.loads,stored))!=(config,state):raise ValueError('SPIKE changed before evidence transport recovery')
+        jobs={}
+        for variant in ('plain','traced'):
+            task=str(uuid.uuid5(uuid.NAMESPACE_URL,OPERATION+':'+digest(config)+':'+variant))
+            row=c.execute('SELECT state FROM test_first_jobs WHERE job_key=?',(task+':copy',)).fetchone()
+            if row:jobs[variant]=json.loads(row[0])
+        corrected,next_state=resume_oversized_handoff(config,state,handoffs.load(c,config['source_task']),jobs)
+        c.execute('INSERT INTO frozen_adjudication_spike_history VALUES(?,?,?,?)',
+            (config['source_task'],digest(config),stored[0],stored[1]))
+        c.execute('UPDATE frozen_adjudication_spikes SET config=?,state=? WHERE source_task=?',
+            (json.dumps(corrected,sort_keys=True),json.dumps(next_state,sort_keys=True),config['source_task']))
+    return corrected,next_state
+
+
 def tick(b):
     try:import controller_maintenance
     except ImportError:from broker import controller_maintenance
@@ -379,7 +456,9 @@ def tick(b):
             except ValueError:continue  # An ineligible older incident cannot starve unrelated handoffs.
             if not registered:continue
             config,state=registered
-            try:config,state=reconcile_stage_repair(b,config,state)
+            try:
+                config,state=reconcile_stage_repair(b,config,state)
+                config,state=reconcile_handoff_size(b,config,state)
             except (ValueError,TimeoutError):continue
             def persist(value):
                 with b.db() as c:c.execute('UPDATE frozen_adjudication_spikes SET state=? WHERE source_task=?',(json.dumps(value,sort_keys=True),source_id))

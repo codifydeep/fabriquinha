@@ -379,6 +379,13 @@ tabela histórica; um novo card e novos handles identificam a receita corrigida.
 Isso não renova tentativas do autor nem os gates de revisão. Recibos parciais
 antigos permanecem inválidos; a nova execução ainda precisa comprovar cobertura
 integral antes do retorno ao CTO.
+O retorno ao CTO usa um dicionário de eventos sem perda: cada relatório lista
+índices dos eventos completos, em ordem e com repetições. O recibo integral
+permanece armazenado e seu hash continua vinculando a decisão. Se somente o
+tamanho bloquear o transporte, uma retomada exige comparação válida, ambos os
+jobs concluídos, hashes conferidos, source inalterada exceto pela anotação do
+próprio bloqueio e ausência de handoff já aceito. Ela arquiva o estado anterior
+e retoma apenas `decision_pending`, sem repetir testes nem renovar tentativas.
 O reconciliador de bootstrap deixa de consultar externamente workers históricos
 somente quando o start foi reconhecido, a lease é terminal e há recibo `gone`
 do mesmo contêiner, vinculado ao payload por observação de política ou fato

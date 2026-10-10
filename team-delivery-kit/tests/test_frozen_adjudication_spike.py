@@ -7,6 +7,44 @@ import test_frozen_diagnosis_format_recovery as prior
 
 
 class AdjudicationSpikeTests(unittest.TestCase):
+    def test_event_dictionary_roundtrip_retains_every_event_report_and_repetition(self):
+        proof=dict(events=[dict(events=[{'sequence':1,'kind':'fetch_started'}]*100,total_events=100,truncated=False)]*5,
+            suite=dict(tests=386,failures=1),delivery_approval=False)
+        original=copy.deepcopy(proof);compact=r.compact_receipt(proof)
+        events=compact['events'];restored=[]
+        for report in events['reports']:
+            item={k:v for k,v in report.items() if k!='event_indices'}
+            item['events']=[events['dictionary'][n] for n in report['event_indices']];restored.append(item)
+        compact['events']=restored
+        self.assertEqual(compact,original);self.assertEqual(proof,original)
+        self.assertLess(len(json.dumps(r.compact_receipt(proof))),len(json.dumps(proof)))
+
+    def test_oversized_handoff_reuses_complete_jobs_and_does_not_reset_execution(self):
+        config=r.qualify(self.evidence());config['recipe_revision']='root_unittest_discovery_v2'
+        original=json.loads(config['previous_handoff']['data']);original['instruction']='read frozen source'
+        config['previous_handoff']['data']=json.dumps(original)
+        plain,traced=self.proofs(config)
+        traced['event_reports']=[dict(events=[dict(sequence=i+1,kind='fetch_started',context=1) for i in range(100)],
+            total_events=100,truncated=False)]*10
+        state=dict(stage='blocked',category='ValueError',plain=plain,traced=traced,spike_issue='same-card')
+        current=copy.deepcopy(config['previous_handoff']);data=json.loads(current['data'])
+        data.update(required_action='CTO diagnose SPIKE state; preserve handles, no identical retry',
+            adjudication_spike_failure=dict(category='ValueError',config_sha256=r.digest(config),delivery_approval=False))
+        current['data']=json.dumps(data);jobs={}
+        for variant in ('plain','traced'):
+            raw=json.dumps(state[variant]);jobs[variant]=dict(stage='complete',result=dict(exit_code=0,
+                output=raw,output_sha256=hashlib.sha256(raw.encode()).hexdigest()))
+        corrected,next_state=r.resume_oversized_handoff(config,state,current,jobs)
+        self.assertEqual(next_state['stage'],'decision_pending');self.assertFalse(next_state['handoff_size_repair']['jobs_reexecuted'])
+        self.assertEqual(corrected['previous_handoff'],current);self.assertEqual(next_state['plain'],plain)
+        for change in ('consumed','source','receipt','live','small'):
+            cfg=copy.deepcopy(config);s=copy.deepcopy(state);cur=copy.deepcopy(current);j=copy.deepcopy(jobs)
+            if change=='consumed':s['handoff_size_repair']={'used':True}
+            if change=='source':cur['owner']='other'
+            if change=='receipt':j['plain']['result']['output_sha256']='e'*64
+            if change=='live':j['traced']['stage']='running'
+            if change=='small':s['traced']['event_reports']=[]
+            with self.subTest(change=change),self.assertRaises(ValueError):r.resume_oversized_handoff(cfg,s,cur,j)
     def test_changed_discovery_preserves_old_receipts_and_cannot_repeat_or_waive_gates(self):
         config=r.qualify(self.evidence());plain,traced=self.proofs(config)
         for proof in (plain,traced):proof['suite']['tests']=2

@@ -1,0 +1,3 @@
+# Reuse completed experiment receipts; lossless event dictionary for CTO handoff.
+FROM delivery-kit-execution-broker:20261010.447
+COPY broker/frozen_adjudication_spike.py /frozen_adjudication_spike.py
