@@ -1,0 +1,3 @@
+# Align qualification schema with the already installed mediation proxy.
+FROM delivery-kit-execution-broker:20261009.437
+COPY decision_schema.py /decision_schema.py
