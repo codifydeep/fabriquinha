@@ -282,6 +282,12 @@ A política foi instalada e a qualificação registrada a partir dos logs e ledg
 do proxy real. A retomada administrativa foi conferida: snapshot e contadores
 preservados, nenhum reinício do autor ou aprovação. O novo diagnóstico pelos
 agentes ainda precisa ser comprovado; esta admissão não equivale à sua conclusão.
+O CTO concluiu a tarefa retomada com `request_review_reconsideration`, mas o
+leitor central legado recusou a nova ação. A correção no código exige os três
+marcadores de mediação, findings de divergência, nenhum arquivo opcional e
+reason limitado; a revalidação administrativa usa a mesma tarefa concluída,
+sem nova chamada ao modelo. Essa correção ainda não foi instalada, e a nova
+revisão independente continua pendente.
 HTTP 400 histórico comprova recusa de transporte, mas
 não identifica sozinho qual parâmetro foi rejeitado pelo provedor.
 

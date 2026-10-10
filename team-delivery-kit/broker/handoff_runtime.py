@@ -542,6 +542,11 @@ class Effects:
         if len(text) > 5000:
             raise ValueError('technical decision too large')
         decision = json.loads(text)
+        mediation=all(re.search(r'^'+marker+r'$',recipient.get('handoff_note') or '',re.MULTILINE)
+            for marker in ('DELIVERY_REVIEW_RECONSIDERATION_V1','DELIVERY_TYPED_TEST_DIAGNOSIS_V1','DELIVERY_TEST_FINDINGS_V1'))
+        actions=('request_correction','retry_author','retry_review','revise_contract','request_test_revision',
+                 'escalate_cto','approve_test_revision','reject_test_revision')
+        if mediation:actions+=('request_review_reconsideration',)
         test_review = decision.get('action') in ('approve_test_revision', 'reject_test_revision')
         expected_keys = {'action', 'reason', 'optional_files'} | ({'manifest_sha256'} if test_review else set())
         if re.search(r'^DELIVERY_TEST_FINDINGS_V1$', recipient.get('handoff_note') or '', re.MULTILINE):
@@ -551,7 +556,7 @@ class Effects:
         if re.search(r'^DELIVERY_SEMANTIC_CHECKS_V1$', recipient.get('handoff_note') or '', re.MULTILINE):
             expected_keys |= {'experiment_sha256', 'semantic_checks'}
         if (set(decision) != expected_keys
-                or decision['action'] not in ('request_correction', 'retry_author', 'retry_review', 'revise_contract', 'request_test_revision', 'escalate_cto', 'approve_test_revision', 'reject_test_revision')
+                or decision['action'] not in actions
                 or not isinstance(decision['reason'], str) or not 1 <= len(decision['reason']) <= 3000
                 or not isinstance(decision['optional_files'], list)):
             raise ValueError('invalid technical decision')
@@ -560,6 +565,12 @@ class Effects:
             raise ValueError('invalid exact-snapshot test review')
         if decision['action'] == 'request_test_revision' and decision['optional_files']:
             raise ValueError('test revision cannot relax contract files')
+        if decision['action']=='request_review_reconsideration' and (
+                decision['optional_files'] or len(decision['reason'])>1200
+                or set(decision)!={'action','reason','optional_files','findings'}
+                or not isinstance(decision['findings'],list) or not 1<=len(decision['findings'])<=3
+                or any(not isinstance(f,dict) or f.get('kind')!='review_disagreement' for f in decision['findings'])):
+            raise ValueError('reconsideration cannot approve, edit or omit concrete findings')
         return decision
 
     def revise_contract(self, route, source, decision_task, decision):

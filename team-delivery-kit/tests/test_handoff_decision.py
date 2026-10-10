@@ -5,6 +5,20 @@ from broker.handoff_runtime import Effects
 
 
 class TechnicalDecisionTests(unittest.TestCase):
+    def test_reconsideration_reader_requires_scoped_nonapproving_contract(self):
+        decision={'action':'request_review_reconsideration','reason':'Reassess the same delivery',
+                  'optional_files':[],'findings':[{'kind':'review_disagreement'}]}
+        markers=('DELIVERY_REVIEW_RECONSIDERATION_V1','DELIVERY_TYPED_TEST_DIAGNOSIS_V1','DELIVERY_TEST_FINDINGS_V1')
+        task={'handoff_note':'\n'.join(markers)+'\n','result':{'output':json.dumps(decision)}}
+        self.assertEqual(self.effects.decision(task),decision)
+        for marker in markers:
+            with self.assertRaises(ValueError):
+                self.effects.decision({**task,'handoff_note':task['handoff_note'].replace(marker,'')})
+        for change in ({'optional_files':['tests/anything.py']},{'reason':'x'*1201},
+                       {'findings':[]},{'findings':[{'kind':'missing_coverage'}]},
+                       {'manifest_sha256':'a'*64},{'action':'approve'}):
+            with self.assertRaises(ValueError):
+                self.effects.decision({**task,'result':{'output':json.dumps({**decision,**change})}})
     def test_semantic_fields_require_the_controller_policy_marker(self):
         decision = {'action': 'request_test_revision', 'reason': 'Verified string facts.', 'optional_files': [],
                     'experiment_sha256': 'a' * 64,

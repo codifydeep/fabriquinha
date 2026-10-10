@@ -4,6 +4,22 @@ from broker import mediation_diagnosis_recovery as recovery
 
 
 class MediationDiagnosisTests(unittest.TestCase):
+    def test_completed_reader_revalidation_preserves_same_task_and_never_approves(self):
+        import json
+        from broker.handoff_runtime import Effects
+        from test_review_reconsideration import ReconsiderationTests
+        state,red,route,task,decision,reads,report=ReconsiderationTests().fixture()
+        task.update(handoff_note='DELIVERY_REVIEW_RECONSIDERATION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\nDELIVERY_TEST_FINDINGS_V1\n',
+            result={'output':json.dumps(decision)})
+        decision=Effects(None,{}).decision(task)
+        state['rejection_diagnosis'].update(status='blocked',failure={'operation':'structured_decision',
+            'detail':'invalid technical decision','task_id':task['id']})
+        updated=recovery.prepare_completed(state,red,route,{},task,decision,reads,report)
+        proof=updated['review_reconsideration']['reader_recovery']
+        self.assertEqual(proof['same_task'],task['id']);self.assertFalse(proof['new_model_call'])
+        self.assertFalse(proof['delivery_approval']);self.assertEqual(updated['status'],'dispatch_intent')
+        state['rejection_diagnosis']['failure']['operation']='artifact_reads'
+        with self.assertRaises(ValueError):recovery.prepare_completed(state,red,route,{},task,decision,reads,report)
     def fixture(self):
         from test_review_reconsideration import ReconsiderationTests
         state,red,route,task,decision,reads,report=ReconsiderationTests().fixture()

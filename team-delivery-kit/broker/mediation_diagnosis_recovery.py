@@ -92,3 +92,49 @@ def resume(b,issue,failed_task,qualification_execution,operation):
                 raise ValueError('mediation changed before recovery')
         test_revision_review._save_rejection(b,route,updated)
     return dict(status='dispatch_intent',attempt_limit=1,author_restarted=False,delivery_approval=False)
+
+
+def prepare_completed(state,red,route,config,task,decision,reads,report):
+    """Revalidate an existing verdict after reader repair, never rerun the CTO."""
+    try:import review_reconsideration
+    except ImportError:from broker import review_reconsideration
+    failure=state.get('rejection_diagnosis',{}).get('failure',{})
+    if (failure.get('operation')!='structured_decision' or failure.get('detail')!='invalid technical decision'
+            or failure.get('task_id')!=task.get('id') or task.get('status')!='completed'
+            or decision.get('action')!='request_review_reconsideration'):
+        raise ValueError('exact completed reconsideration refused by legacy reader required')
+    updated=review_reconsideration.prepare(state,red,route,task,decision,reads,report,
+        initial=config.get('initial_review',False))
+    updated['review_reconsideration']['reader_recovery']=dict(operation='completed_mediation_reader_revalidation_v1',
+        prior_failure=copy.deepcopy(failure),same_task=task['id'],new_model_call=False,delivery_approval=False)
+    return updated
+
+
+def resume_completed(b,issue,task_id,operation):
+    try:import controller_maintenance as maintenance,native,handoff_runtime,test_revision_review,test_review_report
+    except ImportError:from broker import controller_maintenance as maintenance,native,handoff_runtime,test_revision_review,test_review_report
+    with b.LOCK:
+        with b.db() as c:
+            barrier=maintenance.current(c)
+            if not barrier or barrier['stage']!='sealed' or barrier['operation_id']!=operation:
+                raise ValueError('exact sealed maintenance required')
+            config,state=map(json.loads,c.execute('SELECT config,state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone())
+            route=json.loads(c.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()[0])
+            red=json.loads(c.execute('SELECT receipt FROM test_first_red WHERE issue_id=?',(issue,)).fetchone()[0])
+            bindings=c.execute('SELECT n.scope,l.status FROM native_bindings n JOIN leases l USING(request_id) '
+                'WHERE n.task_id=? AND n.agent_id=? AND n.issue_id=?',(task_id,route['cto'],issue)).fetchall()
+            if (not route.get('enabled') or len(bindings)!=1 or bindings[0]['status']!='closed'
+                    or bindings[0]['scope'].split(':')[-2:]!=['planning',task_id]
+                    or c.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','active','closing')").fetchone()):
+                raise ValueError('idle exact completed CTO binding required')
+        if maintenance.native_active(b):raise ValueError('native idle required')
+        settings=json.loads((b.STATE/'native.json').read_text());fx=handoff_runtime.Effects(b,settings)
+        task=native.task_record(settings,task_id,route['cto']);decision=fx.decision(task)
+        test_revision_review.validate_evidence(b,route,state,decision)
+        report=test_review_report.load(b,issue,state['manifest_sha256'])
+        updated=prepare_completed(state,red,route,config,task,decision,fx.read_evidence(task),report)
+        with b.db() as c:
+            if json.loads(c.execute('SELECT state FROM test_revision_trials WHERE issue_id=?',(issue,)).fetchone()[0])!=state:
+                raise ValueError('completed mediation changed during revalidation')
+        test_revision_review._save(b,route,updated)
+    return dict(status='dispatch_intent',same_task=task_id,new_model_call=False,delivery_approval=False)
