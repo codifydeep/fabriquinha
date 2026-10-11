@@ -22,6 +22,7 @@ class WorkflowTests(unittest.TestCase):
             def verify(self,c):parent.assertEqual(c,parent.config)
             def reserve(self,c):return True
             def ready(self,c,task):return True
+            def materialize(self,c):return None
             def runs(self,c):return parent.runs
             def wake(self,c,note,marker,allow_create):
                 parent.events.append(('wake',allow_create,marker))
@@ -113,3 +114,54 @@ class WorkflowTests(unittest.TestCase):
         self.advance()
         self.assertEqual(self.state()['category'],'bundle_source_binding_rejected')
         self.assertFalse(self.events)
+
+    def test_materialization_receipt_advances_without_author_retry_or_approval(self):
+        self.advance()
+        self.runs=[dict(id='producer',wakeup_id='wake',agent_id='cto',status='completed')]
+        self.advance(2)
+        s=self.state()
+        self.fx.materialize=lambda c:dict(receipt=dict(bundle_sha256=s['bundle_sha256'],policy_sha256=s['policy_sha256'],
+            tests_executed=False,execution_authorized=False,delivery_approval=False),
+            controls_volume='new-controls',policy_volume='new-policy')
+        count=len(self.events)
+        self.advance(3)
+        self.assertEqual(self.state()['stage'],'controls_ready')
+        self.assertEqual(len(self.events),count)
+        self.assertFalse(self.state()['delivery_approval'])
+
+    def test_pending_materialization_observes_and_failure_is_owned(self):
+        self.advance()
+        self.runs=[dict(id='producer',wakeup_id='wake',agent_id='cto',status='completed')]
+        self.advance(2)
+        def pending(c):raise TimeoutError('same job pending')
+        self.fx.materialize=pending
+        self.advance(3);self.assertEqual(self.state()['stage'],'prepare_controls')
+        def rejected(c):raise ValueError('actual failed materialization')
+        self.fx.materialize=rejected
+        self.advance(4);self.assertEqual(self.state()['category'],'bundle_materialization_rejected')
+        self.assertEqual(self.state()['owner'],'cto')
+
+    def test_malformed_or_changed_receipt_is_persisted_hold_not_supervisor_exception(self):
+        self.advance()
+        self.runs=[dict(id='producer',wakeup_id='wake',agent_id='cto',status='completed')]
+        self.advance(2)
+        original=self.state()
+        good=dict(bundle_sha256=original['bundle_sha256'],policy_sha256=original['policy_sha256'],
+            tests_executed=False,execution_authorized=False,delivery_approval=False)
+        cases=[{},dict(receipt=None),dict(receipt={}),
+            *[dict(receipt={**good,key:value}) for key,value in (
+                ('bundle_sha256','wrong'),('policy_sha256','wrong'),
+                ('tests_executed',True),('execution_authorized',True),('delivery_approval',True))]]
+        for result in cases:
+            with self.subTest(result=result):
+                self.con.execute('UPDATE generic_calibration_workflows SET state=?',
+                    (json.dumps(original),));self.con.commit()
+                calls=[]
+                def materialize(c):calls.append(c);return result
+                self.fx.materialize=materialize
+                self.advance(3)
+                self.assertEqual(self.state()['stage'],'blocked')
+                self.assertEqual(self.state()['category'],'bundle_materialization_receipt_rejected')
+                self.assertEqual(self.state()['owner'],'cto')
+                self.assertFalse(self.state()['execution_authorized'])
+                self.advance(4);self.assertEqual(len(calls),1)

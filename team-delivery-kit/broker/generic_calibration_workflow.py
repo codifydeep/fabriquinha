@@ -1,8 +1,8 @@
 """Durable native CTO bundle dispatch; proposals never authorize delivery.
 
-The current terminal prerequisite is prepare_controls, owned by the technical
-controller. It is not success: materialization, attestation, independent review,
-input probe and calibration must subsequently consume the exact same bundle.
+The current terminal prerequisite is controls_ready, owned by the technical
+controller. It is not success: attestation, independent review, input probe and
+calibration must subsequently consume the exact same materialized bundle.
 """
 import hashlib
 import json
@@ -50,7 +50,7 @@ def advance(con,c,fx,*,now=None):
     row=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
         (c['issue_id'],c['author_task'])).fetchone()
     gate.require(row and json.loads(row[0])==c);s=json.loads(row[1])
-    if s['stage'] in ('blocked','prepare_controls'):return s
+    if s['stage'] in ('blocked','controls_ready'):return s
     def save(**changes):
         s.update(changes)
         con.execute('UPDATE generic_calibration_workflows SET state=? WHERE issue_id=? AND author_task=?',
@@ -61,6 +61,21 @@ def advance(con,c,fx,*,now=None):
     try:fx.verify(c)
     except (ValueError,KeyError,TypeError):
         return hold('bundle_source_binding_rejected','CTO diagnose changed source binding; no dispatch or retry')
+    if s['stage']=='prepare_controls':
+        try:result=fx.materialize(c)
+        except TimeoutError:return s  # Observe the same durable Docker job.
+        except (ValueError,KeyError,TypeError):
+            return hold('bundle_materialization_rejected','CTO diagnose controller materialization; never reassign author blindly')
+        if result is None:return s
+        try:
+            receipt=result['receipt']
+            gate.require(receipt['bundle_sha256']==s['bundle_sha256'] and receipt['policy_sha256']==s['policy_sha256']
+                and all(receipt[k] is False for k in ('tests_executed','execution_authorized','delivery_approval')))
+        except (ValueError,KeyError,TypeError):
+            return hold('bundle_materialization_receipt_rejected',
+                'CTO diagnose exact materialization receipt; preserve job and never replay effects')
+        return save(stage='controls_ready',materialization=result,
+            required_action='CTO attest exact immutable policy, then Tech Lead independently reviews; no test authority')
     if s['stage'] in ('bundle_dispatch','observe_bundle_dispatch'):
         first=s['stage']=='bundle_dispatch'
         if first and not fx.reserve(c):
@@ -202,13 +217,17 @@ class Effects:
         try:import generic_calibration_proposal as producer
         except ImportError:from broker import generic_calibration_proposal as producer
         return producer.collect(self.b,c['issue_id'],c['author_task'],task['id'],wakeup)
+    def materialize(self,c):
+        try:import generic_calibration_materialization as jobs
+        except ImportError:from broker import generic_calibration_materialization as jobs
+        with self.b.db() as con:return jobs.run(self.b,con,c['issue_id'],c['author_task'])
 
 
 def tick(b):
     with b.LOCK,b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows').fetchall()
-        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','prepare_controls')]
+        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','controls_ready')]
         if not active:return
         fx=Effects(b)
         for c in active:advance(con,c,fx)

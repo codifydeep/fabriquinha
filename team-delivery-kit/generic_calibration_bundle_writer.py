@@ -9,6 +9,9 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import base64
+import os
+import zlib
 
 from generic_harness_calibration import digest,relative,require,validate_policy
 from r3_snapshot_probe import probe
@@ -81,11 +84,29 @@ def write(controls,policy,record,expected):
         policy_manifest_sha256=policy_manifest,tests_executed=False,execution_authorized=False,delivery_approval=False)
 
 
+def decode_environment(encoded):
+    """Bound compressed transport too; never truncate a native proposal."""
+    require(isinstance(encoded,str) and 1<=len(encoded)<=98304)
+    packed=base64.b64decode(encoded,validate=True);decoder=zlib.decompressobj()
+    raw=decoder.decompress(packed,1048577)
+    require(len(raw)<=1048576 and decoder.eof and not decoder.unused_data and not decoder.unconsumed_tail)
+    def unique(pairs):
+        result={}
+        for key,value in pairs:
+            require(key not in result);result[key]=value
+        return result
+    return json.loads(raw,object_pairs_hook=unique,
+        parse_constant=lambda value:(_ for _ in ()).throw(ValueError('nonfinite bundle')))
+
+
 if __name__=='__main__':
     try:
         require(len(sys.argv)==5)
-        source=Path(sys.argv[3]);require(not source.is_symlink() and source.is_file() and source.stat().st_size<=1048576)
-        print(json.dumps(write(sys.argv[1],sys.argv[2],json.loads(source.read_text()),sys.argv[4]),sort_keys=True))
+        if sys.argv[3]=='--environment':record=decode_environment(os.environ.get('CALIBRATION_BUNDLE_ZLIB'))
+        else:
+            source=Path(sys.argv[3]);require(not source.is_symlink() and source.is_file() and source.stat().st_size<=1048576)
+            record=json.loads(source.read_text())
+        print(json.dumps(write(sys.argv[1],sys.argv[2],record,sys.argv[4]),sort_keys=True))
     except Exception as error:
         print(json.dumps(dict(status='rejected',category=type(error).__name__,tests_executed=False,
             execution_authorized=False,delivery_approval=False)));sys.exit(1)

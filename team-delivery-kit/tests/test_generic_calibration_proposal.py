@@ -77,6 +77,14 @@ class ProposalTests(unittest.TestCase):
 
 class MaterializationTests(unittest.TestCase):
     setUp=ProposalTests.setUp
+    def test_compressed_transport_is_bounded_and_does_not_accept_duplicate_or_trailing_data(self):
+        import base64,zlib
+        from generic_calibration_bundle_writer import decode_environment
+        encoded=lambda raw:base64.b64encode(zlib.compress(raw)).decode()
+        self.assertEqual(decode_environment(encoded(b'{"bounded":true}')),{'bounded':True})
+        for value in (encoded(b'{"same":1,"same":2}'),encoded(b'x'*1048577),
+                      base64.b64encode(zlib.compress(b'{}')+b'trailing').decode()):
+            with self.assertRaises(ValueError):decode_environment(value)
     def test_materializer_does_not_accept_extra_operations(self):
         from generic_calibration_bundle_writer import expected_files
         record=proposal.bundle(self.body,self.value,self.route,self.prepared)

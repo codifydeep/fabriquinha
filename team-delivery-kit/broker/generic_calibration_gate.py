@@ -93,7 +93,7 @@ def payload(b,record):
     require(len({context[k] for k in ('candidate_volume','controls_volume','policy_volume')})==3)
     return dict(Image=image,User='10000:10000',Entrypoint=['python'],
         Cmd=['/generic_harness_calibration.py','/candidate','/controls','/policy/policy.json',record['policy_sha256']],
-        NetworkDisabled=True,Env=['PYTHONDONTWRITEBYTECODE=1'],
+        Env=['PYTHONDONTWRITEBYTECODE=1'],
         Labels={**labels('generic-calibration',b.PREFIX),'delivery-kit.owner':b.OWNER,
             'delivery-kit.calibration-policy':record['policy_sha256'],
             'delivery-kit.calibration-author-task':context['author_task']},

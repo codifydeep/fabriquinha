@@ -1342,19 +1342,33 @@ do CTO, exige leitura completa e leases encerrados, e calcula os vínculos com o
 plano e a cópia imutável do autor. Não aceita comandos ou declarações de aprovação
 na proposta. `generic_calibration_bundle_writer.py` materializa somente controles
 e política em destinos novos do controlador; não executa testes nem sobrescreve
-arquivos divergentes. Esses componentes ainda aguardam o despacho nativo e a
-materialização Docker duráveis do fluxo de proposta/revisão: não representam
-uma política instalada ou uma entrega autônoma já validada.
+arquivos divergentes. Esses componentes não representam uma política instalada
+ou uma entrega autônoma já validada.
 O despacho de proposta possui agora uma máquina persistente em
 `broker/generic_calibration_workflow.py`, conectada aos hooks do supervisor e
 dos mounts de planejamento no código-fonte. Intenções precedem wakeups; após
 resposta incerta, só é permitida observação. A tarefa exata do CTO lê candidato
 e histórico somente para leitura, e sua proposta é coletada pela identidade
-nativa. Falhas mantêm responsável e próxima ação; uma proposta válida aguarda
+nativa. Falhas mantêm responsável e próxima ação; uma proposta válida segue para
 materialização de controles, sem reacionar o autor ou aprovar a entrega.
-Esse caminho ainda não está instalado: entrada no gate de Red, materialização
-durável e despacho das aprovações independentes precisam ser integrados antes
-da retomada do ensaio.
+`broker/generic_calibration_materialization.py` grava intenções antes de criar
+cada volume, contêiner ou execução. Seu helper fixo possui somente dois volumes
+novos graváveis, raiz somente leitura, nenhuma rede, credencial ou socket. A
+perda de resposta observa os mesmos recursos; não cria substitutos. Os bytes
+do bundle e os manifestos são conferidos, e o recibo não executa testes nem
+autoriza Red ou entrega. A imagem do helper deve ser fixada por digest em
+`BROKER_GENERIC_CALIBRATION_WRITER_IMAGE`.
+A imagem dedicada é construída com `Dockerfile.calibration-writer-1`, separada
+do executor de testes. Antes de qualquer efeito Docker, o controlador rejeita
+imagens com volumes herdados ou variáveis fora da lista permitida; depois da
+criação, confere os mounts realmente observados, não apenas os solicitados.
+O canário local de materialização validou esse caminho no Docker real, sem
+aprovações nativas ou execução dos testes do produto. Recibos divergentes
+produzem um bloqueio persistente com responsável CTO, sem derrubar o supervisor
+ou repetir a execução. Isso não qualifica o executor de testes nem a entrega
+ponta a ponta.
+Esse caminho ainda não está instalado: entrada no gate de Red e despacho das
+aprovações independentes precisam ser integrados antes da retomada do ensaio.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
