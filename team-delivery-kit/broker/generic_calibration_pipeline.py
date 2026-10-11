@@ -8,7 +8,8 @@ import hashlib
 import json
 import time
 
-from generic_harness_calibration import digest,validate_receipt
+from generic_harness_calibration import digest
+from calibration_policy_adapter import validate_receipt
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
 

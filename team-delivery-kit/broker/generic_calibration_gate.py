@@ -13,7 +13,8 @@ import os
 from types import SimpleNamespace
 
 from docker_grouping import labels
-from generic_harness_calibration import digest,validate_policy,validate_receipt
+from generic_harness_calibration import digest
+from calibration_policy_adapter import validate_policy,validate_receipt,product_paths,fixture_paths,executor
 
 
 def require(condition):
@@ -32,7 +33,7 @@ def require_author_scope(binding,task):
 def required_paths(policy,context):
     return sorted({'/evidence/policy/policy.json',
         *('/evidence/candidate/'+p for p in policy['test_sha256']),
-        *('/evidence/candidate/'+m['product_path'] for m in policy['modules']),
+        *('/evidence/candidate/'+p for p in product_paths(policy)),
         *('/evidence/previous/'+p for p in policy['previous_methods']),
         *('/evidence/controls/'+p for p in context['control_files'])})
 
@@ -66,7 +67,7 @@ def qualify(policy,context,proposal,review,proposal_reads,review_reads):
         'criteria','control_files','candidate_volume','controls_volume','policy_volume'})
     require(all(policy[k]==context[k] for k in ('source_task','execution_sha256','plan_sha256','criteria','previous_methods')))
     require(len({context['author'],context['cto'],context['reviewer']})==3)
-    controls={m['positive_fixture'] for m in policy['modules']}|{n['fixture'] for n in policy['negatives']}
+    controls=fixture_paths(policy)
     require(set(context['control_files'])==controls and len(context['control_files'])==len(controls))
     require(proposal['id']!=review['id'] and context['author_task'] not in (proposal['id'],review['id']))
     artifacts={}
@@ -102,14 +103,16 @@ def store(con,record):
 
 def payload(b,record):
     p=record['policy'];context=record['context'];validate_policy(p,record['policy_sha256'])
-    image=getattr(b,'GENERIC_CALIBRATION_IMAGE',None) or os.environ.get('BROKER_GENERIC_CALIBRATION_IMAGE')
+    # A v2 policy must not silently use the installed v1 executor image.
+    setting='GENERIC_CALIBRATION_V2_IMAGE' if p['version']=='generic_harness_calibration_v2' else 'GENERIC_CALIBRATION_IMAGE'
+    image=getattr(b,setting,None) or os.environ.get('BROKER_'+setting)
     require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
     for key in ('candidate_volume','controls_volume','policy_volume'):
         require(isinstance(context[key],str) and context[key].startswith(b.PREFIX+'-')
             and bool(re.fullmatch('[A-Za-z0-9_.-]{1,200}',context[key])))
     require(len({context[k] for k in ('candidate_volume','controls_volume','policy_volume')})==3)
     return dict(Image=image,User='10000:10000',Entrypoint=['python'],
-        Cmd=['/generic_harness_calibration.py','/candidate','/controls','/policy/policy.json',record['policy_sha256']],
+        Cmd=[executor(p),'/candidate','/controls','/policy/policy.json',record['policy_sha256']],
         Env=['PYTHONDONTWRITEBYTECODE=1'],
         Labels={**labels('generic-calibration',b.PREFIX),'delivery-kit.owner':b.OWNER,
             'delivery-kit.calibration-policy':record['policy_sha256'],

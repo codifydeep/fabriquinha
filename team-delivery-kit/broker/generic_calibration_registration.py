@@ -12,7 +12,8 @@ import time
 
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
-from generic_harness_calibration import digest,validate_policy
+from generic_harness_calibration import digest
+from calibration_policy_adapter import validate_policy,product_paths,input_operation
 
 
 def context_from_inputs(value,route,intake,proof):
@@ -22,7 +23,7 @@ def context_from_inputs(value,route,intake,proof):
         'controls_manifest_sha256','candidate_test_sha256','previous_test_sha256','candidate_methods',
         'previous_methods','product_sha256','control_sha256','tests_executed','execution_authorized','delivery_approval'}
     gate.require(isinstance(proof,dict) and set(proof)==expected_fields
-        and proof['operation']=='generic_calibration_inputs_v1'
+        and proof['operation']==input_operation(p)
         and all(proof[k] is False for k in ('tests_executed','execution_authorized','delivery_approval')))
     gate.require(intake['previous']==previous and p['source_task']==value['source_task']
         and p['execution_sha256']==digest(value) and p['plan_sha256']==value['plan_sha256']
@@ -40,7 +41,7 @@ def context_from_inputs(value,route,intake,proof):
     for key in ('candidate_manifest_sha256','controls_manifest_sha256'):gate.require(proof[key]==p[key])
     normalized=lambda classes:{key:sorted(methods) for key,methods in classes.items()}
     gate.require(proof['candidate_methods']=={m['path']:normalized(m['classes']) for m in p['modules']})
-    gate.require(set(proof['product_sha256'])=={m['product_path'] for m in p['modules']}
+    gate.require(set(proof['product_sha256'])==product_paths(p)
         and set(proof['control_sha256'])==set(context['control_files']))
     for mapping in (proof['product_sha256'],proof['control_sha256']):
         gate.require(all(isinstance(v,str) and bool(re.fullmatch('[a-f0-9]{64}',v)) for v in mapping.values()))

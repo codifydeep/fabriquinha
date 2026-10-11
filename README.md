@@ -1527,6 +1527,12 @@ controlador; a coleta instalada continua no contrato v1. A materialização
 preserva todos os controles declarados, exige digest exato do bundle e não
 sobrescreve arquivos divergentes. Seu recibo de gravação permanece sem autoridade
 de execução ou entrega, e não substitui a revisão independente da política.
+Os contratos candidatos de revisão e pipeline verificam todos os arquivos e
+recibos pela versão exata. Execução v2 exige configuração própria
+`BROKER_GENERIC_CALIBRATION_V2_IMAGE`, com image ID, e usa somente o entrypoint
+fixo do adapter em sandbox restrito. Ausência dessa configuração não permite
+fallback para a imagem v1. A seleção persistente do workflow, a instalação e
+um ensaio nativo completo ainda são requisitos pendentes para ativação.
 
 ## Contribuir e reutilizar
 
