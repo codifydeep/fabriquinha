@@ -1,5 +1,6 @@
+import json
 import unittest
-from calibration_diagnostic_probe import build
+from calibration_diagnostic_probe import build, summarize_reply
 from calibration_response_contract import capsule, context
 
 
@@ -45,3 +46,29 @@ class DiagnosticProbeTests(unittest.TestCase):
     def test_oversized_output_is_rejected_before_transport(self):
         reads=[self.reads[0],dict(self.reads[1],output='x'*131073)]
         with self.assertRaises(ValueError):build(self.note,reads,'model',self.experiment,self.task)
+
+    def test_read_requests_are_preserved_without_executing_or_disclosing_content(self):
+        body,_=build(self.note,self.reads,'model',self.experiment,self.task)
+        args={'path':'/evidence/candidate/web/lobby.html','offset':1,'limit':100}
+        data=json.dumps({'choices':[{'finish_reason':'tool_calls','message':{
+            'tool_calls':[{'function':{'name':'read_file','arguments':json.dumps(args)}}]}}]}).encode()
+        result=summarize_reply(body,data)
+        self.assertEqual(result['requested_reads'],[args])
+        self.assertIs(result['tool_execution_allowed'],False)
+        self.assertIs(result['delivery_approval'],False)
+
+    def test_objection_is_format_observation_not_workflow_transition(self):
+        body,_=build(self.note,self.reads,'model',self.experiment,self.task)
+        content=json.dumps(dict(action='calibration_objection',reason='private detail',
+            execution_authorized=False,delivery_approval=False))
+        data=json.dumps({'choices':[{'finish_reason':'stop','message':{'content':content}}]}).encode()
+        result=summarize_reply(body,data)
+        self.assertEqual(result['action'],'calibration_objection')
+        self.assertNotIn('private detail',json.dumps(result))
+        self.assertIs(result['workflow_transition'],False)
+
+    def test_invalid_reply_is_not_promoted_to_diagnostic_success(self):
+        body,_=build(self.note,self.reads,'model',self.experiment,self.task)
+        for content in ('not json',json.dumps({'action':'approve','delivery_approval':True})):
+            data=json.dumps({'choices':[{'finish_reason':'stop','message':{'content':content}}]}).encode()
+            with self.assertRaises(ValueError):summarize_reply(body,data)

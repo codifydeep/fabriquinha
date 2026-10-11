@@ -8,7 +8,7 @@ import hashlib
 import json
 import uuid
 from artifact_read_evidence import observations
-from calibration_response_contract import request, safe_path
+from calibration_response_contract import request, safe_path, validate_reply
 
 
 def build(note, durable, model, experiment_id, source_task):
@@ -63,3 +63,26 @@ def build(note, durable, model, experiment_id, source_task):
         native_read_evidence=False, execution_authorized=False, delivery_approval=False,
         workflow_transition=False, tool_execution_allowed=False)
     return copy.deepcopy(body), receipt
+
+
+def summarize_reply(body, data):
+    """Keep bounded read requests, not product bytes, prose or permissions.
+
+    Validation is still mandatory. A terminal proposal here is only a format
+    observation and is never a native task result or delivery approval.
+    """
+    if not validate_reply(body, data, 'application/json'):
+        raise ValueError('current bundle diagnostic reply required')
+    reply = json.loads(data)
+    choice = reply['choices'][0]
+    message = choice['message']
+    reads = [json.loads(call['function']['arguments'])
+             for call in message.get('tool_calls', [])]
+    result = dict(response_sha256=hashlib.sha256(data).hexdigest(),
+        finish_reason=choice['finish_reason'], requested_reads=reads,
+        native_read_evidence=False, tool_execution_allowed=False,
+        execution_authorized=False, delivery_approval=False, workflow_transition=False)
+    if not reads:
+        value = json.loads(message['content'])
+        result.update(action=value['action'], reason_present=bool(value.get('reason')))
+    return result
