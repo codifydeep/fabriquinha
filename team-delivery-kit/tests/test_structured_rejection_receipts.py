@@ -40,6 +40,19 @@ class StructuredRejectionTests(unittest.TestCase):
         event=self.event();event['structured_rejection_diagnostic']['message']='upstream text'
         with self.assertRaises(ValueError):receipts.from_event(event)
 
+    def test_multipath_rejection_fields_are_durable_without_authority(self):
+        with tempfile.TemporaryDirectory() as root:
+            counter=str(Path(root).resolve()/'calls.json')
+            Path(counter).write_text('{"calls":0}')
+            event=self.event()
+            event['structured_rejection_diagnostic']['fields']=['attribute','fixtures','replacements']
+            event['structured_rejection_diagnostic']['missing_fields']=['attribute']
+            receipts.record(counter,event)
+            stored=receipts.read(counter,EXECUTION)
+            self.assertEqual(stored[0]['diagnostic'],event['structured_rejection_diagnostic'])
+            self.assertFalse(stored[0]['execution_authorized'])
+            self.assertFalse(stored[0]['delivery_approval'])
+
     def test_current_bundle_schema_failure_exposes_only_known_fields_and_keywords(self):
         from test_calibration_response_contract import CalibrationContractTests
         fixture=CalibrationContractTests();body=apply(fixture.body(complete=True))

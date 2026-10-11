@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261011.128
+USER root
+COPY structured_rejection_receipts.py /structured_rejection_receipts.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import structured_rejection_receipts;assert callable(structured_rejection_receipts.record)"
+USER 10000:10000

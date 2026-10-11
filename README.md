@@ -1559,9 +1559,20 @@ em um mesmo módulo. Raízes não reconhecidas ficam bloqueadas. As primitivas
 de `generic_calibration_capability_recovery.py` permitem uma única mudança
 auditada v1→v2, preservando configuração/falha anteriores e o ledger da
 migração de protocolo já consumida. Elas não são uma API de worker: o wrapper
-operacional ainda precisa autenticar a manutenção, a execução real do probe,
+operacional `migrate` autentica a manutenção, a execução real do probe,
 as identidades nativas e a entrega original antes da aplicação. Calibração e
 recuperação não autorizam Red, Green ou entrega.
+`controller_calibration_capability_cli.py` seleciona apenas o controlador Compose
+exato; nunca recebe uma prova ou decisão fornecida pelo operador/worker. O job
+fixo exige `BROKER_GENERIC_CALIBRATION_SEAM_IMAGE` por image ID e monta somente
+o snapshot, para leitura, sem rede ou credenciais. Intenções Docker são persistidas
+antes dos efeitos; confirmação perdida observa o mesmo handle. A configuração
+anterior só muda depois da evidência real, e o recibo preserva a identidade do
+probe. A imagem `465` verifica o payload efetivo do adaptador de agrupamento,
+preservando a intenção original e observando o mesmo contêiner após uma
+confirmação incerta. O proxy `129` persiste também os campos sanitizados do
+contrato multiarquivo. A instalação e o probe não comprovam o ensaio nativo:
+proposta, revisão independente e execução calibrada continuam obrigatórias.
 
 ## Contribuir e reutilizar
 

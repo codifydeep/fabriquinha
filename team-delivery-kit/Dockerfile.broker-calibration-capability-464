@@ -1,0 +1,6 @@
+# Candidate: installation does not apply migration or dispatch a model.
+FROM delivery-kit-execution-broker:20261011.463
+COPY broker/generic_calibration_capability_recovery.py /generic_calibration_capability_recovery.py
+COPY broker/generic_calibration_seam_job.py /generic_calibration_seam_job.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_capability_recovery as c,generic_calibration_seam_job as j;assert callable(c.migrate) and callable(j.run)"

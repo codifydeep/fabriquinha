@@ -25,7 +25,7 @@ def from_event(event):
             'oneOf','allOf','not','uniqueItems','other'}
         fields={'action','engine','modules','negatives','previous_methods','controls','execution_authorized',
             'delivery_approval','reason','path','fixture_attribute','product_path','positive_fixture','classes',
-            'id','module','class_name','method','fixture','criteria'}
+            'id','module','class_name','method','fixture','criteria','fixtures','attribute','replacements'}
         if not expected or set(diagnostic)!=expected or not re.fullmatch('[a-f0-9]{64}',str(diagnostic['upstream_sha256'])):
             raise ValueError('bounded sanitized rejection required')
         for key,vocabulary in (('constraints',keywords),('fields',fields),('missing_fields',fields)):
