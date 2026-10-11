@@ -1,0 +1,6 @@
+# Qualification candidate only: installing it requires explicit runtime gates.
+# Verify local base ID: sha256:358a4862d9d9a2fbdb95653f3e54e3b10680ed8f18893ff036e61583b857c16b.
+FROM delivery-kit-generic-calibration:20261011.4
+COPY --chmod=0444 generic_harness_calibration_v2.py /generic_harness_calibration_v2.py
+USER 10000:10000
+ENTRYPOINT ["python"]

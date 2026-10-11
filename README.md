@@ -1504,6 +1504,17 @@ O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
 obrigatória. Calibração aprovada não equivale a Red, Green ou homologação.
+O adapter candidato `generic_harness_calibration_v2.py` usa uma política e um
+recibo versionados separadamente para múltiplas variáveis `Path` no mesmo
+módulo. Cada variável deve apontar originalmente ao arquivo declarado no
+snapshot; controles negativos substituem apenas os alvos explícitos e os demais
+retornam às referências positivas. Descoberta completa, métodos anteriores,
+hashes e falha por assertion continuam obrigatórios. Recibos v1 não são
+convertidos para v2. `tests/generic_calibration_v2_canary.py` qualifica o executor
+com dados sintéticos em Docker sem rede, credenciais ou socket e com mounts
+somente leitura; conserva esses dados em arquivo privado para observação após
+uma confirmação perdida. Esse canário não instala o adapter no controlador,
+não constitui uma decisão nativa de CTO/revisor e não libera o produto.
 
 ## Contribuir e reutilizar
 
