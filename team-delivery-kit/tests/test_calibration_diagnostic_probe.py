@@ -1,6 +1,6 @@
 import json
 import unittest
-from calibration_diagnostic_probe import build, summarize_reply
+from calibration_diagnostic_probe import build, summarize_reply, attach_dependencies,prepared_identity
 from calibration_response_contract import capsule, context
 
 
@@ -72,3 +72,25 @@ class DiagnosticProbeTests(unittest.TestCase):
         for content in ('not json',json.dumps({'action':'approve','delivery_approval':True})):
             data=json.dumps({'choices':[{'finish_reason':'stop','message':{'content':content}}]}).encode()
             with self.assertRaises(ValueError):summarize_reply(body,data)
+
+    def test_complete_dependency_context_never_adds_native_tool_receipts(self):
+        body,_=build(self.note,self.reads,'model',self.experiment,self.task)
+        page=dict(output=json.dumps({'total_lines':1,'content':'1|pass'}),
+            file_sha256='b'*64,manifest_sha256='c'*64)
+        dependency=dict(path='/evidence/candidate/app.js',total_lines=1,pages=[page],
+            file_sha256='b'*64,manifest_sha256='c'*64,native_read_evidence=False,
+            execution_authorized=False,delivery_approval=False)
+        result=attach_dependencies(body,[dependency])
+        self.assertEqual(result['messages'][:-1],body['messages'])
+        self.assertEqual(result['messages'][-1]['role'],'user')
+        for bad in (dict(dependency,total_lines=101),dict(dependency,native_read_evidence=True)):
+            with self.assertRaises(ValueError):attach_dependencies(body,[bad])
+
+    def test_prepared_identity_hashes_exact_new_input_and_preserves_parent(self):
+        body,parent=build(self.note,self.reads,'model',self.experiment,self.task)
+        body['messages'].append({'role':'user','content':'prepared dependency input'})
+        receipt=prepared_identity(body,parent)
+        self.assertEqual(receipt['parent_input_sha256'],parent['input_sha256'])
+        self.assertNotEqual(receipt['input_sha256'],parent['input_sha256'])
+        self.assertIs(receipt['native_read_evidence'],False)
+        with self.assertRaises(ValueError):prepared_identity(body,dict(parent,source_sha256='b'*64))

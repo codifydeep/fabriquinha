@@ -1487,6 +1487,13 @@ Docker agrupados, sem rede e com mounts somente leitura. Atingir o limite
 durante paginação não equivale a uma proposta final, nem prova a causa de uma
 rejeição histórica cuja resposta não foi preservada. Leituras desse diagnóstico
 não substituem recibos de inspeção da tarefa nativa.
+`scripts/prepare_calibration_diagnostic_context.py` completa localmente a
+paginação apenas dos arquivos já solicitados pelo diagnóstico. O contexto
+preparado entra como dados, não como chamadas de ferramenta fictícias. Limites
+de páginas/bytes, manifestos e hashes continuam obrigatórios. O recibo preparado
+vincula o hash da requisição completa e preserva o vínculo com a entrada anterior.
+Essa preparação não faz chamadas de modelo nem reabre workflows bloqueados;
+sua integração ao fluxo nativo ainda exige qualificação independente.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

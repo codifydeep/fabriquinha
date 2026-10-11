@@ -38,3 +38,22 @@ def page(args, expected_manifest=None):
         str(i+1)+'|'+lines[i] for i in range(start,min(start+args['limit'],len(lines))))})
     if len(output.encode())>131072:raise ValueError('snapshot page too large')
     return {'output':output,'file_sha256':declared['sha256'],'manifest_sha256':manifest_hash}
+
+
+def complete(path, expected_manifest):
+    """Bounded local pagination; never calls a model or creates native receipts."""
+    first=page({'path':path,'offset':1,'limit':100},expected_manifest)
+    total=json.loads(first['output'])['total_lines']
+    if total>3200:raise ValueError('dependency exceeds complete-read page budget')
+    pages=[first]
+    for offset in range(101,total+1,100):
+        current=page({'path':path,'offset':offset,'limit':100},expected_manifest)
+        if (current['file_sha256']!=first['file_sha256']
+                or json.loads(current['output'])['total_lines']!=total):
+            raise ValueError('dependency changed during complete read')
+        pages.append(current)
+    if sum(len(p['output'].encode()) for p in pages)>450000:
+        raise ValueError('complete dependency exceeds context budget')
+    return dict(path=path,total_lines=total,pages=pages,
+        file_sha256=first['file_sha256'],manifest_sha256=first['manifest_sha256'],
+        native_read_evidence=False,execution_authorized=False,delivery_approval=False)

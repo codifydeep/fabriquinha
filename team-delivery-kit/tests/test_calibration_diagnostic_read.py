@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from calibration_diagnostic_read import page
+from calibration_diagnostic_read import page,complete
 
 
 class DiagnosticReadTests(unittest.TestCase):
@@ -46,3 +46,12 @@ class DiagnosticReadTests(unittest.TestCase):
         manifest=self.root/'manifest.json';manifest.unlink()
         manifest.symlink_to('/etc/passwd')
         with self.assertRaises(ValueError):page(self.args,self.hash)
+
+    def test_complete_local_read_pages_without_model_or_native_evidence(self):
+        lines=''.join('line'+str(n)+'\n' for n in range(205));self.path.write_text(lines)
+        manifest=json.dumps({'files':{'app.html':{'sha256':hashlib.sha256(self.path.read_bytes()).hexdigest(),
+            'bytes':len(self.path.read_bytes())}}}).encode()
+        (self.root/'manifest.json').write_bytes(manifest)
+        result=complete(self.args['path'],hashlib.sha256(manifest).hexdigest())
+        self.assertEqual(result['total_lines'],205);self.assertEqual(len(result['pages']),3)
+        self.assertIs(result['native_read_evidence'],False)

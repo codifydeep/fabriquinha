@@ -42,6 +42,17 @@ def save(root,name,value):
         json.dump(value,file,sort_keys=True)
 
 
+def reader_code(operation='page'):
+    if operation not in ('page','complete'):raise ValueError('fixed reader operation required')
+    module=Path(__file__).resolve().parents[1];code='import sys,json,types\n'
+    for name in ('artifact_read_evidence','calibration_response_contract','calibration_diagnostic_read'):
+        text=(module/(name+'.py')).read_text()
+        code+='m=types.ModuleType('+repr(name)+');sys.modules['+repr(name)+']=m;exec('+repr(text)+',m.__dict__)\n'
+    return code+('v=json.load(sys.stdin);print(json.dumps(m.page(v["args"],v["manifest"])))'
+        if operation=='page' else
+        'v=json.load(sys.stdin);print(json.dumps([m.complete(p,v["manifest"]) for p in v["paths"]]))')
+
+
 def main():
     source=json.load(sys.stdin)
     for role in ('candidate','previous'):
@@ -57,12 +68,7 @@ def main():
     save(root,'input.json',source);save(root,'identity.json',receipt)
     # Modules are injected as source into a networkless, read-only helper. No
     # project source is imported or executed; only this fixed reader runs.
-    module=Path(__file__).resolve().parents[1]
-    code='import sys,json,types\n'
-    for name in ('artifact_read_evidence','calibration_response_contract','calibration_diagnostic_read'):
-        text=(module/(name+'.py')).read_text()
-        code+='m=types.ModuleType('+repr(name)+');sys.modules['+repr(name)+']=m;exec('+repr(text)+',m.__dict__)\n'
-    code+='v=json.load(sys.stdin);print(json.dumps(m.page(v["args"],v["manifest"])))'
+    code=reader_code()
     manifests={'candidate':source['candidate_manifest_sha256'],'previous':None}
     seen=set();events=[]
     for iteration in range(1,5):
