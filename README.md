@@ -1478,6 +1478,15 @@ leituras completas, mas não as promove a novas provas nativas. Não despacha
 tarefas, executa ferramentas, muda o workflow ou aprova entregas. O transporte
 externo e a coleta do resultado ainda dependem de execução autorizada; preparar
 o experimento offline não demonstra recuperação do produtor.
+O runner operacional `scripts/calibration_diagnostic_runner.py` limita o
+diagnóstico explicitamente autorizado a quatro chamadas. Resultados e conteúdos
+ficam somente em diretório privado; o resumo registra hashes e pedidos de
+leitura validados. `calibration_diagnostic_read.py` confere o manifesto e os
+bytes de cada arquivo, rejeita symlinks e lê somente código/testes em helpers
+Docker agrupados, sem rede e com mounts somente leitura. Atingir o limite
+durante paginação não equivale a uma proposta final, nem prova a causa de uma
+rejeição histórica cuja resposta não foi preservada. Leituras desse diagnóstico
+não substituem recibos de inspeção da tarefa nativa.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
