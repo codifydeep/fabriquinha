@@ -18,15 +18,19 @@ def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def context(phase,paths,source_sha256,policy_sha256=None,controls_manifest_sha256=None):
+def context(phase,paths,source_sha256,policy_sha256=None,controls_manifest_sha256=None,*,engine=None):
     value=dict(phase=phase,required_paths=sorted(set(paths)),source_sha256=source_sha256,
         policy_sha256=policy_sha256,controls_manifest_sha256=controls_manifest_sha256)
+    if engine is not None:value['engine']=engine
     validate_context(value);return value
 
 
 def validate_context(value):
-    if set(value)!={'phase','required_paths','source_sha256','policy_sha256','controls_manifest_sha256'}:
+    fields={'phase','required_paths','source_sha256','policy_sha256','controls_manifest_sha256'}
+    if not isinstance(value,dict) or set(value) not in (fields,fields|{'engine'}):
         raise ValueError('exact calibration response context required')
+    if 'engine' in value and value['engine'] not in ('unittest_path_fixture_v1','unittest_path_fixtures_v2'):
+        raise ValueError('known controller-selected calibration engine required')
     phase=value['phase'];paths=value['required_paths']
     if phase not in ('bundle','attestation','review') or not isinstance(paths,list) or not 1<=len(paths)<=512:
         raise ValueError('bounded calibration phase/reads required')
@@ -85,8 +89,15 @@ def schema(value):
         classes=dict(type='object',minProperties=1,maxProperties=128,additionalProperties=array(text()))
         module=obj(dict(path=text(),fixture_attribute=text(),product_path=text(),positive_fixture=text(),classes=classes))
         negative=obj(dict(id=text(),module=text(),class_name=text(),method=text(),fixture=text(),criteria=array(text(),32)))
+        engine=value.get('engine','unittest_path_fixture_v1')
+        if engine=='unittest_path_fixtures_v2':
+            fixture=obj(dict(attribute=text(),product_path=text(),positive_fixture=text()))
+            module=obj(dict(path=text(),fixtures=array(fixture,16),classes=classes))
+            replacement=obj(dict(attribute=text(),fixture=text()))
+            negative=obj(dict(id=text(),module=text(),class_name=text(),method=text(),
+                replacements=array(replacement,16),criteria=array(text(),32)))
         success=obj(dict(action=dict(type='string',enum=['propose_calibration_bundle']),
-            engine=dict(type='string',enum=['unittest_path_fixture_v1']),modules=array(module,32),negatives=array(negative),
+            engine=dict(type='string',enum=[engine]),modules=array(module,32),negatives=array(negative),
             previous_methods=dict(type='object',minProperties=1,maxProperties=32,additionalProperties=classes),
             controls=dict(type='object',minProperties=1,maxProperties=288,additionalProperties=text(65536)),
             execution_authorized=false,delivery_approval=false))
@@ -144,7 +155,7 @@ def validate_reply(body,data,media_type):
             'maxItems','minProperties','maxProperties','pattern','minimum','maximum','anyOf'}
         fields={'action','engine','modules','negatives','previous_methods','controls','execution_authorized',
             'delivery_approval','reason','path','fixture_attribute','product_path','positive_fixture','classes',
-            'id','module','class_name','method','fixture','criteria'}
+            'id','module','class_name','method','fixture','criteria','fixtures','attribute','replacements'}
         constraints=set();locations=set();missing=set()
         if isinstance(error,ValidationError):
             pending=[error]

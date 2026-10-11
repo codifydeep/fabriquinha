@@ -30,7 +30,8 @@ def instruction(source,phase):
         '"execution_authorized":false,"delivery_approval":false}; it becomes an owned hold, not approval.\n'+
         ''.join('READ FULL FILE: '+p+'\n' for p in gate.required_paths(policy,context)))
     note=capsule(make_context('attestation' if phase=='attestation' else 'review',
-        gate.required_paths(policy,context),digest(source),digest(policy),policy['controls_manifest_sha256']))+note
+        gate.required_paths(policy,context),digest(source),digest(policy),policy['controls_manifest_sha256'],
+        engine=policy['engine'] if policy['version']=='generic_harness_calibration_v2' else None))+note
     gate.require(len(note)<=4000)
     return note
 

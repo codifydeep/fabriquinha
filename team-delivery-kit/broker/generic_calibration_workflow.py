@@ -10,6 +10,7 @@ import time
 import urllib.error
 
 from generic_harness_calibration import digest
+from calibration_policy_adapter import version_for_engine
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
 
@@ -22,6 +23,16 @@ def initialize(con):
 def instruction(c):
     from calibration_response_contract import context,capsule
     paths=['/evidence/'+root+'/'+path for root in ('candidate','previous') for path in c['test_files']]
+    engine=c.get('calibration_engine','unittest_path_fixture_v1');version_for_engine(engine)
+    adapter=('Adapter is unittest_path_fixture_v1; fixture_attribute must name the actual uppercase Path variable '
+        if engine=='unittest_path_fixture_v1' else
+        'Adapter is unittest_path_fixtures_v2; every fixtures.attribute must name an actual uppercase Path variable ')
+    modules=('modules=[{path,fixture_attribute,product_path,positive_fixture,classes:{ClassName:[test_method]}}], '
+        if engine=='unittest_path_fixture_v1' else
+        'modules=[{path,fixtures:[{attribute,product_path,positive_fixture}],classes:{ClassName:[test_method]}}], ')
+    negatives=('negatives=[{id,module,class_name,method,fixture,criteria:[A01]}], '
+        if engine=='unittest_path_fixture_v1' else
+        'negatives=[{id,module,class_name,method,replacements:[{attribute,fixture}],criteria:[A01]}], ')
     note=('CTO CALIBRATION BUNDLE PROPOSAL ONLY. Read the frozen candidate tests and the previous tests '
         'completely, plus each product file referenced by your adapter. Do not edit, run tests, use shell, '
         'approve a delivery, change acceptance or ask the CEO a technical question. '
@@ -29,12 +40,10 @@ def instruction(c):
         'methods/assertions. The controller will verify actual AST inventories; your declaration is not proof. '
         'Each negative must identify an existing candidate method that should fail by assertion and cover '
         'the unchanged acceptance IDs. Positive references must pass all declared candidate methods. '
-        'Adapter is unittest_path_fixture_v1; fixture_attribute must name the actual uppercase Path variable '
+        +adapter+
         'used by the immutable test module. Unsupported seams require a technical hold, not fabricated fixtures. '
         'Return one compact JSON object, no prose/fences, with exactly: '
-        'action="propose_calibration_bundle", engine="unittest_path_fixture_v1", '
-        'modules=[{path,fixture_attribute,product_path,positive_fixture,classes:{ClassName:[test_method]}}], '
-        'negatives=[{id,module,class_name,method,fixture,criteria:[A01]}], '
+        'action="propose_calibration_bundle", engine="'+engine+'", '+modules+negatives+
         'previous_methods={test_path:{ClassName:[historical_test_method]}}, '
         'controls={relative_fixture_path:literal_UTF8_content}, execution_authorized=false, delivery_approval=false. '
         'No commands, self-authored hashes or approval fields. Controls are at most64KiB each and512KiB total. '
@@ -43,7 +52,9 @@ def instruction(c):
         '\nSource binding: '+digest(c)+'\nAcceptance (unchanged): '+json.dumps(c['criteria'],separators=(',',':'))+
         '\n'+''.join('READ FULL FILE: /evidence/'+root+'/'+path+'\n'
             for root in ('candidate','previous') for path in c['test_files']))
-    note=capsule(context('bundle',paths,digest(c)))+note
+    if engine=='unittest_path_fixtures_v2':
+        note+=' All product Path globals used by these tests need positive fixtures; each negative changes only its declared attributes.'
+    note=capsule(context('bundle',paths,digest(c),engine=engine if 'calibration_engine' in c else None))+note
     gate.require(len(note)<=4000)
     return note
 
@@ -142,8 +153,9 @@ def advance(con,c,fx,*,now=None):
         required_action='Controller materialize exact immutable controls, then independent native policy review')
 
 
-def request(b,issue,author_task):
+def request(b,issue,author_task,*,engine='unittest_path_fixture_v1'):
     """Freeze the dispatch source after a real completed candidate copy."""
+    version_for_engine(engine)
     try:import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans
     except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans
     with b.LOCK:
@@ -177,6 +189,7 @@ def request(b,issue,author_task):
                 previous_task=value['previous_new_test_delivery']['task_id'],test_files=sorted(prepared['test_sha256']),
                 prepared=prepared,execution_sha256=digest(value),plan_sha256=value['plan_sha256'],
                 criteria=value['criteria'],source_task=value['source_task'])
+            if engine!='unittest_path_fixture_v1':c['calibration_engine']=engine
         fx=Effects(b);fx.verify(c)
         authored=fx.plans.task(author_task,route['author'])
         gate.require_author_scope(author_binding,authored)
@@ -200,6 +213,11 @@ class Effects:
     def verify(self,c):
         try:import remediation_runtime_guard as guard,remediation_admission
         except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission
+        engine=c.get('calibration_engine','unittest_path_fixture_v1');version_for_engine(engine)
+        if engine=='unittest_path_fixtures_v2':
+            import re
+            image=getattr(self.b,'GENERIC_CALIBRATION_V2_IMAGE',None)
+            gate.require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
         value=guard.qualified(self.b,c['issue_id'])
         gate.require(value and digest(value)==c['execution_sha256'] and value['plan_sha256']==c['plan_sha256'])
         config,approved=remediation_admission.Effects(self.b).plan(value['source_task'])
@@ -235,7 +253,8 @@ class Effects:
     def collect(self,c,task,wakeup):
         try:import generic_calibration_proposal as producer
         except ImportError:from broker import generic_calibration_proposal as producer
-        return producer.collect(self.b,c['issue_id'],c['author_task'],task['id'],wakeup)
+        return producer.collect(self.b,c['issue_id'],c['author_task'],task['id'],wakeup,
+            expected_engine=c.get('calibration_engine','unittest_path_fixture_v1'))
     def materialize(self,c):
         try:import generic_calibration_materialization as jobs
         except ImportError:from broker import generic_calibration_materialization as jobs
@@ -261,6 +280,7 @@ class Effects:
         gate.require(value and digest(value)==c['execution_sha256']
             and p['source_task']==c['source_task'] and p['execution_sha256']==c['execution_sha256']
             and p['plan_sha256']==c['plan_sha256'] and p['criteria']==sorted(c['criteria'])
+            and p['engine']==c.get('calibration_engine','unittest_path_fixture_v1')
             and p['candidate_manifest_sha256']==c['prepared']['manifest_sha256']
             and p['test_sha256']==c['prepared']['test_sha256']
             and route['cto']==c['cto'] and route['techlead']==c['reviewer']

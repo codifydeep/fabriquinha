@@ -98,11 +98,12 @@ def store(con,issue,author_task,record):
     return record
 
 
-def collect(b,issue,author_task,producer_task,wakeup):
+def collect(b,issue,author_task,producer_task,wakeup,*,expected_engine='unittest_path_fixture_v1'):
     """No caller-provided role, output, approval or source facts accepted."""
     try:import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans,generic_calibration_registration as registration
     except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans,generic_calibration_registration as registration
     with b.LOCK:
+        version_for_engine(expected_engine)
         value=guard.qualified(b,issue)
         gate.require(value and value.get('amendment',{}).get('kind')=='inherited_frozen_suite')
         config,approved=remediation_admission.Effects(b).plan(value['source_task'])
@@ -124,6 +125,18 @@ def collect(b,issue,author_task,producer_task,wakeup):
             gate.require(type(result['exit_code']) is int and result['exit_code']==0 and result['approval'] is False
                 and hashlib.sha256(raw.encode()).hexdigest()==result['output_sha256'])
             prepared=json.loads(raw)
+            if expected_engine!='unittest_path_fixture_v1':
+                # Never take a capability selection solely from a model body
+                # or an internal caller: re-fetch the persisted workflow.
+                bound=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
+                    (issue,author_task)).fetchone()
+                gate.require(bound is not None)
+                selected,workflow_state=map(json.loads,bound)
+                gate.require(selected.get('calibration_engine')==expected_engine
+                    and selected['execution_sha256']==digest(value) and selected['prepared']==prepared
+                    and selected['cto']==route['cto'] and selected['reviewer']==route['techlead']
+                    and selected['issue_id']==issue and selected['author_task']==author_task
+                    and workflow_state.get('stage')=='await_bundle' and workflow_state.get('wakeup_id')==wakeup)
         fx=plans.Effects(b)
         gate.require(fx.settings['agents'].get(route['cto'])=='planning'
             and fx.settings['agents'].get(route['author'])=='implementation')
@@ -131,7 +144,7 @@ def collect(b,issue,author_task,producer_task,wakeup):
         gate.require_author_scope(author_binding,authored)
         gate.require(authored.get('status')=='completed' and authored.get('issue_id')==issue)
         task=fx.task(producer_task,route['cto'])
-        record=from_task(task,wakeup,value,route,prepared,fx.reads(task))
+        record=from_task(task,wakeup,value,route,prepared,fx.reads(task),expected_engine=expected_engine)
         targets=[m for m in identity['payload']['HostConfig']['Mounts'] if m.get('Target')=='/snapshot']
         gate.require(len(targets)==1)
         volume=targets[0]['Source']

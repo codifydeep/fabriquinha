@@ -1533,6 +1533,13 @@ recibos pela versão exata. Execução v2 exige configuração própria
 fixo do adapter em sandbox restrito. Ausência dessa configuração não permite
 fallback para a imagem v1. A seleção persistente do workflow, a instalação e
 um ensaio nativo completo ainda são requisitos pendentes para ativação.
+O workflow candidato pode registrar `calibration_engine` ao criar uma nova
+execução. Essa seleção integra o hash da configuração e da cápsula de resposta;
+propostas v2 são recusadas em contexto v1. O coletor v2 reconsulta o estado
+persistente, a seleção e o wakeup exato antes de aceitar a proposta. Configurações
+já registradas não são atualizadas em lugar: um bloqueio antigo continua exigindo
+recuperação explícita e auditável. Esses contratos ainda não foram instalados
+nem comprovados por um ensaio nativo v2.
 
 ## Contribuir e reutilizar
 
