@@ -92,6 +92,12 @@ def advance(con,c,fx,*,now=None):
         if first and not fx.reserve(c):
             return save(required_action='Await proxy reserve before recording any wakeup effect')
         marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol='generic-calibration-producer-v1'))
+        if s.get('protocol_recovery_sha256'):
+            try:import generic_calibration_protocol_recovery as repair
+            except ImportError:from broker import generic_calibration_protocol_recovery as repair
+            receipt=repair.qualified(con,c,s)
+            marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol=receipt['protocol'],
+                recovery_sha256=digest(receipt)))
         try:note=instruction(c)
         except ValueError:
             return hold('bundle_context_requires_readonly_capsule',

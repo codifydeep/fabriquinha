@@ -165,7 +165,12 @@ def validate_request(body):
         body['reasoning'] = ({'enabled': False}
                              if reasoning_off or REASONING_EFFORT == 'disabled'
                              else {'effort': REASONING_EFFORT})
-    result=typed_test_source.apply(typed_decision_contract.apply(apply_test_artifact_schema(apply_write_tool_schema(apply_decision_schema(body)))))
+    # Current controller phase takes precedence across the entire legacy adapter
+    # chain, not just decision_schema. Historical author/typed markers are data.
+    from calibration_response_contract import apply as calibration_response
+    result=calibration_response(body)
+    if result is None:
+        result=typed_test_source.apply(typed_decision_contract.apply(apply_test_artifact_schema(apply_write_tool_schema(apply_decision_schema(body)))))
     if os.environ.get('MODEL_PROXY_OPTIONAL_FILES_FEEDBACK')=='1':
         result=technical_optional_files_feedback.opt_in(result)
     return result

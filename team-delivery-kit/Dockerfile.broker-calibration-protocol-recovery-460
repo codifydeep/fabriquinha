@@ -1,0 +1,7 @@
+FROM delivery-kit-execution-broker:20261011.459
+COPY broker/generic_calibration_protocol_recovery.py /generic_calibration_protocol_recovery.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY decision_schema.py /decision_schema.py
+COPY structured_response_contract.py /structured_response_contract.py
+COPY model_proxy.py /model_proxy.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_protocol_recovery,generic_calibration_workflow"

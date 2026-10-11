@@ -1449,6 +1449,17 @@ fechados vinculados aos hashes exatos; nenhuma dessas respostas autoriza uma
 entrega. Recibos nativos de leitura dos controles e da política são reconhecidos
 separadamente de alegações textuais. A suíte offline qualifica esse contrato,
 mas não comprova recuperação do produtor bloqueado ou homologação com agentes.
+`generic_calibration_protocol_recovery.py` permite uma única migração operacional
+de um produtor que falhou antes de executar ferramentas, por aplicação comprovada
+do schema técnico legado. Exige manutenção selada, ausência de tarefas/leases
+ativos, autor e cópia originais revalidados, fonte instalada idêntica no proxy e
+controlador e diagnóstico privado vinculado à execução. Preserva integralmente
+o estado anterior em ledger e reabre apenas o pré-requisito, com identidade nova.
+Reinícios observam o mesmo dispatch; uma segunda falha não reinicia a migração.
+Esse bootstrap usa log arquivado pelo operador, identificado como diagnóstico,
+não como aprovação ou recibo retroativo do modelo. Não há endpoint administrativo
+para workers. O contrato atual prevalece em toda a cadeia de adapters do proxy,
+inclusive sobre marcadores históricos de autoria e submissão tipada.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

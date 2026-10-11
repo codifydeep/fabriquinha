@@ -17,6 +17,17 @@ def receipt(path=PATH):
 
 
 class CalibrationContractTests(unittest.TestCase):
+    def test_proxy_pipeline_ignores_historical_author_and_typed_markers_for_current_phase(self):
+        import model_proxy
+        for phase,complete in (('bundle',False),('bundle',True),('review',True)):
+            body=self.body(phase,complete)
+            body['model']=model_proxy.MODEL
+            body['messages'][0]['content']='DELIVERY_TYPED_DECISION_V1\nDELIVERY_TEST_ARTIFACT_V1:/workspace/tests/test_old.py\n'+body['messages'][0]['content']
+            result=model_proxy.validate_request(body)
+            self.assertEqual([t['function']['name'] for t in result['tools']],[] if phase=='review' else ['read_file'])
+            if phase=='review':self.assertEqual(result['response_format']['json_schema']['name'],'delivery_generic_calibration_v1')
+            else:self.assertNotIn('response_format',result)
+
     def test_native_handoff_wrapper_keeps_current_capsule_and_nonuser_claims_cannot_select_it(self):
         body=self.body()
         current=body['messages'][0]['content']

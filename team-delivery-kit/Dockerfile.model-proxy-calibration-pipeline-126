@@ -1,0 +1,4 @@
+FROM delivery-kit-model-proxy:20261011.125
+USER root
+COPY model_proxy.py /model_proxy.py
+USER 10000:10000
