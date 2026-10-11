@@ -28,3 +28,20 @@ class DiagnosticProbeTests(unittest.TestCase):
         with self.assertRaises(ValueError):build(self.note,self.reads,'model',self.task,self.task)
         note=capsule(context('review',[self.path],'a'*64,'b'*64,'c'*64))
         with self.assertRaises(ValueError):build(note,self.reads,'model',self.experiment,self.task)
+
+    def test_extra_reads_cannot_include_other_workspaces_or_credentials(self):
+        for path in ('/delivery/secret.txt','/secret/openrouter.key',
+                     '/evidence/policy/policy.json','/evidence/candidate/../secret'):
+            extra=[dict(self.reads[0],call_id='extra',input={'path':path}),
+                dict(self.reads[1],call_id='extra')]
+            with self.assertRaises(ValueError):
+                build(self.note,self.reads+extra,'model',self.experiment,self.task)
+
+    def test_partial_pages_do_not_manufacture_complete_inspection(self):
+        reads=[self.reads[0],dict(self.reads[1],output=
+            'Read '+self.path+' — 2 total lines\n\n```\n1|pass\n```')]
+        with self.assertRaises(ValueError):build(self.note,reads,'model',self.experiment,self.task)
+
+    def test_oversized_output_is_rejected_before_transport(self):
+        reads=[self.reads[0],dict(self.reads[1],output='x'*131073)]
+        with self.assertRaises(ValueError):build(self.note,reads,'model',self.experiment,self.task)

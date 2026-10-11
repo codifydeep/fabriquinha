@@ -8,7 +8,7 @@ import hashlib
 import json
 import uuid
 from artifact_read_evidence import observations
-from calibration_response_contract import request
+from calibration_response_contract import request, safe_path
 
 
 def build(note, durable, model, experiment_id, source_task):
@@ -37,6 +37,11 @@ def build(note, durable, model, experiment_id, source_task):
                 or not identifier or result.get('call_id') != identifier or identifier in seen):
             raise ValueError('distinct preserved read pair required')
         seen.add(identifier)
+        if not safe_path((use.get('input') or {}).get('path'), 'bundle'):
+            raise ValueError('only frozen candidate or previous reads permitted')
+        if (not isinstance(result.get('output'), str)
+                or len(result['output'].encode()) > 131072):
+            raise ValueError('bounded preserved read output required')
         if not isinstance(result.get('output'), str) or not observations([use, result]):
             # Individual partial pages may be needed to reconstruct a full file.
             from artifact_read_evidence import coverage
@@ -50,6 +55,8 @@ def build(note, durable, model, experiment_id, source_task):
         {'type': 'function', 'function': {'name': 'read_file', 'parameters': {'type': 'object'}}}])
     if not set(context['required_paths']) <= set(observations(messages, wire=True)):
         raise ValueError('complete preserved mandatory reads required')
+    if len(json.dumps(body).encode()) > 500000:
+        raise ValueError('bounded diagnostic request required')
     receipt = dict(kind='isolated_calibration_format_probe_v1', experiment_id=experiment_id,
         source_task=source_task, source_sha256=context['source_sha256'],
         input_sha256=hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest(),
