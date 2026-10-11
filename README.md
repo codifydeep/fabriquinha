@@ -1494,6 +1494,12 @@ de páginas/bytes, manifestos e hashes continuam obrigatórios. O recibo prepara
 vincula o hash da requisição completa e preserva o vínculo com a entrada anterior.
 Essa preparação não faz chamadas de modelo nem reabre workflows bloqueados;
 sua integração ao fluxo nativo ainda exige qualificação independente.
+`scripts/run_prepared_calibration_diagnostic.py` pode fazer uma única chamada
+explicitamente autorizada com esse contexto. Reconfere os hashes e a origem,
+registra a intenção antes do envio, preserva a resposta privadamente e não executa
+ferramentas solicitadas. Contexto já submetido ou intenção sem confirmação não
+é reenviado automaticamente. Objeções técnicas são hipóteses a conferir no código,
+não evidência automática de defeito do harness nem decisões nativas aprovadas.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

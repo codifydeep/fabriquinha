@@ -6,6 +6,8 @@ dispatches tasks nor grants delivery authority; the original workflow stays put.
 import copy
 import hashlib
 import json
+import os
+import re
 import uuid
 from artifact_read_evidence import observations
 from calibration_response_contract import request, safe_path, validate_reply
@@ -133,3 +135,20 @@ def prepared_identity(body, parent):
     return {**parent,'kind':'prepared_calibration_format_probe_v1',
         'parent_input_sha256':parent['input_sha256'],
         'input_sha256':hashlib.sha256(json.dumps(body,sort_keys=True).encode()).hexdigest()}
+
+
+def claim_prepared_submission(base, preparation_id, experiment_id, input_sha256):
+    """Durable one-shot intent; even an unknown acknowledgment forbids replay."""
+    for identifier in (preparation_id,experiment_id):
+        if str(uuid.UUID(identifier))!=identifier:raise ValueError('exact diagnostic identity required')
+    if not re.fullmatch('[a-f0-9]{64}',input_sha256):raise ValueError('prepared input hash required')
+    for old in base.glob('*/identity.json'):
+        if json.loads(old.read_text()).get('prepared_from')==preparation_id:
+            raise ValueError('prepared context already submitted; no automatic replay')
+    claim=dict(experiment_id=experiment_id,input_sha256=input_sha256,
+        max_model_calls=1,automatic_replay=False)
+    with os.fdopen(os.open(base/preparation_id/'single-call-claim.json',
+            os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as stream:
+        json.dump(claim,stream,sort_keys=True)
+        stream.flush();os.fsync(stream.fileno())
+    return claim
