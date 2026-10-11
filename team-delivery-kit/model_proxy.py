@@ -540,6 +540,14 @@ class Handler(BaseHTTPRequestHandler):
                 event.update(status=status,category='request_rejection_receipt_unavailable')
                 data=b'{"error":{"code":"request_rejection_receipt_unavailable"}}'
                 content_type='application/json'
+        if event.get('structured_rejection_category'):
+            try:
+                import structured_rejection_receipts
+                structured_rejection_receipts.record(COUNTER_PATH,event)
+            except Exception:
+                status=503
+                event.update(status=status,category='structured_rejection_receipt_unavailable')
+                data=b'{"error":{"code":"structured_rejection_receipt_unavailable"}}'
         if event.get('artifact_rejection_category'):
             try:
                 import artifact_rejection_receipts

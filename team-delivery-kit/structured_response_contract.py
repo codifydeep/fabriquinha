@@ -23,8 +23,8 @@ def validate(body,data,media_type):
     from calibration_response_contract import validate_reply
     try:
         if validate_reply(body,data,media_type):return
-    except Exception:
-        raise StructuredResponseRejected('calibration_response_invalid') from None
+    except Exception as error:
+        raise StructuredResponseRejected('calibration_response_invalid',getattr(error,'diagnostic',None)) from None
     fmt=body.get('response_format',{})
     if fmt.get('type')!='json_schema':return
     choice=body.get('tool_choice')

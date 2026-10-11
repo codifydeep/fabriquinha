@@ -1460,6 +1460,12 @@ Esse bootstrap usa log arquivado pelo operador, identificado como diagnóstico,
 não como aprovação ou recibo retroativo do modelo. Não há endpoint administrativo
 para workers. O contrato atual prevalece em toda a cadeia de adapters do proxy,
 inclusive sobre marcadores históricos de autoria e submissão tipada.
+As rejeições estruturadas futuras usam `structured_rejection_receipts.py`:
+identidade da execução/chamada, hash da resposta e somente campos/keywords
+conhecidos do schema ficam em ledger durável. Texto, valores rejeitados, paths
+arbitrários e mensagens de exceção não são publicados. Uma falha de persistência
+é erro de infraestrutura; não encaminha a resposta rejeitada ao worker. Esses
+recibos não reconstroem bytes históricos nem autorizam outra tentativa ou entrega.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

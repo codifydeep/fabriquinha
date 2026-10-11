@@ -130,7 +130,42 @@ def apply(body):
     return body
 
 
+class CalibrationResponseRejected(ValueError):
+    def __init__(self,diagnostic):
+        self.diagnostic=diagnostic
+        super().__init__('calibration response rejected')
+
+
 def validate_reply(body,data,media_type):
+    try:return _validate_reply(body,data,media_type)
+    except Exception as error:
+        from jsonschema.exceptions import ValidationError
+        keywords={'type','enum','required','additionalProperties','minLength','maxLength','minItems',
+            'maxItems','minProperties','maxProperties','pattern','minimum','maximum','anyOf'}
+        fields={'action','engine','modules','negatives','previous_methods','controls','execution_authorized',
+            'delivery_approval','reason','path','fixture_attribute','product_path','positive_fixture','classes',
+            'id','module','class_name','method','fixture','criteria'}
+        constraints=set();locations=set();missing=set()
+        if isinstance(error,ValidationError):
+            pending=[error]
+            for _ in range(1024):
+                if not pending:break
+                item=pending.pop()
+                constraints.add(item.validator if item.validator in keywords else 'other')
+                locations.update(part for part in item.absolute_schema_path if isinstance(part,str) and part in fields)
+                if item.validator=='required' and isinstance(item.instance,dict):
+                    missing.update(part for part in item.validator_value if part in fields and part not in item.instance)
+                pending.extend(item.context)
+            category='schema_violation'
+        elif isinstance(error,json.JSONDecodeError):category='invalid_json'
+        else:category='invalid_transport_or_tool'
+        diagnostic=dict(version='calibration-constraint-v1',category=category,
+            constraints=sorted(constraints),fields=sorted(locations),missing_fields=sorted(missing),
+            upstream_sha256=hashlib.sha256(data).hexdigest())
+        raise CalibrationResponseRejected(diagnostic) from None
+
+
+def _validate_reply(body,data,media_type):
     """Validate producer tool turns or final JSON; never manufactures read proof."""
     value=request(body)
     if value is None or isinstance(body.get('tool_choice'),dict):return False
