@@ -28,16 +28,21 @@ def main(image):
     archive(root,'identity.json',dict(image=image,cycle=cycle,paid_calls=0,native_approval=False))
     fixture=MultiPathCalibrationTests();fixture.setUp()
     try:
+        previous=fixture.candidate.parent/'previous';previous.mkdir()
+        test='tests/test_ui.py'
+        previous_sha,_=fixture.snapshot(previous,{test:(fixture.candidate/test).read_text()})
         policy_root=fixture.candidate.parent/'policy';policy_root.mkdir()
         (policy_root/'policy.json').write_text(json.dumps(fixture.policy))
         synthetic=root/'synthetic';synthetic.mkdir(mode=0o700)
-        for role,path in (('candidate',fixture.candidate),('controls',fixture.controls),('policy',policy_root)):
+        for role,path in (('candidate',fixture.candidate),('previous',previous),('controls',fixture.controls),('policy',policy_root)):
             shutil.copytree(path,synthetic/role)
         expected=digest(fixture.policy)
         code='''import os,json,subprocess,sys
 from pathlib import Path
 sys.path.insert(0,"/")
 from generic_harness_calibration_v2 import run
+from generic_calibration_input_probe import run as input_probe
+from calibration_policy_adapter import validate_receipt
 for name in ("/candidate/tests/test_ui.py","/candidate/app/app.js","/candidate/app/index.html","/controls/js-positive.js","/policy/policy.json"):
  try:
   with open(name,"r+b"):pass
@@ -48,18 +53,27 @@ assert not Path("/var/run/docker.sock").exists()
 assert not any(k in os.environ for k in ("OPENROUTER_API_KEY","GH_TOKEN","GITHUB_TOKEN","TELEGRAM_BOT_TOKEN"))
 assert subprocess.run(["node","-e","process.stdout.write(String(1+1))"],capture_output=True,text=True,check=True,timeout=5).stdout=="2"
 p=json.loads(Path("/policy/policy.json").read_text())
+inputs=input_probe("/candidate","/previous","/controls",p,sys.argv[1],sys.argv[2])
+assert inputs["operation"]=="generic_calibration_inputs_v2"
+assert set(inputs["product_sha256"])=={"app/app.js","app/index.html"}
+assert all(inputs[k] is False for k in ("tests_executed","execution_authorized","delivery_approval"))
 r=run("/candidate","/controls",p,sys.argv[1])
-print(json.dumps({"receipt":r,"readonly":True,"socket_absent":True,"credentials_absent":True,"node_runtime":True}))
+validate_receipt(r,p,sys.argv[1])
+old={**r,"operation":"generic_harness_calibration_v1"}
+try:validate_receipt(old,p,sys.argv[1])
+except ValueError:pass
+else:raise RuntimeError("cross-version receipt accepted")
+print(json.dumps({"receipt":r,"inputs":inputs,"cross_version_rejected":True,"readonly":True,"socket_absent":True,"credentials_absent":True,"node_runtime":True}))
 '''
         name='delivery-kit-port2-v2-canary-'+cycle
         argv=['docker','run','--rm','--name',name,*group_args('calibration-v2-canary','delivery-kit-port2'),
             '--label','delivery-kit.canary='+cycle,'--network','none','--read-only','--user','10000:10000',
             '--cap-drop','ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1',
             '--pids-limit','96','--tmpfs','/tmp:rw,nosuid,nodev,size=64m,mode=1777']
-        for target in ('candidate','controls','policy'):
+        for target in ('candidate','previous','controls','policy'):
             path=synthetic/target
             argv+=['--mount','type=bind,src='+str(path)+',dst=/'+target+',readonly']
-        argv += ['--entrypoint','python',image,'-B','-c',code,expected]
+        argv += ['--entrypoint','python',image,'-B','-c',code,expected,previous_sha]
         archive(root,'intent.json',dict(container=name,argv=argv,policy=fixture.policy,policy_sha256=expected))
         result=subprocess.run(argv,capture_output=True,text=True,timeout=60)
         archive(root,'observed.json',dict(exit_code=result.returncode,stdout=result.stdout,stderr=result.stderr))
@@ -68,6 +82,9 @@ print(json.dumps({"receipt":r,"readonly":True,"socket_absent":True,"credentials_
         archive(root,'qualified.json',observed)
         print(json.dumps(dict(passed=True,image=image,positive_tests=observed['receipt']['positive']['tests'],
             negative_controls=len(observed['receipt']['negative_controls']),readonly=observed['readonly'],
+            input_products=len(observed['inputs']['product_sha256']),
+            input_tests_executed=observed['inputs']['tests_executed'],
+            cross_version_rejected=observed['cross_version_rejected'],
             socket_absent=observed['socket_absent'],credentials_absent=observed['credentials_absent'],
             node_runtime=observed['node_runtime'],native_approval=False,product_state_changed=False)))
     finally:fixture.doCleanups()

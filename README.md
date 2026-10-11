@@ -1540,6 +1540,13 @@ persistente, a seleção e o wakeup exato antes de aceitar a proposta. Configura
 já registradas não são atualizadas em lugar: um bloqueio antigo continua exigindo
 recuperação explícita e auditável. Esses contratos ainda não foram instalados
 nem comprovados por um ensaio nativo v2.
+As receitas candidatas de imagens do controlador (`463`), proxy (`128`),
+executor (`6`) e materializador (`2`) incluem os módulos v2 sem substituir os
+IDs instalados. O canário do executor verifica a prova de entrada multiarquivo
+e a rejeição de recibo v1 em sandbox; `tests/calibration_writer_v2_canary.py`
+verifica hashes dos módulos empacotados, gravação idempotente e rejeição de digest
+obsoleto usando apenas dados sintéticos em tmpfs. Recibos desses canários são
+privados, não autorizam execução nativa e não substituem o ensaio da equipe.
 
 ## Contribuir e reutilizar
 

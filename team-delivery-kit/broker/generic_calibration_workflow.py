@@ -7,6 +7,7 @@ gate using the same immutable delivery, before independent product review.
 import hashlib
 import json
 import time
+import os
 import urllib.error
 
 from generic_harness_calibration import digest
@@ -216,7 +217,7 @@ class Effects:
         engine=c.get('calibration_engine','unittest_path_fixture_v1');version_for_engine(engine)
         if engine=='unittest_path_fixtures_v2':
             import re
-            image=getattr(self.b,'GENERIC_CALIBRATION_V2_IMAGE',None)
+            image=getattr(self.b,'GENERIC_CALIBRATION_V2_IMAGE',None) or os.environ.get('BROKER_GENERIC_CALIBRATION_V2_IMAGE')
             gate.require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
         value=guard.qualified(self.b,c['issue_id'])
         gate.require(value and digest(value)==c['execution_sha256'] and value['plan_sha256']==c['plan_sha256'])

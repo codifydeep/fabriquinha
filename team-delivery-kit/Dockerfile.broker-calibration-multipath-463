@@ -1,0 +1,10 @@
+# Candidate: scope routes stay blocked until a separately audited recovery.
+FROM delivery-kit-execution-broker:20261011.462
+COPY calibration_policy_adapter.py generic_harness_calibration_v2.py calibration_response_contract.py /
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/generic_calibration_proposal.py /generic_calibration_proposal.py
+COPY broker/generic_calibration_gate.py /generic_calibration_gate.py
+COPY broker/generic_calibration_registration.py /generic_calibration_registration.py
+COPY broker/generic_calibration_pipeline.py /generic_calibration_pipeline.py
+COPY broker/generic_calibration_approvals.py /generic_calibration_approvals.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_workflow,generic_calibration_proposal,generic_calibration_gate,generic_calibration_registration,generic_calibration_pipeline,generic_calibration_approvals;from calibration_policy_adapter import version_for_engine;assert version_for_engine('unittest_path_fixtures_v2')=='generic_harness_calibration_v2'"

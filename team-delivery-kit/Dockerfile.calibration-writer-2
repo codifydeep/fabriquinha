@@ -1,0 +1,5 @@
+# Fixed local parent; runtime still qualifies and pins the new output image ID.
+# Expected parent ID: sha256:f2160c983e6ce1f8d16902f80b8ecfc590dac1128cff196791b3e34fdd0596e0
+FROM delivery-kit-calibration-writer:20261011.1
+COPY --chmod=0444 generic_calibration_bundle_writer.py calibration_policy_adapter.py generic_harness_calibration_v2.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_bundle_writer;from calibration_policy_adapter import version_for_engine;assert version_for_engine('unittest_path_fixtures_v2')=='generic_harness_calibration_v2'"

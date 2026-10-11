@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261011.127
+USER root
+COPY calibration_response_contract.py /calibration_response_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "from calibration_response_contract import context,schema;v=context('bundle',['/evidence/candidate/tests/test_ui.py'],'a'*64,engine='unittest_path_fixtures_v2');assert schema(v)['anyOf'][0]['properties']['engine']['enum']==['unittest_path_fixtures_v2']"
+USER 10000:10000
