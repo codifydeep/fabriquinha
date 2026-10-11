@@ -1,8 +1,8 @@
 """Durable native CTO bundle dispatch; proposals never authorize delivery.
 
-The current terminal prerequisite is inputs_ready, owned by the technical
-controller. It is not success: input probe and calibration must subsequently
-consume the exact independently reviewed materialized bundle.
+The current terminal prerequisite is calibration_ready, owned by the technical
+controller. It is not success: author Red must subsequently pass its separate
+gate using the same immutable delivery, before independent product review.
 """
 import hashlib
 import json
@@ -50,7 +50,11 @@ def advance(con,c,fx,*,now=None):
     row=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
         (c['issue_id'],c['author_task'])).fetchone()
     gate.require(row and json.loads(row[0])==c);s=json.loads(row[1])
-    if s['stage'] in ('blocked','inputs_ready'):return s
+    if s['stage'] in ('blocked','calibration_ready'):return s
+    if s['stage'] in ('inputs_ready','observe_inputs','register_policy','observe_calibration'):
+        try:import generic_calibration_pipeline as pipeline
+        except ImportError:from broker import generic_calibration_pipeline as pipeline
+        return pipeline.advance(con,c,fx,now=now)
     if s['stage']=='controls_ready' or s['stage'].startswith('policy_'):
         try:import generic_calibration_approvals as approvals
         except ImportError:from broker import generic_calibration_approvals as approvals
@@ -300,13 +304,56 @@ class Effects:
             else:con.execute('INSERT INTO generic_calibration_intakes VALUES(?,?,?)',
                 (c['issue_id'],c['author_task'],json.dumps(intake,sort_keys=True)))
         return intake
+    def pipeline_intake(self,c,s):
+        source=self.approval_source(c,s)
+        with self.b.db() as con:
+            row=con.execute('SELECT config FROM generic_calibration_intakes WHERE issue_id=? AND author_task=?',
+                (c['issue_id'],c['author_task'])).fetchone()
+        gate.require(row is not None);intake=json.loads(row[0])
+        gate.require(digest(intake)==s['intake_sha256'] and intake['policy']==source['policy']
+            and intake['previous']==source['previous']
+            and intake['context']=={**source['context'],'proposal_wakeup':s['attestation_wakeup'],
+                'review_wakeup':s['policy_wakeup']}
+            and intake['proposal_task']==s['attestation_task'] and intake['review_task']==s['review_task'])
+        return intake
+    def input_probe(self,c,s,intake):
+        try:import generic_calibration_registration as registration,remediation_runtime_guard as guard
+        except ImportError:from broker import generic_calibration_registration as registration,remediation_runtime_guard as guard
+        value=guard.qualified(self.b,c['issue_id'])
+        gate.require(value and digest(value)==c['execution_sha256'])
+        with self.b.db() as con:
+            route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(c['issue_id'],)).fetchone()[0])
+            return registration.run_inputs(self.b,con,intake,value,route)
+    def register_policy(self,c,s,intake):
+        try:import generic_calibration_registration as registration
+        except ImportError:from broker import generic_calibration_registration as registration
+        # register independently re-fetches native tasks, exact closed leases,
+        # original copy, input job and immutable intake; never model declarations.
+        with self.b.db() as con:
+            row=con.execute('SELECT state FROM generic_calibration_input_jobs WHERE job_key=?',
+                (intake['probe_job_key'],)).fetchone()
+        gate.require(row is not None);state=json.loads(row[0])
+        gate.require(state.get('stage')=='complete' and digest(state['result'])==s['input_result_sha256'])
+        return registration.register(self.b,c['issue_id'],c['author_task'])
+    def calibrate(self,c,s,record):
+        with self.b.db() as con:return gate.run(self.b,con,record)
+    def registered_policy(self,c,s,intake):
+        with self.b.db() as con:
+            row=con.execute('SELECT record FROM generic_calibration_policies WHERE issue_id=? AND author_task=?',
+                (c['issue_id'],c['author_task'])).fetchone()
+        gate.require(row is not None);record=json.loads(row[0])
+        gate.require(digest(record)==s['registration_sha256'])
+        # Re-fetch actual approval/lease facts. register's immutable store reads
+        # the existing identical row; it cannot create a new revision here.
+        gate.require(self.register_policy(c,s,intake)==record)
+        return record
 
 
 def tick(b):
     with b.LOCK,b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows').fetchall()
-        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','inputs_ready')]
+        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','calibration_ready')]
         if not active:return
         fx=Effects(b)
         for c in active:advance(con,c,fx)

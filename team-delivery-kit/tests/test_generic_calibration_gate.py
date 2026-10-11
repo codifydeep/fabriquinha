@@ -90,6 +90,8 @@ class GenericCalibrationGateTests(unittest.TestCase):
             if path.startswith('/containers/create'):
                 container.update(Id='exact-container',Image=b.GENERIC_CALIBRATION_IMAGE,
                     Config={k:copy.deepcopy(v) for k,v in body.items() if k!='HostConfig'},
+                    Mounts=[dict(Type='volume',Name=m['Source'],Destination=m['Target'],RW=not m['ReadOnly'])
+                        for m in body['HostConfig']['Mounts']],
                     HostConfig=copy.deepcopy(body['HostConfig']),State=dict(Status='created',Running=False,ExitCode=0))
                 if uncertain=='create':raise TimeoutError('acknowledgment lost')
                 return {'Id':'exact-container'}
@@ -97,6 +99,28 @@ class GenericCalibrationGateTests(unittest.TestCase):
             if uncertain=='start':raise TimeoutError('acknowledgment lost')
         b.docker=docker;b.docker_stdout=lambda *a,**k:json.dumps(receipt)
         return b,con,record,calls,container
+
+    def test_inherited_volume_image_is_rejected_before_docker_effects(self):
+        b,con,record,calls,container=self.job()
+        original=b.docker
+        def docker(method,path,body=None):
+            info=original(method,path,body)
+            if path.startswith('/images/'):info['Config']['Volumes']={'/opt/data':{}}
+            return info
+        b.docker=docker
+        with self.assertRaises(ValueError):gate.run(b,con,record,now=1)
+        self.assertFalse(any(method=='POST' for method,path in calls))
+
+    def test_unexpected_actual_mount_or_privilege_is_rejected_before_start(self):
+        for defect in ('extra','writable','privilege'):
+            with self.subTest(defect=defect):
+                b,con,record,calls,container=self.job('create')
+                with self.assertRaises(TimeoutError):gate.run(b,con,record,now=1)
+                if defect=='extra':container['Mounts'].append(dict(Type='volume',Name='unexpected',Destination='/opt/data',RW=True))
+                if defect=='writable':container['Mounts'][0]['RW']=True
+                if defect=='privilege':container['HostConfig']['Privileged']=True
+                with self.assertRaises(ValueError):gate.run(b,con,record,now=2)
+                self.assertFalse(any(path.endswith('/start') for method,path in calls))
 
     def test_uncertain_create_or_start_observes_existing_job_without_replay(self):
         for phase in ('create','start'):

@@ -127,6 +127,28 @@ def validate_volumes(b,record):
             and tags.get('delivery-kit.calibration-role')==role)
 
 
+def environment(b,image):
+    """Reject automatic image volumes before recording any Docker effect."""
+    info=b.docker('GET','/images/'+image+'/json') or {}
+    require(info.get('Id')==image and not info.get('Config',{}).get('Volumes'))
+    try:import harness_qualification
+    except ImportError:from broker import harness_qualification
+    return harness_qualification.image_environment(SimpleNamespace(IMAGE=image,docker=b.docker))
+
+
+def verify_job(b,info,expected):
+    try:import test_first_job
+    except ImportError:from broker import test_first_job
+    test_first_job.verify(b,info,expected)
+    host=info['HostConfig']
+    require(not any(host.get(k) for k in ('Privileged','Binds','Devices','DeviceRequests','CapAdd')))
+    require(all(m.get('ReadOnly') is True for m in expected['HostConfig']['Mounts']))
+    wanted={(m['Source'],m['Target'],False) for m in expected['HostConfig']['Mounts']}
+    actual={(m.get('Name'),m.get('Destination'),m.get('RW')) for m in info.get('Mounts',[]) if m.get('Type')=='volume'}
+    require(actual==wanted and all(m.get('Type')=='volume' or m.get('Type')=='tmpfs'
+        and m.get('Destination') in expected['HostConfig']['Tmpfs'] for m in info.get('Mounts',[])))
+
+
 def run(b,con,record,*,now=None):
     """One job; persist each intent before Docker. Unknown effects only observe."""
     initialize(con);context=record['context'];sha=record['policy_sha256']
@@ -137,7 +159,7 @@ def run(b,con,record,*,now=None):
     expected=payload(b,record)
     try:import harness_qualification,test_first_job
     except ImportError:from broker import harness_qualification,test_first_job
-    expected['Env']=harness_qualification.image_environment(SimpleNamespace(IMAGE=expected['Image'],docker=b.docker))
+    expected['Env']=environment(b,expected['Image'])
     key=context['issue_id']+':'+context['author_task'];name=b.PREFIX+'-generic-calibration-'+sha[:24]
     identity=dict(name=name,payload=expected,record_sha256=digest(record))
     row=con.execute('SELECT identity,state FROM generic_calibration_jobs WHERE job_key=?',(key,)).fetchone()
@@ -164,7 +186,7 @@ def run(b,con,record,*,now=None):
         except TimeoutError:raise TimeoutError('observe exact calibration create; never repeat POST') from None
     info=b.docker('GET','/containers/'+name+'/json')
     if info is None:raise TimeoutError('observe exact calibration handle; never recreate')
-    test_first_job.verify(b,info,expected)
+    verify_job(b,info,expected)
     if state['stage']=='create_intent':save(stage='created',container_id=info['Id'])
     require(info['Id']==state['container_id'])
     if state['stage']=='created':
@@ -173,7 +195,7 @@ def run(b,con,record,*,now=None):
         except TimeoutError:raise TimeoutError('observe exact calibration start; never repeat POST') from None
         info=b.docker('GET','/containers/'+info['Id']+'/json')
         if info is None:raise TimeoutError('observe recorded calibration start')
-        test_first_job.verify(b,info,expected)
+        verify_job(b,info,expected)
     if info['State']['Status']!='exited':raise TimeoutError('calibration pending; observe same handle')
     raw=b.docker_stdout(info['Id'],include_stderr=info['State']['ExitCode']!=0,limit=65536)
     output_sha256=hashlib.sha256(raw.encode()).hexdigest()
@@ -201,7 +223,7 @@ def require_result(b,con,record,red):
     expected=payload(b,record)
     try:import harness_qualification
     except ImportError:from broker import harness_qualification
-    expected['Env']=harness_qualification.image_environment(SimpleNamespace(IMAGE=expected['Image'],docker=b.docker))
+    expected['Env']=environment(b,expected['Image'])
     require(identity==dict(name=b.PREFIX+'-generic-calibration-'+sha[:24],payload=expected,record_sha256=digest(record))
         and state.get('stage')=='complete' and state['result'].get('delivery_approval') is False)
     validate_volumes(b,record)

@@ -1374,6 +1374,11 @@ exige o wakeup exato, lease de planejamento encerrado, leitura completa e hashes
 da política; a execução que escreveu a proposta não pode se autoatestar.
 Intenções de despacho são persistidas antes dos efeitos, respostas incertas
 observam o mesmo marcador e a gravação do intake é imutável e retomável.
+`generic_calibration_pipeline.py` conecta esse intake ao probe fixo de leitura
+e AST, revalida tarefas/leases nativos antes do registro e observa a calibração
+original. Os resultados ficam vinculados por hash a cada transição. Falhas de
+evidência e observações sem progresso por 30 minutos geram impedimento persistente
+do CTO, sem dispensar controles ou reiniciar o autor.
 
 ```mermaid
 flowchart LR
@@ -1381,14 +1386,18 @@ flowchart LR
   M --> C[Nova atestação CTO]
   C --> T[Revisão independente Tech Lead]
   T --> I[Intake persistente: inputs_ready]
-  I -. integração pendente .-> P[Probe de inputs e calibração]
+  I --> P[Probe de inputs e calibração]
   P -. integração pendente .-> R[Retomada do TDD]
 ```
 
 Esse diagrama descreve o caminho implementado no código, não um ensaio autônomo
-já aprovado. O novo caminho ainda não está instalado: despacho do probe de inputs,
-isolamento do executor e entrada no gate de Red precisam ser integrados e
-validados com agentes reais antes da retomada do ensaio. `inputs_ready` não é
+já aprovado. O novo caminho ainda não está instalado: uma imagem do executor sem
+volumes herdados precisa ser qualificada, e a entrada no gate de Red precisa ser
+integrada e validada com agentes reais antes da retomada do ensaio.
+O controlador agora rejeita volumes automáticos da imagem antes dos efeitos e
+confere os mounts efetivos somente leitura antes de iniciar probe ou calibração;
+imagens históricas com `/opt/data` não são uma alternativa autorizada.
+`inputs_ready` e `calibration_ready` não são
 conclusão de card, aprovação de entrega ou homologação.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente

@@ -99,8 +99,7 @@ def run_inputs(b,con,intake,value,route,*,now=None):
         (context['issue_id'],context['author_task'])).fetchone()
     gate.require(stored and json.loads(stored[0])==intake)
     expected=input_payload(b,intake)
-    expected['Env']=harness_qualification.image_environment(
-        gate.SimpleNamespace(IMAGE=expected['Image'],docker=b.docker))
+    expected['Env']=gate.environment(b,expected['Image'])
     identity=dict(name=b.PREFIX+'-calibration-inputs-'+digest(intake)[:24],
         payload=expected,intake_sha256=digest(intake))
     row=con.execute('SELECT identity,state FROM generic_calibration_input_jobs WHERE job_key=?',(key,)).fetchone()
@@ -139,7 +138,7 @@ def run_inputs(b,con,intake,value,route,*,now=None):
         except TimeoutError:raise TimeoutError('observe exact input create; never repeat POST') from None
     info=b.docker('GET','/containers/'+identity['name']+'/json')
     if info is None:raise TimeoutError('observe exact input handle; never recreate')
-    test_first_job.verify(b,info,expected)
+    gate.verify_job(b,info,expected)
     if state['stage']=='create_intent':save(stage='created',container_id=info['Id'])
     gate.require(info['Id']==state['container_id'])
     if state['stage']=='created':
@@ -148,7 +147,7 @@ def run_inputs(b,con,intake,value,route,*,now=None):
         except TimeoutError:raise TimeoutError('observe exact input start; never repeat POST') from None
         info=b.docker('GET','/containers/'+info['Id']+'/json')
         if info is None:raise TimeoutError('observe recorded input start')
-        test_first_job.verify(b,info,expected)
+        gate.verify_job(b,info,expected)
         gate.require(info['Id']==state['container_id'])
     if info['State']['Status']!='exited':raise TimeoutError('input pending; observe same handle')
     raw=b.docker_stdout(info['Id'],include_stderr=info['State']['ExitCode']!=0,limit=65536)
@@ -198,8 +197,7 @@ def register(b,issue,author_task):
                     and rows[0]['agent_id']==actor and rows[0]['issue_id']==issue
                     and rows[0]['scope'].split(':')[-2:]==[mode,tid])
         expected=input_payload(b,intake)
-        expected['Env']=harness_qualification.image_environment(
-            gate.SimpleNamespace(IMAGE=expected['Image'],docker=b.docker))
+        expected['Env']=gate.environment(b,expected['Image'])
         gate.require(identity.get('payload')==expected and state.get('stage')=='complete')
         result=state.get('result',{});raw=result.get('output')
         gate.require(type(result.get('exit_code')) is int and result['exit_code']==0
