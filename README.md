@@ -1472,6 +1472,12 @@ e revisão reconhecem também os snapshots somente leitura de controles/polític
 Declarar uma cápsula no texto não permite assumir outra fase, papel ou escopo.
 Isso corrige a preparação do contexto, não transforma uma proposta rejeitada
 em válida nem autoriza repetir automaticamente um produtor bloqueado.
+`calibration_diagnostic_probe.py` prepara experimentos isolados de formato a
+partir de leituras preservadas. Exige identidade distinta da tarefa original e
+leituras completas, mas não as promove a novas provas nativas. Não despacha
+tarefas, executa ferramentas, muda o workflow ou aprova entregas. O transporte
+externo e a coleta do resultado ainda dependem de execução autorizada; preparar
+o experimento offline não demonstra recuperação do produtor.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
