@@ -11,6 +11,55 @@ from generic_calibration_input_probe import run as probe
 
 
 class ExecutorCanaryTests(unittest.TestCase):
+    def test_lost_start_ack_observes_original_job_without_restarting(self):
+        images,docker,command,stdout,effects=self.fake()
+        lost=[False]
+        def uncertain(method,path,body=None):
+            result=docker(method,path,body)
+            if method=='POST' and path.endswith('/start') and not lost[0]:
+                lost[0]=True;raise TimeoutError('start ack lost')
+            return result
+        with tempfile.TemporaryDirectory() as directory,patch.object(canary,'BASE',Path(directory)),\
+                patch.object(canary,'docker',side_effect=uncertain),patch.object(canary,'command',side_effect=command),\
+                patch.object(canary,'stdout',side_effect=stdout):
+            with self.assertRaises(TimeoutError):canary.qualify(images['engine'],images['seed'])
+            root=next(Path(directory).iterdir())
+            self.assertEqual(canary.qualify(images['engine'],images['seed'],root)['status'],'passed')
+            self.assertEqual(len([e for e in effects if e[0]=='start']),4)
+            self.assertEqual(len([e for e in effects if e[0]=='cp']),4)
+
+    def test_uncertain_copy_stays_visible_without_replaying(self):
+        images,docker,command,stdout,effects=self.fake()
+        def uncertain(*args):
+            command(*args)
+            if args[0]=='cp':raise TimeoutError('copy acknowledgement lost')
+        with tempfile.TemporaryDirectory() as directory,patch.object(canary,'BASE',Path(directory)),\
+                patch.object(canary,'docker',side_effect=docker),patch.object(canary,'command',side_effect=uncertain),\
+                patch.object(canary,'stdout',side_effect=stdout):
+            with self.assertRaises(TimeoutError):canary.qualify(images['engine'],images['seed'])
+            root=next(Path(directory).iterdir())
+            with self.assertRaises(ValueError):canary.qualify(images['engine'],images['seed'],root)
+            self.assertEqual(len([e for e in effects if e[0]=='cp']),1)
+            self.assertFalse((root/'qualification.json').exists())
+
+    def test_lost_create_ack_resumes_exact_container_without_replaying_creation(self):
+        images,docker,command,stdout,effects=self.fake()
+        lost=[False]
+        def uncertain(method,path,body=None):
+            result=docker(method,path,body)
+            if '/create?name=delivery-kit-port2-executor-seed-' in path and not lost[0]:
+                lost[0]=True;raise TimeoutError('ack lost after creation')
+            return result
+        with tempfile.TemporaryDirectory() as directory,patch.object(canary,'BASE',Path(directory)),\
+                patch.object(canary,'docker',side_effect=uncertain),patch.object(canary,'command',side_effect=command),\
+                patch.object(canary,'stdout',side_effect=stdout):
+            with self.assertRaises(TimeoutError):canary.qualify(images['engine'],images['seed'])
+            root=next(Path(directory).iterdir())
+            result=canary.qualify(images['engine'],images['seed'],root)
+            self.assertEqual(result['status'],'passed')
+            self.assertEqual(len([e for e in effects if e[0]=='create']),5)
+            self.assertEqual(len([e for e in effects if e[0]=='volume']),4)
+
     def fake(self,mutate=False):
         images={'engine':'sha256:'+'a'*64,'seed':'sha256:'+'b'*64}
         volumes={};containers={};dirs={};effects=[]

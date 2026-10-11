@@ -1391,20 +1391,23 @@ flowchart LR
 ```
 
 Esse diagrama descreve o caminho implementado no código, não um ensaio autônomo
-já aprovado. O novo caminho ainda não está instalado: uma imagem do executor sem
-volumes herdados precisa ser qualificada, e a entrada no gate de Red precisa ser
+já aprovado. O novo caminho ainda não está instalado: a entrada no gate de Red precisa ser
 integrada e validada com agentes reais antes da retomada do ensaio.
 O controlador agora rejeita volumes automáticos da imagem antes dos efeitos e
 confere os mounts efetivos somente leitura antes de iniciar probe ou calibração;
 imagens históricas com `/opt/data` não são uma alternativa autorizada.
 `Dockerfile.generic-calibration-4` propõe reconstruir o filesystem do runtime
-local sem herdar metadados Docker ou o ambiente dos workers. O resultado precisa
-ser fixado por ID e qualificado, não apenas construído.
+local sem herdar metadados Docker ou o ambiente dos workers. A imagem foi fixada
+por ID e passou pelo canário Docker real de isolamento e calibração em 11/10/2026;
+isso não qualifica a integração com agentes ou a entrega de um produto.
 `tests/generic_calibration_executor_canary.py` prepara volumes sintéticos próprios,
 executa probe, controles positivos/negativos, revalidação dos hashes e tentativas
 de acesso gravável; também verifica ausência de socket/credenciais e execução
 local do Node. Intenções e evidências são arquivadas antes dos efeitos; falhas
-preservam os recursos, sem repetição automática. Helpers concluídos são retirados
+preservam os recursos, sem repetição automática. `--resume` observa a mesma criação
+ou início cujo reconhecimento foi perdido, sem repetir o efeito; uma cópia sem
+confirmação permanece bloqueada. Os fixtures sintéticos ficam preservados para
+retomada, sem substituir evidências do produto. Helpers concluídos são retirados
 por ID exato, mantendo volumes. Esse canário não fabrica aprovações nativas,
 não altera o produto e não qualifica, sozinho, QA de navegador ou homologação.
 `inputs_ready` e `calibration_ready` não são
