@@ -1,0 +1,6 @@
+# Adds only the fixed read/hash/AST probe; no test or delivery authority.
+# Expected base ID: sha256:0b4a4748cee38c79e3034a0f0c7cd05a0032a4cdf4faaf7314f5e5fac5adf26e
+FROM delivery-kit-generic-calibration:20261011.6
+COPY --chmod=0444 generic_calibration_seam_probe.py /
+USER 10000:10000
+ENTRYPOINT ["python"]

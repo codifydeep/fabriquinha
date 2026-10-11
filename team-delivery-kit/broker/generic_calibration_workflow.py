@@ -104,6 +104,14 @@ def advance(con,c,fx,*,now=None):
         if first and not fx.reserve(c):
             return save(required_action='Await proxy reserve before recording any wakeup effect')
         marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol='generic-calibration-producer-v1'))
+        if s.get('capability_recovery_sha256'):
+            try:import generic_calibration_capability_recovery as capability
+            except ImportError:from broker import generic_calibration_capability_recovery as capability
+            try:receipt=capability.qualified(con,c,s)
+            except (ValueError,KeyError,TypeError):
+                return hold('capability_recovery_binding_rejected','Controller verify exact durable v2 capability migration; no dispatch')
+            marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol=receipt['protocol'],
+                capability_recovery_sha256=s['capability_recovery_sha256']))
         if s.get('protocol_recovery_sha256'):
             try:import generic_calibration_protocol_recovery as repair
             except ImportError:from broker import generic_calibration_protocol_recovery as repair

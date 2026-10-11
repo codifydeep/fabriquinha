@@ -1538,7 +1538,7 @@ O workflow pode registrar `calibration_engine` ao criar uma nova
 execução. Essa seleção integra o hash da configuração e da cápsula de resposta;
 propostas v2 são recusadas em contexto v1. O coletor v2 reconsulta o estado
 persistente, a seleção e o wakeup exato antes de aceitar a proposta. Configurações
-já registradas não são atualizadas em lugar: um bloqueio antigo continua exigindo
+já registradas não mudam silenciosamente: um bloqueio antigo continua exigindo
 recuperação explícita e auditável. A instalação não converte recibos antigos
 nem comprova o ensaio nativo v2.
 As receitas de imagens do controlador (`463`), proxy (`128`),
@@ -1553,6 +1553,15 @@ selada e sem trabalho ativo. Cria um backup privado uma única vez, verifica
 integridade e restauração em memória e confere as contagens de todas as tabelas.
 Uma confirmação perdida exige observar o arquivo existente, nunca sobrescrevê-lo.
 Backup e instalação não liberam cards nem concedem aprovação de produto.
+O probe candidato `generic_calibration_seam_probe.py` lê hashes e AST, sem
+importar os testes, para demonstrar múltiplas referências `Path` existentes
+em um mesmo módulo. Raízes não reconhecidas ficam bloqueadas. As primitivas
+de `generic_calibration_capability_recovery.py` permitem uma única mudança
+auditada v1→v2, preservando configuração/falha anteriores e o ledger da
+migração de protocolo já consumida. Elas não são uma API de worker: o wrapper
+operacional ainda precisa autenticar a manutenção, a execução real do probe,
+as identidades nativas e a entrega original antes da aplicação. Calibração e
+recuperação não autorizam Red, Green ou entrega.
 
 ## Contribuir e reutilizar
 
