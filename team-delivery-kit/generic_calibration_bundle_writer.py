@@ -13,7 +13,8 @@ import base64
 import os
 import zlib
 
-from generic_harness_calibration import digest,relative,require,validate_policy
+from generic_harness_calibration import digest,relative,require
+from calibration_policy_adapter import validate_policy,fixture_paths
 from r3_snapshot_probe import probe
 
 
@@ -35,7 +36,7 @@ def expected_files(record,expected):
         relative(name);require(name!='manifest.json' and isinstance(content,str))
         size=len(content.encode());total+=size
         require(0<size<=65536 and total<=524288)
-    fixtures={m['positive_fixture'] for m in p['modules']}|{n['fixture'] for n in p['negatives']}
+    fixtures=fixture_paths(p)
     require(set(controls)==fixtures)
     control_manifest=inventory(controls)
     require(record['controls_manifest']==control_manifest

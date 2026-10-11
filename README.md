@@ -1522,6 +1522,11 @@ produto declarados sem importar ou executar os testes. A imagem candidata
 `Dockerfile.generic-calibration-6` empacota essa leitura; sua existência não
 implica instalação. A seleção pelo controlador e os contratos nativos de
 proposta, revisão e execução ainda precisam ser qualificados antes da ativação.
+As funções de proposta aceitam v2 somente com seleção explícita do chamador
+controlador; a coleta instalada continua no contrato v1. A materialização
+preserva todos os controles declarados, exige digest exato do bundle e não
+sobrescreve arquivos divergentes. Seu recibo de gravação permanece sem autoridade
+de execução ou entrega, e não substitui a revisão independente da política.
 
 ## Contribuir e reutilizar
 

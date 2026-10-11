@@ -8,14 +8,18 @@ real sandbox probes are still required by generic_calibration_registration.
 import hashlib
 import json
 
-from generic_harness_calibration import digest,relative,validate_policy
+from generic_harness_calibration import digest,relative
+from calibration_policy_adapter import validate_policy,fixture_paths,version_for_engine
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
 
 
 def source_paths(body):
+    version=version_for_engine(body['engine'])
+    products=({m['product_path'] for m in body['modules']} if version=='generic_harness_calibration_v1'
+        else {f['product_path'] for m in body['modules'] for f in m['fixtures']})
     return sorted({*('/evidence/candidate/'+m['path'] for m in body['modules']),
-        *('/evidence/candidate/'+m['product_path'] for m in body['modules']),
+        *('/evidence/candidate/'+p for p in products),
         *('/evidence/previous/'+p for p in body['previous_methods'])})
 
 
@@ -24,11 +28,14 @@ def manifest(files):
         sha256=hashlib.sha256(content.encode()).hexdigest()) for name,content in files.items()}},sort_keys=True)
 
 
-def bundle(body,value,route,prepared):
+def bundle(body,value,route,prepared,*,expected_engine='unittest_path_fixture_v1'):
     gate.require(isinstance(body,dict) and set(body)=={'action','engine','modules','negatives',
         'previous_methods','controls','execution_authorized','delivery_approval'}
         and body['action']=='propose_calibration_bundle'
         and body['execution_authorized'] is False and body['delivery_approval'] is False)
+    # Supplied by the controller, not taken from the agent's proposed engine.
+    version=version_for_engine(expected_engine)
+    gate.require(body['engine']==expected_engine)
     controls=body['controls']
     gate.require(isinstance(controls,dict) and 1<=len(controls)<=288)
     total=0
@@ -38,14 +45,14 @@ def bundle(body,value,route,prepared):
         size=len(content.encode());total+=size
         gate.require(0<size<=65536 and total<=524288)
     control_manifest=manifest(controls)
-    p=dict(version='generic_harness_calibration_v1',engine=body['engine'],
+    p=dict(version=version,engine=body['engine'],
         source_task=value['source_task'],execution_sha256=digest(value),plan_sha256=value['plan_sha256'],
         candidate_manifest_sha256=prepared['manifest_sha256'],
         controls_manifest_sha256=hashlib.sha256(control_manifest.encode()).hexdigest(),
         criteria=sorted(value['criteria']),test_sha256=prepared['test_sha256'],
         previous_methods=body['previous_methods'],modules=body['modules'],negatives=body['negatives'])
     validate_policy(p,digest(p))
-    fixtures={m['positive_fixture'] for m in p['modules']}|{n['fixture'] for n in p['negatives']}
+    fixtures=fixture_paths(p)
     gate.require(set(controls)==fixtures
         and set(p['test_sha256'])==set(value['steps'][0]['editable_files'])==set(route['test_first_files'])
         and set(p['previous_methods'])==set(value['previous_new_test_delivery']['test_sha256']))
@@ -54,13 +61,13 @@ def bundle(body,value,route,prepared):
         execution_authorized=False,delivery_approval=False)
 
 
-def from_task(task,wakeup,value,route,prepared,reads):
+def from_task(task,wakeup,value,route,prepared,reads,*,expected_engine='unittest_path_fixture_v1'):
     gate.require(task.get('status')=='completed' and task.get('agent_id')==route['cto']
         and task.get('issue_id')==route['issue_id'] and task.get('wakeup_id')==wakeup
         and len({route['author'],route['cto'],route['techlead']})==3)
     raw=(task.get('result') or {}).get('output')
     gate.require(isinstance(raw,str) and 1<=len(raw.encode())<=786432)
-    body=json.loads(raw);record=bundle(body,value,route,prepared)
+    body=json.loads(raw);record=bundle(body,value,route,prepared,expected_engine=expected_engine)
     paths=source_paths(body)
     for path in paths:
         observed=reads.get(path,{})

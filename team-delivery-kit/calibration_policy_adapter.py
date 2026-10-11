@@ -6,6 +6,13 @@ image and immutable delivery checks remain required by callers.
 from generic_harness_calibration import require,digest
 
 
+def version_for_engine(engine):
+    versions={'unittest_path_fixture_v1':'generic_harness_calibration_v1',
+        'unittest_path_fixtures_v2':'generic_harness_calibration_v2'}
+    require(isinstance(engine,str) and engine in versions)
+    return versions[engine]
+
+
 def _adapter(p):
     require(isinstance(p,dict))
     identity=(p.get('version'),p.get('engine'))
