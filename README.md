@@ -1397,6 +1397,16 @@ integrada e validada com agentes reais antes da retomada do ensaio.
 O controlador agora rejeita volumes automáticos da imagem antes dos efeitos e
 confere os mounts efetivos somente leitura antes de iniciar probe ou calibração;
 imagens históricas com `/opt/data` não são uma alternativa autorizada.
+`Dockerfile.generic-calibration-4` propõe reconstruir o filesystem do runtime
+local sem herdar metadados Docker ou o ambiente dos workers. O resultado precisa
+ser fixado por ID e qualificado, não apenas construído.
+`tests/generic_calibration_executor_canary.py` prepara volumes sintéticos próprios,
+executa probe, controles positivos/negativos, revalidação dos hashes e tentativas
+de acesso gravável; também verifica ausência de socket/credenciais e execução
+local do Node. Intenções e evidências são arquivadas antes dos efeitos; falhas
+preservam os recursos, sem repetição automática. Helpers concluídos são retirados
+por ID exato, mantendo volumes. Esse canário não fabrica aprovações nativas,
+não altera o produto e não qualifica, sozinho, QA de navegador ou homologação.
 `inputs_ready` e `calibration_ready` não são
 conclusão de card, aprovação de entrega ou homologação.
 O controlador não pode executar o código de testes diretamente:

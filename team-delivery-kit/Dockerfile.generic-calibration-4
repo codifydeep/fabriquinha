@@ -1,0 +1,12 @@
+# Keep the qualified local Python/Node/Playwright filesystem, but do not inherit
+# Docker metadata (especially VOLUME /opt/data) or the worker's environment.
+# Runtime installation must pin and qualify the resulting image ID separately.
+FROM delivery-kit-generic-calibration:20261010.2 AS runtime
+FROM scratch
+COPY --from=runtime / /
+ENV PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright \
+    HOME=/tmp \
+    PYTHONDONTWRITEBYTECODE=1
+USER 10000:10000
+ENTRYPOINT ["python"]
