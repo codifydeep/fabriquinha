@@ -26,7 +26,7 @@ def coverage(messages, wire=False, include_content=False):
             raw = message.get('input') or {}
             path = raw.get('path')
             if path is None:
-                match = re.search(r'/(?:evidence/(?:candidate|previous)|delivery)/[A-Za-z0-9_./-]+', raw.get('text', ''))
+                match = re.search(r'/(?:evidence/(?:candidate|previous|controls|policy)|delivery)/[A-Za-z0-9_./-]+', raw.get('text', ''))
                 path = match.group(0) if match else None
             calls[message.get('call_id')] = (path, raw.get('offset', 1), raw.get('limit'))
         is_result = message.get('role') == 'tool' if wire else message.get('type') == 'tool_result'
@@ -44,7 +44,7 @@ def coverage(messages, wire=False, include_content=False):
         except ValueError:
             # ACP starts omit input. Its actual completed read identifies the
             # path and total, followed by a fenced numbered page.
-            match = re.fullmatch(r'Read (/(?:evidence/(?:candidate|previous)|delivery)/[A-Za-z0-9_./-]+)'
+            match = re.fullmatch(r'Read (/(?:evidence/(?:candidate|previous|controls|policy)|delivery)/[A-Za-z0-9_./-]+)'
                                  r'(?: \(from line (\d+)(?:, limit (\d+))?\))?'
                                  r' — (\d+) total lines\n\n(`{3,})[^\n]*\n(.*)\n\5', output, re.DOTALL)
             if not match:

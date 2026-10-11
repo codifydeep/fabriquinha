@@ -1,0 +1,8 @@
+FROM delivery-kit-model-proxy:20261010.124
+USER root
+COPY calibration_response_contract.py /calibration_response_contract.py
+COPY artifact_read_evidence.py /artifact_read_evidence.py
+COPY decision_schema.py /decision_schema.py
+COPY structured_response_contract.py /structured_response_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_response_contract,decision_schema,structured_response_contract"
+USER 10000:10000

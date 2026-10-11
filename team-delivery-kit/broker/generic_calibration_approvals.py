@@ -14,6 +14,7 @@ except ImportError:from broker import generic_calibration_gate as gate
 
 
 def instruction(source,phase):
+    from calibration_response_contract import context as make_context,capsule
     policy=source['policy'];context=source['context']
     action='propose_calibration' if phase=='attestation' else 'approve_calibration'
     note=('IMMUTABLE CALIBRATION POLICY '+phase.upper()+'. Read every listed file completely. '
@@ -25,8 +26,11 @@ def instruction(source,phase):
         json.dumps(dict(action=action,policy_sha256=digest(policy),
             controls_manifest_sha256=policy['controls_manifest_sha256'],
             execution_authorized=False,delivery_approval=False),separators=(',',':'))+
-        '\nIf unsound, return a concrete technical objection; it becomes an owned hold, not approval.\n'+
+        '\nIf unsound, return exactly {"action":"calibration_objection","reason":"concrete technical objection",'
+        '"execution_authorized":false,"delivery_approval":false}; it becomes an owned hold, not approval.\n'+
         ''.join('READ FULL FILE: '+p+'\n' for p in gate.required_paths(policy,context)))
+    note=capsule(make_context('attestation' if phase=='attestation' else 'review',
+        gate.required_paths(policy,context),digest(source),digest(policy),policy['controls_manifest_sha256']))+note
     gate.require(len(note)<=4000)
     return note
 

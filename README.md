@@ -1438,6 +1438,17 @@ por ID exato, mantendo volumes. Esse canário não fabrica aprovações nativas,
 não altera o produto e não qualifica, sozinho, QA de navegador ou homologação.
 `inputs_ready` e `calibration_ready` não são
 conclusão de card, aprovação de entrega ou homologação.
+O contrato `calibration_response_contract.py` separa a proposta de fixtures das
+decisões técnicas históricas presentes no contexto. Uma cápsula vinculada por
+hash à fase e aos arquivos congelados seleciona o formato atual, sem conceder
+permissão de execução. Leituras obrigatórias exigem recibos reais completos;
+o produtor pode consultar dependências adicionais somente nos snapshots. Seus
+mapas dinâmicos de fixtures são validados localmente, sem anunciá-los como um
+schema fechado incompatível com o provedor. Attestation e revisão usam schemas
+fechados vinculados aos hashes exatos; nenhuma dessas respostas autoriza uma
+entrega. Recibos nativos de leitura dos controles e da política são reconhecidos
+separadamente de alegações textuais. A suíte offline qualifica esse contrato,
+mas não comprova recuperação do produtor bloqueado ou homologação com agentes.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

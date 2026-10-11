@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261011.458
+COPY calibration_response_contract.py /calibration_response_contract.py
+COPY artifact_read_evidence.py /artifact_read_evidence.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/generic_calibration_approvals.py /generic_calibration_approvals.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_response_contract,generic_calibration_workflow,generic_calibration_approvals"

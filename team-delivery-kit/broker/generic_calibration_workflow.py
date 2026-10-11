@@ -20,6 +20,8 @@ def initialize(con):
 
 
 def instruction(c):
+    from calibration_response_contract import context,capsule
+    paths=['/evidence/'+root+'/'+path for root in ('candidate','previous') for path in c['test_files']]
     note=('CTO CALIBRATION BUNDLE PROPOSAL ONLY. Read the frozen candidate tests and the previous tests '
         'completely, plus each product file referenced by your adapter. Do not edit, run tests, use shell, '
         'approve a delivery, change acceptance or ask the CEO a technical question. '
@@ -36,11 +38,12 @@ def instruction(c):
         'previous_methods={test_path:{ClassName:[historical_test_method]}}, '
         'controls={relative_fixture_path:literal_UTF8_content}, execution_authorized=false, delivery_approval=false. '
         'No commands, self-authored hashes or approval fields. Controls are at most64KiB each and512KiB total. '
-        'If unsupported, explain the concrete seam restriction; the controller will retain an owned hold, '
-        'not interpret that prose as a submitted bundle. '
+        'If unsupported, return exactly {"action":"calibration_objection","reason":"concrete seam restriction",'
+        '"execution_authorized":false,"delivery_approval":false}; this retains an owned hold, not an approval. '
         '\nSource binding: '+digest(c)+'\nAcceptance (unchanged): '+json.dumps(c['criteria'],separators=(',',':'))+
         '\n'+''.join('READ FULL FILE: /evidence/'+root+'/'+path+'\n'
             for root in ('candidate','previous') for path in c['test_files']))
+    note=capsule(context('bundle',paths,digest(c)))+note
     gate.require(len(note)<=4000)
     return note
 

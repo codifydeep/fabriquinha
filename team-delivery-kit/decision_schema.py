@@ -15,6 +15,9 @@ def validation_schema(sha):
 
 
 def apply(body):
+    from calibration_response_contract import apply as calibration
+    current=calibration(body)
+    if current is not None:return current
     from product_scope_contract import apply as product_scope
     scope=product_scope(body)
     if scope is not None:return scope
