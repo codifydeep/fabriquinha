@@ -1,0 +1,9 @@
+# Coherent prerequisite pipeline; deployment still requires sealed maintenance.
+# Local base tag must be checked against its installed immutable ID before build.
+FROM delivery-kit-execution-broker:20261010.453
+COPY broker/generic_calibration_*.py /
+COPY broker/technical_remediation_plan.py /technical_remediation_plan.py
+COPY broker/harness_qualification.py /harness_qualification.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+COPY generic_harness_calibration.py generic_calibration_input_probe.py generic_calibration_bundle_writer.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_workflow,generic_calibration_red_bridge,generic_calibration_pipeline,generic_calibration_approvals,generic_calibration_materialization,technical_remediation_plan,harness_qualification,test_first_handoffs"

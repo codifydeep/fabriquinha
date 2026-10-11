@@ -23,10 +23,11 @@ class HarnessJobTests(unittest.TestCase):
         self.assertEqual(con.execute('SELECT count(*) FROM sqlite_master').fetchone()[0],0)
 
     def test_inherited_policy_must_register_before_capture_or_review_without_bypass(self):
-        from broker import remediation_runtime_guard as guard,generic_calibration_registration as registration
+        from broker import remediation_runtime_guard as guard,generic_calibration_registration as registration,generic_calibration_workflow as workflow
         con=sqlite3.connect(':memory:');self.addCleanup(con.close)
         self.b.docker=lambda *a:self.fail('missing reviewed intake must not produce Docker effects')
         with patch.object(guard,'qualified',return_value={'amendment':{'kind':'inherited_frozen_suite'}}),\
+                patch.object(workflow,'request',return_value={'stage':'calibration_ready'}),\
                 patch.object(registration,'register',side_effect=ValueError('independently reviewed input intent required')) as register:
             with self.assertRaisesRegex(ValueError,'independently reviewed'):
                 job.capture(self.b,con,'issue','task','volume',self.prepared)

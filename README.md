@@ -1387,12 +1387,19 @@ flowchart LR
   C --> T[Revisão independente Tech Lead]
   T --> I[Intake persistente: inputs_ready]
   I --> P[Probe de inputs e calibração]
-  P -. integração pendente .-> R[Retomada do TDD]
+  P --> B[Ponte persistente: aguardar ou manter impedimento técnico]
+  B -->|calibration_ready; provas revalidadas| R[Gate separado de Red do autor original]
 ```
 
 Esse diagrama descreve o caminho implementado no código, não um ensaio autônomo
-já aprovado. O novo caminho ainda não está instalado: a entrada no gate de Red precisa ser
-integrada e validada com agentes reais antes da retomada do ensaio.
+já aprovado. O novo caminho ainda não está instalado nem validado com agentes reais.
+`generic_calibration_red_bridge.py` conecta a entrada no gate de Red à calibração
+persistente. Enquanto CTO ou Tech Lead atuam, o handoff observa o mesmo workflow,
+sem reiniciar o autor nem substituir os prazos de cada fase pelo timeout genérico
+de dez minutos. Impedimentos da calibração preservam responsável e próxima ação;
+não são interpretados como falha dos testes do autor ou enviados à recuperação
+legada de testes. Ao chegar a `calibration_ready`, registro, entrega e resultado
+real são conferidos novamente, antes de executar o Red pelo gate separado.
 O controlador agora rejeita volumes automáticos da imagem antes dos efeitos e
 confere os mounts efetivos somente leitura antes de iniciar probe ou calibração;
 imagens históricas com `/opt/data` não são uma alternativa autorizada.

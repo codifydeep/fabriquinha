@@ -800,6 +800,11 @@ def reconcile(broker, route, runs, effects):
                     handoffs.save(con,source['id'],issue,'technical_decision_required',
                         route['cto'],preserved,time.time())
                     prior=handoffs.load(con,source['id'])
+        if (prior and prior['stage']=='test_first_blocked'
+                and json.loads(prior['data']).get('calibration_prerequisite',{}).get('stage')=='blocked'):
+            # This is a prerequisite-controller incident, not failed author tests.
+            # Keep its exact owner/action; no legacy test repair or author retry.
+            return None
         try:import fenced_patch_diagnosis
         except ImportError:from broker import fenced_patch_diagnosis
         if fenced_patch_diagnosis.enrich(broker,route,runs,source,prior,effects):
@@ -949,7 +954,10 @@ def reconcile(broker, route, runs, effects):
             try:
                 effects.capture_test_first_red({'task_id': source['id']})
                 return None  # Next tick verifies durable Red before waking anyone.
-            except TimeoutError:
+            except TimeoutError as failure:
+                try:import generic_calibration_red_bridge as calibration
+                except ImportError:from broker import generic_calibration_red_bridge as calibration
+                if calibration.observe(broker,route,source,prior,failure):return None
                 validation_wait(broker,route,source,prior,'fixed_controller_job')
                 return None
             except Exception as failure:

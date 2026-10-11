@@ -193,13 +193,9 @@ def capture(b,con,issue,task,volume,prepared):
     value=guard.qualified(b,issue)
     if not value or not value.get('amendment'):return None
     if value['amendment'].get('kind')=='inherited_frozen_suite':
-        try:import generic_calibration_gate as gate,generic_calibration_registration as registration
-        except ImportError:from broker import generic_calibration_gate as gate,generic_calibration_registration as registration
-        record=registration.register(b,issue,task)
-        gate.require(volume==record['context']['candidate_volume']
-            and prepared['manifest_sha256']==record['policy']['candidate_manifest_sha256']
-            and prepared['test_sha256']==record['policy']['test_sha256'])
-        return gate.run(b,con,record)['receipt']
+        try:import generic_calibration_red_bridge as bridge
+        except ImportError:from broker import generic_calibration_red_bridge as bridge
+        return bridge.capture(b,con,issue,task,volume,prepared)
     background,timers=calibration_policy(value)
     from service_mode_harness_qualification import TEST
     if set(prepared['test_sha256'])!={TEST}:raise ValueError('declared amendment test scope required')
