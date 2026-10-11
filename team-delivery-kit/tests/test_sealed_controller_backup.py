@@ -1,0 +1,60 @@
+import contextlib
+import importlib.util
+import io
+import json
+from pathlib import Path
+import sqlite3
+import tempfile
+import threading
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+source=Path(__file__).resolve().parents[1]/'scripts'/'backup_sealed_controller.py'
+spec=importlib.util.spec_from_file_location('sealed_backup_script',source)
+script=importlib.util.module_from_spec(spec);spec.loader.exec_module(script)
+
+
+class SealedBackupTests(unittest.TestCase):
+    def setUp(self):
+        temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);self.root=Path(temp.name)
+        self.con=sqlite3.connect(':memory:');self.addCleanup(self.con.close)
+        self.operation='2e2aeb1d-f33a-44b0-ba39-9a5b6cd9d2eb'
+        self.state=dict(operation_id=self.operation,stage='sealed')
+        self.con.executescript('CREATE TABLE controller_maintenance(operation_id TEXT,receipt TEXT);'
+            'CREATE TABLE leases(status TEXT);CREATE TABLE protected(value TEXT);INSERT INTO protected VALUES("preserve");')
+        self.con.execute('INSERT INTO controller_maintenance VALUES(?,?)',(self.operation,json.dumps(self.state)))
+        self.con.commit()
+        @contextlib.contextmanager
+        def db():yield self.con
+        self.b=SimpleNamespace(STATE=self.root,LOCK=threading.RLock(),db=db)
+        self.active=[]
+        self.m=SimpleNamespace(current=lambda con:self.state,native_active=lambda b:self.active)
+
+    def execute(self):
+        output=io.StringIO()
+        with patch.dict('sys.modules',{'broker':self.b,'controller_maintenance':self.m}),\
+                patch('sys.argv',['backup',self.operation]),contextlib.redirect_stdout(output):
+            exec(compile(script.PROGRAM,'sealed-backup','exec'),{})
+        return json.loads(output.getvalue())
+
+    def test_backup_restores_exact_rows_privately_and_never_replays(self):
+        receipt=self.execute();path=Path(receipt['path']);before=path.read_bytes()
+        self.assertEqual(receipt['restore_integrity'],'ok')
+        self.assertEqual(path.stat().st_mode&0o777,0o600)
+        restored=sqlite3.connect(path);self.addCleanup(restored.close)
+        self.assertEqual(restored.execute('SELECT value FROM protected').fetchone(),('preserve',))
+        self.assertIs(receipt['delivery_approval'],False)
+        with self.assertRaises(FileExistsError):self.execute()
+        self.assertEqual(path.read_bytes(),before)
+
+    def test_unsealed_wrong_operation_or_active_work_creates_no_backup(self):
+        for mutate in (lambda:self.state.update(stage='draining'),
+                lambda:self.state.update(operation_id='foreign'),lambda:self.active.append('task')):
+            old=dict(self.state);mutate()
+            with self.assertRaises(ValueError):self.execute()
+            self.assertEqual(list(self.root.iterdir()),[])
+            self.state=old;self.active=[]
+        self.con.execute('INSERT INTO leases VALUES("closing")');self.con.commit()
+        with self.assertRaises(ValueError):self.execute()
+        self.assertEqual(list(self.root.iterdir()),[])

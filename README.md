@@ -1520,33 +1520,39 @@ versão/engine, sem fallback, e mantém operações de prova de entrada distinta
 para v1 e v2. O probe de entrada v2 registra hashes de todos os arquivos de
 produto declarados sem importar ou executar os testes. A imagem candidata
 `Dockerfile.generic-calibration-6` empacota essa leitura; sua existência não
-implica instalação. A seleção pelo controlador e os contratos nativos de
-proposta, revisão e execução ainda precisam ser qualificados antes da ativação.
+implica autorização de execução. Os contratos multiarquivo estão instalados
+no ambiente de qualificação, mas sua ativação em um workflow exige seleção
+persistente auditada e comprovação no ensaio nativo da equipe.
 As funções de proposta aceitam v2 somente com seleção explícita do chamador
 controlador; a coleta instalada continua no contrato v1. A materialização
 preserva todos os controles declarados, exige digest exato do bundle e não
 sobrescreve arquivos divergentes. Seu recibo de gravação permanece sem autoridade
 de execução ou entrega, e não substitui a revisão independente da política.
-Os contratos candidatos de revisão e pipeline verificam todos os arquivos e
+Os contratos de revisão e pipeline verificam todos os arquivos e
 recibos pela versão exata. Execução v2 exige configuração própria
 `BROKER_GENERIC_CALIBRATION_V2_IMAGE`, com image ID, e usa somente o entrypoint
 fixo do adapter em sandbox restrito. Ausência dessa configuração não permite
-fallback para a imagem v1. A seleção persistente do workflow, a instalação e
-um ensaio nativo completo ainda são requisitos pendentes para ativação.
-O workflow candidato pode registrar `calibration_engine` ao criar uma nova
+fallback para a imagem v1. O workflow antigo permanece em v1 e bloqueado;
+uma recuperação auditável e um ensaio nativo completo continuam pendentes.
+O workflow pode registrar `calibration_engine` ao criar uma nova
 execução. Essa seleção integra o hash da configuração e da cápsula de resposta;
 propostas v2 são recusadas em contexto v1. O coletor v2 reconsulta o estado
 persistente, a seleção e o wakeup exato antes de aceitar a proposta. Configurações
 já registradas não são atualizadas em lugar: um bloqueio antigo continua exigindo
-recuperação explícita e auditável. Esses contratos ainda não foram instalados
-nem comprovados por um ensaio nativo v2.
-As receitas candidatas de imagens do controlador (`463`), proxy (`128`),
-executor (`6`) e materializador (`2`) incluem os módulos v2 sem substituir os
-IDs instalados. O canário do executor verifica a prova de entrada multiarquivo
+recuperação explícita e auditável. A instalação não converte recibos antigos
+nem comprova o ensaio nativo v2.
+As receitas de imagens do controlador (`463`), proxy (`128`),
+executor (`6`) e materializador (`2`) incluem os módulos v2; o overlay de
+qualificação fixa seus IDs. O canário do executor verifica a prova de entrada multiarquivo
 e a rejeição de recibo v1 em sandbox; `tests/calibration_writer_v2_canary.py`
 verifica hashes dos módulos empacotados, gravação idempotente e rejeição de digest
 obsoleto usando apenas dados sintéticos em tmpfs. Recibos desses canários são
 privados, não autorizam execução nativa e não substituem o ensaio da equipe.
+`scripts/backup_sealed_controller.py` exige a operação de manutenção exata,
+selada e sem trabalho ativo. Cria um backup privado uma única vez, verifica
+integridade e restauração em memória e confere as contagens de todas as tabelas.
+Uma confirmação perdida exige observar o arquivo existente, nunca sobrescrevê-lo.
+Backup e instalação não liberam cards nem concedem aprovação de produto.
 
 ## Contribuir e reutilizar
 
