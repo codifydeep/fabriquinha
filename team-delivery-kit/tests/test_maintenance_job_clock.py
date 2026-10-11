@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import unittest
+from unittest.mock import patch
 from broker import maintenance_job_clock as clock
 
 
@@ -32,3 +33,27 @@ class MaintenanceClockTests(unittest.TestCase):
     def test_invalid_interval_fails_closed(self):
         self.record('released',100,10)
         with self.assertRaises(ValueError):clock.deadline(self.con,'owned',600,700)
+
+    def test_parent_handoff_keeps_remaining_budget_without_resetting_first_seen(self):
+        from broker import test_first_handoffs,handoffs
+        from test_test_first_handoffs import Broker
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            b=Broker(Path(directory)/'db');b.PREFIX='owned'
+            with b.db() as con:
+                handoffs.initialize(con)
+                con.execute('CREATE TABLE controller_maintenance(stage TEXT,receipt TEXT)')
+                con.execute('INSERT INTO controller_maintenance VALUES(?,?)',('released',json.dumps(dict(
+                    namespace='owned',sealed_at=100,released_at=1100))))
+            prior=dict(data=json.dumps(dict(validation_wait={'first_seen':0})))
+            route=dict(issue_id='issue',cto='cto');source=dict(id='task')
+            with patch.object(test_first_handoffs.time,'time',return_value=1200):
+                test_first_handoffs.validation_wait(b,route,source,prior,'fixed_controller_job')
+            with b.db() as con:r=handoffs.load(con,'task')
+            self.assertEqual(r['stage'],'test_first_validation_pending')
+            self.assertEqual(json.loads(r['data'])['validation_wait']['first_seen'],0)
+            with patch.object(test_first_handoffs.time,'time',return_value=1700):
+                test_first_handoffs.validation_wait(b,route,source,r,'fixed_controller_job')
+            with b.db() as con:r=handoffs.load(con,'task')
+            self.assertEqual(r['stage'],'test_first_blocked')

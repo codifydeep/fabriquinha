@@ -1410,6 +1410,15 @@ comprovados de manutenção selada do orçamento original, sem reiniciar o prazo
 Durante a manutenção selada não inicia jobs; pausa do provedor, espera comum e
 draining não ampliam o orçamento. Uma intenção Docker incerta continua vinculada
 ao mesmo nome/ID e não autoriza repetir criação ou início.
+O relógio de espera do handoff usa os mesmos intervalos comprovados; uma troca de
+imagem não reinicia o orçamento nem transforma a espera em falha dos testes.
+`controller_route_isolation.py` permite ao operador, somente com manutenção
+selada e ausência comprovada de agentes/leases ativos, manter uma rota habilitada
+e pausar as históricas. A configuração original fica no ledger persistente;
+contratos, estados nativos, incidentes e evidências não são cancelados ou
+concluídos. Repetição exige o mesmo alvo e estado exato; não há restauração
+automática nem endpoint administrativo disponível aos agentes. Essa operação é
+isolamento de um ensaio, não limitação do grafo de trabalho de uma release.
 O controlador agora rejeita volumes automáticos da imagem antes dos efeitos e
 confere os mounts efetivos somente leitura antes de iniciar probe ou calibração;
 imagens históricas com `/opt/data` não são uma alternativa autorizada.

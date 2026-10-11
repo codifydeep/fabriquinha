@@ -746,9 +746,11 @@ def validation_wait(broker,route,source,prior,category):
     data.update(source_task=source['id'],phase='test_first',validation_wait=wait,
                 required_action='Observe this task lease and fixed controller jobs; never restart the author')
     stage='test_first_validation_pending'
-    if time.time()-wait['first_seen']>=600:
-        stage='test_first_blocked';data['error']='test_first_validation_observation_deadline'
     with broker.db() as con:
+        try:import maintenance_job_clock as clock
+        except ImportError:from broker import maintenance_job_clock as clock
+        if time.time()>=clock.deadline(con,getattr(broker,'PREFIX',''),wait['first_seen']+600,time.time()):
+            stage='test_first_blocked';data['error']='test_first_validation_observation_deadline'
         handoffs.save(con,source['id'],route['issue_id'],stage,route['cto'],data,time.time())
 
 

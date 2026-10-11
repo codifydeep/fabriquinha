@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261011.457
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_first_handoffs,maintenance_job_clock,controller_route_isolation"

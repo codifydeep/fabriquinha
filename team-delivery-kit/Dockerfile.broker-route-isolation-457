@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261011.456
+COPY broker/controller_route_isolation.py /controller_route_isolation.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import controller_route_isolation"
