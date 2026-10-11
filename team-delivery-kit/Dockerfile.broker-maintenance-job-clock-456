@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261011.455
+COPY broker/maintenance_job_clock.py /maintenance_job_clock.py
+COPY broker/test_first_job.py /test_first_job.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import maintenance_job_clock,test_first_job"

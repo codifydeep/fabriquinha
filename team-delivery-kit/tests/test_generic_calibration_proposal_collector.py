@@ -48,7 +48,8 @@ class ProposalCollectorTests(unittest.TestCase):
             result=dict(output=json.dumps(fixture.body)))
         reads={path:dict(lines=3,total_lines=3) for path in proposal.source_paths(fixture.body)}
         self.fx=SimpleNamespace(settings={'agents':{'cto':'planning','author':'implementation'}},
-            task=lambda tid,actor:self.task if actor=='cto' else dict(status='completed',issue_id='issue'),
+            task=lambda tid,actor:self.task if actor=='cto' else dict(id=tid,agent_id=actor,workspace_id='workspace',
+                chat_session_id=tid,status='completed',issue_id='issue'),
             reads=lambda t:reads)
 
     def collect(self):

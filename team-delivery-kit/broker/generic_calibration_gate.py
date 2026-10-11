@@ -20,6 +20,15 @@ def require(condition):
     if not condition:raise ValueError('exact independent generic calibration binding required')
 
 
+def require_author_scope(binding,task):
+    try:import native
+    except ImportError:from broker import native
+    require(task.get('id')==binding['task_id'] and task.get('agent_id')==binding['agent_id']
+        and task.get('issue_id')==binding['issue_id'] and task.get('status')=='completed')
+    require(binding['scope']==':'.join((task['workspace_id'],task['agent_id'],
+        'implementation',native.scope_source(task,'implementation'))))
+
+
 def required_paths(policy,context):
     return sorted({'/evidence/policy/policy.json',
         *('/evidence/candidate/'+p for p in policy['test_sha256']),

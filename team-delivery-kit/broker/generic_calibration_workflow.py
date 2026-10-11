@@ -151,7 +151,8 @@ def request(b,issue,author_task):
             rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',
                 (author_task,)).fetchall()
             gate.require(len(rows)==1 and rows[0]['agent_id']==route['author'] and rows[0]['issue_id']==issue
-                and rows[0]['status']=='closed' and rows[0]['scope'].split(':')[-2:]==['implementation',author_task])
+                and rows[0]['status']=='closed' and rows[0]['scope'].split(':')[-2]=='implementation')
+            author_binding=dict(rows[0])
             copied=con.execute('SELECT identity,state FROM test_first_jobs WHERE job_key=?',(author_task+':copy',)).fetchone()
             gate.require(copied is not None);identity,state=map(json.loads,copied)
             gate.require(state.get('stage')=='complete')
@@ -169,6 +170,7 @@ def request(b,issue,author_task):
                 criteria=value['criteria'],source_task=value['source_task'])
         fx=Effects(b);fx.verify(c)
         authored=fx.plans.task(author_task,route['author'])
+        gate.require_author_scope(author_binding,authored)
         gate.require(authored.get('status')=='completed' and authored.get('issue_id')==issue)
         with b.db() as con:
             prior=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',

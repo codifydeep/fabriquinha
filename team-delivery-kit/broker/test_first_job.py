@@ -81,7 +81,9 @@ def run(b,con,task,phase,payload,*,now=None):
         state.update(values)
         con.execute('UPDATE test_first_jobs SET state=? WHERE job_key=?',(json.dumps(state,sort_keys=True),key))
         con.commit()
-    if now>=state['deadline']:
+    try:import maintenance_job_clock as clock
+    except ImportError:from broker import maintenance_job_clock as clock
+    if now>=clock.deadline(con,b.PREFIX,state['deadline'],now):
         save(stage='blocked',category='observation_deadline')
         raise ValueError('test-first job observation deadline; preserve exact handle')
     if state['stage']=='prepared':

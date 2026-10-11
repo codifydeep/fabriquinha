@@ -195,7 +195,9 @@ def register(b,issue,author_task):
                     (tid,)).fetchall()
                 gate.require(len(rows)==1 and rows[0]['status']=='closed'
                     and rows[0]['agent_id']==actor and rows[0]['issue_id']==issue
-                    and rows[0]['scope'].split(':')[-2:]==[mode,tid])
+                    and (rows[0]['scope'].split(':')[-2:]==[mode,tid]
+                        if mode=='planning' else rows[0]['scope'].split(':')[-2]=='implementation'))
+                if mode=='implementation':author_binding=dict(rows[0])
         expected=input_payload(b,intake)
         expected['Env']=gate.environment(b,expected['Image'])
         gate.require(identity.get('payload')==expected and state.get('stage')=='complete')
@@ -212,6 +214,7 @@ def register(b,issue,author_task):
         gate.require(all(fx.settings['agents'].get(actor)=='planning' for actor in (route['cto'],route['techlead'])))
         gate.require(fx.settings['agents'].get(route['author'])=='implementation')
         authored=fx.task(author_task,route['author'])
+        gate.require_author_scope(author_binding,authored)
         gate.require(authored.get('status')=='completed' and authored.get('issue_id')==issue)
         proposal=fx.task(intake['proposal_task'],route['cto']);review=fx.task(intake['review_task'],route['techlead'])
         record=gate.qualify(intake['policy'],context,proposal,review,fx.reads(proposal),fx.reads(review))

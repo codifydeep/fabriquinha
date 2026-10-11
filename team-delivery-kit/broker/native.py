@@ -116,17 +116,24 @@ def ensure_task_handoff(settings, issue_id, target, source_task, marker, instruc
     return created
 
 
-def task_binding(settings, task_id, agent_id):
-    task = task_record(settings, task_id, agent_id)
-    if task.get('status') != 'running':
-        raise ValueError('native task is not running')
+def scope_source(task,mode):
+    """Pure scope identity; no task state transition or execution authority."""
+    task_id=task['id']
     source = task.get('chat_session_id') or task.get('issue_id') or task_id
-    mode = settings['agents'][agent_id]
     # Implementation retains issue context/workspace for corrections. Reviews
     # must start fresh so an old run cannot masquerade as reading a new snapshot.
     if mode in ('review', 'planning') or (mode=='implementation' and re.search(
             r'(?:^|\n)(?:DELIVERY_DRIVER_CHECKPOINT_V3(?:\n|$)|DELIVERY_SCOPE_AUTHOR_START [a-f0-9]{64}(?:\n|$))',task.get('handoff_note') or '')):
         source = task_id
+    return source
+
+
+def task_binding(settings, task_id, agent_id):
+    task = task_record(settings, task_id, agent_id)
+    if task.get('status') != 'running':
+        raise ValueError('native task is not running')
+    mode = settings['agents'][agent_id]
+    source=scope_source(task,mode)
     source = str(uuid.UUID(source))
     return {'task_id': task_id, 'agent_id': agent_id, 'mode': mode,
             'issue_id': task.get('issue_id'),

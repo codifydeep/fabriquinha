@@ -1,0 +1,8 @@
+# Match immutable calibration bindings to the real native workspace contract.
+FROM delivery-kit-execution-broker:20261011.454
+COPY broker/native.py /native.py
+COPY broker/generic_calibration_gate.py /generic_calibration_gate.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/generic_calibration_proposal.py /generic_calibration_proposal.py
+COPY broker/generic_calibration_registration.py /generic_calibration_registration.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import native,generic_calibration_gate,generic_calibration_workflow,generic_calibration_proposal,generic_calibration_registration"

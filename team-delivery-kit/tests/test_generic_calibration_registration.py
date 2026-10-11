@@ -114,7 +114,7 @@ class RegistrationInputTests(unittest.TestCase):
                 'workspace:'+actor+':'+mode+':'+actor+'-task','issue'))
             con.execute('INSERT INTO leases VALUES(?,?)',(actor,'closed'))
         def task(tid,actor):
-            return dict(id=tid,agent_id=actor,issue_id='issue',status='completed',
+            return dict(id=tid,agent_id=actor,workspace_id='workspace',chat_session_id=tid,issue_id='issue',status='completed',
                 wakeup_id=self.context['proposal_wakeup' if actor=='cto' else 'review_wakeup'],
                 result=dict(output=json.dumps(dict(action='propose_calibration' if actor=='cto' else 'approve_calibration',
                     policy_sha256=digest(self.policy),controls_manifest_sha256=self.policy['controls_manifest_sha256'],

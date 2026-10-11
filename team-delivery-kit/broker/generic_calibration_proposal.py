@@ -107,7 +107,9 @@ def collect(b,issue,author_task,producer_task,wakeup):
             for tid,actor,mode in ((author_task,route['author'],'implementation'),(producer_task,route['cto'],'planning')):
                 rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',(tid,)).fetchall()
                 gate.require(len(rows)==1 and rows[0]['status']=='closed' and rows[0]['issue_id']==issue
-                    and rows[0]['agent_id']==actor and rows[0]['scope'].split(':')[-2:]==[mode,tid])
+                    and rows[0]['agent_id']==actor and (rows[0]['scope'].split(':')[-2:]==[mode,tid]
+                        if mode=='planning' else rows[0]['scope'].split(':')[-2]=='implementation'))
+                if mode=='implementation':author_binding=dict(rows[0])
             copy=con.execute('SELECT identity,state FROM test_first_jobs WHERE job_key=?',(author_task+':copy',)).fetchone()
             gate.require(copy is not None);identity,state=map(json.loads,copy)
             gate.require(state.get('stage')=='complete')
@@ -119,6 +121,7 @@ def collect(b,issue,author_task,producer_task,wakeup):
         gate.require(fx.settings['agents'].get(route['cto'])=='planning'
             and fx.settings['agents'].get(route['author'])=='implementation')
         authored=fx.task(author_task,route['author'])
+        gate.require_author_scope(author_binding,authored)
         gate.require(authored.get('status')=='completed' and authored.get('issue_id')==issue)
         task=fx.task(producer_task,route['cto'])
         record=from_task(task,wakeup,value,route,prepared,fx.reads(task))

@@ -1392,7 +1392,8 @@ flowchart LR
 ```
 
 Esse diagrama descreve o caminho implementado no código, não um ensaio autônomo
-já aprovado. O novo caminho ainda não está instalado nem validado com agentes reais.
+já aprovado. O caminho está instalado no controlador isolado, mas ainda não foi
+validado ponta a ponta com agentes reais; instalação não é aprovação de entrega.
 `generic_calibration_red_bridge.py` conecta a entrada no gate de Red à calibração
 persistente. Enquanto CTO ou Tech Lead atuam, o handoff observa o mesmo workflow,
 sem reiniciar o autor nem substituir os prazos de cada fase pelo timeout genérico
@@ -1400,6 +1401,15 @@ de dez minutos. Impedimentos da calibração preservam responsável e próxima a
 não são interpretados como falha dos testes do autor ou enviados à recuperação
 legada de testes. Ao chegar a `calibration_ready`, registro, entrega e resultado
 real são conferidos novamente, antes de executar o Red pelo gate separado.
+A identidade da correção do autor segue o contrato nativo: o workspace pode
+permanecer na issue ou sessão de chat, enquanto planejamento e revisão usam
+execuções isoladas. `native.scope_source` é a fonte compartilhada dessa regra;
+lease fechada, tarefa, ator, workspace e issue são conferidos separadamente.
+Para jobs fixos de cópia/Red, `maintenance_job_clock.py` desconta somente intervalos
+comprovados de manutenção selada do orçamento original, sem reiniciar o prazo.
+Durante a manutenção selada não inicia jobs; pausa do provedor, espera comum e
+draining não ampliam o orçamento. Uma intenção Docker incerta continua vinculada
+ao mesmo nome/ID e não autoriza repetir criação ou início.
 O controlador agora rejeita volumes automáticos da imagem antes dos efeitos e
 confere os mounts efetivos somente leitura antes de iniciar probe ou calibração;
 imagens históricas com `/opt/data` não são uma alternativa autorizada.
