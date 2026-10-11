@@ -1466,6 +1466,12 @@ conhecidos do schema ficam em ledger durável. Texto, valores rejeitados, paths
 arbitrários e mensagens de exceção não são publicados. Uma falha de persistência
 é erro de infraestrutura; não encaminha a resposta rejeitada ao worker. Esses
 recibos não reconstroem bytes históricos nem autorizam outra tentativa ou entrega.
+O prompt nativo da calibração valida sua cápsula contra o workflow persistente,
+o ator e o wakeup exatos. Não acrescenta o contrato técnico legado; attestation
+e revisão reconhecem também os snapshots somente leitura de controles/política.
+Declarar uma cápsula no texto não permite assumir outra fase, papel ou escopo.
+Isso corrige a preparação do contexto, não transforma uma proposta rejeitada
+em válida nem autoriza repetir automaticamente um produtor bloqueado.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua

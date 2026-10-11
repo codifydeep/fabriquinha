@@ -370,6 +370,41 @@ def tick(b):
         for c in active:advance(con,c,fx)
 
 
+def bound_prompt(c,s,task,note,expected_note):
+    """A capsule is format context, never permission to impersonate a phase."""
+    from calibration_response_contract import request
+    phases={'await_bundle':('bundle',c['cto'],'wakeup_id'),
+        'policy_attestation_wait':('attestation',c['cto'],'attestation_wakeup'),
+        'policy_review_wait':('review',c['reviewer'],'policy_wakeup')}
+    gate.require(s['stage'] in phases)
+    phase,actor,wake=phases[s['stage']]
+    gate.require(task.get('agent_id')==actor and task.get('issue_id')==c['issue_id']
+        and bool(s.get(wake)) and task.get('wakeup_id')==s[wake])
+    value=request(dict(messages=[dict(role='user',content=note)]))
+    expected=request(dict(messages=[dict(role='user',content=expected_note)]))
+    gate.require(value is not None and value==expected and value['phase']==phase)
+    return value
+
+
+def prompt_contract(b,issue,task,note):
+    from calibration_response_contract import request
+    value=request(dict(messages=[dict(role='user',content=note)]))
+    if value is None:return None
+    with b.db() as con:
+        initialize(con)
+        rows=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=?',(issue,)).fetchall()
+    phases={'await_bundle','policy_attestation_wait','policy_review_wait'}
+    matches=[(json.loads(r[0]),json.loads(r[1])) for r in rows if json.loads(r[1])['stage'] in phases]
+    gate.require(len(matches)==1);c,s=matches[0]
+    fx=Effects(b);fx.verify(c)
+    if s['stage']=='await_bundle':expected=instruction(c)
+    else:
+        try:import generic_calibration_approvals as approvals
+        except ImportError:from broker import generic_calibration_approvals as approvals
+        expected=approvals.instruction(fx.approval_source(c,s),'attestation' if s['stage']=='policy_attestation_wait' else 'review')
+    return bound_prompt(c,s,task,note,expected)
+
+
 def mounts(b,binding):
     with b.db() as con:
         initialize(con)

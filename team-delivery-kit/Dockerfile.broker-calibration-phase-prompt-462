@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261011.461
+COPY broker/server.py /broker.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/review_context_recovery.py /review_context_recovery.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import ast,pathlib,generic_calibration_workflow;ast.parse(pathlib.Path('/broker.py').read_text());assert hasattr(generic_calibration_workflow,'prompt_contract')"

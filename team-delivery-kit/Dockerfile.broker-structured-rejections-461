@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261011.460
+COPY calibration_response_contract.py /calibration_response_contract.py
+COPY structured_response_contract.py /structured_response_contract.py
+COPY structured_rejection_receipts.py /structured_rejection_receipts.py
+COPY model_proxy.py /model_proxy.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_protocol_recovery,structured_rejection_receipts"
