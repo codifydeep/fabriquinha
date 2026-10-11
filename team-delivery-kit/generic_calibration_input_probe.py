@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 import sys
 
-from generic_harness_calibration import validate_policy,require
+from generic_harness_calibration import require
+from calibration_policy_adapter import validate_policy,product_paths,fixture_paths,input_operation
 from r3_snapshot_probe import probe
 
 
@@ -30,19 +31,21 @@ def run(candidate,previous,controls,policy,expected,previous_manifest):
     current=json.loads((roots[0][0]/'manifest.json').read_text())['files']
     prior=json.loads((roots[1][0]/'manifest.json').read_text())['files']
     fixtures=json.loads((roots[2][0]/'manifest.json').read_text())['files']
-    expected_fixtures={m['positive_fixture'] for m in p['modules']}|{n['fixture'] for n in p['negatives']}
+    expected_fixtures=fixture_paths(p)
     require(set(fixtures)==expected_fixtures)
     candidate_methods={};previous_methods={};previous_tests={};products={}
     for m in p['modules']:
-        path=m['path'];require(path in prior and path in current and m['product_path'] in current)
+        path=m['path'];require(path in prior and path in current)
         require(current[path]['sha256']==p['test_sha256'][path])
         candidate_methods[path]=methods(candidate,path);previous_methods[path]=methods(previous,path)
         normalized=lambda classes:{k:sorted(v) for k,v in classes.items()}
         require(candidate_methods[path]==normalized(m['classes'])
             and previous_methods[path]==normalized(p['previous_methods'][path]))
-        previous_tests[path]=prior[path]['sha256'];products[m['product_path']]=current[m['product_path']]['sha256']
+        previous_tests[path]=prior[path]['sha256']
+    for path in product_paths(p):
+        require(path in current);products[path]=current[path]['sha256']
     for root,sha in roots:probe(root,sha)
-    return dict(operation='generic_calibration_inputs_v1',policy_sha256=expected,
+    return dict(operation=input_operation(p),policy_sha256=expected,
         candidate_manifest_sha256=p['candidate_manifest_sha256'],previous_manifest_sha256=previous_manifest,
         controls_manifest_sha256=p['controls_manifest_sha256'],candidate_test_sha256=p['test_sha256'],
         # AST equality above is order-independent; retain the exact approved

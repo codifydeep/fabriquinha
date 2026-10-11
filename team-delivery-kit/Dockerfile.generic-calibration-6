@@ -1,0 +1,6 @@
+# Candidate only: qualify and pin the output image before runtime installation.
+# Base candidate ID: sha256:1f8ba242f1ff6f6d5f7e4aa1a7e80eb117fe650272c5a5d294634f8f5f246dce
+FROM delivery-kit-generic-calibration:20261011.5
+COPY --chmod=0444 calibration_policy_adapter.py generic_calibration_input_probe.py /
+USER 10000:10000
+ENTRYPOINT ["python"]

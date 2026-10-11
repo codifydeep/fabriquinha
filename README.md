@@ -1515,6 +1515,13 @@ com dados sintéticos em Docker sem rede, credenciais ou socket e com mounts
 somente leitura; conserva esses dados em arquivo privado para observação após
 uma confirmação perdida. Esse canário não instala o adapter no controlador,
 não constitui uma decisão nativa de CTO/revisor e não libera o produto.
+O dispatcher fechado `calibration_policy_adapter.py` verifica o par exato
+versão/engine, sem fallback, e mantém operações de prova de entrada distintas
+para v1 e v2. O probe de entrada v2 registra hashes de todos os arquivos de
+produto declarados sem importar ou executar os testes. A imagem candidata
+`Dockerfile.generic-calibration-6` empacota essa leitura; sua existência não
+implica instalação. A seleção pelo controlador e os contratos nativos de
+proposta, revisão e execução ainda precisam ser qualificados antes da ativação.
 
 ## Contribuir e reutilizar
 
