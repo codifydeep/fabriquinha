@@ -1,8 +1,8 @@
 """Durable native CTO bundle dispatch; proposals never authorize delivery.
 
-The current terminal prerequisite is controls_ready, owned by the technical
-controller. It is not success: attestation, independent review, input probe and
-calibration must subsequently consume the exact same materialized bundle.
+The current terminal prerequisite is inputs_ready, owned by the technical
+controller. It is not success: input probe and calibration must subsequently
+consume the exact independently reviewed materialized bundle.
 """
 import hashlib
 import json
@@ -50,7 +50,11 @@ def advance(con,c,fx,*,now=None):
     row=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
         (c['issue_id'],c['author_task'])).fetchone()
     gate.require(row and json.loads(row[0])==c);s=json.loads(row[1])
-    if s['stage'] in ('blocked','controls_ready'):return s
+    if s['stage'] in ('blocked','inputs_ready'):return s
+    if s['stage']=='controls_ready' or s['stage'].startswith('policy_'):
+        try:import generic_calibration_approvals as approvals
+        except ImportError:from broker import generic_calibration_approvals as approvals
+        return approvals.advance(con,c,fx,now=now)
     def save(**changes):
         s.update(changes)
         con.execute('UPDATE generic_calibration_workflows SET state=? WHERE issue_id=? AND author_task=?',
@@ -221,13 +225,88 @@ class Effects:
         try:import generic_calibration_materialization as jobs
         except ImportError:from broker import generic_calibration_materialization as jobs
         with self.b.db() as con:return jobs.run(self.b,con,c['issue_id'],c['author_task'])
+    def approval_source(self,c,s):
+        try:import generic_calibration_materialization as jobs,remediation_runtime_guard as guard
+        except ImportError:from broker import generic_calibration_materialization as jobs,remediation_runtime_guard as guard
+        self.verify(c)
+        with self.b.db() as con:
+            producer=con.execute('SELECT record FROM generic_calibration_proposals WHERE issue_id=? AND author_task=?',
+                (c['issue_id'],c['author_task'])).fetchone()
+            row=con.execute('SELECT identity,state FROM generic_calibration_materializations WHERE issue_id=? AND author_task=?',
+                (c['issue_id'],c['author_task'])).fetchone()
+            route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(c['issue_id'],)).fetchone()[0])
+        gate.require(producer and row)
+        record=json.loads(producer[0]);identity,state=map(json.loads,row);p=record['policy']
+        gate.require(digest(record)==s['bundle_sha256'] and record['policy_sha256']==s['policy_sha256']
+            and record['producer']['task_id']==s['producer_task']
+            and state.get('stage')=='complete' and state['result']==s['materialization']
+            and identity==jobs.identity(self.b,record))
+        jobs.validate_receipt(state['result']['receipt'],record)
+        value=guard.qualified(self.b,c['issue_id'])
+        gate.require(value and digest(value)==c['execution_sha256']
+            and p['source_task']==c['source_task'] and p['execution_sha256']==c['execution_sha256']
+            and p['plan_sha256']==c['plan_sha256'] and p['criteria']==sorted(c['criteria'])
+            and p['candidate_manifest_sha256']==c['prepared']['manifest_sha256']
+            and p['test_sha256']==c['prepared']['test_sha256']
+            and route['cto']==c['cto'] and route['techlead']==c['reviewer']
+            and len({route['author'],c['cto'],c['reviewer']})==3)
+        for role,expected in identity['volumes'].items():
+            actual=self.b.docker('GET','/volumes/'+expected['Name']) or {}
+            gate.require(actual.get('Name')==expected['Name'] and actual.get('Labels')==expected['Labels']
+                and state['result'][role+'_volume']==expected['Name'])
+        context=dict(issue_id=c['issue_id'],author_task=c['author_task'],author=route['author'],cto=c['cto'],
+            reviewer=c['reviewer'],previous_methods=p['previous_methods'],execution_sha256=c['execution_sha256'],
+            plan_sha256=c['plan_sha256'],source_task=c['source_task'],criteria=p['criteria'],
+            control_files=sorted(record['controls']),candidate_volume=c['candidate_volume'],
+            controls_volume=state['result']['controls_volume'],policy_volume=state['result']['policy_volume'])
+        gate.validate_volumes(self.b,dict(policy_sha256=digest(p),context=context))
+        return dict(policy=p,context=context,previous=value['previous_new_test_delivery'])
+    def wake_policy(self,c,actor,note,marker,allow_create):
+        try:import native
+        except ImportError:from broker import native
+        gate.require(actor in (c['cto'],c['reviewer']))
+        return native.ensure_planning_start(self.plans.settings,c['issue_id'],actor,c['author_task'],marker,note,
+            allow_create=allow_create)
+    def policy_task(self,c,tid,actor):
+        gate.require(actor in (c['cto'],c['reviewer']) and tid!=c['author_task'])
+        with self.b.db() as con:
+            rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',
+                (tid,)).fetchall()
+        gate.require(len(rows)==1 and rows[0]['status']=='closed' and rows[0]['issue_id']==c['issue_id']
+            and rows[0]['agent_id']==actor and rows[0]['scope'].split(':')[-2:]==['planning',tid])
+        return self.plans.task(tid,actor)
+    def policy_reads(self,task):return self.plans.reads(task)
+    def persist_intake(self,c,s,intake):
+        try:import generic_calibration_registration as registration
+        except ImportError:from broker import generic_calibration_registration as registration
+        source=self.approval_source(c,s)
+        gate.require(intake['policy']==source['policy'] and intake['previous']==source['previous']
+            and intake['context']=={**source['context'],'proposal_wakeup':s['attestation_wakeup'],
+                'review_wakeup':s['policy_wakeup']}
+            and intake['proposal_task']==s['attestation_task']
+            and intake['review_task'] not in (c['author_task'],s['producer_task'],s['attestation_task'])
+            and intake['probe_job_key']==c['author_task']+':calibration-inputs:'+digest(source['policy']))
+        proposal=self.policy_task(c,intake['proposal_task'],c['cto'])
+        review=self.policy_task(c,intake['review_task'],c['reviewer'])
+        gate.qualify(intake['policy'],intake['context'],proposal,review,self.policy_reads(proposal),self.policy_reads(review))
+        with self.b.db() as con:
+            registration.initialize(con)
+            current=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
+                (c['issue_id'],c['author_task'])).fetchone()
+            gate.require(current and json.loads(current[0])==c and json.loads(current[1])==s)
+            old=con.execute('SELECT config FROM generic_calibration_intakes WHERE issue_id=? AND author_task=?',
+                (c['issue_id'],c['author_task'])).fetchone()
+            if old:gate.require(json.loads(old[0])==intake)
+            else:con.execute('INSERT INTO generic_calibration_intakes VALUES(?,?,?)',
+                (c['issue_id'],c['author_task'],json.dumps(intake,sort_keys=True)))
+        return intake
 
 
 def tick(b):
     with b.LOCK,b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows').fetchall()
-        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','controls_ready')]
+        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','inputs_ready')]
         if not active:return
         fx=Effects(b)
         for c in active:advance(con,c,fx)
@@ -237,8 +316,12 @@ def mounts(b,binding):
     with b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=?',(binding['issue_id'],)).fetchall()
-        matches=[(json.loads(r[0]),json.loads(r[1])) for r in rows if json.loads(r[1])['stage']=='await_bundle'
-            and json.loads(r[0])['cto']==binding['agent_id']]
+        def expected_actor(c,s):
+            if s['stage']=='await_bundle' or s['stage']=='policy_attestation_wait':return c['cto']
+            if s['stage']=='policy_review_wait':return c['reviewer']
+            return None
+        matches=[(json.loads(r[0]),json.loads(r[1])) for r in rows
+            if expected_actor(json.loads(r[0]),json.loads(r[1]))==binding['agent_id']]
         if not matches:return []
         gate.require(len(matches)==1);c,s=matches[0]
         current=con.execute("SELECT n.* FROM native_bindings n JOIN leases l USING(request_id) "
@@ -247,7 +330,12 @@ def mounts(b,binding):
         gate.require(len(current)==1)
         gate.require(current[0]['scope'].split(':')[-2:]==['planning',current[0]['task_id']])
     fx=Effects(b);fx.verify(c)
-    task=fx.plans.task(current[0]['task_id'],c['cto'])
-    gate.require(task.get('wakeup_id')==s['wakeup_id'] and task.get('issue_id')==c['issue_id'])
-    return [dict(Type='volume',Source=c[key],Target=target,ReadOnly=True) for key,target in (
-        ('candidate_volume','/evidence/candidate'),('previous_volume','/evidence/previous'))]
+    task=fx.plans.task(current[0]['task_id'],expected_actor(c,s))
+    wakeup=s['wakeup_id'] if s['stage']=='await_bundle' else s['policy_wakeup']
+    gate.require(task.get('wakeup_id')==wakeup and task.get('issue_id')==c['issue_id'])
+    volumes=[(c['candidate_volume'],'/evidence/candidate'),(c['previous_volume'],'/evidence/previous')]
+    if s['stage']!='await_bundle':
+        source=fx.approval_source(c,s)
+        volumes.extend((source['context'][role+'_volume'],'/evidence/'+role) for role in ('controls','policy'))
+    gate.require(len({v for v,t in volumes})==len(volumes))
+    return [dict(Type='volume',Source=volume,Target=target,ReadOnly=True) for volume,target in volumes]

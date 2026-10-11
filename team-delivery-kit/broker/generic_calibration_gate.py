@@ -28,6 +28,28 @@ def required_paths(policy,context):
         *('/evidence/controls/'+p for p in context['control_files'])})
 
 
+def attest(policy,context,task,actor,wakeup,action,reads):
+    """Validate one actual native policy decision; never grants execution."""
+    sha=digest(policy);validate_policy(policy,sha)
+    require(action in ('propose_calibration','approve_calibration'))
+    require(task.get('status')=='completed' and task.get('agent_id')==actor
+        and task.get('issue_id')==context['issue_id'] and task.get('wakeup_id')==wakeup
+        and task.get('id')!=context['author_task'])
+    raw=(task.get('result') or {}).get('output')
+    require(isinstance(raw,str) and 1<=len(raw)<=4096)
+    body=json.loads(raw)
+    require(isinstance(body,dict) and body.get('execution_authorized') is False
+        and body.get('delivery_approval') is False and body==dict(action=action,policy_sha256=sha,
+        controls_manifest_sha256=policy['controls_manifest_sha256'],
+        execution_authorized=False,delivery_approval=False))
+    for path in required_paths(policy,context):
+        observed=reads.get(path,{})
+        require(type(observed.get('lines')) is int and observed['lines']>0
+            and observed['lines']==observed.get('total_lines'))
+    return dict(task_id=task['id'],actor=actor,wakeup_id=wakeup,
+        artifact_sha256=digest(body),read_evidence={p:reads[p] for p in required_paths(policy,context)})
+
+
 def qualify(policy,context,proposal,review,proposal_reads,review_reads):
     sha=digest(policy);validate_policy(policy,sha)
     require(isinstance(context,dict) and set(context)=={'issue_id','author_task','author','cto','reviewer',
@@ -42,21 +64,7 @@ def qualify(policy,context,proposal,review,proposal_reads,review_reads):
     for task,actor,wakeup,action,reads in (
             (proposal,context['cto'],context['proposal_wakeup'],'propose_calibration',proposal_reads),
             (review,context['reviewer'],context['review_wakeup'],'approve_calibration',review_reads)):
-        require(task.get('status')=='completed' and task.get('agent_id')==actor
-            and task.get('issue_id')==context['issue_id'] and task.get('wakeup_id')==wakeup)
-        raw=(task.get('result') or {}).get('output')
-        require(isinstance(raw,str) and 1<=len(raw)<=4096)
-        body=json.loads(raw)
-        require(isinstance(body,dict) and body.get('execution_authorized') is False
-            and body.get('delivery_approval') is False and body==dict(action=action,policy_sha256=sha,
-            controls_manifest_sha256=policy['controls_manifest_sha256'],
-            execution_authorized=False,delivery_approval=False))
-        for path in required_paths(policy,context):
-            observed=reads.get(path,{})
-            require(type(observed.get('lines')) is int and observed['lines']>0
-                and observed['lines']==observed.get('total_lines'))
-        artifacts[action]=dict(task_id=task['id'],actor=actor,wakeup_id=wakeup,
-            artifact_sha256=digest(body),read_evidence={p:reads[p] for p in required_paths(policy,context)})
+        artifacts[action]=attest(policy,context,task,actor,wakeup,action,reads)
     return dict(operation='generic_calibration_registration_v1',policy=policy,policy_sha256=sha,
         context=context,approvals=artifacts,execution_authorized=False,delivery_approval=False)
 

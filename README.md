@@ -1367,8 +1367,29 @@ aprovações nativas ou execução dos testes do produto. Recibos divergentes
 produzem um bloqueio persistente com responsável CTO, sem derrubar o supervisor
 ou repetir a execução. Isso não qualifica o executor de testes nem a entrega
 ponta a ponta.
-Esse caminho ainda não está instalado: entrada no gate de Red e despacho das
-aprovações independentes precisam ser integrados antes da retomada do ensaio.
+No código-fonte, `generic_calibration_approvals.py` despacha uma nova execução
+de atestação do CTO e outra de revisão do Tech Lead. Ambas leem candidato,
+histórico, controles e política em quatro volumes somente leitura. Cada decisão
+exige o wakeup exato, lease de planejamento encerrado, leitura completa e hashes
+da política; a execução que escreveu a proposta não pode se autoatestar.
+Intenções de despacho são persistidas antes dos efeitos, respostas incertas
+observam o mesmo marcador e a gravação do intake é imutável e retomável.
+
+```mermaid
+flowchart LR
+  B[Proposta nativa CTO] --> M[Materialização isolada]
+  M --> C[Nova atestação CTO]
+  C --> T[Revisão independente Tech Lead]
+  T --> I[Intake persistente: inputs_ready]
+  I -. integração pendente .-> P[Probe de inputs e calibração]
+  P -. integração pendente .-> R[Retomada do TDD]
+```
+
+Esse diagrama descreve o caminho implementado no código, não um ensaio autônomo
+já aprovado. O novo caminho ainda não está instalado: despacho do probe de inputs,
+isolamento do executor e entrada no gate de Red precisam ser integrados e
+validados com agentes reais antes da retomada do ensaio. `inputs_ready` não é
+conclusão de card, aprovação de entrega ou homologação.
 O controlador não pode executar o código de testes diretamente:
 deve usar um contêiner sem rede, credenciais ou socket, com snapshots somente
 leitura e limites de recursos. A revisão semântica de assertions continua
