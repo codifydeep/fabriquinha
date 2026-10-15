@@ -45,7 +45,7 @@ def save(root,name,value):
 def reader_code(operation='page'):
     if operation not in ('page','complete'):raise ValueError('fixed reader operation required')
     module=Path(__file__).resolve().parents[1];code='import sys,json,types\n'
-    for name in ('artifact_read_evidence','calibration_response_contract','calibration_diagnostic_read'):
+    for name in ('artifact_read_evidence','calibration_rejection_diagnostics','calibration_response_contract','calibration_diagnostic_read'):
         text=(module/(name+'.py')).read_text()
         code+='m=types.ModuleType('+repr(name)+');sys.modules['+repr(name)+']=m;exec('+repr(text)+',m.__dict__)\n'
     return code+('v=json.load(sys.stdin);print(json.dumps(m.page(v["args"],v["manifest"])))'

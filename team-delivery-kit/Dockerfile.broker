@@ -24,13 +24,16 @@ COPY broker/generic_calibration_gate.py /generic_calibration_gate.py
 COPY broker/generic_calibration_registration.py /generic_calibration_registration.py
 COPY broker/generic_calibration_proposal.py /generic_calibration_proposal.py
 COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/generic_calibration_capability_recovery.py broker/generic_calibration_local_recovery.py broker/generic_calibration_seam_job.py /
 COPY broker/generic_calibration_protocol_recovery.py /generic_calibration_protocol_recovery.py
 COPY calibration_response_contract.py /calibration_response_contract.py
+COPY calibration_rejection_diagnostics.py /calibration_rejection_diagnostics.py
 COPY broker/generic_calibration_approvals.py /generic_calibration_approvals.py
 COPY broker/generic_calibration_pipeline.py /generic_calibration_pipeline.py
 COPY broker/generic_calibration_materialization.py /generic_calibration_materialization.py
 COPY generic_calibration_bundle_writer.py /generic_calibration_bundle_writer.py
 COPY generic_harness_calibration.py /generic_harness_calibration.py
+COPY calibration_policy_adapter.py generic_harness_calibration_v2.py generic_calibration_input_probe.py /
 COPY service_mode_harness_qualification.py /service_mode_harness_qualification.py
 COPY inherited_harness_probe.py /inherited_harness_probe.py
 COPY r3_snapshot_probe.py /r3_snapshot_probe.py

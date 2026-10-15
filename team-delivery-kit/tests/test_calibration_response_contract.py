@@ -17,6 +17,44 @@ def receipt(path=PATH):
 
 
 class CalibrationContractTests(unittest.TestCase):
+    def terminal_stream(self,trailer):
+        artifact=dict(action='calibration_objection',reason='Unsupported seam',execution_authorized=False,delivery_approval=False)
+        frames=[dict(choices=[dict(index=0,delta=dict(content=json.dumps(artifact)),finish_reason='stop')])]
+        if trailer is not None:frames.append(dict(choices=[dict(index=0,delta=trailer,finish_reason='stop')]))
+        return ''.join('data: '+json.dumps(f)+'\n\n' for f in frames)+'data: [DONE]\n\n'
+
+    def test_one_empty_assistant_terminal_trailer_is_transport_only(self):
+        body=apply(self.body(complete=True))
+        for trailer in ({},{'role':'assistant'},{'content':''},{'role':'assistant','content':None}):
+            validate(body,self.terminal_stream(trailer).encode(),'text/event-stream')
+
+    def test_transport_failure_has_fixed_code_and_no_rejected_values(self):
+        body=apply(self.body(complete=True))
+        for trailer in ({'content':'NEVER_PERSIST_THIS'}, {'role':'tool'}, {'tool_calls':[]}):
+            with self.assertRaises(StructuredResponseRejected) as caught:
+                validate(body,self.terminal_stream(trailer).encode(),'text/event-stream')
+            diagnostic=caught.exception.diagnostic
+            self.assertEqual(diagnostic['version'],'calibration-constraint-v2')
+            self.assertEqual(diagnostic['failure_code'],'stream_after_finish')
+            self.assertNotIn('NEVER_PERSIST_THIS',json.dumps(diagnostic))
+
+    def test_duplicate_or_changed_terminal_is_rejected_even_when_empty(self):
+        body=apply(self.body(complete=True));raw=self.terminal_stream({})
+        final='data: '+json.dumps(dict(choices=[dict(index=0,delta={},finish_reason='stop')]))+'\n\n'
+        for candidate in (raw.replace('data: [DONE]',final+'data: [DONE]'),
+                raw.replace('"delta": {}, "finish_reason": "stop"','"delta": {}, "finish_reason": "length"')):
+            with self.assertRaises(StructuredResponseRejected) as caught:
+                validate(body,candidate.encode(),'text/event-stream')
+            self.assertEqual(caught.exception.diagnostic['failure_code'],'stream_after_finish')
+
+    def test_unclassified_exception_never_exposes_its_message(self):
+        from unittest.mock import patch
+        with patch.object(contract,'_validate_reply',side_effect=TypeError('private upstream detail')):
+            with self.assertRaises(contract.CalibrationResponseRejected) as caught:
+                contract.validate_reply({},b'private response','application/json')
+        self.assertEqual(caught.exception.diagnostic['failure_code'],'unclassified_transport')
+        self.assertNotIn('private',json.dumps(caught.exception.diagnostic))
+
     def test_proxy_pipeline_ignores_historical_author_and_typed_markers_for_current_phase(self):
         import model_proxy
         for phase,complete in (('bundle',False),('bundle',True),('review',True)):

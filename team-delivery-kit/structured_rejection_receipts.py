@@ -3,6 +3,7 @@ import json
 import re
 import uuid
 from deterministic_read_dispatch import ledger
+from calibration_rejection_diagnostics import CODE_CATEGORIES
 
 
 def from_event(event):
@@ -19,7 +20,8 @@ def from_event(event):
     if diagnostic is not None:
         version=diagnostic.get('version')
         expected=({'version','constraints','upstream_sha256'} if version=='structured-constraint-v1' else
-            {'version','category','constraints','fields','missing_fields','upstream_sha256'} if version=='calibration-constraint-v1' else set())
+            {'version','category','constraints','fields','missing_fields','upstream_sha256'} if version=='calibration-constraint-v1' else
+            {'version','category','constraints','fields','missing_fields','upstream_sha256','failure_code'} if version=='calibration-constraint-v2' else set())
         keywords={'type','enum','required','additionalProperties','minLength','maxLength','minItems',
             'maxItems','minProperties','maxProperties','pattern','minimum','maximum','anyOf',
             'oneOf','allOf','not','uniqueItems','other'}
@@ -33,8 +35,11 @@ def from_event(event):
             items=diagnostic[key]
             if not isinstance(items,list) or any(not isinstance(v,str) for v in items) or items!=sorted(set(items)) or not set(items)<=vocabulary:
                 raise ValueError('untrusted rejection values forbidden')
-        if version=='calibration-constraint-v1' and diagnostic['category'] not in ('schema_violation','invalid_json','invalid_transport_or_tool'):
+        if version in ('calibration-constraint-v1','calibration-constraint-v2') and diagnostic['category'] not in ('schema_violation','invalid_json','invalid_transport_or_tool'):
             raise ValueError('fixed calibration rejection category required')
+        if version=='calibration-constraint-v2' and (not isinstance(diagnostic['failure_code'],str)
+                or CODE_CATEGORIES.get(diagnostic['failure_code'])!=diagnostic['category']):
+            raise ValueError('fixed category-matched calibration failure code required')
     return dict(operation='structured_validator_rejection_v1',execution_id=execution,call_number=call,
         category=category,diagnostic=diagnostic,response_forwarded=False,worker_tool_executed=False,
         execution_authorized=False,delivery_approval=False)

@@ -1594,6 +1594,15 @@ O bridge do Red reconcilia um pré-requisito durável antes do reparo legado de
 testes. Uma projeção desatualizada é restaurada com referência ao estado anterior,
 sem novas mensagens/eventos idênticos a cada tick, sem alterar testes e sem
 converter falha de calibração em uma tentativa de correção pelo autor.
+Os diagnósticos novos usam `calibration-constraint-v2`, com `failure_code` de
+vocabulário fechado e hash da resposta. Não persistem texto, valores rejeitados
+ou mensagens de exceção; recibos v1 não são reclassificados. O parser admite
+somente um trailer terminal vazio com papel `assistant` opcional e o mesmo
+término. Texto novo, ferramentas, papel diferente, término divergente ou um
+segundo trailer continuam bloqueados. Essa compatibilidade de transporte não
+altera o artefato, não aprova entregas e não prova a causa de uma falha antiga
+cuja resposta completa não foi preservada. Instalar o diagnóstico tampouco
+rearma qualquer limite de tentativa.
 
 ## Contribuir e reutilizar
 

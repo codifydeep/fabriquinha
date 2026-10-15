@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261015.468
+COPY calibration_rejection_diagnostics.py calibration_response_contract.py structured_rejection_receipts.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_response_contract,structured_rejection_receipts,calibration_rejection_diagnostics"

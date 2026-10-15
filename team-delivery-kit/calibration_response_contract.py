@@ -8,6 +8,7 @@ Native identities/read receipts and sandbox evidence remain separate gates.
 import hashlib
 import json
 import re
+from calibration_rejection_diagnostics import failure_code
 from artifact_read_evidence import observations,next_read
 
 MARKER='DELIVERY_CALIBRATION_RESPONSE_V1'
@@ -170,7 +171,7 @@ def validate_reply(body,data,media_type):
             category='schema_violation'
         elif isinstance(error,json.JSONDecodeError):category='invalid_json'
         else:category='invalid_transport_or_tool'
-        diagnostic=dict(version='calibration-constraint-v1',category=category,
+        diagnostic=dict(version='calibration-constraint-v2',category=category,failure_code=failure_code(error,category),
             constraints=sorted(constraints),fields=sorted(locations),missing_fields=sorted(missing),
             upstream_sha256=hashlib.sha256(data).hexdigest())
         raise CalibrationResponseRejected(diagnostic) from None
@@ -200,7 +201,10 @@ def _validate_reply(body,data,media_type):
             entry=choices[0];delta=entry.get('delta',{})
             if delta.get('function_call'):raise ValueError('legacy calibration function call forbidden')
             if finish is not None:
-                if trailer or delta or entry.get('finish_reason')!=finish:raise ValueError('calibration data after finish')
+                if (trailer or entry.get('finish_reason')!=finish or set(delta)-{'content','role'}
+                        or delta.get('content') not in (None,'')
+                        or ('role' in delta and delta['role']!='assistant')):
+                    raise ValueError('calibration data after finish')
                 trailer=True
                 continue
             if delta.get('content'):content.append(delta['content'])

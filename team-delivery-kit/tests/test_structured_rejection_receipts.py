@@ -11,6 +11,18 @@ EXECUTION='9135f8fd-924a-4d15-87c0-addf0418f484'
 
 
 class StructuredRejectionTests(unittest.TestCase):
+    def test_versioned_transport_code_is_durable_but_arbitrary_reason_is_forbidden(self):
+        event=self.event();event['structured_rejection_diagnostic'].update(
+            version='calibration-constraint-v2',category='invalid_transport_or_tool',failure_code='stream_after_finish')
+        with tempfile.TemporaryDirectory() as root:
+            counter=str(Path(root).resolve()/'calls.json');Path(counter).write_text('{"calls":0}')
+            receipts.record(counter,event);receipts.record(counter,event)
+            self.assertEqual(receipts.read(counter,EXECUTION)[0]['diagnostic'],event['structured_rejection_diagnostic'])
+            event['structured_rejection_diagnostic']['failure_code']='secret upstream detail'
+            with self.assertRaises(ValueError):receipts.record(counter,event)
+            event['structured_rejection_diagnostic']['failure_code']='schema_violation'
+            with self.assertRaises(ValueError):receipts.from_event(event)
+
     def test_other_receipt_families_and_unbound_legacy_errors_are_not_reclassified(self):
         event=self.event()
         self.assertIsNone(receipts.from_event({**event,'structured_rejection_category':'typed_format_feedback_consumed','call_number':None}))
