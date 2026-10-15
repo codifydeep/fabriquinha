@@ -3,6 +3,7 @@ import hashlib
 import json
 import time
 import urllib.error
+import os
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 from generic_harness_calibration import digest,require
@@ -53,6 +54,8 @@ def advance(con,issue,author,fx,*,now=None):
     now=time.time() if now is None else now
     cfg,s=map(json.loads,con.execute('SELECT config,state FROM calibration_objections WHERE issue_id=? AND author_task=?',(issue,author)).fetchone())
     c=cfg['source']
+    if s['stage']=='blocked' and s.get('category')=='experiment_plan_rejected' and getattr(fx,'controls_enabled',lambda:False)():
+        fx.controls_step(con,cfg,s);return s
     if s['stage']=='blocked' and s.get('category') in ('objection_hold_retained','experiment_evidence_rejected','experiment_native_failed'):
         try:import calibration_experiment_runtime as experiment
         except ImportError:from broker import calibration_experiment_runtime as experiment
@@ -111,7 +114,8 @@ def advance(con,issue,author,fx,*,now=None):
     require(s['stage']=='resume_pending')
     try:
         fx.verify_decision(cfg,s)
-        if s.get('experiment'):
+        if s.get('diagnostic_referral'):fx.verify_control_referral(cfg,s)
+        elif s.get('experiment'):
             fx.verify_experiment(cfg,s)
         row=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',(issue,author)).fetchone()
         require(list(map(json.loads,row))==[c,cfg['prior_state']])
@@ -122,6 +126,8 @@ def advance(con,issue,author,fx,*,now=None):
             objection=cfg['objection'],probe=s['probe'],decision=s['decision'],submission_limit=1,
             author_restarted=False,tests_executed=False,execution_authorized=False,delivery_approval=False)
         if s.get('experiment'):receipt['experiment']=s['experiment']
+        if s.get('diagnostic_referral'):
+            receipt.update(diagnostic_referral=s['diagnostic_referral'],tests_executed=True,source_author_red_executed=False)
         updated={k:v for k,v in cfg['prior_state'].items() if k.endswith('_recovery_sha256') or k in ('incident_resume_id','incident_resume_sha256')}
         updated.update(stage='bundle_dispatch',owner=c['cto'],objection_resume_sha256=digest(receipt),
             execution_authorized=False,delivery_approval=False,required_action='CTO produce one new data proposal using measured SPIKE; all gates unchanged')
@@ -142,11 +148,20 @@ def qualified(con,c,s):
     require(row is not None);cfg,state=map(json.loads,row);r=state['referral']
     require(state['stage']=='referred' and state['submission_consumed'] is True and cfg['source']==c
         and r['source_sha256']==digest(c) and r['submission_limit']==1 and digest(r)==s['objection_resume_sha256']
-        and all(r[k] is False for k in ('author_restarted','tests_executed','execution_authorized','delivery_approval')))
+        and all(r[k] is False for k in ('author_restarted','execution_authorized','delivery_approval')))
+    if r.get('diagnostic_referral'):
+        try:import calibration_controls_diagnostic as diagnostic
+        except ImportError:from broker import calibration_controls_diagnostic as diagnostic
+        require(r['tests_executed'] is True and r['source_author_red_executed'] is False)
+        diagnostic.cached_referral(con,c,r['diagnostic_referral'])
+    else:require(r['tests_executed'] is False)
     return r
 
 
 def addendum(r):
+    if r.get('diagnostic_referral'):
+        return ('\nIndependent measured full-harness diagnostic referral: positive references passed; each negative failed its test body. '
+            'Not product approval or author Red. Propose new verified data; preserve all gates. Evidence '+digest(r['diagnostic_referral'])+'.')
     if r.get('experiment'):
         e=r['experiment'];require(e['stage']=='permitted')
         return ('\nIndependent experiment PLAN permit, not results/approval. Full harness + positive/negative controls remain required. '
@@ -173,6 +188,15 @@ class Effects:
         try:import generic_calibration_workflow as workflow,native
         except ImportError:from broker import generic_calibration_workflow as workflow,native
         self.b=b;self.workflow=workflow;self.native=native;self.source=workflow.Effects(b);self.plans=self.source.plans
+    def controls_enabled(self):return bool(os.environ.get('BROKER_GENERIC_CALIBRATION_CONTROLS_IMAGE'))
+    def controls_step(self,con,cfg,s):
+        try:import calibration_controls_diagnostic as diagnostic
+        except ImportError:from broker import calibration_controls_diagnostic as diagnostic
+        return diagnostic.handle(self.b,con,cfg,s)
+    def verify_control_referral(self,cfg,s):
+        try:import calibration_controls_diagnostic as diagnostic
+        except ImportError:from broker import calibration_controls_diagnostic as diagnostic
+        diagnostic.verify_referral(self.b,cfg['source'],s['diagnostic_referral'])
     def verify(self,cfg):
         c=cfg['source'];self.source.verify(c);require(self.workflow.request(self.b,c['issue_id'],c['author_task'])==cfg['prior_state'])
         task=self.plans.task(cfg['objection']['producer_task'],c['cto'])

@@ -1690,6 +1690,12 @@ flowchart LR
     B --> D[Tech Lead: revisão independente do plano, não dos resultados]
     D -->|Permitir preparar controles| C
     D -->|Recusar ou falta de capacidade| H[Bloqueio técnico visível; sem replay automático]
+    H -->|Capacidade diagnóstica isolada| F[CTO produz referências; dados não confiáveis]
+    F --> X[Executor fixo: harness completo, positivos e negativos]
+    X -->|Falha preservada| H
+    X -->|Controles passam; falha no corpo do teste| R[Tech Lead revisa evidência medida]
+    R -->|Encaminhar uma vez| C
+    R -->|Recusar| H
     P -->|Experimento não aplicável ou falhou| B
 ```
 
@@ -1725,6 +1731,19 @@ reexecutada. A ferramenta é de qualificação operacional: não é despacho
 autônomo, não produz controles positivos/negativos e nunca aprova Red,
 calibração, regressão completa ou entrega. Cinco falhas de setup, por exemplo,
 não são evidência de que cinco assertions de comportamento foram exercitadas.
+
+O caminho `calibration_controls_diagnostic.py` permite à equipe construir esses
+controles em uma tarefa nativa filha, separada da entrega bloqueada. O CTO pode
+apenas ler os snapshots e devolver dados; somente um executor fixo roda o harness
+em contêiner sem rede, credenciais ou socket, com o candidato somente leitura e
+fixtures temporárias próprias. Falhas de setup, teardown ou cleanup não contam
+como detecção funcional dos controles negativos. Dados e medições ficam
+preservados fora dos worktrees. Uma revisão independente da evidência medida
+pode encaminhar uma única nova proposta na fonte original, nunca reiniciar o
+autor ou converter fixtures diagnósticas diretamente em entrega. Os gates
+normais de revisão de política, calibração, TDD, regressão e homologação continuam
+obrigatórios. A instalação desse caminho ainda exige qualificação nativa real;
+testes sintéticos não demonstram recuperação ou autonomia ponta a ponta.
 
 Nos workers governados, os nudges periódicos que criam forks de auto-revisão de
 memória/skills e os títulos pagos de sessão ficam desativados. Memórias existentes

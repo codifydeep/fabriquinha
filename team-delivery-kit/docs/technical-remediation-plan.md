@@ -943,6 +943,38 @@ positive/negative reference controls. The next recovery capability must let the
 team construct and measure those isolated controls before another delivery
 submission can be considered.
 
+### Native isolated reference-control construction
+
+`calibration_controls_diagnostic.py` owns a separate durable child issue and
+ledger for one CTO diagnostic-data producer, one fixed full-harness experiment
+and an independent native Lead evidence referral. The original source workflow,
+author task and spent budgets remain unchanged. Producer context and mounts
+require the exact registered child issue, current phase, actor, wakeup and live
+planning binding. Only candidate/previous snapshot reads are available. Native
+completion, closed lease, full test/product reads and exact source/acceptance
+bindings are revalidated before accepting any fixture bytes. A mere capsule
+does not authorize a task or mount.
+
+The fixed sandbox receives only validated/compressed fixture data, original
+candidate RO and private tmpfs; no arbitrary agent command, network, credential,
+socket or policy-registration API. Its diagnostic result preserves failed
+positive/negative measurements. Every negative must fail an assertion in its
+declared test body; setup, teardown, cleanup and setup subtests do not satisfy
+that predicate. The default v2 calibration CLI still validates passed receipts;
+diagnostic observations use `status=observed` and cannot serve as those receipts.
+
+Only measured passing controls can reach an independent Lead referral. Before
+the single new source-data dispatch, the controller rechecks original decisions,
+producer identity/bytes/reads, exact cached Docker result and independent review.
+The source receipt explicitly distinguishes reference tests executed from author
+Red not executed. Diagnostic fixtures are never adopted as product or registered
+policy. Later source-policy review/calibration, Red/Green, regression, PR/CI,
+deployment and QA remain mandatory. Unknown Docker/wakeup effects observe their
+original handles. Failing controls, explicit objections, changed identities,
+deadlines and refusals retain a visible CTO-owned hold without identical replay.
+The Linux/Node canary qualifies only the synthetic executor and isolation; this
+new native recovery route is not end-to-end delivery qualification.
+
 The controller distinguishes an explicit `calibration_objection` from malformed
 bundle data. It re-fetches the native task, closed planning lease, exact source
 capsule and full candidate/previous test reads; reason, output hash and actor are

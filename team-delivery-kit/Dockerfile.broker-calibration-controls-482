@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261015.481
+COPY broker/calibration_controls_diagnostic.py broker/calibration_objection_runtime.py broker/generic_calibration_workflow.py broker/generic_calibration_seam_job.py /
+COPY generic_harness_calibration_v2.py calibration_control_experiment_probe.py calibration_frozen_harness_probe.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_controls_diagnostic,calibration_objection_runtime,generic_calibration_workflow"

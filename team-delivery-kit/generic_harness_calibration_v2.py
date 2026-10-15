@@ -86,8 +86,10 @@ def validate_receipt(r,p,expected):
     return r
 
 
-def run(candidate,controls,policy,expected):
+def observe(candidate,controls,policy,expected,*,_observe_suite=None):
+    """Fixed diagnostic execution. Counts are not a passed calibration receipt."""
     p=validate_policy(policy,expected);candidate=Path(candidate);controls=Path(controls)
+    execute=observed if _observe_suite is None else _observe_suite
     probe(candidate,p['candidate_manifest_sha256']);probe(controls,p['controls_manifest_sha256'])
     files=json.loads((candidate/'manifest.json').read_text())['files']
     fixtures=json.loads((controls/'manifest.json').read_text())['files']
@@ -114,25 +116,30 @@ def run(candidate,controls,policy,expected):
                 value=getattr(module,f['attribute'],None)
                 require(isinstance(value,Path) and value.resolve()==(candidate/f['product_path']).resolve())
             positive_paths(module,m);loaded[m['path']]=(module,classes,m)
-        positive=observed(unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromTestCase(cls)
+        positive=execute(unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromTestCase(cls)
             for module,classes,m in loaded.values() for cls in classes.values()))
         negatives={}
         for n in p['negatives']:
             module,classes,m=loaded[n['module']];positive_paths(module,m)
             for replacement in n['replacements']:
                 setattr(module,replacement['attribute'],controls/replacement['fixture'])
-            try:negatives[n['id']]=observed(unittest.TestSuite([classes[n['class_name']](n['method'])]))
+            try:negatives[n['id']]=execute(unittest.TestSuite([classes[n['class_name']](n['method'])]))
             finally:positive_paths(module,m)
-        receipt=dict(operation='generic_harness_calibration_v2',status='passed',policy_sha256=expected,
+        receipt=dict(operation='generic_harness_calibration_v2',status='observed',policy_sha256=expected,
             candidate_manifest_sha256=p['candidate_manifest_sha256'],controls_manifest_sha256=p['controls_manifest_sha256'],
             test_sha256=p['test_sha256'],positive=positive,negative_controls=negatives,
             product_green=False,red_approved=False,delivery_approval=False)
-        return validate_receipt(receipt,p,expected)
+        return receipt
     finally:
         sys.dont_write_bytecode=bytecode
         for name,module in saved.items():
             if sys.modules.get(name) is module:del sys.modules[name]
         probe(candidate,p['candidate_manifest_sha256']);probe(controls,p['controls_manifest_sha256'])
+
+
+def run(candidate,controls,policy,expected):
+    receipt=observe(candidate,controls,policy,expected)
+    return validate_receipt({**receipt,'status':'passed'},policy,expected)
 
 
 if __name__=='__main__':

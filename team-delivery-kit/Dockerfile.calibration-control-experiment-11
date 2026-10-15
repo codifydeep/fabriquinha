@@ -1,0 +1,6 @@
+FROM delivery-kit-calibration-node-path:20261015.10
+USER root
+COPY --chmod=0444 generic_harness_calibration_v2.py generic_calibration_bundle_writer.py calibration_policy_adapter.py calibration_frozen_harness_probe.py calibration_control_experiment_probe.py /
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import calibration_control_experiment_probe"
+USER 10000:10000
+ENTRYPOINT ["python"]

@@ -95,3 +95,18 @@ class MultiPathCalibrationTests(unittest.TestCase):
                 lambda x:x['positive'].update(tests=True),lambda x:x.update(policy_sha256='c'*64)):
             bad=copy.deepcopy(r);mutate(bad)
             with self.assertRaises(ValueError):validate_receipt(bad,self.policy,digest(self.policy))
+
+    def test_diagnostic_observation_retains_failing_controls_without_qualifying_them(self):
+        import generic_harness_calibration_v2 as engine
+        files={**self.control_files,'js-positive.js':'script-broken'}
+        controls,_=self.snapshot(self.controls,files);p=copy.deepcopy(self.policy);p['controls_manifest_sha256']=controls
+        result=engine.observe(self.candidate,self.controls,p,digest(p))
+        self.assertEqual(result['status'],'observed');self.assertGreater(result['positive']['failures'],0)
+        with self.assertRaises(ValueError):validate_receipt(result,p,digest(p))
+        with self.assertRaises(ValueError):run(self.candidate,self.controls,p,digest(p))
+
+    def test_even_successful_diagnostic_counts_cannot_be_a_calibration_receipt(self):
+        import generic_harness_calibration_v2 as engine
+        result=engine.observe(self.candidate,self.controls,self.policy,digest(self.policy))
+        self.assertEqual(result['positive']['failures'],0);self.assertEqual(result['status'],'observed')
+        with self.assertRaises(ValueError):validate_receipt(result,self.policy,digest(self.policy))

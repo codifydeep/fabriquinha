@@ -72,3 +72,23 @@ class ObjectionRuntimeTests(unittest.TestCase):
         self.con.execute("UPDATE delivery_handoffs SET data='{}'");self.con.commit()
         self.assertEqual(self.advance(2)['stage'],'resume_pending')
         self.assertEqual(self.advance(602)['category'],'objection_projection_deadline')
+
+    def test_measured_reference_referral_does_not_claim_that_no_tests_ran_or_author_red_passed(self):
+        from broker import calibration_controls_diagnostic as diagnostic
+        self.advance();self.advance();self.advance();self.completed();state=self.advance()
+        cfg=dict(source=self.c);result=dict(receipt=dict(functional_controls_passed=True))
+        d=dict(stage='referred',bundle={'reference':'bytes'},result=result)
+        d['decision']=dict(task_id='independent-measured-review',agent_id='lead',value={**diagnostic.review_context(cfg,d),
+            'action':'refer_to_cto','reason':'Measured reference controls, not author Red',
+            'author_retry_authorized':False,'execution_authorized':False,'delivery_approval':False})
+        diagnostic.register(self.con,cfg)
+        self.con.execute('UPDATE calibration_control_experiments SET state=?',(json.dumps(d),));self.con.commit()
+        state['diagnostic_referral']=diagnostic.referral(cfg,d)
+        self.con.execute('UPDATE calibration_objections SET state=?',(json.dumps(state),));self.con.commit()
+        self.fx.verify_control_referral=lambda *_:self.effects.append(('verify_control_referral',))
+        result=self.advance();receipt=result['referral']
+        self.assertTrue(receipt['tests_executed']);self.assertFalse(receipt['source_author_red_executed'])
+        self.assertIn(('verify_control_referral',),self.effects)
+        source=json.loads(self.con.execute('SELECT state FROM generic_calibration_workflows').fetchone()[0])
+        runtime.qualified(self.con,self.c,source)
+        self.assertIn('Not product approval or author Red',runtime.addendum(receipt))

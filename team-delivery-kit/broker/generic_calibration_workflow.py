@@ -500,6 +500,10 @@ def prompt_contract(b,issue,task,note):
     from calibration_response_contract import request
     value=request(dict(messages=[dict(role='user',content=note)]))
     if value is None:return None
+    try:import calibration_controls_diagnostic as diagnostic
+    except ImportError:from broker import calibration_controls_diagnostic as diagnostic
+    current=diagnostic.prompt_contract(b,issue,task,note)
+    if current is not None:return current
     with b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=?',(issue,)).fetchall()
@@ -516,6 +520,10 @@ def prompt_contract(b,issue,task,note):
 
 
 def mounts(b,binding):
+    try:import calibration_controls_diagnostic as diagnostic
+    except ImportError:from broker import calibration_controls_diagnostic as diagnostic
+    current=diagnostic.mounts(b,binding)
+    if current:return current
     with b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=?',(binding['issue_id'],)).fetchall()

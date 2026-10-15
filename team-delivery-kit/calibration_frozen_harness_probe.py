@@ -33,13 +33,21 @@ class Results(unittest.TestResult):
             value.update(exception_type=error[0].__name__,details_sha256=hashlib.sha256(
                 ''.join(traceback.format_exception(*error)).encode()).hexdigest())
             phase='test_body';frames=[];tb=error[2]
+            phases={'_callSetUp':'set_up','_callTearDown':'tear_down','_callCleanup':'clean_up'}
             while tb is not None:
                 frame=tb.tb_frame;function=frame.f_code.co_name
                 if frame.f_globals.get('__name__')=='unittest.case':
-                    phase={'_callSetUp':'set_up','_callTearDown':'tear_down'}.get(function,phase)
+                    phase=phases.get(function,phase)
                 if frame.f_code.co_filename==self.source_file:
                     frames.append(dict(function=function,line=tb.tb_lineno))
                 tb=tb.tb_next
+            # subTest catches inside setup/cleanup, before those outer frames
+            # unwind into the traceback. Inspect only trusted phase names; no
+            # stack locals/content are recorded or exposed.
+            current=sys._getframe()
+            while current is not None:
+                if current.f_globals.get('__name__')=='unittest.case':phase=phases.get(current.f_code.co_name,phase)
+                current=current.f_back
             value.update(phase=phase,source_frames=frames[-8:])
         prior=self._observations.get(test.id())
         if prior is None or prior['outcome']=='passed':self._observations[test.id()]=value

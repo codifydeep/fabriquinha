@@ -61,3 +61,20 @@ class SeamJobTests(unittest.TestCase):
         result=job.run(self.b,self.con,self.c,now=1)
         self.assertFalse(result['approval'])
         self.assertEqual(sum(m=='POST' for m,p in self.calls),2)
+
+    def test_reference_control_job_is_fixed_isolated_and_not_a_calibration_registration(self):
+        import test_calibration_control_experiment_probe as examples
+        from generic_harness_calibration import digest
+        import calibration_control_experiment_probe as probe
+        fixture=examples.ControlExperimentProbeTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
+        self.c.update(prepared=fixture.c['prepared'],test_files=fixture.c['test_files'])
+        self.b.GENERIC_CALIBRATION_CONTROLS_IMAGE=self.b.GENERIC_CALIBRATION_SEAM_IMAGE
+        self.proof=probe.run(fixture.f.candidate,fixture.bundle,digest(fixture.bundle))
+        result=job.run(self.b,self.con,self.c,kind='controls',bundle=fixture.bundle,now=1)
+        payload=job.payload(self.b,self.c,'controls',fixture.bundle)
+        self.assertEqual(payload['Cmd'],['/calibration_control_experiment_probe.py','/candidate',digest(fixture.bundle)])
+        self.assertEqual(payload['HostConfig']['NetworkMode'],'none');self.assertEqual(payload['HostConfig']['Memory'],536870912)
+        self.assertEqual(len(payload['HostConfig']['Mounts']),1);self.assertTrue(payload['HostConfig']['Mounts'][0]['ReadOnly'])
+        self.assertFalse(result['approval']);self.assertEqual(sum(m=='POST' for m,p in self.calls),2)
+        self.assertEqual(job.run(self.b,self.con,self.c,kind='controls',bundle=fixture.bundle,now=2),result)
+        self.assertEqual(sum(m=='POST' for m,p in self.calls),2)

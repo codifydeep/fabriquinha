@@ -59,3 +59,11 @@ class Frozen(unittest.TestCase):
         item=result['modules']['test_frozen.py']['outcomes'][0]
         self.assertEqual(item['phase'],'set_up');self.assertEqual(item['source_frames'][-1]['function'],'setUp')
         self.assertNotIn('private setup condition',json.dumps(item))
+
+    def test_cleanup_and_subtests_in_setup_are_not_functional_body_evidence(self):
+        for setup,body,phase in (
+                (' def setUp(self):\n  with self.subTest():self.fail("setup")',' def test_behavior(self):pass','set_up'),
+                (' def setUp(self):self.addCleanup(lambda:self.fail("cleanup"))',' def test_behavior(self):pass','clean_up')):
+            root,manifest,hashes=self.fixture('import unittest\nclass Frozen(unittest.TestCase):\n'+setup+'\n'+body+'\n')
+            result=diagnostic.run(root,manifest,hashes,{'test_frozen.py':['test_behavior']})
+            self.assertEqual(result['modules']['test_frozen.py']['outcomes'][0]['phase'],phase)

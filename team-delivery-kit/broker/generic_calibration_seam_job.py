@@ -4,15 +4,17 @@ import json
 import os
 import re
 import time
+import base64
+import zlib
 from docker_grouping import labels,grouped_create
 from generic_harness_calibration import digest,require
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
 
 
-def payload(b,c,kind='path'):
-    require(kind in ('path','node'))
-    key='GENERIC_CALIBRATION_NODE_IMAGE' if kind=='node' else 'GENERIC_CALIBRATION_SEAM_IMAGE'
+def payload(b,c,kind='path',bundle=None):
+    require(kind in ('path','node','controls') and (bundle is not None)==(kind=='controls'))
+    key={'node':'GENERIC_CALIBRATION_NODE_IMAGE','path':'GENERIC_CALIBRATION_SEAM_IMAGE','controls':'GENERIC_CALIBRATION_CONTROLS_IMAGE'}[kind]
     image=getattr(b,key,None) or os.environ.get('BROKER_'+key)
     require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
     volume=c['candidate_volume']
@@ -20,13 +22,22 @@ def payload(b,c,kind='path'):
     command=['/generic_calibration_seam_probe.py','/candidate',c['prepared']['manifest_sha256'],
             json.dumps(c['prepared']['test_sha256'],sort_keys=True,separators=(',',':'))]
     if kind=='node':command=['-c','import signal,runpy,sys;signal.alarm(90);sys.argv=["/calibration_node_path_probe.py"]+sys.argv[1:];runpy.run_path(sys.argv[0],run_name="__main__")',*command[1:]]
+    env=gate.environment(b,image)
+    if kind=='controls':
+        from generic_calibration_bundle_writer import expected_files
+        expected_files(bundle,digest(bundle));p=bundle['policy']
+        require(p['candidate_manifest_sha256']==c['prepared']['manifest_sha256'] and p['test_sha256']==c['prepared']['test_sha256'])
+        raw=json.dumps(bundle,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode();require(len(raw)<=1048576)
+        encoded=base64.b64encode(zlib.compress(raw,9)).decode();require(len(encoded)<=98304)
+        env=[*env,'CALIBRATION_BUNDLE_ZLIB='+encoded]
+        command=['/calibration_control_experiment_probe.py','/candidate',digest(bundle)]
     return dict(Image=image,User='10000:10000',Entrypoint=['python'],Cmd=command,
-        Env=gate.environment(b,image),Labels={**labels('calibration-seam',b.PREFIX),
+        Env=env,Labels={**labels('calibration-reference-controls' if kind=='controls' else 'calibration-seam',b.PREFIX),
             'delivery-kit.owner':b.OWNER,'delivery-kit.calibration-seam-author':c['author_task']},
         HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
-            Memory=268435456,NanoCpus=1000000000,PidsLimit=64,
+            Memory=536870912 if kind=='controls' else 268435456,NanoCpus=1000000000,PidsLimit=64,
             Mounts=[dict(Type='volume',Source=volume,Target='/candidate',ReadOnly=True)],
-            Tmpfs={'/tmp':'rw,nosuid,nodev,size=16m,mode=1777'}))
+            Tmpfs={'/tmp':'rw,nosuid,nodev,size='+('64m' if kind=='controls' else '16m')+',mode=1777'}))
 
 
 def initialize(con):
@@ -34,17 +45,23 @@ def initialize(con):
         'job_key TEXT PRIMARY KEY,identity TEXT,state TEXT)')
 
 
-def run(b,con,c,*,now=None,kind='path'):
+def run(b,con,c,*,now=None,kind='path',bundle=None):
     """Caller authenticates sealed maintenance and frozen source before each call."""
     try:import generic_calibration_capability_recovery as capability
     except ImportError:from broker import generic_calibration_capability_recovery as capability
     initialize(con);now=time.time() if now is None else now
     tags=(b.docker('GET','/volumes/'+c['candidate_volume']) or {}).get('Labels',{})
     require(tags.get('delivery-kit.owner')==b.OWNER and tags.get('delivery-kit.test-first-task')==c['author_task'])
-    expected=payload(b,c,kind);key=c['issue_id']+':'+c['author_task']+(':node-path-v1' if kind=='node' else '')
-    identity=dict(name=b.PREFIX+('-calibration-node-path-' if kind=='node' else '-calibration-seam-')+digest(c)[:24],payload=expected,config_sha256=digest(c))
+    expected=payload(b,c,kind,bundle)
+    suffix={'path':'','node':':node-path-v1','controls':':reference-controls-v1'}[kind]
+    key=c['issue_id']+':'+c['author_task']+suffix
+    prefix={'path':'-calibration-seam-','node':'-calibration-node-path-','controls':'-reference-controls-'}[kind]
+    identity=dict(name=b.PREFIX+prefix+digest(c)[:24],payload=expected,config_sha256=digest(c))
     def validate(value):
-        if kind=='node':
+        if kind=='controls':
+            from calibration_control_experiment_probe import validate as control_validate
+            control_validate(value,c,bundle)
+        elif kind=='node':
             from calibration_node_path_probe import validate as node_validate
             node_validate(value,c)
         else:capability.seam(value,c)
