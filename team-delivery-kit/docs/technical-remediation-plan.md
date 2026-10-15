@@ -833,3 +833,8 @@ companion image upgrade requires the same durable failed-execution receipt,
 unchanged validator source hashes and byte-identical current incident contracts
 in controller and proxy. It does not reinterpret the missing historical bytes.
 Offline tests qualify these transitions, not autonomous end-to-end delivery.
+
+The synthetic terminal/ledger experiment is applicable only to a transport/tool
+rejection. Invalid JSON and schema violations need their own measured diagnosis;
+they cannot borrow this experiment to justify another data submission. An older
+pending probe for an inapplicable class is held before any Docker effect.

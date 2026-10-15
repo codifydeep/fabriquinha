@@ -1648,6 +1648,9 @@ a causa de uma resposta antiga sem bytes preservados.
 Se a primeira decisão do CTO mantiver a recusa, somente uma coleta fixa de
 evidência nova poderá abrir outro parecer. A recusa original e os hashes de
 ambas as evidências ficam preservados; outra recusa não reinicia essa trilha.
+O experimento de trailers/ledger só se aplica a falhas de transporte/ferramenta;
+JSON inválido ou violações de schema exigem diagnóstico próprio, sem usar esse
+probe como pretexto para uma nova submissão.
 
 Essa trilha cobre incidentes de resposta do produtor, não todo bloqueio possível.
 Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CTO e

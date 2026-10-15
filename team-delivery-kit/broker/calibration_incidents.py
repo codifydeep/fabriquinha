@@ -120,7 +120,8 @@ def advance(con,key,fx,*,now=None):
     now=time.time() if now is None else now
     row=con.execute('SELECT config,state FROM calibration_incidents WHERE incident_id=?',(key,)).fetchone()
     require(row is not None);cfg,s=map(json.loads,row)
-    enrich=(s['stage']=='blocked' and s.get('category')=='technical_hold_retained'
+    probe_applicable=cfg['rejection']['diagnostic']['category']=='invalid_transport_or_tool'
+    enrich=(probe_applicable and s['stage']=='blocked' and s.get('category')=='technical_hold_retained'
         and s.get('observed_phase')=='diagnosis' and not s.get('evidence_addendum_consumed'))
     if s['stage']=='resubmission_sponsored' or (s['stage']=='blocked' and not enrich):return s
     def save(**changes):
@@ -147,6 +148,7 @@ def advance(con,key,fx,*,now=None):
         return save(stage='diagnosis_dispatch',issue_id=issue['id'],identifier=issue.get('identifier'),
             required_action='CTO diagnose fixed experiment scope; no tool authority')
     if s['stage'] in ('probe_pending','evidence_probe_pending'):
+        if not probe_applicable:return hold('incident_experiment_not_applicable')
         enrichment=s['stage']=='evidence_probe_pending'
         try:
             result=fx.probe(cfg,s)

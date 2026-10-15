@@ -160,3 +160,18 @@ class IncidentTests(unittest.TestCase):
         s['prior_hold']['value']['reason']='x'*900
         note=incidents.instruction(cfg,s,'evidence_diagnosis')
         self.assertLessEqual(len(note),3800);self.assertIn('x'*900,note)
+
+    def test_invalid_json_hold_cannot_repeat_an_unrelated_terminal_transport_experiment(self):
+        self.rejection['diagnostic'].update(version='calibration-constraint-v2',category='invalid_json',failure_code='invalid_json')
+        self.cfg=incidents.prepare(self.c,self.s,self.task,self.binding,self.rejection,source_hashes())
+        self.key=self.cfg['incident_id'];incidents.register(self.con,self.cfg)
+        self.advance();self.advance();self.retain('diagnosis');before=list(self.effects)
+        self.assertEqual(self.advance()['stage'],'blocked');self.assertEqual(self.effects,before)
+
+    def test_already_pending_wrong_class_experiment_is_held_without_docker_effects(self):
+        self.rejection['diagnostic'].update(version='calibration-constraint-v2',category='invalid_json',failure_code='invalid_json')
+        self.cfg=incidents.prepare(self.c,self.s,self.task,self.binding,self.rejection,source_hashes())
+        self.key=self.cfg['incident_id'];incidents.register(self.con,self.cfg)
+        self.advance();self.advance();self.finish_phase('diagnosis');before=list(self.effects)
+        self.assertEqual(self.advance()['category'],'incident_experiment_not_applicable')
+        self.assertEqual(self.effects,before)
