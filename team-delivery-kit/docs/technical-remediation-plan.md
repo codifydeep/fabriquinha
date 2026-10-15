@@ -890,6 +890,19 @@ an author retry nor another data submission is granted by formatting recovery.
 
 ### Authenticated calibration objections and a fixed Path/Node SPIKE
 
+An insufficient independent SPIKE review now has an executable, persistent
+escalation: one native CTO experiment-design task, followed by a tool-free Lead
+review of that exact plan. Both bind the immutable source and original hold;
+the Lead additionally binds the CTO proposal. This breaks the circular demand
+for completed control results before allowing control-data preparation. A
+permit is not a result, execution approval, author retry, test weakening or
+delivery approval. It sponsors at most one untrusted fixture-bundle proposal;
+the existing full harness/calibration pipeline still decides whether its
+positive/negative controls actually work. Lost wakeup acknowledgments only
+observe the persisted marker. Deadlines, wrong actors, rejected plans and
+missing capabilities remain CTO-owned visible holds; no identical retry or
+CEO architecture question. This lane still requires native qualification.
+
 The controller distinguishes an explicit `calibration_objection` from malformed
 bundle data. It re-fetches the native task, closed planning lease, exact source
 capsule and full candidate/previous test reads; reason, output hash and actor are

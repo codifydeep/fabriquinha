@@ -170,7 +170,9 @@ def validate_request(body):
     from calibration_incident_contract import apply as calibration_incident
     from calibration_objection_contract import apply as calibration_objection
     from calibration_response_contract import apply as calibration_response
-    result=calibration_objection(body)
+    from calibration_experiment_contract import apply as calibration_experiment
+    result=calibration_experiment(body)
+    if result is None:result=calibration_objection(body)
     if result is None:result=calibration_incident(body)
     if result is None:result=calibration_response(body)
     if result is None:

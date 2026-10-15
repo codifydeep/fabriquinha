@@ -30,6 +30,8 @@ COPY calibration_transport_probe.py /calibration_transport_probe.py
 COPY calibration_json_transport_probe.py /calibration_json_transport_probe.py
 COPY calibration_response_observations.py /calibration_response_observations.py
 COPY calibration_objection_contract.py /calibration_objection_contract.py
+COPY calibration_experiment_contract.py /calibration_experiment_contract.py
+COPY broker/calibration_experiment_runtime.py /calibration_experiment_runtime.py
 COPY calibration_node_path_probe.py /calibration_node_path_probe.py
 COPY generic_calibration_seam_probe.py /generic_calibration_seam_probe.py
 COPY broker/calibration_objection.py /calibration_objection.py

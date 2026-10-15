@@ -1686,7 +1686,10 @@ flowchart LR
     P --> L[Tech Lead: revisão independente dos fatos]
     L -->|Encaminhar, uma vez| C[CTO: nova proposta de dados no mesmo snapshot]
     C --> G[Calibração completa, TDD e gates normais]
-    L -->|Manter objeção| B[CTO responsável; nova evidência necessária]
+    L -->|Manter objeção| B[CTO: tarefa nativa para planejar novo experimento]
+    B --> D[Tech Lead: revisão independente do plano, não dos resultados]
+    D -->|Permitir preparar controles| C
+    D -->|Recusar ou falta de capacidade| H[Bloqueio técnico visível; sem replay automático]
     P -->|Experimento não aplicável ou falhou| B
 ```
 
@@ -1696,6 +1699,17 @@ sentinelas positivas e negativas. Não executa o harness inteiro, não substitui
 a calibração dos critérios de aceite e não altera testes ou produto. Há uma
 única continuação por fonte imutável; mudar o texto da objeção não renova o
 orçamento. Este caminho ainda precisa de qualificação nativa completa.
+
+Se o SPIKE parcial for insuficiente, atribuir o nome do CTO não basta: uma
+máquina de estados persistente cria sua tarefa de desenho de experimento e a
+revisão independente do plano pelo Tech Lead. Ambos operam sem ferramentas e
+vinculam seus pareceres à mesma fonte e à recusa anterior. O plano deve propor
+uma hipótese, um método e evidências esperadas, sem tratá-las como resultados.
+Uma autorização permite somente preparar uma proposta não confiável de fixtures;
+a calibração efetiva do harness completo e seus controles positivos/negativos
+continua obrigatória. Recusa, prazo excedido ou capacidade ausente conservam um
+impedimento técnico do CTO, sem encaminhar arquitetura ao CEO ou repetir o SPIKE.
+Este escalonamento ainda não é qualificação de recuperação ponta a ponta.
 
 Nos workers governados, os nudges periódicos que criam forks de auto-revisão de
 memória/skills e os títulos pagos de sessão ficam desativados. Memórias existentes

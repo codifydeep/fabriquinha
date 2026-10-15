@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261015.479
+COPY broker/calibration_objection_runtime.py /calibration_objection_runtime.py
+COPY broker/calibration_experiment_runtime.py /calibration_experiment_runtime.py
+COPY calibration_experiment_contract.py /calibration_experiment_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_experiment_runtime,calibration_objection_runtime"

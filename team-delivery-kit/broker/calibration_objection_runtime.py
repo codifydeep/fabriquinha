@@ -53,6 +53,10 @@ def advance(con,issue,author,fx,*,now=None):
     now=time.time() if now is None else now
     cfg,s=map(json.loads,con.execute('SELECT config,state FROM calibration_objections WHERE issue_id=? AND author_task=?',(issue,author)).fetchone())
     c=cfg['source']
+    if s['stage']=='blocked' and s.get('category')=='objection_hold_retained':
+        try:import calibration_experiment_runtime as experiment
+        except ImportError:from broker import calibration_experiment_runtime as experiment
+        return experiment.advance(con,cfg,s,fx,now=now)
     if s['stage'] in ('blocked','referred'):return s
     def save(**changes):
         s.update(changes);con.execute('UPDATE calibration_objections SET state=? WHERE issue_id=? AND author_task=?',
@@ -107,6 +111,8 @@ def advance(con,issue,author,fx,*,now=None):
     require(s['stage']=='resume_pending')
     try:
         fx.verify_decision(cfg,s)
+        if s.get('experiment'):
+            fx.verify_experiment(cfg,s)
         row=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',(issue,author)).fetchone()
         require(list(map(json.loads,row))==[c,cfg['prior_state']])
         parent=handoffs.load(con,author);data=json.loads(parent['data']) if parent else {}
@@ -115,6 +121,7 @@ def advance(con,issue,author,fx,*,now=None):
         receipt=dict(operation='independent_objection_referral_v1',source_sha256=digest(c),prior_state=cfg['prior_state'],
             objection=cfg['objection'],probe=s['probe'],decision=s['decision'],submission_limit=1,
             author_restarted=False,tests_executed=False,execution_authorized=False,delivery_approval=False)
+        if s.get('experiment'):receipt['experiment']=s['experiment']
         updated={k:v for k,v in cfg['prior_state'].items() if k.endswith('_recovery_sha256') or k in ('incident_resume_id','incident_resume_sha256')}
         updated.update(stage='bundle_dispatch',owner=c['cto'],objection_resume_sha256=digest(receipt),
             execution_authorized=False,delivery_approval=False,required_action='CTO produce one new data proposal using measured SPIKE; all gates unchanged')
@@ -140,6 +147,10 @@ def qualified(con,c,s):
 
 
 def addendum(r):
+    if r.get('experiment'):
+        e=r['experiment'];require(e['stage']=='permitted')
+        return ('\nIndependent experiment PLAN permit, not results/approval. Full harness + positive/negative controls remain required. '
+            'Method: '+e['proposal']['value']['method']+' Plan SHA '+digest(e['proposal'])+'.')
     proof=json.loads(r['probe']['output'])
     facts={p:dict(attribute=b['attribute'],product_path=b['product_path'],line=b['line']) for p,b in proof['bindings'].items()}
     return '\nIndependent SPIKE referral (not approval): '+json.dumps(facts,separators=(',',':'))+(
@@ -179,21 +190,39 @@ class Effects:
         return self.native.ensure_planning_start(self.plans.settings,s['issue_id'],c['reviewer'],c['author_task'],s['marker'],instruction(cfg,s),allow_create=first)
     def runs(self,cfg,s):return self.native.issue_task_runs(self.plans.settings,s['issue_id'])
     def decision(self,cfg,s,task):
-        c=cfg['source'];actual=self.plans.task(task['id'],c['reviewer'])
+        return self.read_decision(cfg,s,task,cfg['source']['reviewer'],contract,review_context(cfg,s))
+    def read_decision(self,cfg,s,task,actor,module,context):
+        c=cfg['source'];actual=self.plans.task(task['id'],actor)
         require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id'] and actual.get('wakeup_id')==s['wakeup_id']
-            and contract.request(dict(messages=[dict(role='user',content=actual.get('handoff_note',''))]))==review_context(cfg,s))
+            and module.request(dict(messages=[dict(role='user',content=actual.get('handoff_note',''))]))==context)
         with self.b.db() as con:
             rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',(task['id'],)).fetchall();require(len(rows)==1);r=dict(rows[0])
             if r['status'] in ('creating','starting','running','closing'):raise TimeoutError('observe review lease')
-            require(r['status']=='closed' and r['agent_id']==c['reviewer'] and r['issue_id']==s['issue_id']
+            require(r['status']=='closed' and r['agent_id']==actor and r['issue_id']==s['issue_id']
                 and r['scope'].split(':')[-2:]==['planning',task['id']]
                 and con.execute('SELECT coalesce(sum(tool_count),0) FROM tool_events WHERE request_id=?',(r['request_id'],)).fetchone()[0]==0)
         raw=(actual.get('result') or {}).get('output');require(isinstance(raw,str) and 1<=len(raw)<=4096)
-        value=json.loads(raw,object_pairs_hook=_unique);Draft202012Validator(contract.schema(review_context(cfg,s))).validate(value)
-        return dict(task_id=task['id'],agent_id=c['reviewer'],execution_id=r['request_id'],value=value)
+        value=json.loads(raw,object_pairs_hook=_unique);Draft202012Validator(module.schema(context)).validate(value)
+        return dict(task_id=task['id'],agent_id=actor,execution_id=r['request_id'],value=value)
     def verify_decision(self,cfg,s):
         task=self.plans.task(s['decision']['task_id'],cfg['source']['reviewer'])
         require(self.decision(cfg,s,task)==s['decision'] and self.probe(cfg)==s['probe'])
+    def experiment_wake(self,cfg,s,actor,note,first):
+        require(self.plans.settings['agents'].get(actor)=='planning')
+        return self.native.ensure_planning_start(self.plans.settings,s['issue_id'],actor,cfg['source']['author_task'],s['experiment']['marker'],note,allow_create=first)
+    def experiment_decision(self,cfg,s,task,phase):
+        try:import calibration_experiment_runtime as experiment
+        except ImportError:from broker import calibration_experiment_runtime as experiment
+        shadow={**s,'wakeup_id':s['experiment']['wakeup_id']}
+        # Persisted receipts retain their original wakeup as the next phase advances.
+        key='proposal' if phase=='design' else 'review'
+        if key in s['experiment']:shadow['wakeup_id']=s['experiment'][key]['wakeup_id']
+        result=self.read_decision(cfg,shadow,task,cfg['source']['cto' if phase=='design' else 'reviewer'],experiment.contract,experiment.context(cfg,s,phase))
+        return {**result,'wakeup_id':shadow['wakeup_id']}
+    def verify_experiment(self,cfg,s):
+        try:import calibration_experiment_runtime as experiment
+        except ImportError:from broker import calibration_experiment_runtime as experiment
+        experiment.verify(cfg,s,self)
 
 
 def handle(b,con,c,s):
