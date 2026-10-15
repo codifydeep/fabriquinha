@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261011.465
+COPY broker/generic_calibration_local_recovery.py /generic_calibration_local_recovery.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY deterministic_read_dispatch.py /deterministic_read_dispatch.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_local_recovery as r;assert callable(r.migrate)"

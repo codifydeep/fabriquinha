@@ -118,6 +118,14 @@ def advance(con,c,fx,*,now=None):
             receipt=repair.qualified(con,c,s)
             marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol=receipt['protocol'],
                 recovery_sha256=digest(receipt)))
+        if s.get('local_recovery_sha256'):
+            try:import generic_calibration_local_recovery as local
+            except ImportError:from broker import generic_calibration_local_recovery as local
+            try:receipt=local.qualified(con,c,s)
+            except (ValueError,KeyError,TypeError):
+                return hold('local_recovery_binding_rejected','Controller verify exact local rejection repair; no dispatch')
+            marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol=receipt['protocol'],
+                local_recovery_sha256=digest(receipt)))
         try:note=instruction(c)
         except ValueError:
             return hold('bundle_context_requires_readonly_capsule',

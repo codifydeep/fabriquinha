@@ -1580,6 +1580,14 @@ do contrato. Caminho/página divergentes são recusados. O pedido emitido não �
 evidência de leitura; respostas reais da ferramenta, decisões do modelo e todos
 os gates de entrega continuam separados. Uma rejeição local anterior não pode
 ser reinterpretada como resposta inválida do modelo nem autoriza novo retry.
+O controlador oferece uma recuperação administrativa limitada para esse defeito
+local: `controller_calibration_local_cli.py` exige manutenção selada, execução
+falha do CTO fechada, zero ferramentas executadas, recibo do proxy para o erro
+exato anterior ao upstream e um canário sem chamadas externas na imagem corrigida.
+Compara os hashes instalados no proxy/controlador e revalida autor, snapshot,
+rota e ausência de atividade. Registra uma tentativa separada e imutável, sem
+zerar migrações anteriores, alterar configuração, reiniciar autor ou dispensar
+revisão/TDD. Nova falha permanece bloqueada; o mesmo recibo não rebobina o fluxo.
 
 ## Contribuir e reutilizar
 
