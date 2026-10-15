@@ -331,12 +331,33 @@ def lookup(b,issue):
     require(len(matches)<=1);return matches[0] if matches else None
 
 
+def authorize_producer(b,cfg,s,task,fx):
+    """Observe the exact native wakeup if its POST acknowledgment was lost.
+
+    A persisted intent alone is not permission. The native task plus the exact
+    backend wakeup must agree; no create/restart or deadline renewal occurs.
+    """
+    c=cfg['source'];require(s['stage'] in ('producer_observe','producer_wait') and task.get('agent_id')==c['cto']
+        and task.get('issue_id')==s['issue_id'] and bool(task.get('wakeup_id')))
+    if s['stage']=='producer_wait':require(task['wakeup_id']==s['wakeup_id']);return s
+    require(time.time()-s['phase_started']<1800)
+    wake=fx.wake(cfg,s,'producer',False);require(wake is not None and task['wakeup_id']==wake['id'])
+    updated={**s,'stage':'producer_wait','wakeup_id':wake['id'],'owner':c['cto'],
+        'required_action':'Observe exact native diagnostic producer; never duplicate wakeup'}
+    with b.db() as con:
+        changed=con.execute('UPDATE calibration_control_experiments SET state=? WHERE issue_id=? AND author_task=? AND state=?',
+            (json.dumps(updated,sort_keys=True),c['issue_id'],c['author_task'],json.dumps(s,sort_keys=True))).rowcount
+    if changed==1:return updated
+    actual=lookup(b,s['issue_id']);require(actual and actual[0]==cfg and actual[1]['stage']=='producer_wait' and actual[1]['wakeup_id']==wake['id'])
+    return actual[1]
+
+
 def prompt_contract(b,issue,task,note):
     current=lookup(b,issue)
     if current is None:return None
-    cfg,s=current;c=cfg['source'];require(s['stage']=='producer_wait' and task.get('agent_id')==c['cto']
-        and task.get('issue_id')==s['issue_id'] and task.get('wakeup_id')==s['wakeup_id'])
-    fx=Effects(b);fx.verify(cfg);body=dict(messages=[dict(role='user',content=note)]);value=wire.request(body);require(value==producer_context(cfg))
+    cfg,s=current;c=cfg['source'];fx=Effects(b);fx.verify(cfg)
+    body=dict(messages=[dict(role='user',content=note)]);value=wire.request(body);require(value==producer_context(cfg))
+    s=authorize_producer(b,cfg,s,task,fx)
     if s.get('transport'):require(transport.binding(body)==value and fx.transport()==s['transport'])
     else:require(transport.binding(body) is None)
     return value
@@ -345,10 +366,10 @@ def prompt_contract(b,issue,task,note):
 def mounts(b,binding):
     current=lookup(b,binding['issue_id'])
     if current is None:return []
-    cfg,s=current;c=cfg['source'];require(s['stage']=='producer_wait' and binding['agent_id']==c['cto'])
+    cfg,s=current;c=cfg['source'];require(s['stage'] in ('producer_observe','producer_wait') and binding['agent_id']==c['cto'])
     with b.db() as con:
         rows=con.execute("SELECT n.* FROM native_bindings n JOIN leases l USING(request_id) WHERE n.issue_id=? AND n.agent_id=? AND l.status IN ('creating','starting','running')",(s['issue_id'],c['cto'])).fetchall()
         require(len(rows)==1);r=dict(rows[0]);require(r['scope'].split(':')[-2:]==['planning',r['task_id']])
     fx=Effects(b);fx.verify(cfg);task=fx.plans.task(r['task_id'],c['cto'])
-    require(task.get('wakeup_id')==s['wakeup_id'] and task.get('issue_id')==s['issue_id'])
+    authorize_producer(b,cfg,s,task,fx)
     return [dict(Type='volume',Source=c[role+'_volume'],Target='/evidence/'+role,ReadOnly=True) for role in ('candidate','previous')]

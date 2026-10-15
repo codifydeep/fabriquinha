@@ -1003,6 +1003,13 @@ and the installed companion passes the fixed probe. The failed native task,
 original author and source submission budgets are never reset. A failure with
 the new carrier already selected cannot rearm that correction.
 
+If a worker arrives before an uncertain wakeup acknowledgment is reconciled,
+the read-only grant observes the existing backend wakeup with `allow_create=False`.
+It requires that exact task/actor/issue/wakeup and persisted instruction marker,
+then compare-and-swaps the same coordinator state into its wait phase. A state
+file alone is not authorization. No new task, capacity grant or renewed deadline
+is manufactured; foreign wakeups and expired intents remain refused.
+
 The same qualified marker is included in any subsequent, independently referred
 original-source proposal; that proposal still needs all normal immutable policy
 reviews, measured calibration, TDD and delivery gates. Native/provider behavior

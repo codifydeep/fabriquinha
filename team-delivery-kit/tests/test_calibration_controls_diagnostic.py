@@ -141,3 +141,22 @@ class ControlsDiagnosticTests(unittest.TestCase):
         self.fx.native_failure=lambda *_:self.failure_proof();self.fx.transport=lambda:self.protocol()
         s=self.advance();self.assertEqual(s['stage'],'producer_dispatch');self.assertEqual(s['native_failure']['task_id'],'producer-task')
         self.assertEqual(len([x for x in self.calls if x[0]=='wake']),1)
+
+    def test_worker_arriving_before_lost_wakeup_ack_is_authorized_by_observed_exact_intent(self):
+        self.advance();self.uncertain=True;self.advance()
+        task=dict(id='producer-task',agent_id='cto',issue_id='spike',wakeup_id='producer-wake')
+        b=SimpleNamespace(db=lambda:self.con);note=runtime.wire.capsule(runtime.producer_context(self.cfg))
+        with patch.object(runtime,'Effects',return_value=self.fx),patch.object(runtime.time,'time',return_value=2):
+            self.assertEqual(runtime.prompt_contract(b,'spike',task,note),runtime.producer_context(self.cfg))
+        state=json.loads(self.con.execute('SELECT state FROM calibration_control_experiments').fetchone()[0])
+        self.assertEqual(state['stage'],'producer_wait');self.assertEqual(state['phase_started'],1)
+        self.assertEqual([x[2] for x in self.calls if x[0]=='wake'],[True,False])
+
+    def test_foreign_worker_cannot_turn_an_unacknowledged_intent_into_permission(self):
+        self.advance();self.uncertain=True;self.advance()
+        task=dict(id='producer-task',agent_id='cto',issue_id='spike',wakeup_id='foreign-wake')
+        b=SimpleNamespace(db=lambda:self.con);note=runtime.wire.capsule(runtime.producer_context(self.cfg))
+        with patch.object(runtime,'Effects',return_value=self.fx),patch.object(runtime.time,'time',return_value=2):
+            with self.assertRaises(ValueError):runtime.prompt_contract(b,'spike',task,note)
+        state=json.loads(self.con.execute('SELECT state FROM calibration_control_experiments').fetchone()[0])
+        self.assertEqual(state['stage'],'producer_observe')
