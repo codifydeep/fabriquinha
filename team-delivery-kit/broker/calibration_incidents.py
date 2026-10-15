@@ -114,8 +114,7 @@ def instruction(cfg,s,phase):
         note=note.replace('A new fixed experiment has now run;',
             'New JSON-mode protocol qualified synthetically; no provider call has qualified it yet;')
     if phase in s.get('format_recoveries',{}):
-        note=note.replace('reason<=900 characters.',
-            'reason<=200 characters. Prior response failed maxLength; schema limit remains900.')
+        note=note.replace('reason<=900 characters.','reason<=200 characters.')
     require(len(note)<=3800);return note
 
 

@@ -195,6 +195,8 @@ class IncidentTests(unittest.TestCase):
         cfg,current=map(json.loads,self.con.execute('SELECT config,state FROM calibration_incidents WHERE incident_id=?',(self.key,)).fetchone())
         bounded=copy.deepcopy(current);bounded['prior_hold']['value']['reason']='x'*900
         self.assertLessEqual(len(incidents.instruction(cfg,bounded,'evidence_diagnosis')),3800)
+        bounded['format_recoveries']={'evidence_diagnosis':{}}
+        self.assertLessEqual(len(incidents.instruction(cfg,bounded,'evidence_diagnosis')),3800)
         self.advance();self.finish_phase('evidence_diagnosis');self.advance();self.finish_phase('review');state=self.advance()
         self.assertEqual(state['stage'],'resubmission_sponsored')
         self.assertEqual(state['sponsorship']['prior_hold'],original)
