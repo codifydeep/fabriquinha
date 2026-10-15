@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261015.466
+# Qualification must inspect the same response validator as proxy 130. The
+# earlier controller layer retained a historical validator; do not waive drift.
+COPY artifact_response_contract.py /artifact_response_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import artifact_response_contract as a;assert callable(a.validate)"
