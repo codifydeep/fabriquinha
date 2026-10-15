@@ -1667,6 +1667,11 @@ Novas rejeições registram também um recibo privado com fase de parsing, posi�
 tipo de transporte, contagem de ferramentas e hash. O recibo distingue JSON do
 conteúdo, argumentos de ferramenta e frames de stream sem guardar o texto
 rejeitado. Evidências antigas ausentes não são reconstruídas retroativamente.
+Uma decisão de incidente rejeitada somente por comprimento pode receber uma
+única correção de formato por fase, comprovada pelo recibo do proxy e pelo lease
+nativo encerrado sem ferramentas. O novo acionamento pede justificativa curta,
+mas mantém o limite original de validação. Não trunca a resposta, não aceita o
+parecer recusado e não autoriza retry do autor nem nova submissão de dados.
 
 Essa trilha cobre incidentes de resposta do produtor, não todo bloqueio possível.
 Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CTO e

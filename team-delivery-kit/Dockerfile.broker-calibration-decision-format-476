@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261015.475
+COPY broker/calibration_incidents.py /calibration_incidents.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_incidents;assert callable(calibration_incidents.Effects.format_rejection)"

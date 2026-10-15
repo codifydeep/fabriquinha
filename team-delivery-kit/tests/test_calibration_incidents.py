@@ -210,3 +210,29 @@ class IncidentTests(unittest.TestCase):
         self.advance();self.advance();self.advance();self.retain('evidence_diagnosis');before=list(self.effects)
         for _ in range(3):self.assertEqual(self.advance()['stage'],'blocked')
         self.assertEqual(self.effects,before)
+
+    def test_measured_length_failure_gets_one_new_format_handoff_not_more_data_submissions(self):
+        self.advance();self.advance()
+        self.runs=[dict(id='failed-cto',agent_id=self.c['cto'],issue_id='child',wakeup_id='diagnosis-wake',status='failed')]
+        self.assertEqual(self.advance()['stage'],'blocked')
+        rejection=dict(operation='structured_validator_rejection_v1',execution_id='00000000-0000-4000-8000-000000000008',call_number=2,
+            category='schema_violation',diagnostic=dict(version='structured-constraint-v1',constraints=['maxLength'],upstream_sha256='d'*64),
+            response_forwarded=False,worker_tool_executed=False,execution_authorized=False,delivery_approval=False)
+        self.fx.format_rejection=lambda *args:dict(receipt=rejection,context_sha256=__import__('calibration_incident_contract').digest(
+            incidents.context(self.cfg,json.loads(self.con.execute('SELECT state FROM calibration_incidents').fetchone()[0]),'diagnosis')))
+        state=self.advance();self.assertEqual(state['stage'],'diagnosis_dispatch')
+        self.assertEqual(state['format_recoveries']['diagnosis']['failed_task'],'failed-cto')
+        self.assertIn('reason<=200',incidents.instruction(self.cfg,state,'diagnosis'))
+        self.advance();self.advance()
+        wakes=[x for x in self.effects if x[0]=='wake']
+        self.assertNotEqual(wakes[0][-1],wakes[1][-1])
+        before=list(self.effects);state=self.advance()
+        self.assertEqual(state['stage'],'blocked');self.assertEqual(self.effects,before)
+        self.assertEqual(state['category'],'incident_decision_format_recovery_exhausted')
+        self.assertEqual(json.loads(self.con.execute('SELECT state FROM generic_calibration_workflows').fetchone()[0]),self.s)
+
+    def test_unproved_or_other_schema_failure_cannot_rearm_a_native_decision(self):
+        self.advance();self.advance()
+        self.runs=[dict(id='failed-cto',agent_id=self.c['cto'],issue_id='child',wakeup_id='diagnosis-wake',status='failed')]
+        self.advance();self.fx.format_rejection=lambda *args:None
+        before=list(self.effects);self.assertEqual(self.advance()['stage'],'blocked');self.assertEqual(self.effects,before)

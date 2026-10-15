@@ -113,6 +113,9 @@ def instruction(cfg,s,phase):
             'fixed_json_object_transport_probe_v1: JSON-mode wire projection and unchanged canonical validation checks')
         note=note.replace('A new fixed experiment has now run;',
             'New JSON-mode protocol qualified synthetically; no provider call has qualified it yet;')
+    if phase in s.get('format_recoveries',{}):
+        note=note.replace('reason<=900 characters.',
+            'reason<=200 characters. Prior response failed maxLength; schema limit remains900.')
     require(len(note)<=3800);return note
 
 
@@ -134,13 +137,44 @@ def advance(con,key,fx,*,now=None):
         and cfg['rejection']['diagnostic'].get('failure_code')=='invalid_json')
     enrich=(probe_applicable and s['stage']=='blocked' and s.get('category')=='technical_hold_retained'
         and s.get('observed_phase')=='diagnosis' and not s.get('evidence_addendum_consumed'))
-    if s['stage']=='resubmission_sponsored' or (s['stage']=='blocked' and not (enrich or json_enrich)):return s
+    format_candidate=s['stage']=='blocked' and s.get('category')=='incident_native_failed'
+    if s['stage']=='resubmission_sponsored' or (s['stage']=='blocked' and not (enrich or json_enrich or format_candidate)):return s
     def save(**changes):
         s.update(changes);con.execute('UPDATE calibration_incidents SET state=? WHERE incident_id=?',(json.dumps(s,sort_keys=True),key));con.commit();return s
     def hold(category):return save(stage='blocked',owner=cfg['cto'],category=category,
         required_action='CTO diagnose '+category+'; preserve evidence, no identical dispatch or author retry')
+    def recover_format(task,phase):
+        histories=s.get('format_recoveries',{})
+        if phase in histories:return hold('incident_decision_format_recovery_exhausted')
+        collect=getattr(fx,'format_rejection',lambda *_:None)
+        try:
+            proof=collect(cfg,s,phase,task)
+            if proof is None:return hold('incident_native_failed')
+            receipt=proof['receipt'];diagnostic=receipt['diagnostic']
+            require(set(proof)=={'receipt','context_sha256'} and proof['context_sha256']==contract.digest(context(cfg,s,phase))
+                and receipt['category']=='schema_violation' and diagnostic['version']=='structured-constraint-v1'
+                and diagnostic['constraints']==['maxLength'] and type(receipt['call_number']) is int
+                and receipt['call_number']>0 and all(receipt[k] is False for k in (
+                    'response_forwarded','worker_tool_executed','execution_authorized','delivery_approval'))
+                and contract.schema(context(cfg,s,phase))['properties']['reason']['maxLength']==900)
+            expected=structured_rejection_receipts.from_event(dict(event='model_proxy_request',status=502,
+                category='structured_decision_response_invalid',execution_id=receipt['execution_id'],call_number=receipt['call_number'],
+                structured_rejection_category=receipt['category'],structured_rejection_diagnostic=diagnostic))
+            require(expected==receipt)
+        except TimeoutError:return s
+        except (ValueError,KeyError,TypeError,ValidationError):return hold('incident_format_evidence_rejected')
+        entry=dict(failed_task=task['id'],old_wakeup=s['wakeup_id'],proof=proof,attempt_limit=1,reason_target=200,
+            schema_limit=900,execution_authorized=False,delivery_approval=False)
+        return save(stage=phase+'_dispatch',format_recoveries={**histories,phase:entry},
+            owner=cfg['reviewer'] if phase=='review' else cfg['cto'],category='decision_format_recovery',
+            required_action='One shortened native decision from measured maxLength failure; preserve evidence and all submission limits')
     try:fx.verify(cfg)
     except (ValueError,KeyError,TypeError):return hold('incident_source_changed')
+    if format_candidate:
+        phase=s.get('observed_phase');require(phase in ('diagnosis','evidence_diagnosis','review'))
+        matches=[t for t in fx.runs(cfg,s) if t.get('id')==s.get('observed_task') and t.get('wakeup_id')==s['wakeup_id']]
+        if len(matches)!=1 or matches[0].get('status')!='failed':return hold('incident_format_source_rejected')
+        return recover_format(matches[0],phase)
     if enrich or json_enrich:
         try:
             require(s['decision']['value']['action']=='retain_technical_hold')
@@ -195,8 +229,9 @@ def advance(con,key,fx,*,now=None):
         except ValueError:return hold('incident_instruction_bounds')
         first=s['stage']==phase+'_dispatch'
         if first and not fx.reserve():return save(required_action='Await proxy reserve of 32 calls; no spend or wakeup attempted')
-        if first:save(stage='observe_'+phase+'_dispatch',marker=digest(dict(incident=digest(cfg),phase=phase,
-            context=contract.digest(context(cfg,s,phase)))),observation_started=now,
+        identity=dict(incident=digest(cfg),phase=phase,context=contract.digest(context(cfg,s,phase)))
+        if phase in s.get('format_recoveries',{}):identity['format_recovery_sha256']=digest(s['format_recoveries'][phase])
+        if first:save(stage='observe_'+phase+'_dispatch',marker=digest(identity),observation_started=now,
             required_action='Observe exact '+phase+' handoff; no duplicate native task')
         try:wake=fx.wake(cfg,s,phase,first)
         except (TimeoutError,urllib.error.URLError):wake=None
@@ -209,7 +244,8 @@ def advance(con,key,fx,*,now=None):
         return hold('incident_native_deadline') if now-s['dispatched_at']>=1800 else s
     task=matches[0]
     if s.get('observed_task')!=task['id']:save(observed_task=task['id'],observed_phase=phase)
-    if task.get('status')!='completed':return hold('incident_native_failed')
+    if task.get('status')!='completed':
+        return recover_format(task,phase) if task.get('status')=='failed' else hold('incident_native_failed')
     try:
         decision=fx.decision(cfg,s,phase,task);validate_decision(cfg,s,phase,task,decision)
     except TimeoutError:return s
@@ -254,6 +290,7 @@ def sponsor(con,cfg,s,now):
         require(s.get('json_format_addendum_consumed') is True and s['json_format_evidence']['sources']==proof['sources'])
         receipt.update(json_format_evidence=s['json_format_evidence'],json_format_origin=s['json_format_origin'],
             probe_kind='json',probe_job_key=s['probe_job_key'],json_format_submission_limit=1)
+    if s.get('format_recoveries'):receipt['format_recoveries']=s['format_recoveries']
     updated={k:v for k,v in prior.items() if k in ('capability_recovery_sha256','local_recovery_sha256','protocol_recovery_sha256')}
     updated.update(stage='bundle_dispatch',owner=cfg['cto'],incident_resume_id=cfg['incident_id'],incident_resume_sha256=digest(receipt),
         execution_authorized=False,delivery_approval=False,required_action='CTO one independently sponsored data submission; no author retry')
@@ -402,6 +439,23 @@ class Effects:
             and value['json_sources']==json_sources() and value['receipts']==[cfg['rejection']]
             and value['sources']==cfg['validator_sources'] and self.provider.proxy_info(self.b)['Id']==proxy['Id'])
         return dict(protocol='calibration-json-object-v1',sources=value['json_sources'],proxy_image=proxy['Image'])
+    def format_rejection(self,cfg,s,phase,task):
+        actor=cfg['reviewer'] if phase=='review' else cfg['cto'];actual=self.plans.task(task['id'],actor)
+        require(actual.get('status')=='failed' and actual.get('failure_reason')=='agent_error.provider_server_error'
+            and actual.get('wakeup_id')==s['wakeup_id'] and actual.get('issue_id')==s['issue_id']
+            and actual.get('agent_id')==actor and contract.request(dict(messages=[dict(role='user',
+                content=actual.get('handoff_note',''))]))==context(cfg,s,phase))
+        with self.b.db() as con:
+            rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',
+                (actual['id'],)).fetchall();require(len(rows)==1);binding=dict(rows[0])
+            if binding['status'] in ('creating','starting','running','closing'):raise TimeoutError('observe same native format failure')
+            require(binding['status']=='closed' and binding['issue_id']==s['issue_id'] and binding['agent_id']==actor
+                and binding['scope'].split(':')[-2:]==['planning',actual['id']]
+                and con.execute('SELECT coalesce(sum(tool_count),0) FROM tool_events WHERE request_id=?',
+                    (binding['request_id'],)).fetchone()[0]==0)
+        receipt,image=self.evidence(binding['request_id'])
+        if receipt.get('category')!='schema_violation' or receipt.get('diagnostic',{}).get('constraints')!=['maxLength']:return None
+        return dict(receipt=receipt,context_sha256=contract.digest(context(cfg,s,phase)))
     def verify_hold(self,cfg,s):
         saved=s.get('prior_hold') or s['decision'];task=self.plans.task(saved['task_id'],cfg['cto'])
         require(self.decision(cfg,{**s,'wakeup_id':task['wakeup_id']},'diagnosis',task)==saved)

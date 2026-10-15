@@ -871,3 +871,19 @@ tool arguments or exception text. It distinguishes outer response, SSE frame,
 tool-argument and terminal-content parsing failures. Duplicate observations are
 idempotent; a receipt storage failure blocks forwarding. Missing old response
 bytes and missing old observations remain explicitly unqualified.
+
+### Bounded incident-decision length correction
+
+A failed incident decision can receive one formatting correction per phase only
+after revalidation of its native actor, exact handoff context, closed planning
+lease, zero tools and durable proxy rejection. The rejection must contain solely
+`maxLength`; the unchanged closed decision schema has only one length-bounded
+field (`reason`, 900 characters). Missing or different evidence does not qualify.
+
+The controller preserves the failed task/receipt, records intention and a new
+handoff identity, and requests a reason of at most 200 characters. Validation
+remains at 900; no rejected text is shortened or accepted. All probe, snapshot,
+authority and independent-review requirements stay intact. Unknown acknowledgments
+observe the same handoff. A second failure cannot rearm the correction, and the
+format receipt is carried into any later data sponsorship for audit. Neither
+an author retry nor another data submission is granted by formatting recovery.
