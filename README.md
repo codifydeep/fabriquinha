@@ -1716,6 +1716,16 @@ encerrado, zero ferramentas, contexto exato e o recibo persistente do proxy;
 ausência dessas provas ou segunda recusa mantém o bloqueio. A resposta recusada
 nunca é truncada, aceita ou convertida em aprovação.
 
+O diagnóstico isolado `qualify_frozen_harness.py` executa todos os métodos do
+módulo candidato congelado, contra os bytes originais do produto, e distingue
+falhas no setup das falhas no corpo dos testes. O snapshot é montado somente
+para leitura, sem rede, credenciais ou socket Docker. Recibos e logs ficam em
+armazenamento privado; uma intenção com confirmação Docker incerta não é
+reexecutada. A ferramenta é de qualificação operacional: não é despacho
+autônomo, não produz controles positivos/negativos e nunca aprova Red,
+calibração, regressão completa ou entrega. Cinco falhas de setup, por exemplo,
+não são evidência de que cinco assertions de comportamento foram exercitadas.
+
 Nos workers governados, os nudges periódicos que criam forks de auto-revisão de
 memória/skills e os títulos pagos de sessão ficam desativados. Memórias existentes
 não são apagadas e os contratos de memória curada do controlador permanecem.

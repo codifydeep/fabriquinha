@@ -920,6 +920,29 @@ not native recovery or delivery qualification. Maintenance backup/restore checks
 use disk-backed SQLite and streaming hashes: reading a 211 MB backup into the
 256 MB controller is not a safe validation method.
 
+### Full frozen-module diagnostic, without approval authority
+
+`calibration_frozen_harness_probe.py` loads the unchanged candidate module and
+checks its complete method inventory before execution against original frozen
+product bytes. It records per-method pass/failure/error/skip, failure phase,
+bounded source-frame locations and traceback hashes, not exception content.
+Subtest failures remain attributed to their parent and cannot disappear from
+the result. Setup failures are not represented as exercised functional bodies.
+Snapshot hashes are revalidated afterward; no test globals or product bytes are
+replaced. All Red/Green/calibration/retry/delivery flags remain false.
+
+The operator-only `qualify_frozen_harness.py` authenticates the original source,
+prior native decisions and exact rejected experiment review, checks idle leases
+and native tasks, and runs the probe in a grouped disposable container with no
+network, Docker socket, credentials or writable candidate mount. Private intent,
+output and receipt storage is exclusive and restricted. An uncertain intent
+cannot recreate a container; a cached receipt must match the source/image/script
+identity and current frozen method inventory. This is diagnostic qualification,
+not an installed autonomous recovery route or a substitute for measured
+positive/negative reference controls. The next recovery capability must let the
+team construct and measure those isolated controls before another delivery
+submission can be considered.
+
 The controller distinguishes an explicit `calibration_objection` from malformed
 bundle data. It re-fetches the native task, closed planning lease, exact source
 capsule and full candidate/previous test reads; reason, output hash and actor are
