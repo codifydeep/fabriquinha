@@ -887,3 +887,36 @@ authority and independent-review requirements stay intact. Unknown acknowledgmen
 observe the same handoff. A second failure cannot rearm the correction, and the
 format receipt is carried into any later data sponsorship for audit. Neither
 an author retry nor another data submission is granted by formatting recovery.
+
+### Authenticated calibration objections and a fixed Path/Node SPIKE
+
+The controller distinguishes an explicit `calibration_objection` from malformed
+bundle data. It re-fetches the native task, closed planning lease, exact source
+capsule and full candidate/previous test reads; reason, output hash and actor are
+durable private evidence. A prior misclassification may be corrected only from
+these same authoritative facts, without rerunning a producer or approving tests.
+
+The Path/Node lane creates a durable child SPIKE and runs a separately pinned
+fixed job with one readonly candidate volume, no network/socket/credentials,
+limited resources and bounded child processes. It parses the frozen AST, validates
+the manifest, recognizes `json.dumps(str(PathGlobal))` interpolation into the
+literal Node `fs.readFileSync` statement, then exercises that statement with two
+sentinel file paths. It never imports the untrusted test module or executes its
+whole JS harness. Snapshot/template remain unchanged; full calibration, Red,
+product tests and delivery are explicitly not approved by this evidence.
+
+An independent tool-free Tech Lead decision binds source, objection and probe
+hashes. It may refer one new data proposal to the CTO or retain a technical hold.
+The controller revalidates the native decision and fixed-job record, waits a
+bounded time for the source projection, and consumes referral atomically with
+the new handoff. Existing incident/protocol/capability budgets remain spent.
+Changing objection wording cannot create another SPIKE/submission budget for
+the same immutable source. Another unsupported seam requires genuinely new
+technical work, never a waiver or automatic escalation to the CEO.
+
+Governed worker configuration now sets periodic memory and skill-creation nudges
+to zero and disables paid automatic titling. It preserves existing memory files
+and explicit controller-curated memory flows. The real installed ACP config/session
+probe spends no model calls; only later native execution can qualify absence of
+auxiliary post-response model calls. This does not assert the historical extra
+response was conclusively caused by background review.

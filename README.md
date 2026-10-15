@@ -1673,6 +1673,37 @@ nativo encerrado sem ferramentas. O novo acionamento pede justificativa curta,
 mas mantém o limite original de validação. Não trunca a resposta, não aceita o
 parecer recusado e não autoriza retry do autor nem nova submissão de dados.
 
+### Objeções técnicas de calibração
+
+`calibration_objection` é um resultado técnico válido, não um bundle inválido ou
+uma aprovação. O controlador confere ator, sessão, hash do contexto, lease
+encerrado e leituras completas antes de registrá-lo com responsável técnico.
+
+```mermaid
+flowchart LR
+    O[CTO: objeção autenticada] --> S[SPIKE filho e intenção persistida]
+    S --> P[AST e leitura Node isolada; snapshot somente leitura]
+    P --> L[Tech Lead: revisão independente dos fatos]
+    L -->|Encaminhar, uma vez| C[CTO: nova proposta de dados no mesmo snapshot]
+    C --> G[Calibração completa, TDD e gates normais]
+    L -->|Manter objeção| B[CTO responsável; nova evidência necessária]
+    P -->|Experimento não aplicável ou falhou| B
+```
+
+O SPIKE de Path/Node reconhece um padrão específico de interpolação de caminho
+do teste congelado e executa somente a leitura de arquivo reconhecida, com
+sentinelas positivas e negativas. Não executa o harness inteiro, não substitui
+a calibração dos critérios de aceite e não altera testes ou produto. Há uma
+única continuação por fonte imutável; mudar o texto da objeção não renova o
+orçamento. Este caminho ainda precisa de qualificação nativa completa.
+
+Nos workers governados, os nudges periódicos que criam forks de auto-revisão de
+memória/skills e os títulos pagos de sessão ficam desativados. Memórias existentes
+não são apagadas e os contratos de memória curada do controlador permanecem.
+A configuração é migrada somente a partir de versões exatas conhecidas. Isso
+separa autoaperfeiçoamento local dos agentes da memória compartilhada governada;
+não desliga a curadoria explícita nem comprova por si só memória entre releases.
+
 Essa trilha cobre incidentes de resposta do produtor, não todo bloqueio possível.
 Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CTO e
 Tech Lead reais, nova submissão, calibração e posterior entrega ainda precisa ser

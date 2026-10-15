@@ -1,0 +1,5 @@
+FROM delivery-kit-calibration-json:20261015.9
+USER root
+COPY --chmod=0444 generic_calibration_seam_probe.py calibration_node_path_probe.py /
+USER 10000:10000
+ENTRYPOINT ["python"]

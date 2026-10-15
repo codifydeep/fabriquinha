@@ -13,8 +13,11 @@ PREVIOUS_EXPECTED = (LEGACY_EXPECTED + "  max_tokens: 8192\n"
             "agent:\n  reasoning_effort: low\n")
 COMPLETE_READ_EXPECTED = (PREVIOUS_EXPECTED + "file_read_max_chars: 65536\n"
             "tool_output:\n  max_line_length: 65536\n")
-EXPECTED = COMPLETE_READ_EXPECTED.replace("  reasoning_effort: low\n",
+SINGLE_API_EXPECTED = COMPLETE_READ_EXPECTED.replace("  reasoning_effort: low\n",
             "  reasoning_effort: low\n  api_max_retries: 1\n")
+EXPECTED = (SINGLE_API_EXPECTED + "memory:\n  nudge_interval: 0\n"
+            "skills:\n  creation_nudge_interval: 0\n"
+            "auxiliary:\n  title_generation:\n    enabled: false\n")
 
 
 def install_config(home, execution_id=None):
@@ -30,7 +33,7 @@ def install_config(home, execution_id=None):
         normalized = re.sub(re.escape(PROXY_BASE_URL.replace('/api/v1', '/executions/'))
                             + r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}/api/v1', PROXY_BASE_URL, current)
         accepted = (LEGACY_EXPECTED, LOW_REASONING_EXPECTED, PREVIOUS_EXPECTED,
-                    COMPLETE_READ_EXPECTED, EXPECTED)
+                    COMPLETE_READ_EXPECTED, SINGLE_API_EXPECTED, EXPECTED)
         previous = tuple(value.replace('  default: '+MODEL+'\n',
                                       '  default: '+PREVIOUS_MODEL+'\n') for value in accepted)
         if normalized not in accepted + previous:

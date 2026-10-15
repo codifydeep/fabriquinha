@@ -7,6 +7,26 @@ from broker import generic_calibration_workflow as workflow
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_authenticated_objection_is_not_collected_as_an_invalid_bundle(self):
+        self.advance();self.runs=[dict(id='producer',wakeup_id='wake',agent_id='cto',status='completed')]
+        self.fx.objection=lambda *args:dict(operation='calibration_technical_objection_v1',
+            reason='Path seam requires verification',source_sha256=workflow.digest(self.config),execution_authorized=False,delivery_approval=False)
+        self.advance(2)
+        self.assertEqual(self.state()['category'],'bundle_technical_objection')
+        self.assertEqual(self.state()['owner'],'lead')
+        self.assertFalse(any(e[0]=='collect' for e in self.events))
+
+    def test_legacy_rejected_objection_is_reclassified_without_new_wakeup_or_approval(self):
+        self.advance();self.runs=[dict(id='producer',wakeup_id='wake',agent_id='cto',status='completed')]
+        def reject(*args):raise ValueError('not a bundle')
+        self.fx.collect=reject;self.advance(2)
+        self.assertEqual(self.state()['category'],'bundle_submission_rejected');before=list(self.events)
+        self.fx.objection=lambda *args:dict(operation='calibration_technical_objection_v1',
+            reason='Path seam requires verification',source_sha256=workflow.digest(self.config),execution_authorized=False,delivery_approval=False)
+        self.advance(3)
+        self.assertEqual(self.state()['category'],'bundle_technical_objection');self.assertEqual(before,self.events)
+        self.assertFalse(self.state()['delivery_approval'])
+
     def setUp(self):
         self.con=sqlite3.connect(':memory:');self.addCleanup(self.con.close)
         self.config=dict(issue_id='issue',author_task='author-task',cto='cto',reviewer='lead',
@@ -70,6 +90,12 @@ class WorkflowTests(unittest.TestCase):
         self.advance(602)
         self.assertEqual(self.state()['stage'],'blocked')
         self.assertEqual(self.state()['category'],'bundle_dispatch_unobserved')
+
+    def test_rejected_native_handoff_is_an_owned_hold_not_an_exception_that_starves_other_work(self):
+        def rejected(*args):raise ValueError('native handoff exceeds wrapper bound')
+        self.fx.wake=rejected;self.advance()
+        self.assertEqual(self.state()['category'],'bundle_dispatch_rejected')
+        self.assertEqual(self.state()['owner'],'cto')
 
     def test_duplicate_native_runs_are_not_arbitrarily_selected(self):
         self.advance()

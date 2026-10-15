@@ -1,0 +1,9 @@
+FROM delivery-kit-execution-broker:20261015.477
+COPY broker/calibration_objection.py /calibration_objection.py
+COPY broker/calibration_objection_runtime.py /calibration_objection_runtime.py
+COPY broker/generic_calibration_seam_job.py /generic_calibration_seam_job.py
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/generic_calibration_red_bridge.py /generic_calibration_red_bridge.py
+COPY broker/worker_model_config.py /worker_model_config.py
+COPY calibration_objection_contract.py calibration_node_path_probe.py generic_calibration_seam_probe.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_objection_runtime,calibration_node_path_probe"

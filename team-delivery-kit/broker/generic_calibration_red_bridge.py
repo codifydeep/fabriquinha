@@ -38,7 +38,12 @@ def reconcile_existing(b,route,source,prior):
     if state['stage']=='calibration_ready':return False
     try:import calibration_incidents as incidents
     except ImportError:from broker import calibration_incidents as incidents
-    with b.db() as con:projected=incidents.projection(con,route['issue_id'],source['id'],state)
+    with b.db() as con:
+        projected=incidents.projection(con,route['issue_id'],source['id'],state)
+        if projected is None:
+            try:import calibration_objection_runtime as objections
+            except ImportError:from broker import calibration_objection_runtime as objections
+            projected=objections.projection(con,route['issue_id'],source['id'],state)
     data=json.loads(prior['data']) if prior else {}
     expected_stage='test_first_blocked' if state['stage']=='blocked' else 'test_first_validation_pending'
     if (prior and prior['stage']==expected_stage and data.get('calibration_prerequisite')==state
@@ -83,7 +88,12 @@ def observe(b,route,source,prior,error):
     else:data.pop('error',None)
     try:import calibration_incidents as incidents
     except ImportError:from broker import calibration_incidents as incidents
-    with b.db() as con:projected=incidents.projection(con,route['issue_id'],source['id'],state)
+    with b.db() as con:
+        projected=incidents.projection(con,route['issue_id'],source['id'],state)
+        if projected is None:
+            try:import calibration_objection_runtime as objections
+            except ImportError:from broker import calibration_objection_runtime as objections
+            projected=objections.projection(con,route['issue_id'],source['id'],state)
     if projected:
         data.update(calibration_incident=projected,required_action=projected['required_action'])
     else:data.pop('calibration_incident',None)

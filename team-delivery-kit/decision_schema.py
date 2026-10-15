@@ -15,6 +15,9 @@ def validation_schema(sha):
 
 
 def apply(body):
+    from calibration_objection_contract import apply as objection
+    current=objection(body)
+    if current is not None:return current
     from calibration_incident_contract import apply as incident
     current=incident(body)
     if current is not None:return current

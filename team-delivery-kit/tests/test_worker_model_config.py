@@ -11,6 +11,17 @@ spec.loader.exec_module(worker)
 
 
 class WorkerModelConfigTests(unittest.TestCase):
+    def test_governed_worker_disables_only_periodic_self_review_and_paid_titles(self):
+        import yaml
+        config=yaml.safe_load(worker.EXPECTED)
+        self.assertEqual(config['memory']['nudge_interval'],0)
+        self.assertEqual(config['skills']['creation_nudge_interval'],0)
+        self.assertFalse(config['auxiliary']['title_generation']['enabled'])
+        self.assertNotIn('enabled',config['memory']) # Existing memory reads are not disabled.
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'config.yaml';target.write_text(worker.SINGLE_API_EXPECTED)
+            worker.install_config(Path(directory));self.assertEqual(target.read_text(),worker.EXPECTED)
+
     def test_authorized_model_change_migrates_only_exact_old_config(self):
         from model_policy import MODEL, PREVIOUS_MODEL
         with tempfile.TemporaryDirectory() as directory:

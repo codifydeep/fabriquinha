@@ -56,7 +56,7 @@ def instruction(c):
     if engine=='unittest_path_fixtures_v2':
         note+=' All product Path globals used by these tests need positive fixtures; each negative changes only its declared attributes.'
     note=capsule(context('bundle',paths,digest(c),engine=engine if 'calibration_engine' in c else None))+note
-    gate.require(len(note)<=4000)
+    gate.require(len(note)<=3800) # Reserve native marker/source wrapper space.
     return note
 
 
@@ -65,7 +65,8 @@ def advance(con,c,fx,*,now=None):
     row=con.execute('SELECT config,state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
         (c['issue_id'],c['author_task'])).fetchone()
     gate.require(row and json.loads(row[0])==c);s=json.loads(row[1])
-    if s['stage'] in ('blocked','calibration_ready'):return s
+    legacy_objection=s['stage']=='blocked' and s.get('category')=='bundle_submission_rejected'
+    if s['stage']=='calibration_ready' or (s['stage']=='blocked' and not legacy_objection):return s
     if s['stage'] in ('inputs_ready','observe_inputs','register_policy','observe_calibration'):
         try:import generic_calibration_pipeline as pipeline
         except ImportError:from broker import generic_calibration_pipeline as pipeline
@@ -81,9 +82,24 @@ def advance(con,c,fx,*,now=None):
         return s
     def hold(category,action,**facts):
         return save(stage='blocked',category=category,owner=c['cto'],required_action=action,**facts)
+    def objection(task):
+        record=getattr(fx,'objection',lambda *_:None)(c,task,s['wakeup_id'])
+        if record is None:return None
+        gate.require(record['operation']=='calibration_technical_objection_v1' and record['source_sha256']==digest(c)
+            and record['execution_authorized'] is False and record['delivery_approval'] is False)
+        return save(stage='blocked',category='bundle_technical_objection',owner=c['reviewer'],objection=record,
+            observed_task=task['id'],prior_classification=s.get('category'),
+            required_action='Tech Lead verify CTO objection through a fixed source-bound SPIKE; no author retry or delivery approval')
     try:fx.verify(c)
     except (ValueError,KeyError,TypeError):
         return hold('bundle_source_binding_rejected','CTO diagnose changed source binding; no dispatch or retry')
+    if legacy_objection:
+        matches=[t for t in fx.runs(c) if t.get('id')==s.get('observed_task') and t.get('wakeup_id')==s['wakeup_id']]
+        if len(matches)!=1 or matches[0].get('status')!='completed':return s
+        try:
+            if not fx.ready(c,matches[0]):return s
+            result=objection(matches[0]);return result if result is not None else s
+        except (ValueError,KeyError,TypeError):return s # Retain invalid submissions, never reinterpret them as objections.
     if s['stage']=='prepare_controls':
         try:result=fx.materialize(c)
         except TimeoutError:return s  # Observe the same durable Docker job.
@@ -133,7 +149,17 @@ def advance(con,c,fx,*,now=None):
             except (ValueError,KeyError,TypeError):
                 return hold('incident_sponsorship_rejected','CTO verify exact independent incident sponsorship; no dispatch')
             marker=digest(dict(config_sha256=digest(c),phase='bundle',incident_sponsorship=digest(receipt)))
-        try:note=instruction(c)
+        objection_receipt=None
+        if s.get('objection_resume_sha256'):
+            try:import calibration_objection_runtime as objections
+            except ImportError:from broker import calibration_objection_runtime as objections
+            try:objection_receipt=objections.qualified(con,c,s)
+            except (ValueError,KeyError,TypeError):return hold('objection_referral_binding_rejected','CTO verify exact independent SPIKE referral; no dispatch')
+            marker=digest(dict(config_sha256=digest(c),phase='bundle',objection_referral=digest(objection_receipt)))
+        try:
+            note=instruction(c)
+            if objection_receipt:
+                note+=objections.addendum(objection_receipt);gate.require(len(note)<=3800)
         except ValueError:
             return hold('bundle_context_requires_readonly_capsule',
                 'Controller materialize full context for CTO; never truncate approved criteria')
@@ -142,6 +168,8 @@ def advance(con,c,fx,*,now=None):
         gate.require(s['marker']==marker)
         try:wake=fx.wake(c,note,marker,first)
         except (TimeoutError,urllib.error.URLError):wake=None
+        except (ValueError,KeyError,TypeError):
+            return hold('bundle_dispatch_rejected','CTO/platform verify exact bounded wakeup; no identical dispatch or author retry')
         if wake is None:
             if now-s['observation_started']>=600:
                 return hold('bundle_dispatch_unobserved','CTO diagnose exact unobserved wakeup; never repeat POST')
@@ -168,7 +196,10 @@ def advance(con,c,fx,*,now=None):
         if now-s['dispatched_at']>=1800:
             return hold('bundle_lease_close_deadline','CTO diagnose exact unclosed producer lease',observed_task=task['id'])
         return s
-    try:record=fx.collect(c,task,s['wakeup_id'])
+    try:
+        result=objection(task)
+        if result is not None:return result
+        record=fx.collect(c,task,s['wakeup_id'])
     except (ValueError,KeyError,TypeError):
         return hold('bundle_submission_rejected','CTO diagnose invalid source-bound bundle; no identical retry',observed_task=task['id'])
     gate.require(record['execution_authorized'] is False and record['delivery_approval'] is False)
@@ -289,6 +320,10 @@ class Effects:
         except ImportError:from broker import generic_calibration_proposal as producer
         return producer.collect(self.b,c['issue_id'],c['author_task'],task['id'],wakeup,
             expected_engine=c.get('calibration_engine','unittest_path_fixture_v1'))
+    def objection(self,c,task,wakeup):
+        try:import calibration_objection
+        except ImportError:from broker import calibration_objection
+        return calibration_objection.collect(self.b,c,task,wakeup)
     def materialize(self,c):
         try:import generic_calibration_materialization as jobs
         except ImportError:from broker import generic_calibration_materialization as jobs
@@ -422,6 +457,18 @@ def tick(b):
         for row in rows:
             c,s=map(json.loads,row)
             if s['stage']=='blocked':
+                if s.get('category')=='bundle_submission_rejected':
+                    if fx is None:fx=Effects(b)
+                    advance(con,c,fx)
+                if s.get('category')=='bundle_technical_objection':
+                    try:import calibration_objection_runtime as objections
+                    except ImportError:from broker import calibration_objection_runtime as objections
+                    try:objections.handle(b,con,c,s)
+                    except (ValueError,KeyError,TypeError,RuntimeError,TimeoutError,urllib.error.URLError,objections.ValidationError) as error:
+                        # Fixed category only, never raw native/provider errors.
+                        initialize(con)
+                        con.execute('CREATE TABLE IF NOT EXISTS calibration_objection_errors(issue_id TEXT,author_task TEXT,category TEXT,PRIMARY KEY(issue_id,author_task))')
+                        con.execute('INSERT OR REPLACE INTO calibration_objection_errors VALUES(?,?,?)',(c['issue_id'],c['author_task'],type(error).__name__));con.commit()
                 if s.get('category')=='bundle_task_failed' and s.get('observed_task'):
                     try:import calibration_incidents as incidents
                     except ImportError:from broker import calibration_incidents as incidents

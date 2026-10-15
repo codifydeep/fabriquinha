@@ -10,14 +10,17 @@ try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
 
 
-def payload(b,c):
-    image=getattr(b,'GENERIC_CALIBRATION_SEAM_IMAGE',None) or os.environ.get('BROKER_GENERIC_CALIBRATION_SEAM_IMAGE')
+def payload(b,c,kind='path'):
+    require(kind in ('path','node'))
+    key='GENERIC_CALIBRATION_NODE_IMAGE' if kind=='node' else 'GENERIC_CALIBRATION_SEAM_IMAGE'
+    image=getattr(b,key,None) or os.environ.get('BROKER_'+key)
     require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
     volume=c['candidate_volume']
     require(volume.startswith(b.PREFIX+'-') and bool(re.fullmatch('[A-Za-z0-9_.-]{1,200}',volume)))
-    return dict(Image=image,User='10000:10000',Entrypoint=['python'],
-        Cmd=['/generic_calibration_seam_probe.py','/candidate',c['prepared']['manifest_sha256'],
-            json.dumps(c['prepared']['test_sha256'],sort_keys=True,separators=(',',':'))],
+    command=['/generic_calibration_seam_probe.py','/candidate',c['prepared']['manifest_sha256'],
+            json.dumps(c['prepared']['test_sha256'],sort_keys=True,separators=(',',':'))]
+    if kind=='node':command=['-c','import signal,runpy,sys;signal.alarm(90);sys.argv=["/calibration_node_path_probe.py"]+sys.argv[1:];runpy.run_path(sys.argv[0],run_name="__main__")',*command[1:]]
+    return dict(Image=image,User='10000:10000',Entrypoint=['python'],Cmd=command,
         Env=gate.environment(b,image),Labels={**labels('calibration-seam',b.PREFIX),
             'delivery-kit.owner':b.OWNER,'delivery-kit.calibration-seam-author':c['author_task']},
         HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
@@ -31,15 +34,20 @@ def initialize(con):
         'job_key TEXT PRIMARY KEY,identity TEXT,state TEXT)')
 
 
-def run(b,con,c,*,now=None):
+def run(b,con,c,*,now=None,kind='path'):
     """Caller authenticates sealed maintenance and frozen source before each call."""
     try:import generic_calibration_capability_recovery as capability
     except ImportError:from broker import generic_calibration_capability_recovery as capability
     initialize(con);now=time.time() if now is None else now
     tags=(b.docker('GET','/volumes/'+c['candidate_volume']) or {}).get('Labels',{})
     require(tags.get('delivery-kit.owner')==b.OWNER and tags.get('delivery-kit.test-first-task')==c['author_task'])
-    expected=payload(b,c);key=c['issue_id']+':'+c['author_task']
-    identity=dict(name=b.PREFIX+'-calibration-seam-'+digest(c)[:24],payload=expected,config_sha256=digest(c))
+    expected=payload(b,c,kind);key=c['issue_id']+':'+c['author_task']+(':node-path-v1' if kind=='node' else '')
+    identity=dict(name=b.PREFIX+('-calibration-node-path-' if kind=='node' else '-calibration-seam-')+digest(c)[:24],payload=expected,config_sha256=digest(c))
+    def validate(value):
+        if kind=='node':
+            from calibration_node_path_probe import validate as node_validate
+            node_validate(value,c)
+        else:capability.seam(value,c)
     # Preserve the recorded pre-adapter plan, including uncertain creates. The
     # controller boundary deterministically groups every POST; verify exactly
     # that effective payload, not a broader set of acceptable labels.
@@ -51,7 +59,7 @@ def run(b,con,c,*,now=None):
             result=state['result'];raw=result['output']
             require(result['approval'] is False and type(result['exit_code']) is int and result['exit_code']==0
                 and hashlib.sha256(raw.encode()).hexdigest()==result['output_sha256'])
-            capability.seam(json.loads(raw),c);return result
+            validate(json.loads(raw));return result
         require(state['stage']!='blocked')
     else:
         require(b.docker('GET','/containers/'+identity['name']+'/json') is None)
@@ -61,7 +69,7 @@ def run(b,con,c,*,now=None):
     def save(**changes):
         state.update(changes);con.execute('UPDATE generic_calibration_seam_jobs SET state=? WHERE job_key=?',
             (json.dumps(state,sort_keys=True),key));con.commit()
-    if now>=state['deadline']:
+    if now>=state['deadline'] and (kind=='path' or state['stage']=='prepared'):
         save(stage='blocked',category='seam_observation_deadline');raise ValueError('retain exact seam job; no identical retry')
     if state['stage']=='prepared':
         save(stage='create_intent')
@@ -72,6 +80,8 @@ def run(b,con,c,*,now=None):
     gate.verify_job(b,info,effective)
     if state['stage']=='create_intent':save(stage='created',container_id=info['Id'])
     require(info['Id']==state['container_id'])
+    if now>=state['deadline'] and info['State']['Status']!='exited':
+        save(stage='blocked',category='seam_observation_deadline');raise ValueError('retain exact seam job; no identical retry')
     if state['stage']=='created':
         require(info['State']['Status']=='created');save(stage='start_intent')
         try:b.docker('POST','/containers/'+info['Id']+'/start')
@@ -84,7 +94,7 @@ def run(b,con,c,*,now=None):
     output_sha=hashlib.sha256(raw.encode()).hexdigest()
     try:
         require(type(info['State']['ExitCode']) is int and info['State']['ExitCode']==0)
-        capability.seam(json.loads(raw),c)
+        validate(json.loads(raw))
     except (ValueError,KeyError,TypeError):
         save(stage='blocked',category='seam_actual_probe_rejected',output_sha256=output_sha,output=raw)
         raise ValueError('actual seam rejected; no identical retry') from None

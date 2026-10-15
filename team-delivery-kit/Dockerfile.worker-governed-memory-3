@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker@sha256:8587b28c1ca28e5042321b2d2123bc2de92a6847c3ddf9fc1e0a7ff60f019a1f
+COPY broker/worker_model_config.py /worker_model_config.py
+COPY model_policy.py /model_policy.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import worker_model_config;assert 'creation_nudge_interval: 0' in worker_model_config.EXPECTED"
