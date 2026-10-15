@@ -17,6 +17,8 @@ class LocalWrapperTests(unittest.TestCase):
         f=samples.CapabilityWrapperTests();f.setUp();self.addCleanup(f.doCleanups);self.f=f
         f.migrate();self.con=f.con
         self.c,self.s=map(json.loads,self.con.execute('SELECT config,state FROM generic_calibration_workflows').fetchone())
+        route=json.loads(self.con.execute('SELECT config FROM delivery_routes').fetchone()[0]);route['issue_id']=f.issue
+        self.con.execute('UPDATE delivery_routes SET config=?',(json.dumps(route),))
         self.s.update(stage='blocked',category='bundle_task_failed',observed_task=f.task['id'],wakeup_id=f.task['wakeup_id'])
         self.con.execute('UPDATE generic_calibration_workflows SET state=?',(json.dumps(self.s),))
         self.con.execute('CREATE TABLE IF NOT EXISTS tool_events(request_id TEXT,tool_count INTEGER)')
@@ -47,6 +49,7 @@ class LocalWrapperTests(unittest.TestCase):
             stack.enter_context(patch.object(maintenance,'native_active',return_value=[]))
             stack.enter_context(patch.object(maintenance,'current',return_value=self.f.barrier))
             stack.enter_context(patch.object(workflow,'Effects',return_value=self.f.fx))
+            stack.enter_context(patch.object(workflow,'request',return_value=self.s))
             return recovery.migrate(self.f.b,self.f.issue,self.f.author,self.f.operation)
 
     def test_wrapper_collects_closed_native_binding_proxy_ledger_and_exact_source_hashes(self):

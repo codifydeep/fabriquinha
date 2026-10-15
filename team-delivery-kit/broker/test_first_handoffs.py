@@ -802,6 +802,9 @@ def reconcile(broker, route, runs, effects):
                     handoffs.save(con,source['id'],issue,'technical_decision_required',
                         route['cto'],preserved,time.time())
                     prior=handoffs.load(con,source['id'])
+        try:import generic_calibration_red_bridge as calibration
+        except ImportError:from broker import generic_calibration_red_bridge as calibration
+        if calibration.reconcile_existing(broker,route,source,prior):return None
         if (prior and prior['stage']=='test_first_blocked'
                 and json.loads(prior['data']).get('calibration_prerequisite',{}).get('stage')=='blocked'):
             # This is a prerequisite-controller incident, not failed author tests.

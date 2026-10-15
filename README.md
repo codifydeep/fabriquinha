@@ -1588,6 +1588,12 @@ Compara os hashes instalados no proxy/controlador e revalida autor, snapshot,
 rota e ausência de atividade. Registra uma tentativa separada e imutável, sem
 zerar migrações anteriores, alterar configuração, reiniciar autor ou dispensar
 revisão/TDD. Nova falha permanece bloqueada; o mesmo recibo não rebobina o fluxo.
+A retomada sem seleção explícita reutiliza o engine persistido e revalida toda
+a configuração; selecionar outro engine continua exigindo uma migração própria.
+O bridge do Red reconcilia um pré-requisito durável antes do reparo legado de
+testes. Uma projeção desatualizada é restaurada com referência ao estado anterior,
+sem novas mensagens/eventos idênticos a cada tick, sem alterar testes e sem
+converter falha de calibração em uma tentativa de correção pelo autor.
 
 ## Contribuir e reutilizar
 

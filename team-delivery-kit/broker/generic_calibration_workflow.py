@@ -170,12 +170,22 @@ def advance(con,c,fx,*,now=None):
         required_action='Controller materialize exact immutable controls, then independent native policy review')
 
 
-def request(b,issue,author_task,*,engine='unittest_path_fixture_v1'):
-    """Freeze the dispatch source after a real completed candidate copy."""
-    version_for_engine(engine)
+def request(b,issue,author_task,*,engine=None):
+    """Freeze or revalidate a source; omitted engine observes persisted choice.
+
+    An explicit engine remains a selection, never a migration authorization.
+    The reconstructed config, native author and original copy are still checked.
+    """
     try:import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans
     except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans
     with b.LOCK:
+        if engine is None:
+            with b.db() as con:
+                exists=con.execute("SELECT 1 FROM sqlite_master WHERE name='generic_calibration_workflows'").fetchone()
+                previous=con.execute('SELECT config FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
+                    (issue,author_task)).fetchone() if exists else None
+            engine=json.loads(previous[0]).get('calibration_engine','unittest_path_fixture_v1') if previous else 'unittest_path_fixture_v1'
+        version_for_engine(engine)
         value=guard.qualified(b,issue)
         gate.require(value and value.get('amendment',{}).get('kind')=='inherited_frozen_suite')
         approved_config,approved=remediation_admission.Effects(b).plan(value['source_task'])

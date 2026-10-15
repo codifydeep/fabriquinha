@@ -159,6 +159,15 @@ def migrate(b,issue,author,operation):
         require(provider.proxy_info(b)['Id']==proxy['Id'] and not maintenance.native_active(b))
         proof=dict(operation='calibration_read_qualification_v1',passed=True,source_sha256=digest(c),
             sources=expected,proxy_image=proxy['Image'],delivery_approval=False)
+        # Reconcile a stale legacy projection through the normal source-bound
+        # bridge, not by manufacturing the parent state required by transition.
+        try:import generic_calibration_red_bridge as bridge
+        except ImportError:from broker import generic_calibration_red_bridge as bridge
+        with b.db() as con:
+            route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(issue,)).fetchone()[0])
+            parent=handoffs.load(con,author)
+        original=workflow.Effects(b).plans.task(author,route['author'])
+        require(bridge.reconcile_existing(b,route,original,parent))
         with b.db() as con:
             maintenance.transaction(con);require(maintenance.current(con)==barrier)
             require(not con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone())

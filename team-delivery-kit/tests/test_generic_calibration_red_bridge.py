@@ -64,3 +64,24 @@ class RedBridgeTests(unittest.TestCase):
         self.assertFalse(bridge.observe(self.b,self.route,self.source,None,TimeoutError()))
         with self.assertRaises(ValueError):
             bridge.observe(self.b,self.route,self.source,None,bridge.Pending('other','author',self.pending))
+
+    def test_durable_calibration_restores_legacy_overwrite_without_legacy_repair_or_event_loop(self):
+        source={**self.source,'status':'completed','agent_id':'author','created_at':'now'}
+        route={**self.route,'author':'author'}
+        blocked={**self.pending,'stage':'blocked','category':'bundle_task_failed','owner':'cto'}
+        with self.b.db() as con:
+            bridge.workflow.initialize(con)
+            con.execute('INSERT INTO generic_calibration_workflows VALUES(?,?,?,?)',
+                ('issue','author','{}',json.dumps(blocked)))
+            con.execute('CREATE TABLE test_first_red(issue_id TEXT,task_id TEXT,receipt TEXT)')
+            handoffs.save(con,'author','issue','test_first_blocked','cto',
+                dict(source_task='author',phase='test_first',error='test_first_correction_failed_after_cto_diagnosis'),0)
+        with patch.object(template_author_executor,'observe'),patch.object(bridge.workflow,'request',return_value=blocked),\
+                patch.object(test_first_handoffs,'technical_recovery') as legacy:
+            test_first_handoffs.reconcile(self.b,route,[source],object())
+            with self.b.db() as con:
+                restored=handoffs.load(con,'author');count=con.execute('SELECT count(*) FROM delivery_handoff_events').fetchone()[0]
+            data=json.loads(restored['data']);self.assertEqual(data['calibration_prerequisite'],blocked)
+            self.assertEqual(data['calibration_projection_repair']['prior_error'],'test_first_correction_failed_after_cto_diagnosis')
+            test_first_handoffs.reconcile(self.b,route,[source],object());legacy.assert_not_called()
+            with self.b.db() as con:self.assertEqual(con.execute('SELECT count(*) FROM delivery_handoff_events').fetchone()[0],count)

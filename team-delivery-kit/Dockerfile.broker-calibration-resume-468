@@ -1,0 +1,6 @@
+FROM delivery-kit-execution-broker:20261015.467
+COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
+COPY broker/generic_calibration_red_bridge.py /generic_calibration_red_bridge.py
+COPY broker/test_first_handoffs.py /test_first_handoffs.py
+COPY broker/generic_calibration_local_recovery.py /generic_calibration_local_recovery.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import generic_calibration_red_bridge as b;assert callable(b.reconcile_existing)"
