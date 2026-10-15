@@ -34,6 +34,8 @@ COPY calibration_experiment_contract.py /calibration_experiment_contract.py
 COPY broker/calibration_experiment_runtime.py /calibration_experiment_runtime.py
 COPY broker/calibration_controls_diagnostic.py /calibration_controls_diagnostic.py
 COPY calibration_control_experiment_probe.py calibration_frozen_harness_probe.py /
+COPY diagnostic_control_transport.py /diagnostic_control_transport.py
+COPY diagnostic_control_transport_probe.py /diagnostic_control_transport_probe.py
 COPY calibration_node_path_probe.py /calibration_node_path_probe.py
 COPY generic_calibration_seam_probe.py /generic_calibration_seam_probe.py
 COPY broker/calibration_objection.py /calibration_objection.py

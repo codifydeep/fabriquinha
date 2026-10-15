@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261015.482
+COPY broker/calibration_controls_diagnostic.py broker/calibration_objection_runtime.py /
+COPY model_proxy.py diagnostic_control_transport.py diagnostic_control_transport_probe.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_controls_diagnostic;import diagnostic_control_transport_probe as p;assert all(len(v)==64 for v in p.source_hashes().values())"

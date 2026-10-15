@@ -975,6 +975,39 @@ deadlines and refusals retain a visible CTO-owned hold without identical replay.
 The Linux/Node canary qualifies only the synthetic executor and isolation; this
 new native recovery route is not end-to-end delivery qualification.
 
+### Opt-in diagnostic data carrier and one measured protocol recovery
+
+The `DELIVERY_DIAGNOSTIC_CONTROL_TRANSPORT_V1` marker binds the transport to the
+exact current bundle context. Mandatory reads are unchanged. Only after their
+canonical receipts are present, the upstream request keeps actual `read_file`
+and adds the non-executable `return_diagnostic_control_data` carrier with required
+tool selection. Provider hints omit unsupported unions; the unchanged complete
+canonical schema still validates every returned byte locally. Native DTO calls
+are consumed by the proxy as data, never sent to a worker handler or counted as
+execution. Argument strings are preserved literally; null optional stream
+metadata may be normalized, never JSON contents, assertions or authorizations.
+Nonterminal/mixed/multiple/foreign calls, invalid JSON and forged flags fail
+closed. Real extra reads retain their arguments and actual tool execution/read
+receipts remain separately required.
+
+Successful data envelopes have a private, durable hash-only receipt tied to
+execution/call/source and canonical payload. Native collection rechecks that
+receipt and the closed session instead of treating an adapter's schema request
+as evidence. The fixed offline probe runs on the proxy companion; the controller
+compares its exact installed source hashes with mirrored source files, without
+loading the proxy service or its unrelated dependencies. It spends no provider calls. JSON-mode
+history is preserved, not retroactively repaired. A failed old native producer
+may receive one different diagnostic task only after its actual closed binding,
+mandatory read evidence and persisted invalid-JSON rejection are authenticated,
+and the installed companion passes the fixed probe. The failed native task,
+original author and source submission budgets are never reset. A failure with
+the new carrier already selected cannot rearm that correction.
+
+The same qualified marker is included in any subsequent, independently referred
+original-source proposal; that proposal still needs all normal immutable policy
+reviews, measured calibration, TDD and delivery gates. Native/provider behavior
+and full autonomous recovery are not implied by the synthetic adapter tests.
+
 The controller distinguishes an explicit `calibration_objection` from malformed
 bundle data. It re-fetches the native task, closed planning lease, exact source
 capsule and full candidate/previous test reads; reason, output hash and actor are

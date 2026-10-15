@@ -6,6 +6,8 @@ adopts a diagnostic bundle as a delivery, or grants a worker Docker authority.
 import hashlib
 import json
 import time
+import os
+import re
 import urllib.error
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
@@ -13,6 +15,9 @@ from generic_harness_calibration import digest,require
 import calibration_response_contract as wire
 import calibration_objection_contract as review_wire
 from structured_response_contract import _unique
+import diagnostic_control_transport as transport
+import diagnostic_control_transport_probe as transport_probe
+import structured_rejection_receipts
 try:import generic_calibration_seam_job as jobs
 except ImportError:from broker import generic_calibration_seam_job as jobs
 
@@ -37,6 +42,16 @@ def producer_context(cfg):
 def review_context(cfg,s):return review_wire.context(digest(cfg['source']),digest(cfg),digest(s['result']))
 
 
+def validate_transport(value):
+    require(set(value)=={'protocol','proxy_image','probe'} and value['protocol']=='diagnostic_control_data_carrier_v1'
+        and bool(re.fullmatch('sha256:[a-f0-9]{64}',value['proxy_image'])))
+    p=value['probe'];require(p['operation']=='fixed_diagnostic_control_transport_v1' and p['protocol']==value['protocol']
+        and p['passed'] is True and p['sources']==transport_probe.source_hashes() and set(p['checks'])==transport_probe.CHECKS
+        and all(v is True for v in p['checks'].values()) and type(p['model_calls']) is int and p['model_calls']==0
+        and all(p[k] is False for k in ('product_tests_executed','historical_cause_proven','author_retry_authorized','execution_authorized','delivery_approval')))
+    return value
+
+
 def instruction(cfg,s,phase):
     c=cfg['source']
     if phase=='producer':
@@ -46,6 +61,7 @@ def instruction(cfg,s,phase):
         note=wire.capsule(producer_context(cfg))+('ISOLATED DIAGNOSTIC DATA ONLY, not a delivery submission. '
             'Positive references must exercise test bodies; each negative must fail its declared assertion, never setup/teardown. '
             'The original author and delivery remain blocked.\n')+body
+        if s.get('transport'):note+='\n'+transport.MARKER+':'+producer_context(cfg)['source_sha256']+'\n'
     else:
         r=s['result']['receipt'];m=r.get('measurements',{});p=s['bundle'].get('policy',{})
         summary=dict(positive=m.get('positive'),negatives=m.get('negative_controls'),
@@ -62,15 +78,44 @@ def instruction(cfg,s,phase):
 def advance(con,issue,author,fx,*,now=None):
     now=time.time() if now is None else now
     cfg,s=map(json.loads,con.execute('SELECT config,state FROM calibration_control_experiments WHERE issue_id=? AND author_task=?',(issue,author)).fetchone());c=cfg['source']
-    if s['stage'] in ('blocked','referred'):return s
+    legacy=s['stage']=='blocked' and s.get('category')=='diagnostic_evidence_rejected' and not s.get('producer_task')
+    if s['stage']=='referred' or (s['stage']=='blocked' and not legacy):return s
     def save(**changes):
         s.update(changes);con.execute('UPDATE calibration_control_experiments SET state=? WHERE issue_id=? AND author_task=?',
             (json.dumps(s,sort_keys=True),issue,author));con.commit();return s
     def hold(category):return save(stage='blocked',category=category,owner=c['cto'],
         required_action='CTO diagnose '+category+' using preserved diagnostic evidence; no source reset or identical retry')
+    def recover(task):
+        if s.get('transport_recovery'):return hold('diagnostic_protocol_recovery_exhausted')
+        proof=getattr(fx,'native_failure',lambda *_:None)(cfg,s,task)
+        if proof is None:return hold('diagnostic_failure_evidence_unavailable')
+        require(proof['operation']=='diagnostic_producer_transport_failure_v1' and proof['task_id']==task['id']
+            and proof['wakeup_id']==s['wakeup_id'] and proof['diagnostic_sha256']==digest(cfg)
+            and proof['source_sha256']==digest(c) and proof['binding_closed'] is True
+            and all(proof[k] is False for k in ('execution_authorized','delivery_approval')))
+        save(native_failure=proof,observed_task=task['id'])
+        r=proof['receipt'];d=r.get('diagnostic',{})
+        require(structured_rejection_receipts.from_event(dict(event='model_proxy_request',status=502,
+            category='structured_decision_response_invalid',execution_id=proof['execution_id'],call_number=r['call_number'],
+            structured_rejection_category=r['category'],structured_rejection_diagnostic=d))==r)
+        if not (proof['initial_transport'] is None and r['category']=='calibration_response_invalid'
+                and d.get('version')=='calibration-constraint-v2' and d.get('failure_code')=='invalid_json'):
+            return hold('diagnostic_native_failure_not_protocol_recoverable')
+        protocol=getattr(fx,'transport',lambda:None)()
+        if protocol is None:return hold('diagnostic_transport_unavailable')
+        validate_transport(protocol)
+        recovery=dict(failure=proof,protocol=protocol,attempt_limit=1,execution_authorized=False,delivery_approval=False)
+        return save(stage='producer_dispatch',category='diagnostic_transport_recovery',transport=protocol,transport_recovery=recovery,
+            required_action='One new diagnostic task using qualified data-carrier protocol; original failed task and source budgets preserved')
     if 'started' not in s:save(started=now)
     try:
         fx.verify(cfg)
+        if legacy:
+            if 'failure_observation_started' not in s:save(failure_observation_started=now)
+            matches=[t for t in fx.runs(cfg,s) if t.get('wakeup_id')==s['wakeup_id']]
+            require(len(matches)==1 and matches[0].get('agent_id')==c['cto'] and matches[0].get('issue_id')==s['issue_id'])
+            if matches[0].get('status')!='failed':return hold('diagnostic_data_rejected')
+            return recover(matches[0])
         if s['stage'] in ('issue_pending','observe_issue'):
             first=s['stage']=='issue_pending'
             if first:save(stage='observe_issue',phase_started=now)
@@ -88,6 +133,11 @@ def advance(con,issue,author,fx,*,now=None):
         phase='producer' if s['stage'].startswith('producer') else 'review'
         require(s['stage'] in tuple(phase+'_'+suffix for suffix in ('dispatch','observe','wait')))
         actor=c['cto'] if phase=='producer' else c['reviewer'];require(c['cto']!=c['reviewer'])
+        if phase=='producer' and s['stage']=='producer_dispatch':
+            protocol=getattr(fx,'transport',lambda:None)()
+            if protocol:
+                validate_transport(protocol);require(not s.get('transport') or s['transport']==protocol);save(transport=protocol)
+            elif s.get('transport'):return hold('diagnostic_transport_unavailable')
         note=instruction(cfg,s,phase)
         if s['stage'] in (phase+'_dispatch',phase+'_observe'):
             first=s['stage']==phase+'_dispatch'
@@ -100,7 +150,9 @@ def advance(con,issue,author,fx,*,now=None):
         matches=[t for t in fx.runs(cfg,s) if t.get('wakeup_id')==s['wakeup_id']];require(len(matches)<=1)
         if not matches or matches[0].get('status') in ('queued','dispatched','running'):
             return hold('diagnostic_native_deadline') if now-s['phase_started']>=1800 else s
-        task=matches[0];require(task.get('status')=='completed' and task.get('agent_id')==actor and task.get('issue_id')==s['issue_id'] and task['id']!=author)
+        task=matches[0];require(task.get('agent_id')==actor and task.get('issue_id')==s['issue_id'] and task['id']!=author)
+        if phase=='producer' and task.get('status')=='failed':return recover(task)
+        require(task.get('status')=='completed')
         if phase=='producer':
             bundle=fx.collect(cfg,s,task)
             if bundle['operation']=='diagnostic_control_objection_v1':return save(stage='blocked',category='diagnostic_native_objection',
@@ -114,8 +166,10 @@ def advance(con,issue,author,fx,*,now=None):
             decision=decision,owner=c['cto'],required_action='CTO address independent measured-evidence objection; diagnostic budget spent')
         return save(stage='referred',decision=decision,required_action='JIT verify measured independent referral before one source data proposal; no author retry')
     except (TimeoutError,urllib.error.URLError):
-        return hold('diagnostic_observation_deadline') if now-s.get('phase_started',s['started'])>=1800 else s
-    except (ValueError,KeyError,TypeError,ValidationError):return hold('diagnostic_evidence_rejected')
+        start=s.get('failure_observation_started',now) if legacy else s.get('phase_started',s['started'])
+        return hold('diagnostic_observation_deadline') if now-start>=1800 else s
+    except (ValueError,KeyError,TypeError,ValidationError):
+        return hold('diagnostic_failure_evidence_rejected' if legacy else 'diagnostic_evidence_rejected')
 
 
 class Effects:
@@ -123,6 +177,45 @@ class Effects:
         try:import calibration_objection_runtime as objections,native
         except ImportError:from broker import calibration_objection_runtime as objections,native
         self.b=b;self.parent=objections.Effects(b);self.plans=self.parent.plans;self.native=native
+    def transport(self):
+        if not os.environ.get('BROKER_DIAGNOSTIC_CONTROL_PROXY_IMAGE'):return None
+        program='import sys,json;sys.path.insert(0,"/");import diagnostic_control_transport_probe as p;print(json.dumps(p.run(),sort_keys=True))'
+        proof,image=self.proxy_read(program)
+        value=dict(protocol='diagnostic_control_data_carrier_v1',proxy_image=image,probe=proof)
+        validate_transport(value);return value
+    def carrier_evidence(self,execution):
+        program='import sys,json;sys.path.insert(0,"/");import model_proxy as m,diagnostic_control_transport as d;print(json.dumps(d.read(m.COUNTER_PATH,sys.argv[1])))'
+        return self.proxy_read(program,[execution])[0]
+    def proxy_read(self,program,arguments=()):
+        expected=os.environ.get('BROKER_DIAGNOSTIC_CONTROL_PROXY_IMAGE')
+        require(isinstance(expected,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',expected)))
+        try:import provider_diagnosis_recovery as provider
+        except ImportError:from broker import provider_diagnosis_recovery as provider
+        proxy=provider.proxy_info(self.b);require(proxy['Image']==expected and proxy.get('HostConfig',{}).get('ReadonlyRootfs') is True)
+        entry=self.b.docker('POST','/containers/'+proxy['Id']+'/exec',dict(AttachStdout=True,AttachStderr=False,Tty=True,Cmd=['python','-B','-c',program,*arguments]))
+        conn=self.b.DockerConnection('localhost',timeout=10)
+        try:
+            conn.request('POST','/v1.45/exec/'+entry['Id']+'/start',json.dumps(dict(Detach=False,Tty=True)),{'Content-Type':'application/json'})
+            response=conn.getresponse();raw=response.read(32769);require(response.status==200 and len(raw)<=32768)
+        finally:conn.close()
+        outcome=self.b.docker('GET','/exec/'+entry['Id']+'/json');require(outcome and not outcome.get('Running') and outcome.get('ExitCode')==0)
+        require(provider.proxy_info(self.b)['Id']==proxy['Id']);return json.loads(raw),proxy['Image']
+    def native_failure(self,cfg,s,task):
+        try:import calibration_incidents as incidents
+        except ImportError:from broker import calibration_incidents as incidents
+        c=cfg['source'];actual=self.plans.task(task['id'],c['cto']);binding=self.binding(actual,c['cto'])
+        require(actual.get('status')=='failed' and actual.get('failure_reason')=='agent_error.provider_server_error'
+            and actual.get('agent_id')==c['cto']
+            and actual.get('issue_id')==s['issue_id'] and actual.get('wakeup_id')==s['wakeup_id']
+            and wire.request(dict(messages=[dict(role='user',content=actual.get('handoff_note',''))]))==producer_context(cfg))
+        reads=self.plans.reads(actual)
+        for path in producer_context(cfg)['required_paths']:
+            observed=reads.get(path,{});require(type(observed.get('lines')) is int and observed['lines']>0 and observed['lines']==observed.get('total_lines'))
+        receipt,_=incidents.Effects(self.b).evidence(binding['request_id'])
+        return dict(operation='diagnostic_producer_transport_failure_v1',task_id=actual['id'],execution_id=binding['request_id'],
+            wakeup_id=s['wakeup_id'],diagnostic_sha256=digest(cfg),source_sha256=digest(c),binding_closed=True,
+            receipt=receipt,initial_transport=transport.binding(dict(messages=[dict(role='user',content=actual.get('handoff_note',''))])),
+            required_read_evidence={p:reads[p] for p in producer_context(cfg)['required_paths']},execution_authorized=False,delivery_approval=False)
     def verify(self,cfg):
         self.parent.verify(cfg['objection_config']);c=cfg['source']
         with self.b.db() as con:original,state=map(json.loads,con.execute('SELECT config,state FROM calibration_objections WHERE issue_id=? AND author_task=?',(c['issue_id'],c['author_task'])).fetchone())
@@ -154,16 +247,23 @@ class Effects:
         try:import generic_calibration_proposal as proposal,remediation_runtime_guard as guard
         except ImportError:from broker import generic_calibration_proposal as proposal,remediation_runtime_guard as guard
         c=cfg['source'];actual=self.plans.task(task['id'],c['cto']);binding=self.binding(actual,c['cto'])
+        if s.get('transport'):require(self.transport()==s['transport'])
         require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id'] and actual.get('wakeup_id')==s['wakeup_id']
             and wire.request(dict(messages=[dict(role='user',content=actual.get('handoff_note',''))]))==producer_context(cfg))
         raw=(actual.get('result') or {}).get('output');require(isinstance(raw,str) and 1<=len(raw.encode())<=786432)
         body=json.loads(raw,object_pairs_hook=_unique);Draft202012Validator(wire.schema(producer_context(cfg))).validate(body)
+        carrier=None
+        if s.get('transport'):
+            receipts=self.carrier_evidence(binding['request_id']);require(len(receipts)==1);carrier=receipts[0]
+            require(carrier['source_sha256']==producer_context(cfg)['source_sha256'] and carrier['payload_sha256']==digest(body)
+                and carrier['execution_id']==binding['request_id'] and all(carrier[k] is False for k in ('worker_tool_executed','execution_authorized','delivery_approval')))
         reads=self.plans.reads(actual)
         required=producer_context(cfg)['required_paths'] if body['action']=='calibration_objection' else proposal.source_paths(body)
         for path in required:
             observed=reads.get(path,{});require(type(observed.get('lines')) is int and observed['lines']>0 and observed['lines']==observed.get('total_lines'))
         producer=dict(task_id=task['id'],actor=c['cto'],wakeup_id=s['wakeup_id'],execution_id=binding['request_id'],
             diagnostic_issue_id=s['issue_id'],artifact_sha256=hashlib.sha256(raw.encode()).hexdigest(),read_evidence={p:reads[p] for p in required})
+        if carrier:producer['data_carrier_receipt']=carrier
         if body['action']=='calibration_objection':return dict(operation='diagnostic_control_objection_v1',reason=body['reason'],producer=producer,
             execution_authorized=False,delivery_approval=False)
         value=guard.qualified(self.b,c['issue_id']);require(digest(value)==c['execution_sha256'])
@@ -236,7 +336,10 @@ def prompt_contract(b,issue,task,note):
     if current is None:return None
     cfg,s=current;c=cfg['source'];require(s['stage']=='producer_wait' and task.get('agent_id')==c['cto']
         and task.get('issue_id')==s['issue_id'] and task.get('wakeup_id')==s['wakeup_id'])
-    Effects(b).verify(cfg);value=wire.request(dict(messages=[dict(role='user',content=note)]));require(value==producer_context(cfg));return value
+    fx=Effects(b);fx.verify(cfg);body=dict(messages=[dict(role='user',content=note)]);value=wire.request(body);require(value==producer_context(cfg))
+    if s.get('transport'):require(transport.binding(body)==value and fx.transport()==s['transport'])
+    else:require(transport.binding(body) is None)
+    return value
 
 
 def mounts(b,binding):

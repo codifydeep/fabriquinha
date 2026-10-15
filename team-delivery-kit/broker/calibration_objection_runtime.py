@@ -160,8 +160,10 @@ def qualified(con,c,s):
 
 def addendum(r):
     if r.get('diagnostic_referral'):
+        from diagnostic_control_transport import MARKER
         return ('\nIndependent measured full-harness diagnostic referral: positive references passed; each negative failed its test body. '
-            'Not product approval or author Red. Propose new verified data; preserve all gates. Evidence '+digest(r['diagnostic_referral'])+'.')
+            'Not product approval or author Red. Propose new verified data; preserve all gates. Evidence '+digest(r['diagnostic_referral'])+'.\n'
+            +MARKER+':'+r['source_sha256']+'\n')
     if r.get('experiment'):
         e=r['experiment'];require(e['stage']=='permitted')
         return ('\nIndependent experiment PLAN permit, not results/approval. Full harness + positive/negative controls remain required. '

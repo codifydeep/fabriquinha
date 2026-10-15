@@ -11,6 +11,8 @@ COPY calibration_json_transport_probe.py /calibration_json_transport_probe.py
 COPY calibration_response_observations.py /calibration_response_observations.py
 COPY calibration_objection_contract.py /calibration_objection_contract.py
 COPY calibration_experiment_contract.py /calibration_experiment_contract.py
+COPY diagnostic_control_transport.py /diagnostic_control_transport.py
+COPY diagnostic_control_transport_probe.py /diagnostic_control_transport_probe.py
 COPY calibration_response_contract.py /calibration_response_contract.py
 COPY calibration_rejection_diagnostics.py /calibration_rejection_diagnostics.py
 COPY product_scope_contract.py /product_scope_contract.py

@@ -96,3 +96,48 @@ class ControlsDiagnosticTests(unittest.TestCase):
         s['result']['receipt']['functional_controls_passed']=False
         self.con.execute('UPDATE calibration_control_experiments SET state=?',(json.dumps(s),));self.con.commit()
         with self.assertRaises(ValueError):runtime.cached_referral(self.con,self.c,pointer)
+
+    def failure_proof(self):
+        import structured_rejection_receipts as receipts
+        receipt=receipts.from_event(dict(event='model_proxy_request',status=502,category='structured_decision_response_invalid',
+            execution_id='11111111-1111-4111-8111-111111111111',call_number=1,structured_rejection_category='calibration_response_invalid',
+            structured_rejection_diagnostic=dict(version='calibration-constraint-v2',category='invalid_json',failure_code='invalid_json',
+                constraints=[],fields=[],missing_fields=[],upstream_sha256='d'*64)))
+        return dict(operation='diagnostic_producer_transport_failure_v1',task_id='producer-task',execution_id=receipt['execution_id'],
+            wakeup_id='producer-wake',diagnostic_sha256=digest(self.cfg),source_sha256=digest(self.c),binding_closed=True,
+            receipt=receipt,initial_transport=None,execution_authorized=False,delivery_approval=False)
+
+    def protocol(self):
+        p=runtime.transport_probe
+        return dict(protocol='diagnostic_control_data_carrier_v1',proxy_image='sha256:'+'c'*64,
+            probe=dict(operation='fixed_diagnostic_control_transport_v1',protocol='diagnostic_control_data_carrier_v1',passed=True,
+                sources=p.source_hashes(),checks={k:True for k in p.CHECKS},model_calls=0,product_tests_executed=False,
+                historical_cause_proven=False,author_retry_authorized=False,execution_authorized=False,delivery_approval=False))
+
+    def test_proved_invalid_json_can_get_one_different_qualified_transport_not_an_identical_retry(self):
+        self.advance();self.advance();self.completed('producer');self.runs[0]['status']='failed'
+        self.fx.native_failure=lambda *_:self.failure_proof();self.fx.transport=lambda:self.protocol()
+        s=self.advance();self.assertEqual(s['stage'],'producer_dispatch');self.assertEqual(s['transport_recovery']['attempt_limit'],1)
+        self.assertIn(runtime.transport.MARKER,runtime.instruction(self.cfg,s,'producer'))
+        self.advance();wakes=[x for x in self.calls if x[0]=='wake'];self.assertNotEqual(wakes[0][3],wakes[1][3])
+        s=self.advance();self.assertEqual(s['category'],'diagnostic_protocol_recovery_exhausted')
+        self.assertFalse(s['author_restarted']);before=list(self.calls);self.advance();self.assertEqual(self.calls,before)
+
+    def test_already_selected_transport_or_foreign_receipt_cannot_create_a_recovery(self):
+        for variant in ('selected','foreign'):
+            sample=ControlsDiagnosticTests();sample.setUp();self.addCleanup(sample.doCleanups)
+            sample.advance();sample.advance();sample.completed('producer');sample.runs[0]['status']='failed'
+            proof=sample.failure_proof()
+            if variant=='selected':proof['initial_transport']={'already':'selected'}
+            else:proof['receipt']['execution_id']='22222222-2222-4222-8222-222222222222'
+            sample.fx.native_failure=lambda *_:proof;sample.fx.transport=lambda:sample.protocol()
+            s=sample.advance();self.assertEqual(s['stage'],'blocked');self.assertNotIn('transport_recovery',s)
+
+    def test_legacy_failed_task_is_reclassified_from_its_actual_receipt_without_resetting_it(self):
+        self.advance();self.advance();self.completed('producer');self.runs[0]['status']='failed'
+        cfg,s=map(json.loads,self.con.execute('SELECT config,state FROM calibration_control_experiments').fetchone())
+        s.update(stage='blocked',category='diagnostic_evidence_rejected')
+        self.con.execute('UPDATE calibration_control_experiments SET state=?',(json.dumps(s),));self.con.commit()
+        self.fx.native_failure=lambda *_:self.failure_proof();self.fx.transport=lambda:self.protocol()
+        s=self.advance();self.assertEqual(s['stage'],'producer_dispatch');self.assertEqual(s['native_failure']['task_id'],'producer-task')
+        self.assertEqual(len([x for x in self.calls if x[0]=='wake']),1)

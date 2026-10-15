@@ -92,3 +92,5 @@ class ObjectionRuntimeTests(unittest.TestCase):
         source=json.loads(self.con.execute('SELECT state FROM generic_calibration_workflows').fetchone()[0])
         runtime.qualified(self.con,self.c,source)
         self.assertIn('Not product approval or author Red',runtime.addendum(receipt))
+        from diagnostic_control_transport import MARKER
+        self.assertIn(MARKER+':'+digest(self.c),runtime.addendum(receipt))

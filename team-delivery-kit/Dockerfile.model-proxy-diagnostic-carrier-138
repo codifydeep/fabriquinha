@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261015.137
+USER root
+COPY model_proxy.py diagnostic_control_transport.py diagnostic_control_transport_probe.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import diagnostic_control_transport_probe as p;assert p.run()['passed']"
+USER 10000:10000

@@ -1745,6 +1745,22 @@ normais de revisão de política, calibração, TDD, regressão e homologação 
 obrigatórios. A instalação desse caminho ainda exige qualificação nativa real;
 testes sintéticos não demonstram recuperação ou autonomia ponta a ponta.
 
+Para a coleta desses dados, o transporte opcional
+`diagnostic_control_transport.py` mantém as leituras obrigatórias e oferece ao
+modelo um retorno estruturado distinto: `return_diagnostic_control_data`.
+Esse retorno não é uma ferramenta executável do worker. O proxy confere o
+envelope completo e valida os argumentos contra o contrato canônico antes de
+encaminhá-los como JSON literal; não remove Markdown, não repara JSON e não
+transforma texto em execução. As dicas enviadas ao provedor não substituem a
+validação local. Recibos privados persistem hashes da resposta e do payload, sem
+seu texto, e a coleta verifica o vínculo com a sessão nativa. Falha comprovada
+do transporte antigo pode receber uma única execução diagnóstica com o novo
+protocolo qualificado, sem renovar limites de submissão da fonte ou do autor.
+O padrão usa o [tool calling do OpenRouter](https://openrouter.ai/docs/guides/features/tool-calling);
+a compatibilidade e a recuperação ainda exigem validação nativa, não apenas
+testes de formato. Uma proposta original encaminhada após a revisão diagnóstica
+também usa o transporte estruturado, mantendo todos os seus gates posteriores.
+
 Nos workers governados, os nudges periódicos que criam forks de auto-revisão de
 memória/skills e os títulos pagos de sessão ficam desativados. Memórias existentes
 não são apagadas e os contratos de memória curada do controlador permanecem.

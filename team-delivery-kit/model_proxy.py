@@ -23,6 +23,7 @@ import technical_optional_files_feedback
 import typed_test_source
 import planning_schema
 import provider_tool_routing
+import diagnostic_control_transport
 from upstream_error_diagnostic import UpstreamRequestRejected
 import proxy_request_rejections
 from structured_response_contract import validate as validate_structured_response, StructuredResponseRejected
@@ -271,8 +272,13 @@ def read_bounded_response(response, conn, deadline):
             raise RuntimeError('model response too large')
 
 
+def provider_request(body):
+    projected=diagnostic_control_transport.project(body)
+    return projected if projected is not None else provider_tool_routing.wire(body)
+
+
 def forward(body):
-    body=provider_tool_routing.wire(body)
+    body=provider_request(body)
     key = Path('/secret/openrouter.key').read_text().strip()
     if not key or len(key) < 20:
         raise RuntimeError('model credential unavailable')
@@ -351,7 +357,10 @@ class Handler(BaseHTTPRequestHandler):
             body = validate_request(incoming)
             stage = 'metrics'
             request_metrics = safe_request_metrics(body)
-            upstream=provider_tool_routing.wire(body)
+            upstream=provider_request(body)
+            if diagnostic_control_transport.selected(body) is not None:
+                request_metrics['diagnostic_data_transport']='required_data_carrier_v1'
+                request_metrics['canonical_schema_validation_preserved']=True
             if upstream.get('response_format')!=body.get('response_format'):
                 request_metrics['provider_schema_projection']=('calibration_json_object_v1'
                     if upstream.get('response_format')=={'type':'json_object'} else 'haiku_qa_union_v1')
@@ -394,6 +403,12 @@ class Handler(BaseHTTPRequestHandler):
                     stage = 'response'
                     response_metrics = safe_response_metrics(data, content_type)
                     data,content_type=typed_test_source.translate(body,data,content_type)
+                    data,content_type,diagnostic_receipt=diagnostic_control_transport.translate(body,data,content_type)
+                    if diagnostic_receipt:
+                        diagnostic_control_transport.record(COUNTER_PATH,execution_id,call_number,diagnostic_receipt)
+                        response_metrics['diagnostic_data_carrier_validated']=True
+                        response_metrics['diagnostic_data_arguments_sha256']=diagnostic_receipt['arguments_sha256']
+                        response_metrics['diagnostic_data_upstream_sha256']=diagnostic_receipt['upstream_sha256']
                     padding_receipt=None
                     if os.environ.get('MODEL_PROXY_TECHNICAL_PADDING')=='1':
                         data,padding_receipt=typed_decision_contract.normalize_technical_padding(body,data,content_type)
