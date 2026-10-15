@@ -1,11 +1,12 @@
 FROM delivery-kit-hermes-runtime@sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf
 USER root
 COPY model_proxy.py /model_proxy.py
+COPY calibration_incident_contract.py /calibration_incident_contract.py
 COPY provider_tool_routing.py /provider_tool_routing.py
 COPY upstream_error_diagnostic.py /upstream_error_diagnostic.py
 COPY model_policy.py /model_policy.py
 COPY decision_schema.py /decision_schema.py
-COPY calibration_incident_contract.py calibration_transport_probe.py /
+COPY calibration_transport_probe.py /calibration_transport_probe.py
 COPY calibration_response_contract.py /calibration_response_contract.py
 COPY calibration_rejection_diagnostics.py /calibration_rejection_diagnostics.py
 COPY product_scope_contract.py /product_scope_contract.py

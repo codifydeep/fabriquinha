@@ -809,3 +809,27 @@ the prior decision. It grants no author retry, Red approval, increased depth or
 delivery authority. A concrete CTO correction must still pass every existing
 calibration, TDD and independent review gate. Real-model recovery and delivery
 remain to be demonstrated; this is not retroactive qualification of old logs.
+
+### Evidence addendum after a retained calibration diagnosis
+
+A completed, tool-free CTO diagnosis may retain the transport hold because old
+response bytes are missing. The controller must not treat that choice as an
+approval, repeat the identical prompt, or erase the hold. It may collect one
+new `fixed_calibration_transport_probe_v1` result through the existing isolated
+job: synthetic inputs, no model, product tests, network, credentials or socket.
+The original native decision and immutable source are revalidated first.
+
+The new result and original hold hashes select a distinct `evidence_diagnosis`
+handoff. The CTO may submit this current evidence for independent Tech Lead
+review or retain the hold. The historical cause remains unknown. Independent
+sponsorship permits only one new calibration-data submission on the unchanged
+snapshot; every later calibration, TDD, product review, PR/CI and QA gate remains.
+A second hold or a reviewer hold is terminal for this evidence set, with a
+technical owner and next action visible; it cannot replenish any retry ledger.
+Restart or uncertain acknowledgments observe the same fixed job and handoff.
+
+Historical configuration retains its original proxy image. An explicitly pinned
+companion image upgrade requires the same durable failed-execution receipt,
+unchanged validator source hashes and byte-identical current incident contracts
+in controller and proxy. It does not reinterpret the missing historical bytes.
+Offline tests qualify these transitions, not autonomous end-to-end delivery.

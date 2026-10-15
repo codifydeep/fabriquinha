@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261015.132
+USER root
+COPY calibration_incident_contract.py /calibration_incident_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_incident_contract;calibration_incident_contract.context('evidence_diagnosis','a'*64,'b'*64,'c'*64,'d'*64)"
+USER 10000:10000

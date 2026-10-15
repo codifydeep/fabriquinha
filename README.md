@@ -12,6 +12,14 @@ contagem; o próximo ciclo real ainda precisa passar por todos os gates.
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+Se um diagnóstico do CTO mantiver um incidente de transporte por falta de
+evidências históricas, o controlador pode produzir uma única evidência nova com
+um experimento fixo, sintético e isolado, sem chamadas ao modelo ou testes do
+produto. O novo handoff preserva a recusa e vincula seu hash ao resultado real.
+CTO e Tech Lead continuam podendo recusar a continuação; não há aprovação
+automática nem repetição ilimitada. Esse caminho ainda exige validação nativa
+completa e não libera o Truco por si só.
+
 O supervisor possui uma entrada genérica de planejamento para uma falha de suíte
 congelada após duas revisões de testes novos. Ela preserva a base Git, todos os
 critérios de aceite, recibos e tentativas, pausa a rota anterior e registra um
@@ -1620,7 +1628,10 @@ flowchart LR
     P --> T[Tech Lead: revisão independente da evidência]
     T -->|Patrocínio exato, uma vez| N[Nova submissão de dados no mesmo snapshot]
     N --> G[Calibração, TDD e gates normais permanecem obrigatórios]
-    C -->|Sem suporte| B[Bloqueio técnico com dono e próxima ação]
+    C -->|Evidência insuficiente: uma coleta fixa| A[Preservar recusa e produzir evidência nova]
+    A --> D[CTO: novo parecer vinculado ao probe e à recusa]
+    D -->|Encaminhar evidência atual| T
+    D -->|Mantém recusa| B[Bloqueio técnico com dono e próxima ação]
     T -->|Rejeição| B
     N -->|Mesma classe sem nova evidência| B
 ```
@@ -1633,6 +1644,10 @@ validadores não geram outro orçamento por trocar apenas o task ID ou hash da
 resposta. Erros de observação/publicação são persistidos e não impedem o tick de
 outros trabalhos. O probe não executa testes do produto nem prova retroativamente
 a causa de uma resposta antiga sem bytes preservados.
+
+Se a primeira decisão do CTO mantiver a recusa, somente uma coleta fixa de
+evidência nova poderá abrir outro parecer. A recusa original e os hashes de
+ambas as evidências ficam preservados; outra recusa não reinicia essa trilha.
 
 Essa trilha cobre incidentes de resposta do produtor, não todo bloqueio possível.
 Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CTO e

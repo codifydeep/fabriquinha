@@ -18,7 +18,7 @@ def context(phase,incident,source,proposal=None,probe=None):
 def validate_context(v):
     if not isinstance(v,dict) or set(v)!={'phase','incident_sha256','source_sha256','proposal_sha256','probe_sha256'}:
         raise ValueError('exact incident context required')
-    if v['phase'] not in ('diagnosis','review'):raise ValueError('fixed incident role required')
+    if v['phase'] not in ('diagnosis','evidence_diagnosis','review'):raise ValueError('fixed incident role required')
     for k in ('incident_sha256','source_sha256','proposal_sha256','probe_sha256'):
         if v['phase']=='diagnosis' and k in ('proposal_sha256','probe_sha256'):
             if v[k] is not None:raise ValueError('diagnosis cannot claim experiment evidence')
@@ -52,13 +52,14 @@ def request(body):
 def schema(v):
     validate_context(v)
     def fixed(value):return dict(type='string',enum=[value])
-    actions=['request_transport_probe','retain_technical_hold'] if v['phase']=='diagnosis' else ['sponsor_data_submission','retain_technical_hold']
+    actions=[{'diagnosis':'request_transport_probe','evidence_diagnosis':'submit_probe_for_review',
+        'review':'sponsor_data_submission'}[v['phase']],'retain_technical_hold']
     props=dict(action=dict(type='string',enum=actions),incident_sha256=fixed(v['incident_sha256']),
         reason=dict(type='string',minLength=1,maxLength=900),experiment=fixed('fixed_transport_probe_v1'),
         historical_cause_proven=dict(type='boolean',enum=[False]),
         author_retry_authorized=dict(type='boolean',enum=[False]),execution_authorized=dict(type='boolean',enum=[False]),
         delivery_approval=dict(type='boolean',enum=[False]))
-    if v['phase']=='review':props.update(proposal_sha256=fixed(v['proposal_sha256']),probe_sha256=fixed(v['probe_sha256']))
+    if v['phase']!='diagnosis':props.update(proposal_sha256=fixed(v['proposal_sha256']),probe_sha256=fixed(v['probe_sha256']))
     return dict(type='object',properties=props,required=list(props),additionalProperties=False)
 
 

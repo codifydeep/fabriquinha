@@ -44,11 +44,11 @@ class IncidentTests(unittest.TestCase):
             def decision(_,cfg,s,phase,task):
                 from calibration_incident_contract import context
                 ctx=incidents.context(cfg,s,phase)
-                value=dict(action='request_transport_probe' if phase=='diagnosis' else 'sponsor_data_submission',
+                value=dict(action={'diagnosis':'request_transport_probe','evidence_diagnosis':'submit_probe_for_review','review':'sponsor_data_submission'}[phase],
                     incident_sha256=ctx['incident_sha256'],reason='Measured probe, not a claim about historical cause',
                     experiment='fixed_transport_probe_v1',historical_cause_proven=False,author_retry_authorized=False,
                     execution_authorized=False,delivery_approval=False)
-                if phase=='review':value.update(proposal_sha256=ctx['proposal_sha256'],probe_sha256=ctx['probe_sha256'])
+                if phase!='diagnosis':value.update(proposal_sha256=ctx['proposal_sha256'],probe_sha256=ctx['probe_sha256'])
                 return dict(value=value,task_id=task['id'],agent_id=task['agent_id'],execution_id=phase+'-execution')
             def probe(_,cfg,s):parent.effects.append(('probe',));return parent.result
         self.fx=Effects()
@@ -56,7 +56,7 @@ class IncidentTests(unittest.TestCase):
     def advance(self,now=1):return incidents.advance(self.con,self.key,self.fx,now=now)
 
     def finish_phase(self,phase):
-        self.runs=[dict(id=phase+'-task',agent_id=self.c['cto'] if phase=='diagnosis' else self.c['reviewer'],
+        self.runs=[dict(id=phase+'-task',agent_id=self.c['reviewer'] if phase=='review' else self.c['cto'],
             issue_id='child',wakeup_id=phase+'-wake',status='completed')]
         return self.advance()
 
@@ -101,3 +101,62 @@ class IncidentTests(unittest.TestCase):
         self.con.execute('UPDATE generic_calibration_workflows SET config=?',(json.dumps(changed),));self.con.commit()
         self.assertEqual(self.advance()['stage'],'blocked')
         self.assertEqual(json.loads(self.con.execute('SELECT state FROM generic_calibration_workflows').fetchone()[0]),self.s)
+
+    def retain(self,phase):
+        decision=self.fx.decision
+        def hold(cfg,s,p,task):
+            value=decision(cfg,s,p,task);value['value']['action']='retain_technical_hold';return value
+        self.fx.decision=hold
+        try:return self.finish_phase(phase)
+        finally:self.fx.decision=decision
+
+    def test_retained_diagnosis_gets_one_real_evidence_addendum_not_an_identical_retry(self):
+        self.advance();self.advance();held=self.retain('diagnosis')
+        original=copy.deepcopy(held['decision'])
+        self.assertEqual(held['stage'],'blocked')
+        state=self.advance();self.assertEqual(state['stage'],'evidence_probe_pending')
+        self.assertEqual(state['prior_hold'],original)
+        self.advance();self.advance();state=self.finish_phase('evidence_diagnosis')
+        self.assertEqual(state['stage'],'review_dispatch')
+        self.advance();self.finish_phase('review');state=self.advance()
+        self.assertEqual(state['stage'],'resubmission_sponsored')
+        self.assertEqual(state['sponsorship']['prior_hold'],original)
+        wakes=[e for e in self.effects if e[0]=='wake']
+        self.assertEqual([e[1] for e in wakes],['diagnosis','evidence_diagnosis','review'])
+        self.assertNotEqual(wakes[0][3],wakes[1][3])
+        self.assertEqual(self.effects.count(('probe',)),1)
+
+    def test_second_hold_and_review_hold_do_not_loop_or_execute_another_probe(self):
+        self.advance();self.advance();self.retain('diagnosis');self.advance();self.advance();self.advance()
+        self.retain('evidence_diagnosis');before=list(self.effects)
+        for _ in range(3):self.assertEqual(self.advance()['stage'],'blocked')
+        self.assertEqual(self.effects,before)
+
+    def test_addendum_revalidates_original_decision_and_does_not_resume_changed_source(self):
+        self.advance();self.advance();self.retain('diagnosis')
+        def reject(*args):raise ValueError('changed native decision')
+        self.fx.verify_hold=reject
+        self.assertEqual(self.advance()['category'],'incident_hold_binding_rejected')
+        self.assertNotIn(('probe',),self.effects)
+        self.assertEqual(json.loads(self.con.execute('SELECT state FROM generic_calibration_workflows').fetchone()[0]),self.s)
+
+    def test_review_hold_is_terminal_without_automatic_repetition(self):
+        self.advance();self.advance();self.finish_phase('diagnosis');self.advance();self.advance();self.retain('review')
+        before=list(self.effects)
+        self.assertEqual(self.advance()['stage'],'blocked');self.assertEqual(self.effects,before)
+
+    def test_addendum_observes_same_dispatch_after_lost_ack_and_ledger_reload(self):
+        self.advance();self.advance();self.retain('diagnosis');self.advance();self.advance()
+        self.uncertain=True;self.advance()
+        saved=json.loads(self.con.execute('SELECT state FROM calibration_incidents').fetchone()[0])
+        self.assertEqual(saved['stage'],'observe_evidence_diagnosis_dispatch')
+        self.advance();wakes=[x for x in self.effects if x[0]=='wake' and x[1]=='evidence_diagnosis']
+        self.assertEqual([x[2] for x in wakes],[True,False]);self.assertEqual(wakes[0][3],wakes[1][3])
+        self.assertEqual(self.effects.count(('probe',)),1)
+
+    def test_addendum_instruction_keeps_full_maximum_reason_within_bounds(self):
+        self.advance();self.advance();self.retain('diagnosis');self.advance();self.advance()
+        cfg,s=map(json.loads,self.con.execute('SELECT config,state FROM calibration_incidents').fetchone())
+        s['prior_hold']['value']['reason']='x'*900
+        note=incidents.instruction(cfg,s,'evidence_diagnosis')
+        self.assertLessEqual(len(note),3800);self.assertIn('x'*900,note)

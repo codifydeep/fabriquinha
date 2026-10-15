@@ -7,6 +7,16 @@ from decision_schema import apply
 
 
 class IncidentContractTests(unittest.TestCase):
+    def test_evidence_diagnosis_binds_prior_hold_and_actual_probe_without_authority(self):
+        v=contract.context('evidence_diagnosis','a'*64,'b'*64,'c'*64,'d'*64)
+        body=apply(dict(messages=[dict(role='user',content=contract.capsule(v))]))
+        schema=body['response_format']['json_schema']['schema']
+        self.assertEqual(schema['properties']['action']['enum'],['submit_probe_for_review','retain_technical_hold'])
+        self.assertEqual(schema['properties']['proposal_sha256']['enum'],['c'*64])
+        self.assertEqual(schema['properties']['probe_sha256']['enum'],['d'*64])
+        self.assertEqual(body['tools'],[])
+        with self.assertRaises(ValueError):contract.context('evidence_diagnosis','a'*64,'b'*64)
+
     def test_schema_has_no_tools_or_execution_authority_and_binds_review_hashes(self):
         for phase in ('diagnosis','review'):
             v=contract.context(phase,'a'*64,'b'*64,*((None,None) if phase=='diagnosis' else ('c'*64,'d'*64)))

@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261015.472
+COPY broker/calibration_incidents.py /calibration_incidents.py
+COPY calibration_incident_contract.py /calibration_incident_contract.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_incidents,calibration_incident_contract;calibration_incident_contract.context('evidence_diagnosis','a'*64,'b'*64,'c'*64,'d'*64)"

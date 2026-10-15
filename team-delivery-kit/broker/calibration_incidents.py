@@ -5,6 +5,7 @@ Red/Green, merge, deploy or delivery approval is conferred by this lane.
 """
 import hashlib
 import json
+import os
 import time
 import uuid
 import urllib.error
@@ -75,7 +76,8 @@ def register(con,cfg):
 
 def context(cfg,s,phase):
     return contract.context(phase,digest(cfg),cfg['source_config_sha256'],
-        digest(s['cto_decision']['value']) if phase=='review' else None,digest(s['probe']) if phase=='review' else None)
+        digest(s['prior_hold']['value']) if phase=='evidence_diagnosis' else
+        digest(s['cto_decision']['value']) if phase=='review' else None,digest(s['probe']) if phase!='diagnosis' else None)
 
 
 def instruction(cfg,s,phase):
@@ -83,7 +85,7 @@ def instruction(cfg,s,phase):
     facts=dict(failed_task=cfg['failed_task'],failed_execution=cfg['failed_execution'],
         diagnostic=diagnostic,manifest_sha256=cfg['manifest_sha256'])
     note=contract.capsule(context(cfg,s,phase))+(
-        'TECHNICAL TRANSPORT INCIDENT ONLY. '+('CTO diagnosis. ' if phase=='diagnosis' else 'Independent Tech Lead evidence review. ')+
+        'TECHNICAL TRANSPORT INCIDENT ONLY. '+('Independent Tech Lead evidence review. ' if phase=='review' else 'CTO diagnosis. ')+
         'Analyze only these controller-supplied receipts. No tools, product decisions, file edits, tests, '
         'shell, administration or credentials. Historical response bytes were not preserved: their hash '
         'does NOT prove a root cause. historical_cause_proven must remain false. The only permitted '
@@ -92,18 +94,23 @@ def instruction(cfg,s,phase):
         'No assertion weakening, baseline changes, author restart or retry-budget reset. '
         'Return only the exact incident JSON schema. reason<=900 characters. '+
         ('Choose request_transport_probe or retain_technical_hold. ' if phase=='diagnosis' else
+         'A new fixed experiment has now run; do not require the lost historical response to evaluate CURRENT transport. '
+         'Choose submit_probe_for_review to let the independent Tech Lead evaluate a data-only submission, '
+         'or retain_technical_hold with the remaining measurable concern. This is not historical root-cause proof. '
+         if phase=='evidence_diagnosis' else
          'Choose sponsor_data_submission only if the actual experiment supports one NEW calibration data submission '
          'on the SAME immutable snapshot, with every later calibration/TDD/review gate unchanged; otherwise retain_technical_hold. ')+
         'All authorization/approval flags remain false. Facts: '+json.dumps(facts,separators=(',',':')))
-    if phase=='review':
+    if phase!='diagnosis':
         proof=json.loads(s['probe']['output'])
-        note+='\nCTO proposal: '+json.dumps(s['cto_decision']['value'],separators=(',',':'))
+        if phase=='review':note+='\nCTO proposal: '+json.dumps(s['cto_decision']['value'],separators=(',',':'))
+        else:note+='\nPrior hold preserved: '+json.dumps(s['prior_hold']['value'],separators=(',',':'))
         note+='\nActual fixed experiment: '+json.dumps({k:proof[k] for k in ('operation','passed','checks','historical_cause_proven','product_tests_executed')},separators=(',',':'))
     require(len(note)<=3800);return note
 
 
 def validate_decision(cfg,s,phase,task,decision):
-    actor=cfg['cto'] if phase=='diagnosis' else cfg['reviewer']
+    actor=cfg['reviewer'] if phase=='review' else cfg['cto']
     require(decision['task_id']==task['id'] and decision['agent_id']==actor and task.get('agent_id')==actor
         and task.get('issue_id')==s['issue_id'] and task.get('wakeup_id')==s['wakeup_id'] and task.get('status')=='completed')
     Draft202012Validator(contract.schema(context(cfg,s,phase))).validate(decision['value'])
@@ -113,13 +120,22 @@ def advance(con,key,fx,*,now=None):
     now=time.time() if now is None else now
     row=con.execute('SELECT config,state FROM calibration_incidents WHERE incident_id=?',(key,)).fetchone()
     require(row is not None);cfg,s=map(json.loads,row)
-    if s['stage'] in ('blocked','resubmission_sponsored'):return s
+    enrich=(s['stage']=='blocked' and s.get('category')=='technical_hold_retained'
+        and s.get('observed_phase')=='diagnosis' and not s.get('evidence_addendum_consumed'))
+    if s['stage']=='resubmission_sponsored' or (s['stage']=='blocked' and not enrich):return s
     def save(**changes):
         s.update(changes);con.execute('UPDATE calibration_incidents SET state=? WHERE incident_id=?',(json.dumps(s,sort_keys=True),key));con.commit();return s
     def hold(category):return save(stage='blocked',owner=cfg['cto'],category=category,
         required_action='CTO diagnose '+category+'; preserve evidence, no identical dispatch or author retry')
     try:fx.verify(cfg)
     except (ValueError,KeyError,TypeError):return hold('incident_source_changed')
+    if enrich:
+        try:
+            require(s['decision']['value']['action']=='retain_technical_hold')
+            getattr(fx,'verify_hold',lambda *_:None)(cfg,s)
+        except (ValueError,KeyError,TypeError,ValidationError):return hold('incident_hold_binding_rejected')
+        return save(stage='evidence_probe_pending',prior_hold=s['decision'],evidence_addendum_consumed=True,
+            required_action='Controller collect one new fixed transport experiment; preserve CTO hold, no repeated diagnosis on identical evidence')
     if s['stage'] in ('issue_pending','observe_issue'):
         first=s['stage']=='issue_pending'
         if first and not fx.reserve():return save(required_action='Await proxy reserve of 32 calls; no spend or wakeup attempted')
@@ -130,21 +146,24 @@ def advance(con,key,fx,*,now=None):
             return hold('incident_issue_unobserved') if now-s['observation_started']>=600 else s
         return save(stage='diagnosis_dispatch',issue_id=issue['id'],identifier=issue.get('identifier'),
             required_action='CTO diagnose fixed experiment scope; no tool authority')
-    if s['stage']=='probe_pending':
+    if s['stage'] in ('probe_pending','evidence_probe_pending'):
+        enrichment=s['stage']=='evidence_probe_pending'
         try:
             result=fx.probe(cfg,s)
             require(hashlib.sha256(result['output'].encode()).hexdigest()==result['output_sha256'])
             jobs.validate(json.loads(result['output']),cfg['validator_sources'])
         except TimeoutError:return s
         except (ValueError,KeyError,TypeError):return hold('incident_experiment_rejected')
-        return save(stage='review_dispatch',probe=result,owner=cfg['reviewer'],
-            required_action='Tech Lead independently review exact CTO decision and actual fixed experiment')
+        return save(stage='evidence_diagnosis_dispatch' if enrichment else 'review_dispatch',probe=result,
+            owner=cfg['cto'] if enrichment else cfg['reviewer'],
+            required_action='CTO evaluate genuinely new fixed experiment; prior hold preserved' if enrichment else
+                'Tech Lead independently review exact CTO decision and actual fixed experiment')
     if s['stage']=='resume_pending':
         try:
             check=getattr(fx,'verify_decisions',lambda *_:None);check(cfg,s)
             return sponsor(con,cfg,s,now)
         except (ValueError,KeyError,TypeError,ValidationError):return hold('incident_sponsorship_binding_rejected')
-    phase='review' if 'review' in s['stage'] else 'diagnosis'
+    phase='evidence_diagnosis' if 'evidence_diagnosis' in s['stage'] else 'review' if 'review' in s['stage'] else 'diagnosis'
     if s['stage'] in (phase+'_dispatch','observe_'+phase+'_dispatch'):
         try:instruction(cfg,s,phase)
         except ValueError:return hold('incident_instruction_bounds')
@@ -174,6 +193,9 @@ def advance(con,key,fx,*,now=None):
             required_action='CTO provide a new evidence-backed hypothesis; no identical submission')
     if phase=='diagnosis':return save(stage='probe_pending',cto_decision=decision,
         required_action='Controller execute fixed local transport experiment; no agent-supplied commands')
+    if phase=='evidence_diagnosis':return save(stage='review_dispatch',cto_decision=decision,
+        cto_decision_phase=phase,owner=cfg['reviewer'],
+        required_action='Tech Lead independently review new CTO decision and exact fixed experiment; no inherited approval')
     return save(stage='resume_pending',review_decision=decision,owner=cfg['cto'],
         required_action='Consume exact independent sponsorship once; preserve original author and all delivery gates')
 
@@ -184,7 +206,7 @@ def sponsor(con,cfg,s,now):
     c,prior=map(json.loads,source)
     require(digest(c)==cfg['source_config_sha256'] and digest(prior)==cfg['source_state_sha256']
         and prior['stage']=='blocked' and prior['observed_task']==cfg['failed_task']
-        and s['cto_decision']['value']['action']=='request_transport_probe'
+        and s['cto_decision']['value']['action']==('submit_probe_for_review' if s.get('cto_decision_phase')=='evidence_diagnosis' else 'request_transport_probe')
         and s['cto_decision']['agent_id']==cfg['cto'] and s['review_decision']['agent_id']==cfg['reviewer']
         and s['cto_decision']['task_id']!=s['review_decision']['task_id']
         and s['review_decision']['value']['action']=='sponsor_data_submission')
@@ -197,6 +219,10 @@ def sponsor(con,cfg,s,now):
         incident_sha256=digest(cfg),source_config_sha256=digest(c),prior_state=prior,cto_decision=s['cto_decision'],
         review_decision=s['review_decision'],probe=s['probe'],submission_limit=1,old_limits_preserved=True,
         author_restarted=False,tests_executed=False,execution_authorized=False,delivery_approval=False,at=now)
+    if s.get('cto_decision_phase')=='evidence_diagnosis':
+        require(s.get('evidence_addendum_consumed') is True and s['prior_hold']['value']['action']=='retain_technical_hold'
+            and s['prior_hold']['task_id']!=s['cto_decision']['task_id'])
+        receipt.update(prior_hold=s['prior_hold'],cto_decision_phase='evidence_diagnosis',evidence_addendum_limit=1)
     updated={k:v for k,v in prior.items() if k in ('capability_recovery_sha256','local_recovery_sha256','protocol_recovery_sha256')}
     updated.update(stage='bundle_dispatch',owner=cfg['cto'],incident_resume_id=cfg['incident_id'],incident_resume_sha256=digest(receipt),
         execution_authorized=False,delivery_approval=False,required_action='CTO one independently sponsored data submission; no author retry')
@@ -248,8 +274,10 @@ def projection(con,issue,author,source_state):
 
 PROXY_QUERY='''import sys,json;sys.path.insert(0,"/")
 import model_proxy as m,structured_rejection_receipts as r
+import hashlib,calibration_incident_contract as incident_contract
 from calibration_transport_probe import source_hashes
-print(json.dumps(dict(receipts=r.read(m.COUNTER_PATH,sys.argv[1]),sources=source_hashes())))
+print(json.dumps(dict(receipts=r.read(m.COUNTER_PATH,sys.argv[1]),sources=source_hashes(),
+ incident_contract_sha256=hashlib.sha256(open(incident_contract.__file__,"rb").read()).hexdigest())))
 '''
 
 
@@ -271,6 +299,7 @@ class Effects:
         outcome=self.b.docker('GET','/exec/'+entry['Id']+'/json')
         require(outcome and not outcome.get('Running') and outcome.get('ExitCode')==0)
         value=json.loads(raw);require(value['sources']==source_hashes() and len(value['receipts'])==1)
+        require(value['incident_contract_sha256']==hashlib.sha256(open(contract.__file__,'rb').read()).hexdigest())
         require(self.provider.proxy_info(self.b)['Id']==proxy['Id'])
         return value['receipts'][0],proxy['Image']
     def verify(self,cfg):
@@ -281,7 +310,14 @@ class Effects:
         self.source.verify(c)
         require(self.workflow.request(self.b,c['issue_id'],c['author_task'])==s and source_hashes()==cfg['validator_sources'])
         proxy=self.provider.proxy_info(self.b)
-        require(proxy['Image']==cfg['proxy_image'] and proxy.get('HostConfig',{}).get('ReadonlyRootfs') is True)
+        expected=os.environ.get('BROKER_CALIBRATION_INCIDENT_PROXY_IMAGE',cfg['proxy_image'])
+        require(proxy['Image']==expected and proxy.get('HostConfig',{}).get('ReadonlyRootfs') is True)
+        # The historical receipt retains its original proxy image. An explicitly
+        # pinned companion upgrade must prove the same durable rejection and
+        # validator bytes plus byte-identical current incident contracts.
+        if proxy['Image']!=cfg['proxy_image']:
+            rejection,image=self.evidence(cfg['failed_execution'])
+            require(rejection==cfg['rejection'] and image==expected)
     def reserve(self):return self.plans.native.remaining_calls()>=32
     def issue(self,cfg,first):
         from_text='SPIKE TRANSPORT ONLY. Source-bound incident '+digest(cfg)+'. Parent remains blocked; no product implementation or approval. '
@@ -291,13 +327,13 @@ class Effects:
                 'Historical cause is unknown; preserve failed execution '+cfg['failed_task']+' and every delivery gate.',
             parent_issue_id=cfg['origin_issue_id'],project_id=parent.get('project_id'),stage=1,status='todo'),allow_create=first)
     def wake(self,cfg,s,phase,first):
-        actor=cfg['cto'] if phase=='diagnosis' else cfg['reviewer']
+        actor=cfg['reviewer'] if phase=='review' else cfg['cto']
         require(self.plans.settings['agents'].get(actor)=='planning')
         return self.native.ensure_planning_start(self.plans.settings,s['issue_id'],actor,cfg['author_task'],s['marker'],
             instruction(cfg,s,phase),allow_create=first)
     def runs(self,cfg,s):return self.native.issue_task_runs(self.plans.settings,s['issue_id'])
     def decision(self,cfg,s,phase,task):
-        actor=cfg['cto'] if phase=='diagnosis' else cfg['reviewer'];actual=self.plans.task(task['id'],actor)
+        actor=cfg['reviewer'] if phase=='review' else cfg['cto'];actual=self.plans.task(task['id'],actor)
         require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id']
             and actual.get('wakeup_id')==s['wakeup_id'])
         with self.b.db() as con:
@@ -316,8 +352,12 @@ class Effects:
         validate_decision(cfg,s,phase,actual,decision);return decision
     def probe(self,cfg,s):
         with self.b.db() as con:return jobs.run(self.b,con,cfg['incident_id'],cfg['validator_sources'])
+    def verify_hold(self,cfg,s):
+        saved=s.get('prior_hold') or s['decision'];task=self.plans.task(saved['task_id'],cfg['cto'])
+        require(self.decision(cfg,{**s,'wakeup_id':task['wakeup_id']},'diagnosis',task)==saved)
     def verify_decisions(self,cfg,s):
-        for phase,key in (('diagnosis','cto_decision'),('review','review_decision')):
+        if s.get('cto_decision_phase')=='evidence_diagnosis':self.verify_hold(cfg,s)
+        for phase,key in ((s.get('cto_decision_phase','diagnosis'),'cto_decision'),('review','review_decision')):
             saved=s[key];task=self.plans.task(saved['task_id'],saved['agent_id'])
             phase_state={**s,'wakeup_id':task['wakeup_id']}
             require(self.decision(cfg,phase_state,phase,task)==saved)
