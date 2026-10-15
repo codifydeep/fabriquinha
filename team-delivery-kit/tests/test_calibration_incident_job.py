@@ -8,6 +8,19 @@ from calibration_transport_probe import run,source_hashes
 
 
 class IncidentJobTests(unittest.TestCase):
+    def test_json_probe_has_separate_image_identity_and_no_extra_authority(self):
+        from calibration_json_transport_probe import run as json_run,source_hashes as json_sources
+        self.b.CALIBRATION_JSON_PROBE_IMAGE=self.b.CALIBRATION_TRANSPORT_PROBE_IMAGE
+        self.proof=json_run()
+        with self.assertRaises(TimeoutError):jobs.run(self.b,self.con,'e'*64,json_sources(),now=1,kind='json')
+        r=jobs.run(self.b,self.con,'e'*64,json_sources(),now=2,kind='json')
+        self.assertEqual(json.loads(r['output'])['operation'],'fixed_json_object_transport_probe_v1')
+        _,payload=jobs.payload(self.b,'e'*64,'json')
+        self.assertIn('/calibration_json_transport_probe.py',payload['Cmd'][1])
+        self.assertEqual(payload['HostConfig']['NetworkMode'],'none');self.assertEqual(payload['HostConfig']['Mounts'],[])
+        self.assertEqual(payload['Labels']['com.docker.compose.project'],'delivery-kit-port2-tests')
+        with self.assertRaises(ValueError):jobs.run(self.b,self.con,'e'*64,source_hashes(),now=3)
+
     def setUp(self):
         self.con=sqlite3.connect(':memory:');self.addCleanup(self.con.close)
         self.b=SimpleNamespace(PREFIX='delivery-kit-port2',OWNER='owned',CALIBRATION_TRANSPORT_PROBE_IMAGE='sha256:'+'a'*64)

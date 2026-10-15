@@ -838,3 +838,36 @@ The synthetic terminal/ledger experiment is applicable only to a transport/tool
 rejection. Invalid JSON and schema violations need their own measured diagnosis;
 they cannot borrow this experiment to justify another data submission. An older
 pending probe for an inapplicable class is held before any Docker effect.
+
+### JSON-specific changed-protocol evidence
+
+The Haiku calibration producer uses an upstream-only `json_object` request after
+actual mandatory reads. The canonical body, dynamic-dictionary schema, additional
+frozen reads, model, budgets and authority checks remain unchanged. No prose is
+stripped, malformed response repaired or missing value synthesized. This uses
+the documented [OpenRouter JSON mode](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/parameters.mdx);
+syntax constraints are not schema approval or proof that the provider honored them.
+
+A closed `invalid_json` receipt from a failed, closed source-bound producer and
+its preserved tool-free CTO hold may qualify one JSON-specific evidence addendum.
+Controller/proxy source hashes and the current model are checked before a new
+fixed experiment, using a separately pinned no-network/no-credential image and
+separate durable job key. A previous unrelated terminal experiment stays recorded.
+The experiment measures valid bundle/objection transport, unchanged inspections,
+and rejection of invalid JSON, invalid schema and forged authority. It spends no
+model calls and executes no product tests.
+
+The new evidence handoff explicitly says provider compatibility is still unproven.
+The CTO and independent Tech Lead decide again, bound to the exact result and old
+hold. One data submission may follow; all existing calibration, TDD, review and
+delivery gates remain mandatory. Historical cause stays unknown. Another hold or
+the same rejection after consumption cannot replenish this addendum. No existing
+protocol/capability/local-recovery ledger is reset or overwritten.
+
+New calibration rejections also persist a separate private parse-location
+receipt, keyed by execution/call. Only fixed phase/finish/carrier categories,
+counts, numeric JSON positions and response digest are stored, never content,
+tool arguments or exception text. It distinguishes outer response, SSE frame,
+tool-argument and terminal-content parsing failures. Duplicate observations are
+idempotent; a receipt storage failure blocks forwarding. Missing old response
+bytes and missing old observations remain explicitly unqualified.

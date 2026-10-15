@@ -349,7 +349,8 @@ class Handler(BaseHTTPRequestHandler):
             request_metrics = safe_request_metrics(body)
             upstream=provider_tool_routing.wire(body)
             if upstream.get('response_format')!=body.get('response_format'):
-                request_metrics['provider_schema_projection']='haiku_qa_union_v1'
+                request_metrics['provider_schema_projection']=('calibration_json_object_v1'
+                    if upstream.get('response_format')=={'type':'json_object'} else 'haiku_qa_union_v1')
                 request_metrics['canonical_schema_validation_preserved']=True
             if upstream is not body and isinstance(body.get('tool_choice'),dict):
                 request_metrics['routing_compatibility']='haiku_named_tool_v1'
@@ -486,10 +487,16 @@ class Handler(BaseHTTPRequestHandler):
             if reason == 'review inspection stalled':
                 data = b'{"error":{"code":"review_inspection_stalled"}}'
             if isinstance(error,StructuredResponseRejected):
+                rejected_media=content_type
                 status,reason,content_type=502,'structured_decision_response_invalid','application/json'
                 response_metrics['structured_rejection_category']=error.category
                 if error.diagnostic:
                     response_metrics['structured_rejection_diagnostic']=error.diagnostic
+                if error.category=='calibration_response_invalid':
+                    import calibration_response_observations
+                    try:calibration_response_observations.record(COUNTER_PATH,execution_id,call_number,data,rejected_media)
+                    except Exception:
+                        status,reason=503,'calibration_observation_unavailable'
                 data=b'{"error":{"code":"structured_decision_response_invalid"}}'
                 rejection=getattr(error,'receipt',None)
                 if rejection:

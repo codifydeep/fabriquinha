@@ -4,6 +4,57 @@ from provider_tool_routing import wire
 
 
 class ProviderToolRoutingTests(unittest.TestCase):
+    def test_completed_calibration_reads_request_json_mode_without_changing_local_contract(self):
+        from test_calibration_response_contract import CalibrationContractTests
+        from calibration_response_contract import apply
+        body=apply(CalibrationContractTests().body(complete=True));body['model']='anthropic/claude-haiku-5.5'
+        before=copy.deepcopy(body);result=wire(body)
+        self.assertEqual(result['response_format'],{'type':'json_object'})
+        self.assertEqual(body,before)
+        self.assertEqual({k:v for k,v in result.items() if k!='response_format'},body)
+        self.assertEqual(result['tool_choice'],'auto');self.assertEqual(result['provider']['require_parameters'],True)
+
+    def test_json_mode_never_replaces_mandatory_reads_or_policy_decision_schema(self):
+        from test_calibration_response_contract import CalibrationContractTests
+        from calibration_response_contract import apply
+        for phase,complete in (('bundle',False),('review',True),('attestation',True)):
+            body=apply(CalibrationContractTests().body(phase,complete));body['model']='anthropic/claude-haiku-5.5'
+            result=wire(body)
+            self.assertEqual(result.get('response_format'),body.get('response_format'))
+            if phase=='bundle':self.assertEqual(result['tool_choice']['function']['name'],'read_file')
+
+    def test_real_proxy_path_sends_json_mode_but_rejects_invalid_canonical_artifact(self):
+        import json,io
+        from pathlib import Path
+        from unittest.mock import patch,MagicMock
+        import model_proxy as proxy
+        from test_read_stream_recovery import ReadStreamRecoveryTests
+        from test_calibration_response_contract import CalibrationContractTests
+        f=ReadStreamRecoveryTests();f.setUp();self.addCleanup(f.doCleanups)
+        original_read=Path.read_text
+        def read_text(path,*a,**k):
+            return 'synthetic-credential-not-real' if str(path)=='/secret/openrouter.key' else original_read(path,*a,**k)
+        valid=dict(action='calibration_objection',reason='Synthetic seam',execution_authorized=False,delivery_approval=False)
+        for value,status in ((valid,200),({**valid,'delivery_approval':True},502),('NOT_JSON_PRIVATE',502)):
+            body=CalibrationContractTests().body(complete=True);body.update(model='anthropic/claude-haiku-5.5',stream=False)
+            content=value if isinstance(value,str) else json.dumps(value)
+            response=io.BytesIO(json.dumps(dict(choices=[dict(finish_reason='stop',message=dict(content=content))])).encode())
+            response.status=200;response.getheader=lambda *_:'application/json'
+            conn=MagicMock();conn.getresponse.return_value=response
+            with patch.object(proxy,'MODEL','anthropic/claude-haiku-5.5'),patch.object(proxy.http.client,'HTTPSConnection',return_value=conn),patch.object(Path,'read_text',read_text):
+                result=f.request(body)
+            self.assertEqual(result.status,status)
+            transmitted=json.loads(conn.request.call_args.args[2])
+            self.assertEqual(transmitted['response_format'],{'type':'json_object'})
+            self.assertEqual([t['function']['name'] for t in transmitted['tools']],['read_file'])
+            if status==502:
+                from deterministic_read_dispatch import ledger
+                with ledger(str(f.counter)) as c:
+                    observation=json.loads(c.execute('SELECT receipt FROM calibration_response_observations ORDER BY call_number DESC LIMIT 1').fetchone()[0])
+                self.assertEqual(observation['phase'],'terminal_content_json' if isinstance(value,str) else 'json_parsed')
+                self.assertNotIn('NOT_JSON_PRIVATE',json.dumps(observation))
+
+
     def mediation_body(self):
         from test_typed_decision_contract import TypedDecisionTests
         from decision_schema import apply

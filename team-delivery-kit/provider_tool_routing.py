@@ -38,6 +38,20 @@ def explain_unions(result,schema):
 
 
 def wire(body):
+    # Dynamic fixture dictionaries remain subject to the full local schema.
+    # JSON mode constrains syntax only and is selected after real mandatory
+    # reads, never instead of them. Additional frozen reads remain available.
+    if body.get('model')=='anthropic/claude-haiku-5.5' and body.get('tool_choice')=='auto':
+        from calibration_response_contract import request,apply
+        current=request(body)
+        if current and current['phase']=='bundle':
+            canonical=apply(copy.deepcopy(body))
+            if (body.get('response_format') is not None or canonical.get('tool_choice')!='auto'
+                    or body.get('tools')!=canonical.get('tools')
+                    or (body.get('provider') or {}).get('require_parameters') is not True):
+                raise ValueError('canonical completed calibration inspection required')
+            result=copy.deepcopy(body);result['response_format']={'type':'json_object'}
+            return result
     fmt=body.get('response_format') or {}
     contract=fmt.get('json_schema') or {}
     if (body.get('model')=='anthropic/claude-haiku-5.5'

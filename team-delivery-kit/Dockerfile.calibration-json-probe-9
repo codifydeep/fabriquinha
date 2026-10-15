@@ -1,0 +1,5 @@
+FROM delivery-kit-calibration-transport:20261015.8
+USER root
+COPY --chmod=0444 provider_tool_routing.py calibration_json_transport_probe.py /
+USER 10000:10000
+ENTRYPOINT ["python"]

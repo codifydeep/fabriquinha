@@ -27,6 +27,8 @@ COPY broker/generic_calibration_workflow.py /generic_calibration_workflow.py
 COPY broker/calibration_incidents.py broker/calibration_incident_job.py /
 COPY calibration_incident_contract.py /calibration_incident_contract.py
 COPY calibration_transport_probe.py /calibration_transport_probe.py
+COPY calibration_json_transport_probe.py /calibration_json_transport_probe.py
+COPY calibration_response_observations.py /calibration_response_observations.py
 COPY broker/generic_calibration_capability_recovery.py broker/generic_calibration_local_recovery.py broker/generic_calibration_seam_job.py /
 COPY broker/generic_calibration_protocol_recovery.py /generic_calibration_protocol_recovery.py
 COPY calibration_response_contract.py /calibration_response_contract.py

@@ -1632,6 +1632,8 @@ flowchart LR
     A --> D[CTO: novo parecer vinculado ao probe e à recusa]
     D -->|Encaminhar evidência atual| T
     D -->|Mantém recusa| B[Bloqueio técnico com dono e próxima ação]
+    B -->|JSON inválido e protocolo alterado: uma qualificação| J[Probe específico de modo JSON]
+    J --> D
     T -->|Rejeição| B
     N -->|Mesma classe sem nova evidência| B
 ```
@@ -1651,6 +1653,20 @@ ambas as evidências ficam preservados; outra recusa não reinicia essa trilha.
 O experimento de trailers/ledger só se aplica a falhas de transporte/ferramenta;
 JSON inválido ou violações de schema exigem diagnóstico próprio, sem usar esse
 probe como pretexto para uma nova submissão.
+
+Para uma rejeição comprovada de JSON, existe uma continuação específica e
+limitada: após as leituras obrigatórias, o proxy do Haiku pede `json_object` ao
+provedor, mantendo a validação canônica completa no controlador. O experimento
+isolado verifica a projeção real de requisição, leituras e rejeição de conteúdo
+inválido; não chama o modelo nem prova a causa histórica. Somente um novo parecer
+do CTO e uma revisão independente do Tech Lead podem patrocinar outra submissão
+de dados no mesmo snapshot. Recusas, tentativas e experimentos anteriores ficam
+preservados. Outra falha não rearma essa continuação; a compatibilidade do
+provedor e a entrega completa ainda exigem validação por execuções reais.
+Novas rejeições registram também um recibo privado com fase de parsing, posição,
+tipo de transporte, contagem de ferramentas e hash. O recibo distingue JSON do
+conteúdo, argumentos de ferramenta e frames de stream sem guardar o texto
+rejeitado. Evidências antigas ausentes não são reconstruídas retroativamente.
 
 Essa trilha cobre incidentes de resposta do produtor, não todo bloqueio possível.
 Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CTO e

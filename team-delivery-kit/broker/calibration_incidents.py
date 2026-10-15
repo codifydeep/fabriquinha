@@ -6,6 +6,7 @@ Red/Green, merge, deploy or delivery approval is conferred by this lane.
 import hashlib
 import json
 import os
+import re
 import time
 import uuid
 import urllib.error
@@ -77,7 +78,8 @@ def register(con,cfg):
 def context(cfg,s,phase):
     return contract.context(phase,digest(cfg),cfg['source_config_sha256'],
         digest(s['prior_hold']['value']) if phase=='evidence_diagnosis' else
-        digest(s['cto_decision']['value']) if phase=='review' else None,digest(s['probe']) if phase!='diagnosis' else None)
+        digest(s['cto_decision']['value']) if phase=='review' else None,digest(s['probe']) if phase!='diagnosis' else None,
+        experiment='fixed_json_object_transport_probe_v1' if phase!='diagnosis' and s.get('probe_kind')=='json' else None)
 
 
 def instruction(cfg,s,phase):
@@ -106,6 +108,11 @@ def instruction(cfg,s,phase):
         if phase=='review':note+='\nCTO proposal: '+json.dumps(s['cto_decision']['value'],separators=(',',':'))
         else:note+='\nPrior hold preserved: '+json.dumps(s['prior_hold']['value'],separators=(',',':'))
         note+='\nActual fixed experiment: '+json.dumps({k:proof[k] for k in ('operation','passed','checks','historical_cause_proven','product_tests_executed')},separators=(',',':'))
+    if s.get('probe_kind')=='json':
+        note=note.replace('fixed_transport_probe_v1: synthetic terminal trailers and durable sanitized receipt checks',
+            'fixed_json_object_transport_probe_v1: JSON-mode wire projection and unchanged canonical validation checks')
+        note=note.replace('A new fixed experiment has now run;',
+            'New JSON-mode protocol qualified synthetically; no provider call has qualified it yet;')
     require(len(note)<=3800);return note
 
 
@@ -121,20 +128,37 @@ def advance(con,key,fx,*,now=None):
     row=con.execute('SELECT config,state FROM calibration_incidents WHERE incident_id=?',(key,)).fetchone()
     require(row is not None);cfg,s=map(json.loads,row)
     probe_applicable=cfg['rejection']['diagnostic']['category']=='invalid_transport_or_tool'
+    json_enrich=(s['stage']=='blocked' and s.get('category') in ('technical_hold_retained','incident_experiment_not_applicable')
+        and s.get('observed_phase')=='diagnosis' and not s.get('json_format_addendum_consumed')
+        and cfg['rejection']['diagnostic'].get('version')=='calibration-constraint-v2'
+        and cfg['rejection']['diagnostic'].get('failure_code')=='invalid_json')
     enrich=(probe_applicable and s['stage']=='blocked' and s.get('category')=='technical_hold_retained'
         and s.get('observed_phase')=='diagnosis' and not s.get('evidence_addendum_consumed'))
-    if s['stage']=='resubmission_sponsored' or (s['stage']=='blocked' and not enrich):return s
+    if s['stage']=='resubmission_sponsored' or (s['stage']=='blocked' and not (enrich or json_enrich)):return s
     def save(**changes):
         s.update(changes);con.execute('UPDATE calibration_incidents SET state=? WHERE incident_id=?',(json.dumps(s,sort_keys=True),key));con.commit();return s
     def hold(category):return save(stage='blocked',owner=cfg['cto'],category=category,
         required_action='CTO diagnose '+category+'; preserve evidence, no identical dispatch or author retry')
     try:fx.verify(cfg)
     except (ValueError,KeyError,TypeError):return hold('incident_source_changed')
-    if enrich:
+    if enrich or json_enrich:
         try:
             require(s['decision']['value']['action']=='retain_technical_hold')
             getattr(fx,'verify_hold',lambda *_:None)(cfg,s)
         except (ValueError,KeyError,TypeError,ValidationError):return hold('incident_hold_binding_rejected')
+        if json_enrich:
+            try:proof=fx.json_evidence(cfg)
+            except TimeoutError:return s
+            except (ValueError,KeyError,TypeError):return hold('incident_json_protocol_unqualified')
+            if proof is None:return s # No installed changed protocol; never spend calls to repeat old evidence.
+            from calibration_json_transport_probe import source_hashes as json_sources
+            require(set(proof)=={'protocol','sources','proxy_image'} and proof['protocol']=='calibration-json-object-v1'
+                and proof['sources']==json_sources() and bool(re.fullmatch('sha256:[a-f0-9]{64}',str(proof['proxy_image']))))
+            return save(stage='evidence_probe_pending',prior_hold=s['decision'],json_format_addendum_consumed=True,
+                json_format_origin=dict(stage=s['stage'],category=s.get('category'),evidence_addendum_consumed=s.get('evidence_addendum_consumed')),
+                json_format_evidence=proof,probe_kind='json',probe_sources=proof['sources'],
+                probe_job_key=digest(dict(incident=key,format=proof)),
+                required_action='Controller qualify changed JSON-mode transport once; preserve old holds and all submission limits')
         return save(stage='evidence_probe_pending',prior_hold=s['decision'],evidence_addendum_consumed=True,
             required_action='Controller collect one new fixed transport experiment; preserve CTO hold, no repeated diagnosis on identical evidence')
     if s['stage'] in ('issue_pending','observe_issue'):
@@ -148,12 +172,12 @@ def advance(con,key,fx,*,now=None):
         return save(stage='diagnosis_dispatch',issue_id=issue['id'],identifier=issue.get('identifier'),
             required_action='CTO diagnose fixed experiment scope; no tool authority')
     if s['stage'] in ('probe_pending','evidence_probe_pending'):
-        if not probe_applicable:return hold('incident_experiment_not_applicable')
+        if not probe_applicable and s.get('probe_kind')!='json':return hold('incident_experiment_not_applicable')
         enrichment=s['stage']=='evidence_probe_pending'
         try:
             result=fx.probe(cfg,s)
             require(hashlib.sha256(result['output'].encode()).hexdigest()==result['output_sha256'])
-            jobs.validate(json.loads(result['output']),cfg['validator_sources'])
+            jobs.validate(json.loads(result['output']),s.get('probe_sources',cfg['validator_sources']),s.get('probe_kind','terminal'))
         except TimeoutError:return s
         except (ValueError,KeyError,TypeError):return hold('incident_experiment_rejected')
         return save(stage='evidence_diagnosis_dispatch' if enrichment else 'review_dispatch',probe=result,
@@ -213,7 +237,7 @@ def sponsor(con,cfg,s,now):
         and s['cto_decision']['task_id']!=s['review_decision']['task_id']
         and s['review_decision']['value']['action']=='sponsor_data_submission')
     require(hashlib.sha256(s['probe']['output'].encode()).hexdigest()==s['probe']['output_sha256'])
-    proof=json.loads(s['probe']['output']);jobs.validate(proof,cfg['validator_sources'])
+    proof=json.loads(s['probe']['output']);jobs.validate(proof,s.get('probe_sources',cfg['validator_sources']),s.get('probe_kind','terminal'))
     parent=handoffs.load(con,cfg['author_task']);data=json.loads(parent['data']) if parent else {}
     require(parent and parent['issue_id']==cfg['origin_issue_id'] and parent['stage']=='test_first_blocked'
         and data.get('calibration_prerequisite')==prior)
@@ -222,9 +246,14 @@ def sponsor(con,cfg,s,now):
         review_decision=s['review_decision'],probe=s['probe'],submission_limit=1,old_limits_preserved=True,
         author_restarted=False,tests_executed=False,execution_authorized=False,delivery_approval=False,at=now)
     if s.get('cto_decision_phase')=='evidence_diagnosis':
-        require(s.get('evidence_addendum_consumed') is True and s['prior_hold']['value']['action']=='retain_technical_hold'
+        require((s.get('evidence_addendum_consumed') is True or s.get('json_format_addendum_consumed') is True)
+            and s['prior_hold']['value']['action']=='retain_technical_hold'
             and s['prior_hold']['task_id']!=s['cto_decision']['task_id'])
         receipt.update(prior_hold=s['prior_hold'],cto_decision_phase='evidence_diagnosis',evidence_addendum_limit=1)
+    if s.get('probe_kind')=='json':
+        require(s.get('json_format_addendum_consumed') is True and s['json_format_evidence']['sources']==proof['sources'])
+        receipt.update(json_format_evidence=s['json_format_evidence'],json_format_origin=s['json_format_origin'],
+            probe_kind='json',probe_job_key=s['probe_job_key'],json_format_submission_limit=1)
     updated={k:v for k,v in prior.items() if k in ('capability_recovery_sha256','local_recovery_sha256','protocol_recovery_sha256')}
     updated.update(stage='bundle_dispatch',owner=cfg['cto'],incident_resume_id=cfg['incident_id'],incident_resume_sha256=digest(receipt),
         execution_authorized=False,delivery_approval=False,required_action='CTO one independently sponsored data submission; no author retry')
@@ -353,7 +382,26 @@ class Effects:
         decision=dict(value=value,task_id=task['id'],agent_id=actor,execution_id=binding['request_id'])
         validate_decision(cfg,s,phase,actual,decision);return decision
     def probe(self,cfg,s):
-        with self.b.db() as con:return jobs.run(self.b,con,cfg['incident_id'],cfg['validator_sources'])
+        with self.b.db() as con:return jobs.run(self.b,con,s.get('probe_job_key',cfg['incident_id']),
+            s.get('probe_sources',cfg['validator_sources']),kind=s.get('probe_kind','terminal'))
+    def json_evidence(self,cfg):
+        if not os.environ.get('BROKER_CALIBRATION_JSON_PROBE_IMAGE'):return None
+        from calibration_json_transport_probe import source_hashes as json_sources
+        script=PROXY_QUERY.replace('sources=source_hashes(),','sources=source_hashes(),json_model=m.MODEL,json_sources=__import__("calibration_json_transport_probe").source_hashes(),')
+        proxy=self.provider.proxy_info(self.b)
+        entry=self.b.docker('POST','/containers/'+proxy['Id']+'/exec',dict(AttachStdout=True,AttachStderr=False,Tty=True,
+            Cmd=['python','-c',script,cfg['failed_execution']]))
+        conn=self.b.DockerConnection('localhost',timeout=10)
+        try:
+            conn.request('POST','/v1.45/exec/'+entry['Id']+'/start',json.dumps(dict(Detach=False,Tty=True)),{'Content-Type':'application/json'})
+            response=conn.getresponse();raw=response.read(32769);require(response.status==200 and len(raw)<=32768)
+        finally:conn.close()
+        outcome=self.b.docker('GET','/exec/'+entry['Id']+'/json')
+        require(outcome and not outcome.get('Running') and outcome.get('ExitCode')==0)
+        value=json.loads(raw);require(value['json_model']=='anthropic/claude-haiku-5.5'
+            and value['json_sources']==json_sources() and value['receipts']==[cfg['rejection']]
+            and value['sources']==cfg['validator_sources'] and self.provider.proxy_info(self.b)['Id']==proxy['Id'])
+        return dict(protocol='calibration-json-object-v1',sources=value['json_sources'],proxy_image=proxy['Image'])
     def verify_hold(self,cfg,s):
         saved=s.get('prior_hold') or s['decision'];task=self.plans.task(saved['task_id'],cfg['cto'])
         require(self.decision(cfg,{**s,'wakeup_id':task['wakeup_id']},'diagnosis',task)==saved)
@@ -364,11 +412,12 @@ class Effects:
             phase_state={**s,'wakeup_id':task['wakeup_id']}
             require(self.decision(cfg,phase_state,phase,task)==saved)
         with self.b.db() as con:
-            row=con.execute('SELECT identity,state FROM calibration_incident_jobs WHERE incident_id=?',(cfg['incident_id'],)).fetchone()
+            row=con.execute('SELECT identity,state FROM calibration_incident_jobs WHERE incident_id=?',(s.get('probe_job_key',cfg['incident_id']),)).fetchone()
         require(row is not None);identity,job=map(json.loads,row)
-        name,payload=jobs.payload(self.b,cfg['incident_id'])
-        require(identity==dict(name=name,payload=payload,sources=cfg['validator_sources'])
+        name,payload=jobs.payload(self.b,s.get('probe_job_key',cfg['incident_id']),s.get('probe_kind','terminal'))
+        require(identity==dict(name=name,payload=payload,sources=s.get('probe_sources',cfg['validator_sources']))
             and job['stage']=='complete' and job['result']==s['probe'])
+        if s.get('probe_kind')=='json':require(self.json_evidence(cfg)==s['json_format_evidence'])
     def publish(self,cfg,s):
         if not s.get('issue_id'):return
         try:import handoff_runtime

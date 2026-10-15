@@ -7,6 +7,13 @@ from decision_schema import apply
 
 
 class IncidentContractTests(unittest.TestCase):
+    def test_json_experiment_is_bound_only_to_new_evidence_and_independent_review(self):
+        for phase in ('evidence_diagnosis','review'):
+            v=contract.context(phase,'a'*64,'b'*64,'c'*64,'d'*64,experiment='fixed_json_object_transport_probe_v1')
+            self.assertEqual(contract.schema(v)['properties']['experiment']['enum'],['fixed_json_object_transport_probe_v1'])
+            self.assertEqual(contract.request(dict(messages=[dict(role='user',content=contract.capsule(v))])),v)
+        with self.assertRaises(ValueError):contract.context('diagnosis','a'*64,'b'*64,experiment='fixed_json_object_transport_probe_v1')
+
     def test_evidence_diagnosis_binds_prior_hold_and_actual_probe_without_authority(self):
         v=contract.context('evidence_diagnosis','a'*64,'b'*64,'c'*64,'d'*64)
         body=apply(dict(messages=[dict(role='user',content=contract.capsule(v))]))

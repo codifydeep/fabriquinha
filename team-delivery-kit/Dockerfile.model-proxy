@@ -7,6 +7,8 @@ COPY upstream_error_diagnostic.py /upstream_error_diagnostic.py
 COPY model_policy.py /model_policy.py
 COPY decision_schema.py /decision_schema.py
 COPY calibration_transport_probe.py /calibration_transport_probe.py
+COPY calibration_json_transport_probe.py /calibration_json_transport_probe.py
+COPY calibration_response_observations.py /calibration_response_observations.py
 COPY calibration_response_contract.py /calibration_response_contract.py
 COPY calibration_rejection_diagnostics.py /calibration_rejection_diagnostics.py
 COPY product_scope_contract.py /product_scope_contract.py

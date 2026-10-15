@@ -10,14 +10,18 @@ CONTEXT='DELIVERY_CALIBRATION_INCIDENT_CONTEXT_V1'
 def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def context(phase,incident,source,proposal=None,probe=None):
+def context(phase,incident,source,proposal=None,probe=None,*,experiment=None):
     value=dict(phase=phase,incident_sha256=incident,source_sha256=source,proposal_sha256=proposal,probe_sha256=probe)
+    if experiment is not None:value['experiment']=experiment
     validate_context(value);return value
 
 
 def validate_context(v):
-    if not isinstance(v,dict) or set(v)!={'phase','incident_sha256','source_sha256','proposal_sha256','probe_sha256'}:
+    fields={'phase','incident_sha256','source_sha256','proposal_sha256','probe_sha256'}
+    if not isinstance(v,dict) or set(v) not in (fields,fields|{'experiment'}):
         raise ValueError('exact incident context required')
+    if 'experiment' in v and (v['experiment']!='fixed_json_object_transport_probe_v1' or v['phase']=='diagnosis'):
+        raise ValueError('fixed new evidence experiment required')
     if v['phase'] not in ('diagnosis','evidence_diagnosis','review'):raise ValueError('fixed incident role required')
     for k in ('incident_sha256','source_sha256','proposal_sha256','probe_sha256'):
         if v['phase']=='diagnosis' and k in ('proposal_sha256','probe_sha256'):
@@ -55,7 +59,7 @@ def schema(v):
     actions=[{'diagnosis':'request_transport_probe','evidence_diagnosis':'submit_probe_for_review',
         'review':'sponsor_data_submission'}[v['phase']],'retain_technical_hold']
     props=dict(action=dict(type='string',enum=actions),incident_sha256=fixed(v['incident_sha256']),
-        reason=dict(type='string',minLength=1,maxLength=900),experiment=fixed('fixed_transport_probe_v1'),
+        reason=dict(type='string',minLength=1,maxLength=900),experiment=fixed(v.get('experiment','fixed_transport_probe_v1')),
         historical_cause_proven=dict(type='boolean',enum=[False]),
         author_retry_authorized=dict(type='boolean',enum=[False]),execution_authorized=dict(type='boolean',enum=[False]),
         delivery_approval=dict(type='boolean',enum=[False]))

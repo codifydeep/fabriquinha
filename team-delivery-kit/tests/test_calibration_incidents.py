@@ -46,11 +46,12 @@ class IncidentTests(unittest.TestCase):
                 ctx=incidents.context(cfg,s,phase)
                 value=dict(action={'diagnosis':'request_transport_probe','evidence_diagnosis':'submit_probe_for_review','review':'sponsor_data_submission'}[phase],
                     incident_sha256=ctx['incident_sha256'],reason='Measured probe, not a claim about historical cause',
-                    experiment='fixed_transport_probe_v1',historical_cause_proven=False,author_retry_authorized=False,
+                    experiment=ctx.get('experiment','fixed_transport_probe_v1'),historical_cause_proven=False,author_retry_authorized=False,
                     execution_authorized=False,delivery_approval=False)
                 if phase!='diagnosis':value.update(proposal_sha256=ctx['proposal_sha256'],probe_sha256=ctx['probe_sha256'])
                 return dict(value=value,task_id=task['id'],agent_id=task['agent_id'],execution_id=phase+'-execution')
             def probe(_,cfg,s):parent.effects.append(('probe',));return parent.result
+            def json_evidence(_,cfg):return None
         self.fx=Effects()
 
     def advance(self,now=1):return incidents.advance(self.con,self.key,self.fx,now=now)
@@ -174,4 +175,38 @@ class IncidentTests(unittest.TestCase):
         self.key=self.cfg['incident_id'];incidents.register(self.con,self.cfg)
         self.advance();self.advance();self.finish_phase('diagnosis');before=list(self.effects)
         self.assertEqual(self.advance()['category'],'incident_experiment_not_applicable')
+        self.assertEqual(self.effects,before)
+
+    def json_incident(self):
+        self.rejection['diagnostic'].update(version='calibration-constraint-v2',category='invalid_json',failure_code='invalid_json')
+        self.cfg=incidents.prepare(self.c,self.s,self.task,self.binding,self.rejection,source_hashes())
+        self.key=self.cfg['incident_id'];incidents.register(self.con,self.cfg)
+
+    def test_changed_json_protocol_qualifies_new_evidence_and_requires_two_fresh_decisions(self):
+        from calibration_json_transport_probe import run as json_run,source_hashes as json_sources
+        self.json_incident();self.advance();self.advance();held=self.retain('diagnosis')
+        original=copy.deepcopy(held['decision'])
+        self.fx.json_evidence=lambda cfg:dict(protocol='calibration-json-object-v1',sources=json_sources(),proxy_image='sha256:'+'d'*64)
+        self.proof=json_run();output=json.dumps(self.proof)
+        self.result=dict(output=output,output_sha256=__import__('hashlib').sha256(output.encode()).hexdigest(),container_id='json-probe',image='sha256:'+'e'*64)
+        state=self.advance();self.assertEqual(state['stage'],'evidence_probe_pending');self.assertEqual(state['probe_kind'],'json')
+        self.assertNotEqual(state['probe_job_key'],self.key)
+        self.advance()
+        cfg,current=map(json.loads,self.con.execute('SELECT config,state FROM calibration_incidents WHERE incident_id=?',(self.key,)).fetchone())
+        bounded=copy.deepcopy(current);bounded['prior_hold']['value']['reason']='x'*900
+        self.assertLessEqual(len(incidents.instruction(cfg,bounded,'evidence_diagnosis')),3800)
+        self.advance();self.finish_phase('evidence_diagnosis');self.advance();self.finish_phase('review');state=self.advance()
+        self.assertEqual(state['stage'],'resubmission_sponsored')
+        self.assertEqual(state['sponsorship']['prior_hold'],original)
+        self.assertEqual(state['sponsorship']['json_format_submission_limit'],1)
+        self.assertFalse(state['sponsorship']['execution_authorized'])
+        before=list(self.effects);self.advance();self.assertEqual(before,self.effects)
+
+    def test_json_protocol_hold_keeps_prior_experiment_and_cannot_rearm_on_second_hold(self):
+        from calibration_json_transport_probe import source_hashes as json_sources,run as json_run
+        self.json_incident();self.advance();self.advance();self.retain('diagnosis')
+        self.fx.json_evidence=lambda cfg:dict(protocol='calibration-json-object-v1',sources=json_sources(),proxy_image='sha256:'+'d'*64)
+        output=json.dumps(json_run());self.result.update(output=output,output_sha256=__import__('hashlib').sha256(output.encode()).hexdigest())
+        self.advance();self.advance();self.advance();self.retain('evidence_diagnosis');before=list(self.effects)
+        for _ in range(3):self.assertEqual(self.advance()['stage'],'blocked')
         self.assertEqual(self.effects,before)

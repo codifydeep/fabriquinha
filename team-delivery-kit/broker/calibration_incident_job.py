@@ -10,23 +10,32 @@ try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
 
 
-def validate(proof,sources):
+def validate(proof,sources,kind='terminal'):
+    require(kind in ('terminal','json'))
+    if kind=='json':
+        from calibration_json_transport_probe import CHECKS
+        operation='fixed_json_object_transport_probe_v1';checks=CHECKS
+    else:
+        operation='fixed_calibration_transport_probe_v1'
+        checks={'empty_terminal_accepted','extra_terminal_rejected','duplicate_terminal_rejected','ledger_idempotent','legacy_receipt_preserved'}
     require(set(proof)=={'operation','passed','sources','checks','model_calls','product_tests_executed',
         'historical_cause_proven','author_retry_authorized','execution_authorized','delivery_approval'})
-    require(proof['operation']=='fixed_calibration_transport_probe_v1' and proof['passed'] is True
+    require(proof['operation']==operation and proof['passed'] is True
         and proof['sources']==sources and type(proof['model_calls']) is int and proof['model_calls']==0
-        and set(proof['checks'])=={'empty_terminal_accepted','extra_terminal_rejected','duplicate_terminal_rejected',
-            'ledger_idempotent','legacy_receipt_preserved'} and all(v is True for v in proof['checks'].values())
+        and set(proof['checks'])==checks and all(v is True for v in proof['checks'].values())
         and all(proof[k] is False for k in ('product_tests_executed','historical_cause_proven',
             'author_retry_authorized','execution_authorized','delivery_approval')))
 
 
-def payload(b,key):
-    image=getattr(b,'CALIBRATION_TRANSPORT_PROBE_IMAGE',None) or os.environ.get('BROKER_CALIBRATION_TRANSPORT_PROBE_IMAGE')
+def payload(b,key,kind='terminal'):
+    require(kind in ('terminal','json'))
+    attribute='CALIBRATION_JSON_PROBE_IMAGE' if kind=='json' else 'CALIBRATION_TRANSPORT_PROBE_IMAGE'
+    image=getattr(b,attribute,None) or os.environ.get('BROKER_'+attribute)
     require(isinstance(image,str) and bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
     name=b.PREFIX+'-calibration-incident-'+key[:24]
     value=dict(Image=image,User='10000:10000',Entrypoint=['python'],
-        Cmd=['-c','import signal,runpy;signal.alarm(90);runpy.run_path("/calibration_transport_probe.py",run_name="__main__")'],
+        Cmd=['-c','import signal,runpy;signal.alarm(90);runpy.run_path("/'+
+            ('calibration_json_transport_probe.py' if kind=='json' else 'calibration_transport_probe.py')+'",run_name="__main__")'],
         Env=gate.environment(b,image),Labels={'delivery-kit.owner':b.OWNER,'delivery-kit.calibration-incident':key},
         HostConfig=dict(NetworkMode='none',ReadonlyRootfs=True,CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
             Memory=268435456,NanoCpus=1000000000,PidsLimit=64,Mounts=[],Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'}))
@@ -43,9 +52,9 @@ def verify_job(b,info,expected):
     gate.verify_job(b,info,expected)
 
 
-def run(b,con,key,sources,*,now=None):
+def run(b,con,key,sources,*,now=None,kind='terminal'):
     require(isinstance(key,str) and bool(re.fullmatch('[a-f0-9]{64}',key)))
-    now=time.time() if now is None else now;name,expected=payload(b,key)
+    now=time.time() if now is None else now;name,expected=payload(b,key,kind)
     identity=dict(name=name,payload=expected,sources=sources)
     con.execute('CREATE TABLE IF NOT EXISTS calibration_incident_jobs(incident_id TEXT PRIMARY KEY,identity TEXT,state TEXT)')
     row=con.execute('SELECT identity,state FROM calibration_incident_jobs WHERE incident_id=?',(key,)).fetchone()
@@ -53,7 +62,7 @@ def run(b,con,key,sources,*,now=None):
         require(json.loads(row[0])==identity);state=json.loads(row[1])
         if state['stage']=='complete':
             result=state['result'];require(hashlib.sha256(result['output'].encode()).hexdigest()==result['output_sha256'])
-            validate(json.loads(result['output']),sources);return result
+            validate(json.loads(result['output']),sources,kind);return result
         require(state['stage']!='blocked')
     else:
         require(b.docker('GET','/containers/'+name+'/json') is None)
@@ -86,7 +95,7 @@ def run(b,con,key,sources,*,now=None):
         raise TimeoutError('observe same incident probe')
     raw=b.docker_stdout(info['Id'],include_stderr=info['State']['ExitCode']!=0,limit=16384)
     try:
-        require(type(info['State']['ExitCode']) is int and info['State']['ExitCode']==0);validate(json.loads(raw),sources)
+        require(type(info['State']['ExitCode']) is int and info['State']['ExitCode']==0);validate(json.loads(raw),sources,kind)
     except (ValueError,KeyError,TypeError):
         save(stage='blocked',category='incident_probe_rejected',output_sha256=hashlib.sha256(raw.encode()).hexdigest(),output=raw)
         raise ValueError('fixed incident evidence rejected; no repeat') from None
