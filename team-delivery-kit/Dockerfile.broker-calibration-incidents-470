@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261015.469
+COPY broker/calibration_incidents.py broker/calibration_incident_job.py broker/generic_calibration_workflow.py broker/generic_calibration_red_bridge.py /
+COPY calibration_incident_contract.py calibration_transport_probe.py decision_schema.py structured_response_contract.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_incidents,calibration_incident_job,generic_calibration_workflow"

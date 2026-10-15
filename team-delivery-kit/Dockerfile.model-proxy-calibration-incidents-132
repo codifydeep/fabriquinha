@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261015.131
+USER root
+COPY model_proxy.py decision_schema.py calibration_incident_contract.py calibration_transport_probe.py structured_response_contract.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_incident_contract,calibration_transport_probe,model_proxy"
+USER 10000:10000

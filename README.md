@@ -1604,6 +1604,41 @@ altera o artefato, não aprova entregas e não prova a causa de uma falha antiga
 cuja resposta completa não foi preservada. Instalar o diagnóstico tampouco
 rearma qualquer limite de tentativa.
 
+### Incidente de resposta do produtor de calibração
+
+O controlador implementa uma trilha específica para uma rejeição comprovada no
+ledger do proxy: cria um SPIKE filho no Multica, solicita uma decisão sem
+ferramentas ao CTO, executa apenas o experimento sintético fixo e solicita revisão
+independente ao Tech Lead. A projeção do card original acompanha o responsável
+real sem substituir ou esconder seu bloqueio de calibração.
+
+```mermaid
+flowchart LR
+    F[Produtor falhou: recibo preservado] --> I[SPIKE persistente no Multica]
+    I --> C[CTO: hipótese e pedido de probe fixo]
+    C --> P[Controlador: Docker isolado, sem produto ou rede]
+    P --> T[Tech Lead: revisão independente da evidência]
+    T -->|Patrocínio exato, uma vez| N[Nova submissão de dados no mesmo snapshot]
+    N --> G[Calibração, TDD e gates normais permanecem obrigatórios]
+    C -->|Sem suporte| B[Bloqueio técnico com dono e próxima ação]
+    T -->|Rejeição| B
+    N -->|Mesma classe sem nova evidência| B
+```
+
+Não há reset das tentativas históricas, reinício do autor ou aprovação de produto.
+O patrocínio fica vinculado às duas execuções nativas encerradas, ao experimento
+real e ao snapshot exato; é consumido atomicamente antes de um novo handoff.
+Confirmações perdidas observam o mesmo handle. A mesma classe de falha e os mesmos
+validadores não geram outro orçamento por trocar apenas o task ID ou hash da
+resposta. Erros de observação/publicação são persistidos e não impedem o tick de
+outros trabalhos. O probe não executa testes do produto nem prova retroativamente
+a causa de uma resposta antiga sem bytes preservados.
+
+Essa trilha cobre incidentes de resposta do produtor, não todo bloqueio possível.
+Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CTO e
+Tech Lead reais, nova submissão, calibração e posterior entrega ainda precisa ser
+comprovado ponta a ponta.
+
 ## Contribuir e reutilizar
 
 O código próprio está sob a [licença MIT](LICENSE), permitindo reutilização e uso comercial com preservação do aviso. Leia [CONTRIBUTING.md](CONTRIBUTING.md) e [os avisos de terceiros](THIRD_PARTY_NOTICES.md). Dependências e patches sobre projetos externos mantêm suas próprias licenças.

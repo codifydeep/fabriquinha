@@ -36,10 +36,14 @@ def reconcile_existing(b,route,source,prior):
     if prior and prior['stage'] not in ('test_first_validation_pending','test_first_blocked','technical_decision_required'):return False
     state=workflow.request(b,route['issue_id'],source['id'])
     if state['stage']=='calibration_ready':return False
+    try:import calibration_incidents as incidents
+    except ImportError:from broker import calibration_incidents as incidents
+    with b.db() as con:projected=incidents.projection(con,route['issue_id'],source['id'],state)
     data=json.loads(prior['data']) if prior else {}
     expected_stage='test_first_blocked' if state['stage']=='blocked' else 'test_first_validation_pending'
     if (prior and prior['stage']==expected_stage and data.get('calibration_prerequisite')==state
-            and prior['owner']==(state.get('owner') or route['cto'])):return True
+            and prior['owner']==(projected['owner'] if projected else state.get('owner') or route['cto'])
+            and data.get('calibration_incident')==projected):return True
     if prior and data.get('calibration_prerequisite')!=state:
         data['calibration_projection_repair']=dict(operation='restore_durable_calibration_projection_v1',
             prior_stage=prior['stage'],prior_error=data.get('error'),
@@ -77,6 +81,13 @@ def observe(b,route,source,prior,error):
     if state['stage']=='blocked':
         stage='test_first_blocked';data['error']='generic_calibration_prerequisite:'+state['category']
     else:data.pop('error',None)
+    try:import calibration_incidents as incidents
+    except ImportError:from broker import calibration_incidents as incidents
+    with b.db() as con:projected=incidents.projection(con,route['issue_id'],source['id'],state)
+    if projected:
+        data.update(calibration_incident=projected,required_action=projected['required_action'])
+    else:data.pop('calibration_incident',None)
     with b.db() as con:
-        handoffs.save(con,source['id'],route['issue_id'],stage,state.get('owner') or route['cto'],data,time.time())
+        handoffs.save(con,source['id'],route['issue_id'],stage,
+            projected['owner'] if projected else state.get('owner') or route['cto'],data,time.time())
     return True

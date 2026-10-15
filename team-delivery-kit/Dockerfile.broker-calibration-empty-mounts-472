@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261015.471
+COPY broker/calibration_incident_job.py /calibration_incident_job.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_incident_job;assert callable(calibration_incident_job.verify_job)"

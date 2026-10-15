@@ -167,8 +167,10 @@ def validate_request(body):
                              else {'effort': REASONING_EFFORT})
     # Current controller phase takes precedence across the entire legacy adapter
     # chain, not just decision_schema. Historical author/typed markers are data.
+    from calibration_incident_contract import apply as calibration_incident
     from calibration_response_contract import apply as calibration_response
-    result=calibration_response(body)
+    result=calibration_incident(body)
+    if result is None:result=calibration_response(body)
     if result is None:
         result=typed_test_source.apply(typed_decision_contract.apply(apply_test_artifact_schema(apply_write_tool_schema(apply_decision_schema(body)))))
     if os.environ.get('MODEL_PROXY_OPTIONAL_FILES_FEEDBACK')=='1':

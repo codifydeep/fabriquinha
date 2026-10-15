@@ -126,6 +126,13 @@ def advance(con,c,fx,*,now=None):
                 return hold('local_recovery_binding_rejected','Controller verify exact local rejection repair; no dispatch')
             marker=digest(dict(config_sha256=digest(c),phase='bundle',protocol=receipt['protocol'],
                 local_recovery_sha256=digest(receipt)))
+        if s.get('incident_resume_sha256'):
+            try:import calibration_incidents as incidents
+            except ImportError:from broker import calibration_incidents as incidents
+            try:receipt=incidents.qualified_resume(con,c,s)
+            except (ValueError,KeyError,TypeError):
+                return hold('incident_sponsorship_rejected','CTO verify exact independent incident sponsorship; no dispatch')
+            marker=digest(dict(config_sha256=digest(c),phase='bundle',incident_sponsorship=digest(receipt)))
         try:note=instruction(c)
         except ValueError:
             return hold('bundle_context_requires_readonly_capsule',
@@ -411,10 +418,19 @@ def tick(b):
     with b.LOCK,b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows').fetchall()
-        active=[json.loads(r[0]) for r in rows if json.loads(r[1])['stage'] not in ('blocked','calibration_ready')]
-        if not active:return
-        fx=Effects(b)
-        for c in active:advance(con,c,fx)
+        fx=None
+        for row in rows:
+            c,s=map(json.loads,row)
+            if s['stage']=='blocked':
+                if s.get('category')=='bundle_task_failed' and s.get('observed_task'):
+                    try:import calibration_incidents as incidents
+                    except ImportError:from broker import calibration_incidents as incidents
+                    try:incidents.handle(b,con,c,s)
+                    except (ValueError,KeyError,TypeError,RuntimeError,TimeoutError,urllib.error.URLError,incidents.ValidationError) as error:
+                        incidents.enrollment_error(con,c,s,error) # One incident cannot starve the rest of the tick.
+            elif s['stage']!='calibration_ready':
+                if fx is None:fx=Effects(b)
+                advance(con,c,fx)
 
 
 def bound_prompt(c,s,task,note,expected_note):

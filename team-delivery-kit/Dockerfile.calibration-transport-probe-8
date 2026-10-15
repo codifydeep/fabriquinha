@@ -1,0 +1,4 @@
+FROM delivery-kit-generic-calibration:20261011.6
+COPY --chmod=0444 calibration_transport_probe.py calibration_response_contract.py calibration_rejection_diagnostics.py structured_rejection_receipts.py structured_response_contract.py artifact_read_evidence.py deterministic_read_dispatch.py read_stream_recovery.py author_read_policy.py /
+USER 10000:10000
+ENTRYPOINT ["python"]
