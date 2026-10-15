@@ -13,6 +13,53 @@ EXECUTION=fixtures.EXECUTION
 
 
 class DeterministicReadTests(unittest.TestCase):
+    def calibration_body(self,engine='unittest_path_fixtures_v2'):
+        from calibration_response_contract import context,capsule
+        wire=request_body()
+        value=context('bundle',['/evidence/candidate/tests/test_ui.py'],'a'*64,engine=engine)
+        wire['messages']=[dict(role='user',content='DELIVERY_DETERMINISTIC_READ_V1\n'+capsule(value))]
+        wire['tools']=[dict(type='function',function=dict(name='read_file',parameters={}))]
+        return wire
+
+    def test_current_calibration_read_without_legacy_marker_is_local_and_not_evidence(self):
+        for engine in ('unittest_path_fixture_v1','unittest_path_fixtures_v2'):
+            wire=self.calibration_body(engine)
+            with patch.object(proxy,'forward') as forward:reply=self.f.request(wire)
+            self.assertEqual(reply.status,200);forward.assert_not_called()
+            prepared=proxy.validate_request(copy.deepcopy(wire))
+            validate(prepared,reply.wfile.getvalue(),'text/event-stream')
+            self.assertEqual(observations([dict(role='assistant',content=reply.wfile.getvalue().decode())],wire=True),{})
+        self.assertEqual(proxy.load_calls(),0)
+
+    def test_calibration_dispatch_rejects_path_or_page_drift_and_binds_source(self):
+        wire=self.calibration_body();body=proxy.validate_request(copy.deepcopy(wire))
+        original=dispatch.make(body,EXECUTION)
+        for key,value in (('path','/evidence/candidate/secret.txt'),('offset',2),('limit',99)):
+            changed=copy.deepcopy(body)
+            changed['tools'][0]['function']['parameters']['properties'][key]['enum']=[value]
+            with self.assertRaises(ValueError):dispatch.make(changed,EXECUTION)
+        from calibration_response_contract import request,capsule
+        current=request(body);current['source_sha256']='b'*64
+        changed=copy.deepcopy(wire);changed['messages'][0]['content']='DELIVERY_DETERMINISTIC_READ_V1\n'+capsule(current)
+        other=dispatch.make(proxy.validate_request(changed),EXECUTION)
+        self.assertNotEqual(original['scope']['scope'],other['scope']['scope'])
+
+    def test_calibration_pagination_requires_actual_receipt_and_completion_is_not_synthesized(self):
+        wire=self.calibration_body();path='/evidence/candidate/tests/test_ui.py'
+        wire['messages'] += [dict(role='assistant',tool_calls=[dict(id='page',function=dict(name='read_file',
+            arguments=json.dumps(dict(path=path,offset=1,limit=100))))]),
+            dict(role='tool',tool_call_id='page',content=json.dumps(dict(
+                content='\n'.join(str(i)+'|fixture' for i in range(1,101)),total_lines=101)))]
+        prepared=proxy.validate_request(copy.deepcopy(wire));result=dispatch.make(prepared,EXECUTION)
+        call=json.loads(result['data'].decode().split('data: ')[1].split('\n\n')[0])['choices'][0]['delta']['tool_calls'][0]
+        self.assertEqual(json.loads(call['function']['arguments'])['offset'],101)
+        wire['messages'] += [dict(role='assistant',tool_calls=[dict(id='last',function=dict(name='read_file',
+            arguments=json.dumps(dict(path=path,offset=101,limit=100))))]),
+            dict(role='tool',tool_call_id='last',content=json.dumps(dict(content='101|last',total_lines=101)))]
+        complete=proxy.validate_request(copy.deepcopy(wire))
+        self.assertIsNone(dispatch.make(complete,EXECUTION))
+
+
     def test_explicit_revision_200_read_does_not_grant_inspection_or_call_model(self):
         wire=self.author_body()
         wire['messages'][0]['content']+='DELIVERY_TEST_REVISION_V1:/workspace/tests/test_new.py\nDELIVERY_AUTHOR_READ_PAGE_V1:200\n'

@@ -1,5 +1,6 @@
 """Controller-authored read requests, never synthetic read results or decisions."""
 from contextlib import contextmanager
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -45,11 +46,37 @@ def artifact_identity(body, execution_id):
     return dict(scope=scope,execution_id=execution_id,request_sha256=hashlib.sha256(json.dumps(body,sort_keys=True).encode()).hexdigest())
 
 
+def calibration_identity(body,execution_id):
+    """A current capsule authorizes only its next canonical read request.
+
+    Bind the source contract, not a legacy decision marker. This emits no read
+    result: actual complete-file receipts remain independently mandatory.
+    """
+    from calibration_response_contract import request,apply,digest
+    value=request(body)
+    if value is None:return None
+    if body.get('tool_choice')!={'type':'function','function':{'name':'read_file'}}:return None
+    if not isinstance(execution_id,str) or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',execution_id):
+        raise ValueError('exact calibration read execution required')
+    canonical=apply(copy.deepcopy(body))
+    if (canonical.get('tool_choice')!=body['tool_choice'] or canonical.get('tools')!=body.get('tools')):
+        raise ValueError('noncanonical calibration read contract')
+    tools=body.get('tools',[])
+    if len(tools)!=1 or tools[0].get('function',{}).get('name')!='read_file':
+        raise ValueError('one canonical calibration read required')
+    props=tools[0]['function']['parameters']['properties']
+    args={key:field['enum'][0] for key,field in props.items()}
+    scope=hashlib.sha256(json.dumps(dict(namespace='calibration-read-v1',execution=execution_id,
+        model=body.get('model'),contract_sha256=digest(value),**args),sort_keys=True).encode()).hexdigest()
+    return dict(scope=scope,execution_id=execution_id,
+        request_sha256=hashlib.sha256(json.dumps(body,sort_keys=True).encode()).hexdigest())
+
+
 def make(body,execution_id):
     marked=any(m.get('role')=='user' and isinstance(m.get('content'),str)
         and re.search(r'^DELIVERY_DETERMINISTIC_READ_V1$',m['content'],re.M) for m in body.get('messages',[]))
     if not marked:return None
-    scope=identity({**body,'stream':True},execution_id) or artifact_identity(body,execution_id)
+    scope=calibration_identity(body,execution_id) or identity({**body,'stream':True},execution_id) or artifact_identity(body,execution_id)
     if scope is None:
         if body.get('tool_choice')=={'type':'function','function':{'name':'read_file'}}:
             raise ValueError('invalid deterministic read contract')

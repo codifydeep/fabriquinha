@@ -1573,6 +1573,13 @@ preservando a intenção original e observando o mesmo contêiner após uma
 confirmação incerta. O proxy `129` persiste também os campos sanitizados do
 contrato multiarquivo. A instalação e o probe não comprovam o ensaio nativo:
 proposta, revisão independente e execução calibrada continuam obrigatórias.
+O proxy `130` reconhece a cápsula atual de calibração também no despachante
+determinístico de leituras. Recalcula o próximo pedido canônico a partir das
+leituras efetivamente observadas e vincula sua identidade à execução e ao hash
+do contrato. Caminho/página divergentes são recusados. O pedido emitido não é
+evidência de leitura; respostas reais da ferramenta, decisões do modelo e todos
+os gates de entrega continuam separados. Uma rejeição local anterior não pode
+ser reinterpretada como resposta inválida do modelo nem autoriza novo retry.
 
 ## Contribuir e reutilizar
 

@@ -1,0 +1,5 @@
+FROM delivery-kit-model-proxy:20261011.129
+USER root
+COPY deterministic_read_dispatch.py /deterministic_read_dispatch.py
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import deterministic_read_dispatch as d;assert callable(d.calibration_identity)"
+USER 10000:10000
