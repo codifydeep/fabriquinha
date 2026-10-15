@@ -160,3 +160,48 @@ class ControlsDiagnosticTests(unittest.TestCase):
             with self.assertRaises(ValueError):runtime.prompt_contract(b,'spike',task,note)
         state=json.loads(self.con.execute('SELECT state FROM calibration_control_experiments').fetchone()[0])
         self.assertEqual(state['stage'],'producer_observe')
+
+    def objection(self):
+        return dict(operation='diagnostic_control_objection_v1',reason='Candidate lacks the required behavior',
+            producer={'task_id':'producer-task','wakeup_id':'producer-wake'},execution_authorized=False,delivery_approval=False)
+
+    def reach_objection_review(self):
+        self.advance();self.advance();self.completed('producer')
+        self.fx.collect=lambda *_:self.objection()
+        return self.advance()
+
+    def test_native_objection_is_reviewed_before_one_corrected_reference_proposal(self):
+        s=self.reach_objection_review()
+        self.assertEqual(s['stage'],'review_dispatch');self.assertEqual(s['review_subject'],'control_objection')
+        self.assertIn('not measured results',runtime.instruction(self.cfg,s,'review'))
+        self.advance();self.completed('review');s=self.advance()
+        self.assertEqual(s['stage'],'producer_dispatch');self.assertEqual(s['control_revision']['attempt_limit'],1)
+        self.assertIn('reference programs',runtime.instruction(self.cfg,s,'producer'))
+        self.assertFalse(s['author_restarted']);self.assertNotIn(('measure',),self.calls)
+        # A second substantive objection cannot grant itself another revision.
+        self.advance();self.completed('producer');s=self.advance()
+        self.assertEqual(s['category'],'diagnostic_control_revision_exhausted')
+        before=list(self.calls);self.advance();self.assertEqual(self.calls,before)
+
+    def test_independent_hold_or_objection_drift_cannot_rearm_control_construction(self):
+        self.reach_objection_review();self.advance();self.completed('review');self.review='retain_technical_hold'
+        s=self.advance();self.assertEqual(s['category'],'diagnostic_objection_review_hold')
+        self.assertNotIn('control_revision',s)
+
+    def test_legacy_native_objection_is_authenticated_not_blindly_reclassified(self):
+        s=self.reach_objection_review();s.update(stage='blocked',category='diagnostic_native_objection')
+        self.con.execute('UPDATE calibration_control_experiments SET state=?',(json.dumps(s),));self.con.commit()
+        self.fx.collect=lambda *_:{**self.objection(),'reason':'changed evidence'}
+        s=self.advance();self.assertEqual(s['category'],'diagnostic_evidence_rejected')
+        self.assertNotIn('control_revision',s)
+
+    def test_revision_sponsorship_is_reverified_and_cannot_survive_changed_native_evidence(self):
+        self.reach_objection_review();self.advance();self.completed('review');self.advance()
+        self.fx.collect=lambda *_:{**self.objection(),'reason':'changed evidence'}
+        before=list(self.calls);s=self.advance()
+        self.assertEqual(s['stage'],'blocked');self.assertEqual(self.calls,before)
+
+    def test_independent_objection_reviewer_gets_no_author_workspace_mounts(self):
+        self.reach_objection_review();self.advance();b=SimpleNamespace(db=lambda:self.con)
+        self.assertEqual(runtime.mounts(b,dict(issue_id='spike',agent_id='lead')),[])
+        with self.assertRaises(ValueError):runtime.mounts(b,dict(issue_id='spike',agent_id='cto'))

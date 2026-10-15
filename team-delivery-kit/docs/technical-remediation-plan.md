@@ -1021,6 +1021,20 @@ capsule and full candidate/previous test reads; reason, output hash and actor ar
 durable private evidence. A prior misclassification may be corrected only from
 these same authoritative facts, without rerunning a producer or approving tests.
 
+An explicit reference-control construction objection is automatically routed to
+an independent tool-free Tech Lead review, not left as an unassigned hold. The
+review binds the exact objection and source. The multi-Path adapter substitutes
+separate reference programs before running frozen tests: a positive reference
+may implement missing behavior, but it is neither candidate Green nor a product
+change. Tests, Node harness, mocks, assertions and acceptance IDs remain frozen.
+The Lead can retain the technical hold or sponsor exactly one corrected CTO data
+proposal. The controller re-fetches the original objection and native decision
+before using that sponsorship; changed evidence, self-review or another objection
+cannot rearm the budget. This path never claims measurements or bypasses later
+full-harness calibration, source-author Red/Green, independent review or delivery
+gates. Failed controls and an exhausted revision remain visible with a technical
+owner; this bounded path does not assert that every possible deadlock is solved.
+
 The Path/Node lane creates a durable child SPIKE and runs a separately pinned
 fixed job with one readonly candidate volume, no network/socket/credentials,
 limited resources and bounded child processes. It parses the frozen AST, validates

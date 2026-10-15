@@ -1675,6 +1675,14 @@ parecer recusado e não autoriza retry do autor nem nova submissão de dados.
 
 ### Objeções técnicas de calibração
 
+Uma objeção à construção dos controles de referência é encaminhada ao Tech Lead
+para revisão independente. Ele pode manter o impedimento ou autorizar **uma**
+proposta corrigida pelo CTO, vinculada à objeção exata. Referências positivas
+podem implementar o comportamento esperado em arquivos separados; não são uma
+implementação do produto nem evidência de Green. O controlador revalida a decisão
+antes de usá-la; outra objeção não renova o orçamento. Testes, mocks e critérios
+continuam imutáveis, e a execução real dos controles permanece obrigatória.
+
 `calibration_objection` é um resultado técnico válido, não um bundle inválido ou
 uma aprovação. O controlador confere ator, sessão, hash do contexto, lease
 encerrado e leituras completas antes de registrá-lo com responsável técnico.
@@ -1692,6 +1700,9 @@ flowchart LR
     D -->|Recusar ou falta de capacidade| H[Bloqueio técnico visível; sem replay automático]
     H -->|Capacidade diagnóstica isolada| F[CTO produz referências; dados não confiáveis]
     F --> X[Executor fixo: harness completo, positivos e negativos]
+    F -->|Objeção técnica autenticada| V[Tech Lead revisa a objeção]
+    V -->|Uma proposta corrigida| F
+    V -->|Recusar ou orçamento esgotado| H
     X -->|Falha preservada| H
     X -->|Controles passam; falha no corpo do teste| R[Tech Lead revisa evidência medida]
     R -->|Encaminhar uma vez| C

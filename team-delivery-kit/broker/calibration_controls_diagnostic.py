@@ -39,7 +39,21 @@ def producer_context(cfg):
     return wire.context('bundle',paths,digest(cfg),engine=c['calibration_engine'])
 
 
-def review_context(cfg,s):return review_wire.context(digest(cfg['source']),digest(cfg),digest(s['result']))
+def review_context(cfg,s):
+    evidence=s['objection'] if s.get('review_subject')=='control_objection' else s['result']
+    return review_wire.context(digest(cfg['source']),digest(cfg),digest(evidence))
+
+
+def verify_revision(cfg,s,fx):
+    revision=s.get('control_revision')
+    if not revision:return
+    require(revision['attempt_limit']==1 and revision['decision']['agent_id']==cfg['source']['reviewer']
+        and revision['decision']['value']['action']=='refer_to_cto')
+    shadow={**s,'objection':revision['objection'],'review_subject':'control_objection','wakeup_id':revision['wakeup_id']}
+    producer=revision['objection']['producer']
+    require(fx.collect(cfg,{**shadow,'wakeup_id':producer['wakeup_id']},{'id':producer['task_id']})==revision['objection'])
+    require(fx.decision(cfg,shadow,{'id':revision['decision']['task_id']})==revision['decision'])
+    Draft202012Validator(review_wire.schema(review_context(cfg,shadow))).validate(revision['decision']['value'])
 
 
 def validate_transport(value):
@@ -58,10 +72,44 @@ def instruction(cfg,s,phase):
         try:import generic_calibration_workflow as workflow
         except ImportError:from broker import generic_calibration_workflow as workflow
         body=workflow.instruction(c).split('\n',2)[2]
+        if s.get('control_revision'):
+            require(c['calibration_engine']=='unittest_path_fixtures_v2')
+            # This is a separate diagnostic contract, not truncated product scope.
+            # Read paths live in the capsule; every criterion remains literal.
+            body=('CTO reference DATA proposal, engine=unittest_path_fixtures_v2. '
+                'Read candidate/previous test files fully and every referenced product file; readonly tools only. '
+                'Return one object: action=propose_calibration_bundle, engine, '
+                'modules=[{path,fixtures:[{attribute,product_path,positive_fixture}],classes:{ClassName:[test_method]}}], '
+                'negatives=[{id,module,class_name,method,replacements:[{attribute,fixture}],criteria:[A01]}], '
+                'previous_methods={test_path:{ClassName:[historical_test_method]}}, '
+                'controls={relative_fixture_path:literal_UTF8_content}, execution_authorized=false, delivery_approval=false. '
+                'Include every existing test class/method and previous method; each fixture attribute is an existing uppercase Path global. '
+                'Positive references must pass the entire frozen module. Each negative must fail its declared existing test-body '
+                'assertion and together cover all acceptance IDs; setup errors are not evidence. '
+                'Controls max64KiB each,512KiB total. No commands, hashes, shell, writes, test execution or approvals. '
+                'If truly unsupported return action=calibration_objection, reason, execution_authorized=false, delivery_approval=false. '
+                'Reviewed correction: controls are independent executable reference programs, NOT candidate product bytes. '
+                'The adapter redirects declared Path globals to these separate fixtures before running unchanged tests; '
+                'therefore a positive may implement missing behavior and negatives deliberately break it. '
+                'Do not edit Node harness, mocks, tests, assertions, criteria or candidate. '
+                'Only actual sandbox results can prove controls. Independent Lead decision SHA: '+digest(s['control_revision']['decision'])+
+                '\nAcceptance (unchanged): '+json.dumps(c['criteria'],separators=(',',':')))
         note=wire.capsule(producer_context(cfg))+('ISOLATED DIAGNOSTIC DATA ONLY, not a delivery submission. '
             'Positive references must exercise test bodies; each negative must fail its declared assertion, never setup/teardown. '
             'The original author and delivery remain blocked.\n')+body
         if s.get('transport'):note+='\n'+transport.MARKER+':'+producer_context(cfg)['source_sha256']+'\n'
+    elif s.get('review_subject')=='control_objection':
+        note=review_wire.capsule(review_context(cfg,s))+(
+            'INDEPENDENT TECH LEAD REVIEW of a CTO control-construction objection, not measured results. '
+            'The unittest_path_fixtures_v2 adapter assigns each declared existing uppercase Path global to '
+            'a separate reference fixture before unchanged tests execute. JS and HTML fixtures may be executable '
+            'reference programs implementing the expected behavior, not copies of the unfinished candidate. '
+            'The frozen Node harness, mocks, assertions and acceptance IDs cannot change. Missing candidate '
+            'behavior alone does not prove an unsupported seam. No reference controls have passed yet. '
+            'Decide refer_to_cto only if one corrected proposal under these semantics is justified, or '
+            'retain_technical_hold with a concrete restriction. This permits one diagnostic proposal only; '
+            'no source retry, policy approval, Red/Green or delivery approval. No tools. reason<=200 chars. '
+            'CTO objection: '+s['objection']['reason'])
     else:
         r=s['result']['receipt'];m=r.get('measurements',{});p=s['bundle'].get('policy',{})
         summary=dict(positive=m.get('positive'),negatives=m.get('negative_controls'),
@@ -79,7 +127,8 @@ def advance(con,issue,author,fx,*,now=None):
     now=time.time() if now is None else now
     cfg,s=map(json.loads,con.execute('SELECT config,state FROM calibration_control_experiments WHERE issue_id=? AND author_task=?',(issue,author)).fetchone());c=cfg['source']
     legacy=s['stage']=='blocked' and s.get('category')=='diagnostic_evidence_rejected' and not s.get('producer_task')
-    if s['stage']=='referred' or (s['stage']=='blocked' and not legacy):return s
+    native_objection=s['stage']=='blocked' and s.get('category')=='diagnostic_native_objection'
+    if s['stage']=='referred' or (s['stage']=='blocked' and not (legacy or native_objection)):return s
     def save(**changes):
         s.update(changes);con.execute('UPDATE calibration_control_experiments SET state=? WHERE issue_id=? AND author_task=?',
             (json.dumps(s,sort_keys=True),issue,author));con.commit();return s
@@ -110,6 +159,13 @@ def advance(con,issue,author,fx,*,now=None):
     if 'started' not in s:save(started=now)
     try:
         fx.verify(cfg)
+        verify_revision(cfg,s,fx)
+        if native_objection:
+            producer=s['objection']['producer']
+            require(not s.get('control_revision') and fx.collect(cfg,{**s,'wakeup_id':producer['wakeup_id']},
+                {'id':producer['task_id']})==s['objection'])
+            return save(stage='review_dispatch',review_subject='control_objection',owner=c['reviewer'],
+                required_action='Tech Lead independently evaluate control-construction objection; no source retry or automatic rearm')
         if legacy:
             if 'failure_observation_started' not in s:save(failure_observation_started=now)
             matches=[t for t in fx.runs(cfg,s) if t.get('wakeup_id')==s['wakeup_id']]
@@ -155,13 +211,23 @@ def advance(con,issue,author,fx,*,now=None):
         require(task.get('status')=='completed')
         if phase=='producer':
             bundle=fx.collect(cfg,s,task)
-            if bundle['operation']=='diagnostic_control_objection_v1':return save(stage='blocked',category='diagnostic_native_objection',
-                owner=c['cto'],objection=bundle,required_action='CTO diagnose explicit control-construction objection; no source retry')
+            if bundle['operation']=='diagnostic_control_objection_v1':
+                if s.get('control_revision'):return save(stage='blocked',category='diagnostic_control_revision_exhausted',
+                    owner=c['cto'],repeated_objection=bundle,required_action='CTO diagnose repeated objection with new experiment evidence; no identical retry')
+                return save(stage='review_dispatch',category='diagnostic_native_objection',review_subject='control_objection',
+                    owner=c['reviewer'],objection=bundle,required_action='Tech Lead independently evaluate control-construction objection')
             require(bundle['operation']=='generic_calibration_proposal_bundle_v1')
             return save(stage='experiment_pending',bundle=bundle,producer_task=task['id'],producer_wakeup=s['wakeup_id'],
                 required_action='Controller run fixed isolated experiment; no policy registration or delivery authority')
         decision=fx.decision(cfg,s,task);require(decision['task_id']==task['id'] and decision['agent_id']==actor)
         Draft202012Validator(review_wire.schema(review_context(cfg,s))).validate(decision['value'])
+        if s.get('review_subject')=='control_objection':
+            if decision['value']['action']=='retain_technical_hold':return save(stage='blocked',category='diagnostic_objection_review_hold',
+                objection_decision=decision,owner=c['cto'],required_action='CTO address independent objection review; no identical retry')
+            require(not s.get('control_revision'))
+            revision=dict(objection=s['objection'],decision=decision,wakeup_id=s['wakeup_id'],attempt_limit=1)
+            return save(stage='producer_dispatch',category='diagnostic_control_revision',review_subject=None,control_revision=revision,
+                owner=c['cto'],required_action='One independently sponsored reference-program proposal; source and delivery remain blocked')
         if decision['value']['action']=='retain_technical_hold':return save(stage='blocked',category='diagnostic_review_hold',
             decision=decision,owner=c['cto'],required_action='CTO address independent measured-evidence objection; diagnostic budget spent')
         return save(stage='referred',decision=decision,required_action='JIT verify measured independent referral before one source data proposal; no author retry')
@@ -317,7 +383,7 @@ def cached_referral(con,c,pointer):
 
 def verify_referral(b,c,pointer):
     with b.db() as con:cfg,s=cached_referral(con,c,pointer)
-    fx=Effects(b);fx.verify(cfg)
+    fx=Effects(b);fx.verify(cfg);verify_revision(cfg,s,fx)
     producer=fx.plans.task(s['producer_task'],c['cto'])
     require(fx.collect(cfg,{**s,'wakeup_id':s['producer_wakeup']},producer)==s['bundle'])
     result=fx.measure(cfg,s);fx.validate_measurement(cfg,s,result);require(result==s['result'])
@@ -366,7 +432,10 @@ def prompt_contract(b,issue,task,note):
 def mounts(b,binding):
     current=lookup(b,binding['issue_id'])
     if current is None:return []
-    cfg,s=current;c=cfg['source'];require(s['stage'] in ('producer_observe','producer_wait') and binding['agent_id']==c['cto'])
+    cfg,s=current;c=cfg['source']
+    if s['stage'] in ('review_observe','review_wait'):
+        require(binding['agent_id']==c['reviewer'] and c['reviewer']!=c['cto']);return []
+    require(s['stage'] in ('producer_observe','producer_wait') and binding['agent_id']==c['cto'])
     with b.db() as con:
         rows=con.execute("SELECT n.* FROM native_bindings n JOIN leases l USING(request_id) WHERE n.issue_id=? AND n.agent_id=? AND l.status IN ('creating','starting','running')",(s['issue_id'],c['cto'])).fetchall()
         require(len(rows)==1);r=dict(rows[0]);require(r['scope'].split(':')[-2:]==['planning',r['task_id']])
