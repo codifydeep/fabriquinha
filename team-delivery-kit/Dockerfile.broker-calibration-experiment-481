@@ -1,0 +1,12 @@
+# Consolidate the qualified image filesystem: the incremental lineage reached
+# 384 layers and a further RUN exceeded overlay mount-option limits. Copy IMAGE
+# bytes only, never a live container (which could hold private runtime state).
+FROM delivery-kit-execution-broker:20261015.480 AS qualified
+FROM delivery-kit-hermes-runtime@sha256:6445719a1d1c5866f6c6f7b4affe45dd8f16ada952506036d0a8145a072de0bf
+USER root
+COPY --from=qualified / /
+COPY broker/calibration_objection_runtime.py broker/calibration_experiment_runtime.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_experiment_runtime,calibration_objection_runtime"
+LABEL delivery-kit.parent-image="sha256:6b663f5968b6132d6310bb2f9aac5827a743f35152cd4eb66851b7b6d16bf8f0"
+ENTRYPOINT ["python", "/broker.py"]
+CMD []

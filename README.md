@@ -1710,6 +1710,11 @@ a calibração efetiva do harness completo e seus controles positivos/negativos
 continua obrigatória. Recusa, prazo excedido ou capacidade ausente conservam um
 impedimento técnico do CTO, sem encaminhar arquitetura ao CEO ou repetir o SPIKE.
 Este escalonamento ainda não é qualificação de recuperação ponta a ponta.
+Uma resposta nativa recusada somente por `maxLength` pode ter uma correção de
+formato por fase, com novo marcador e instrução mais curta. Isso exige o lease
+encerrado, zero ferramentas, contexto exato e o recibo persistente do proxy;
+ausência dessas provas ou segunda recusa mantém o bloqueio. A resposta recusada
+nunca é truncada, aceita ou convertida em aprovação.
 
 Nos workers governados, os nudges periódicos que criam forks de auto-revisão de
 memória/skills e os títulos pagos de sessão ficam desativados. Memórias existentes

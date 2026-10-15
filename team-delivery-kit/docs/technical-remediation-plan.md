@@ -902,6 +902,23 @@ positive/negative controls actually work. Lost wakeup acknowledgments only
 observe the persisted marker. Deadlines, wrong actors, rejected plans and
 missing capabilities remain CTO-owned visible holds; no identical retry or
 CEO architecture question. This lane still requires native qualification.
+Each phase may correct one measured `maxLength` rejection, never a functional
+failure: exact failed native task/context, closed planning lease, zero tools and
+the persisted proxy receipt are mandatory. The correction keeps the same schema
+and shorter requested fields with a new durable marker. Its ledger cannot rearm;
+missing proof and repeated failures remain visible instead of polling/retrying
+the same action indefinitely. Refused bytes are neither recovered nor accepted.
+
+The incremental controller image hit the overlay mount-option limit at 384
+layers. Recipe 481 consolidates the qualified IMAGE filesystem over the pinned
+runtime base, never exporting a live container. The offline
+`qualify_controller_image_compaction.py` compares private configuration without
+printing it and verifies every root Python file/mode against the original,
+except the two explicitly updated source modules. It also checks the unchanged
+broker authorization hash and reduced layer count. This is packaging evidence,
+not native recovery or delivery qualification. Maintenance backup/restore checks
+use disk-backed SQLite and streaming hashes: reading a 211 MB backup into the
+256 MB controller is not a safe validation method.
 
 The controller distinguishes an explicit `calibration_objection` from malformed
 bundle data. It re-fetches the native task, closed planning lease, exact source

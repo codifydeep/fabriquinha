@@ -28,6 +28,7 @@ class ExperimentRuntimeTests(base.ObjectionRuntimeTests):
             return dict(value=v,agent_id=self.c['cto' if phase=='design' else 'reviewer'],task_id=task['id'],wakeup_id=task['wakeup_id'],execution_id='experiment-'+phase)
         self.fx.experiment_wake=wake;self.fx.experiment_decision=decision
         self.fx.verify_experiment=lambda cfg,s:self.effects.append(('verify_experiment',))
+        self.fx.experiment_format_rejection=lambda *_:None
 
     def held(self):
         self.action='retain_technical_hold';self.advance();self.advance();self.advance();self.completed();s=self.advance()
@@ -70,6 +71,45 @@ class ExperimentRuntimeTests(base.ObjectionRuntimeTests):
         self.held();self.fx.verify_decision=lambda *_:(_ for _ in ()).throw(TimeoutError())
         self.assertEqual(self.advance(2)['experiment']['stage'],'design_dispatch')
         self.assertEqual(self.advance(1803)['category'],'experiment_evidence_observation_deadline')
+
+    def format_proof(self,phase):
+        import structured_rejection_receipts as receipts
+        cfg,s=map(json.loads,self.con.execute('SELECT config,state FROM calibration_objections').fetchone())
+        receipt=receipts.from_event(dict(event='model_proxy_request',status=502,category='structured_decision_response_invalid',
+            execution_id='95a15ba2-5a88-44b8-bdce-133bf18f8922',call_number=1,structured_rejection_category='schema_violation',
+            structured_rejection_diagnostic=dict(version='structured-constraint-v1',constraints=['maxLength'],upstream_sha256='d'*64)))
+        return dict(receipt=receipt,context_sha256=digest(experiment.context(cfg,s,phase)))
+
+    def test_only_proved_format_failure_allows_one_shortened_decision_per_phase(self):
+        self.held();self.advance();self.finish_phase('cto');self.runs[0]['status']='failed'
+        proof=self.format_proof('design');self.fx.experiment_format_rejection=lambda *_:proof
+        s=self.advance();self.assertEqual(s['experiment']['stage'],'design_dispatch')
+        cfg,_=map(json.loads,self.con.execute('SELECT config,state FROM calibration_objections').fetchone())
+        self.assertIn('FORMAT CORRECTION ONLY',experiment.instruction(cfg,s,'design'))
+        self.advance();self.assertNotEqual(self.wakes[0][2],self.wakes[1][2])
+        s=self.advance();self.assertEqual(s['category'],'experiment_format_recovery_exhausted')
+        self.assertEqual(len(self.wakes),2);self.advance();self.assertEqual(len(self.wakes),2)
+
+    def test_legacy_failed_observation_requires_actual_receipt_not_reset(self):
+        self.held();self.advance();self.finish_phase('cto');self.runs[0]['status']='failed'
+        # Model the old controller's classification; no live state reset is permitted.
+        cfg,s=map(json.loads,self.con.execute('SELECT config,state FROM calibration_objections').fetchone())
+        s.update(category='experiment_evidence_rejected');s['experiment'].update(stage='blocked',category='experiment_evidence_rejected')
+        self.con.execute('UPDATE calibration_objections SET state=?',(json.dumps(s),));self.con.commit()
+        self.assertEqual(len(self.wakes),1)
+        proof=self.format_proof('design');self.fx.experiment_format_rejection=lambda *_:proof
+        s=self.advance();self.assertEqual(s['experiment']['stage'],'design_dispatch')
+
+    def test_failure_without_format_evidence_is_not_an_infinite_recovery_lookup(self):
+        self.held();self.advance();self.finish_phase('cto');self.runs[0]['status']='failed'
+        s=self.advance();self.assertEqual(s['category'],'experiment_failure_needs_diagnosis')
+        before=list(self.wakes);self.advance();self.assertEqual(self.wakes,before)
+
+    def test_wrong_receipt_does_not_create_a_correction(self):
+        self.held();self.advance();self.finish_phase('cto');self.runs[0]['status']='failed'
+        proof=self.format_proof('design');proof['context_sha256']='f'*64
+        self.fx.experiment_format_rejection=lambda *_:proof
+        s=self.advance();self.assertNotIn('format_recoveries',s['experiment']);self.assertEqual(len(self.wakes),1)
 
 
 class ExperimentNativeEvidenceTests(unittest.TestCase):

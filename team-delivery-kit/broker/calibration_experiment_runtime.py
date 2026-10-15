@@ -9,6 +9,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 from generic_harness_calibration import digest,require
 import calibration_experiment_contract as contract
+import structured_rejection_receipts
 
 
 def context(cfg,s,phase):
@@ -32,6 +33,9 @@ def instruction(cfg,s,phase):
         note+='\nState hypothesis, method<=220 chars and expected_evidence. Describe a falsifiable experiment, not a claimed result.'
     else:note+='\nCTO proposal (unexecuted; exact receipt hash bound above): '+json.dumps(
         {k:s['experiment']['proposal']['value'][k] for k in ('hypothesis','method','expected_evidence')},separators=(',',':'))
+    correction=s.get('experiment',{}).get('format_recoveries',{}).get(phase)
+    if correction:
+        note+='\nFORMAT CORRECTION ONLY: prior response rejected for maxLength. reason/hypothesis <=100 chars; method/expected_evidence <=120 chars. Same schema, no tools or approval. Receipt '+digest(correction['proof'])+'.'
     require(len(note)<=3800);return note
 
 
@@ -47,12 +51,36 @@ def advance(con,cfg,s,fx,*,now):
             required_action='CTO resolve '+category+' with a new implementation capability; this experiment budget is spent')
         con.execute('UPDATE calibration_objections SET state=? WHERE issue_id=? AND author_task=?',
             (json.dumps(s,sort_keys=True),c['issue_id'],c['author_task']));con.commit();return result
-    if e['stage'] in ('blocked','permitted'):return s
+    def recover_format(task,phase):
+        histories=e.get('format_recoveries',{})
+        if phase in histories:return hold('experiment_format_recovery_exhausted',c['cto'])
+        proof=fx.experiment_format_rejection(cfg,s,task,phase)
+        if proof is None:return hold('experiment_failure_needs_diagnosis',c['cto'])
+        receipt=proof['receipt'];diagnostic=receipt['diagnostic']
+        require(set(proof)=={'receipt','context_sha256'} and proof['context_sha256']==digest(context(cfg,s,phase))
+            and receipt['category']=='schema_violation' and diagnostic['version']=='structured-constraint-v1'
+            and diagnostic['constraints']==['maxLength'] and type(receipt['call_number']) is int and receipt['call_number']>0
+            and all(receipt[k] is False for k in ('response_forwarded','worker_tool_executed','execution_authorized','delivery_approval')))
+        require(structured_rejection_receipts.from_event(dict(event='model_proxy_request',status=502,
+            category='structured_decision_response_invalid',execution_id=receipt['execution_id'],call_number=receipt['call_number'],
+            structured_rejection_category=receipt['category'],structured_rejection_diagnostic=diagnostic))==receipt)
+        entry=dict(proof=proof,failed_task=task['id'],old_wakeup=e['wakeup_id'],attempt_limit=1,
+            execution_authorized=False,delivery_approval=False)
+        s['category']='objection_hold_retained'
+        return save(stage=phase+'_dispatch',format_recoveries={**histories,phase:entry})
+    format_candidate=e['stage']=='blocked' and e.get('category') in ('experiment_evidence_rejected','experiment_native_failed')
+    if e['stage']=='permitted' or (e['stage']=='blocked' and not format_candidate):return s
     try:
         fx.verify(cfg);fx.verify_decision(cfg,s)
         phase='design' if e['stage'].startswith('design') else 'review'
+        if format_candidate:phase='review' if 'proposal' in e else 'design'
         actor=c['cto'] if phase=='design' else c['reviewer']
         require(c['cto']!=c['reviewer'])
+        if format_candidate:
+            matches=[t for t in fx.runs(cfg,s) if t.get('wakeup_id')==e['wakeup_id']]
+            require(len(matches)==1 and matches[0].get('status')=='failed' and matches[0].get('agent_id')==actor
+                and matches[0].get('issue_id')==s['issue_id'])
+            return recover_format(matches[0],phase)
         note=instruction(cfg,s,phase)
         if e['stage'] in (phase+'_dispatch',phase+'_observe'):
             first=e['stage']==phase+'_dispatch'
@@ -67,7 +95,9 @@ def advance(con,cfg,s,fx,*,now):
         require(len(matches)<=1)
         if not matches or matches[0].get('status') in ('queued','dispatched','running'):
             return hold('experiment_'+phase+'_deadline',c['cto']) if now-e['started']>=1800 else s
-        task=matches[0];require(task.get('status')=='completed' and task.get('agent_id')==actor and task.get('issue_id')==s['issue_id'])
+        task=matches[0];require(task.get('agent_id')==actor and task.get('issue_id')==s['issue_id'])
+        if task.get('status')=='failed':return recover_format(task,phase)
+        require(task.get('status')=='completed')
         decision=fx.experiment_decision(cfg,s,task,phase)
         require(decision['agent_id']==actor and decision['task_id']==task['id'])
         Draft202012Validator(contract.schema(context(cfg,s,phase))).validate(decision['value'])
@@ -83,7 +113,8 @@ def advance(con,cfg,s,fx,*,now):
             (json.dumps(s,sort_keys=True),c['issue_id'],c['author_task']));con.commit();return s
     except (TimeoutError,urllib.error.URLError):
         return hold('experiment_evidence_observation_deadline',c['cto']) if now-e['started']>=1800 else save()
-    except (ValueError,KeyError,TypeError,ValidationError):return hold('experiment_evidence_rejected',c['cto'])
+    except (ValueError,KeyError,TypeError,ValidationError):
+        return hold('experiment_format_evidence_rejected' if format_candidate else 'experiment_evidence_rejected',c['cto'])
 
 
 def verify(cfg,s,fx):

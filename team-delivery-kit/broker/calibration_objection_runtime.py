@@ -53,7 +53,7 @@ def advance(con,issue,author,fx,*,now=None):
     now=time.time() if now is None else now
     cfg,s=map(json.loads,con.execute('SELECT config,state FROM calibration_objections WHERE issue_id=? AND author_task=?',(issue,author)).fetchone())
     c=cfg['source']
-    if s['stage']=='blocked' and s.get('category')=='objection_hold_retained':
+    if s['stage']=='blocked' and s.get('category') in ('objection_hold_retained','experiment_evidence_rejected','experiment_native_failed'):
         try:import calibration_experiment_runtime as experiment
         except ImportError:from broker import calibration_experiment_runtime as experiment
         return experiment.advance(con,cfg,s,fx,now=now)
@@ -223,6 +223,24 @@ class Effects:
         try:import calibration_experiment_runtime as experiment
         except ImportError:from broker import calibration_experiment_runtime as experiment
         experiment.verify(cfg,s,self)
+    def experiment_format_rejection(self,cfg,s,task,phase):
+        try:import calibration_experiment_runtime as experiment,calibration_incidents as incidents
+        except ImportError:from broker import calibration_experiment_runtime as experiment,calibration_incidents as incidents
+        actor=cfg['source']['cto' if phase=='design' else 'reviewer'];actual=self.plans.task(task['id'],actor)
+        require(actual.get('status')=='failed' and actual.get('failure_reason')=='agent_error.provider_server_error'
+            and actual.get('wakeup_id')==s['experiment']['wakeup_id'] and actual.get('issue_id')==s['issue_id']
+            and actual.get('agent_id')==actor and experiment.contract.request(dict(messages=[dict(role='user',
+                content=actual.get('handoff_note',''))]))==experiment.context(cfg,s,phase))
+        with self.b.db() as con:
+            rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',(task['id'],)).fetchall()
+            require(len(rows)==1);r=dict(rows[0])
+            if r['status'] in ('creating','starting','running','closing'):raise TimeoutError('observe exact failed experiment lease')
+            require(r['status']=='closed' and r['agent_id']==actor and r['issue_id']==s['issue_id']
+                and r['scope'].split(':')[-2:]==['planning',task['id']]
+                and con.execute('SELECT coalesce(sum(tool_count),0) FROM tool_events WHERE request_id=?',(r['request_id'],)).fetchone()[0]==0)
+        receipt,_=incidents.Effects(self.b).evidence(r['request_id'])
+        if receipt.get('category')!='schema_violation' or receipt.get('diagnostic',{}).get('constraints')!=['maxLength']:return None
+        return dict(receipt=receipt,context_sha256=digest(experiment.context(cfg,s,phase)))
 
 
 def handle(b,con,c,s):
