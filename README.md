@@ -1784,6 +1784,31 @@ Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CT
 Tech Lead reais, nova submissão, calibração e posterior entrega ainda precisa ser
 comprovado ponta a ponta.
 
+## Espaço ocupado pelos backups
+
+Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.
+Use somente diretórios de **cópias offline** chamados `backups`, nunca o banco
+ativo do controlador, diretórios de snapshots ou volumes Docker:
+
+```sh
+python3 team-delivery-kit/compact_backup_databases.py --root /caminho/privado/backups
+# Após conferir a prévia e confirmar ausência de consumidores dessas cópias:
+python3 team-delivery-kit/compact_backup_databases.py --root /caminho/privado/backups --apply
+```
+
+A ferramenta preserva os dois bancos elegíveis mais recentes sem compactar.
+Nos demais, verifica SQLite, o hash SHA-256 da ida/volta gzip e a identidade do
+original antes de retirar a cópia descompactada. Arquivos com WAL/SHM/journal,
+links, mudanças concorrentes ou verificações recusadas permanecem preservados.
+Recibos privados ficam no próprio diretório de backups, nunca no Git. A ferramenta
+não descobre consumidores Docker nem autoriza uso em backups montados por serviços.
+
+Para consultar ou restaurar um banco compactado no seu caminho original, primeiro
+use `gzip -dk /caminho/privado/backups/arquivo.sqlite.gz`. O conteúdo restaurado
+é idêntico; o arquivo `.gz` permanece. Manifestos antigos que esperam `.sqlite`
+precisam dessa descompactação antes da verificação. Essa manutenção não inicia
+agentes, não chama modelos e não remove volumes, imagens ou backups completos.
+
 ## Contribuir e reutilizar
 
 O código próprio está sob a [licença MIT](LICENSE), permitindo reutilização e uso comercial com preservação do aviso. Leia [CONTRIBUTING.md](CONTRIBUTING.md) e [os avisos de terceiros](THIRD_PARTY_NOTICES.md). Dependências e patches sobre projetos externos mantêm suas próprias licenças.
