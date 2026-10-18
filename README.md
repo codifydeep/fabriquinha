@@ -1675,6 +1675,18 @@ parecer recusado e não autoriza retry do autor nem nova submissão de dados.
 
 ### Objeções técnicas de calibração
 
+Quando a confiabilidade do próprio harness está em questão, existe uma inspeção
+isolada por contraexemplo: `team-delivery-kit/qualify_harness_protocol.py`. Ela
+exige manutenção selada, ausência de workers e uma recusa técnica nativa já
+autenticada. Executa o harness Node congelado com um driver diagnóstico sem
+proteção contra respostas antigas e compara com uma corrida real entre Promises
+ainda pendentes. Assim é possível detectar um teste que aceita comportamento
+vulnerável, sem editar o teste ou implementar o produto. Essa ferramenta do
+operador é limitada ao formato de relatório reconhecido; não é um verificador
+universal nem uma recuperação autônoma já instalada. Seus recibos não autorizam
+retry, mudança de teste, Green ou homologação. Uma correção continua exigindo
+submissão pelo autor e revisão independente, preservando critérios e assertions.
+
 Uma objeção à construção dos controles de referência é encaminhada ao Tech Lead
 para revisão independente. Ele pode manter o impedimento ou autorizar **uma**
 proposta corrigida pelo CTO, vinculada à objeção exata. Referências positivas

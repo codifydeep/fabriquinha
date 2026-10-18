@@ -1021,6 +1021,27 @@ capsule and full candidate/previous test reads; reason, output hash and actor ar
 durable private evidence. A prior misclassification may be corrected only from
 these same authoritative facts, without rerunning a producer or approving tests.
 
+`qualify_harness_protocol.py` is an operator-only diagnostic for a completed,
+authenticated reference-control technical hold. It requires sealed maintenance,
+idle leases and native tasks, the exact preserved CTO objection and independent
+Lead decision. A grouped disposable sandbox mounts the original candidate and
+the hash-bound diagnostic script readonly, with no network/socket/credentials.
+It parses, but never imports, a Python test module containing the recognized
+literal `NODE_HARNESS` and report-comparison pattern. It runs that actual literal
+harness against a deliberately unguarded diagnostic request driver, then runs
+the same driver against a real pending out-of-order request race. This can show
+that a stale-response comparison accepts a driver that actually allows stale
+responses. It also records initial/poll counts without changing their required
+threshold or deciding which behavior the approved brief requires.
+
+This counterexample is not a positive reference, functional Red, Python assertion
+execution, full regression run or permission to edit tests. It never resets the
+author, changes the board or ignores an independent hold. All acceptance IDs,
+test bytes and historical approvals remain intact. Its current qualification is
+limited to the recognized test/report shape, not arbitrary browser harnesses.
+Any repair must be a separately authorized author submission, with independent
+review and proof that existing assertions and criteria have not been weakened.
+
 An explicit reference-control construction objection is automatically routed to
 an independent tool-free Tech Lead review, not left as an unassigned hold. The
 review binds the exact objection and source. The multi-Path adapter substitutes
