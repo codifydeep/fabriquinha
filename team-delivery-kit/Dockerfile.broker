@@ -4,6 +4,7 @@ COPY broker/server.py /broker.py
 COPY broker/validation_job.py /validation_job.py
 COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py /
 COPY broker/literal_plan_preflight_recovery.py /
+COPY broker/literal_base_recovery.py /
 COPY calibration_harness_protocol_probe.py qualify_harness_protocol.py qualify_frozen_harness.py docker_grouping.py /
 COPY broker/validation_recovery.py /validation_recovery.py
 COPY broker/test_first_job.py /test_first_job.py

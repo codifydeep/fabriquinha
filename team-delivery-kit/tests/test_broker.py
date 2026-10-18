@@ -204,6 +204,29 @@ class BrokerTests(unittest.TestCase):
         state.start()
         self.addCleanup(state.stop)
 
+    def test_literal_maintenance_native_prompt_uses_seed_hashes_without_fabricating_old_red(self):
+        from broker import test_revision_review,literal_maintenance_effects as literal
+        trial=dict(seed_previous_tests=True,seeded_edit_required=True,harness_maintenance_only=True,
+            literal_maintenance={'source_task':'source','config_sha256':'a'*64})
+        with broker.db() as con:
+            test_revision_review.initialize(con)
+            con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',('issue','parent',json.dumps(trial),'{}'))
+        issue=dict(id='issue',title='Isolated literal maintenance',description='Only the declared literal may change.')
+        task=dict(task_id='task',agent_id='author',issue_id='issue',wakeup_id='wake',handoff_note='Controller-scoped maintenance')
+        frame=dict(method='session/prompt',params=dict(prompt=[]))
+        with patch.object(broker,'implementation_phase',return_value='tests_only'),\
+                patch.object(broker,'test_artifact_phase_context',return_value='\nDELIVERY_TEST_ARTIFACT_V1:/workspace/tests/test.py\n'),\
+                patch.object(literal,'seeded_hashes',create=True,return_value={'tests/test.py':'b'*64}) as hashes:
+            text=broker.native_task_prompt(frame,'implementation',issue,task)['params']['prompt'][0]['text']
+        self.assertIn('DELIVERY_TEST_REVISION_V1:/workspace/tests/test.py',text)
+        self.assertIn('DELIVERY_SEEDED_EDIT_REQUIRED_V1:/workspace/tests/test.py',text)
+        self.assertIn('LITERAL MAINTENANCE PHASE',text);hashes.assert_called_once()
+        self.assertIn('not historical Red',text)
+        self.assertNotIn('executes the full pinned suite',text)
+        with broker.db() as con:
+            stored=json.loads(con.execute('SELECT config FROM test_revision_trials WHERE issue_id="issue"').fetchone()[0])
+        self.assertEqual(stored,trial);self.assertNotIn('old_red',stored)
+
     def test_portable_node_test_command_is_exact_and_immutable(self):
         issue = str(uuid.uuid4())
         with tempfile.TemporaryDirectory() as directory, \

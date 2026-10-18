@@ -5,6 +5,7 @@ handoff only; product admission, full calibration and TDD remain separate gates.
 Effects are controller-owned and are never selected by a model command.
 """
 import json
+import hashlib
 import time
 import urllib.error
 from jsonschema import Draft202012Validator
@@ -198,7 +199,15 @@ def advance(con,source,fx,*,now=None):
                 required_action='Return measured change request to original maintenance author, preserving both revisions')
         decisions={**s['decisions'],phase:dict(receipt=decision,wakeup_id=s['wakeup_id'],marker=s['marker'])}
         next_stage={'triage':'plan_dispatch','plan':'permit_dispatch','permit':'prepare'}[phase]
-        return save(stage=next_stage,decisions=decisions,owner=cfg['cto'] if phase=='triage' else cfg['reviewer'])
+        return save(stage=next_stage,decisions=decisions,phase_started=now,
+            required_action={'triage':'CTO propose bounded maintenance scope','plan':'Lead independently review the CTO scope',
+                'permit':'Controller prepare isolated author workspace'}[phase],
+            owner=cfg['cto'] if phase=='triage' else cfg['reviewer'])
     except (TimeoutError,urllib.error.URLError):
         return hold('maintenance_evidence_deadline') if now-s.get('phase_started',now)>=1800 else s
-    except (ValueError,KeyError,TypeError,ValidationError):return hold('maintenance_evidence_rejected')
+    except (ValueError,KeyError,TypeError,ValidationError) as error:
+        # Preserve the failing phase and a stable diagnostic without copying
+        # model text, source files or credentials into a public status payload.
+        save(last_error=dict(phase=s['stage'],type=type(error).__name__,
+            sha256=hashlib.sha256(str(error).encode()).hexdigest()))
+        return hold('maintenance_evidence_rejected')

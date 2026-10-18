@@ -105,3 +105,15 @@ class LiteralEffectsTests(unittest.TestCase):
         broker=SimpleNamespace(db=lambda:self.con)
         with patch.object(effects,'handle') as handle:effects.tick(broker)
         handle.assert_called_once_with(broker,'source')
+
+    def test_seed_hashes_require_exact_author_context_without_inserting_old_red(self):
+        self.save();trial={'literal_maintenance':{'source_task':'source'}}
+        b=SimpleNamespace(db=lambda:self.con)
+        selected={'tests/test.py':'a'*64}
+        with patch.object(effects,'author_context',return_value={'title':'verified'}),\
+                patch.object(effects,'seed_source',return_value={'selection':{'test_sha256':selected}}):
+            self.assertEqual(effects.seeded_hashes(b,'maintenance',{'id':'task'},trial),selected)
+        self.assertNotIn('old_red',trial)
+        with patch.object(effects,'author_context',return_value=None),patch.object(effects,'seed_source') as seed:
+            with self.assertRaises(ValueError):effects.seeded_hashes(b,'maintenance',{'id':'foreign'},trial)
+            seed.assert_not_called()

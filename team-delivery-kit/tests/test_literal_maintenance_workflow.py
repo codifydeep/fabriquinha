@@ -63,6 +63,19 @@ class LiteralWorkflowTests(unittest.TestCase):
         with patch.object(flow,'instruction',return_value=actual+'\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'):
             with self.assertRaises(ValueError):flow.preflight_plan(self.cfg,{})
 
+    def test_rejected_preparation_preserves_phase_and_hash_without_leaking_error_text(self):
+        import hashlib
+        self.advance()
+        for phase in ('triage','plan','permit'):
+            self.advance();self.complete(phase);self.advance()
+        with patch.object(self.fx,'prepare',side_effect=ValueError('private diagnostic detail')):
+            state=self.advance()
+        self.assertEqual(state['stage'],'blocked')
+        self.assertEqual(state['last_error'],dict(phase='prepare',type='ValueError',
+            sha256=hashlib.sha256(b'private diagnostic detail').hexdigest()))
+        self.assertNotIn('private diagnostic detail',json.dumps(state))
+        self.assertEqual(set(state['decisions']),{'triage','plan','permit'})
+
     def test_unknown_wakeup_ack_only_observes_same_intent_and_deadline(self):
         self.advance();self.timeout=True;self.advance();self.advance()
         wakes=[c for c in self.calls if c[0]=='wake'];self.assertEqual([c[2] for c in wakes],[True,False])

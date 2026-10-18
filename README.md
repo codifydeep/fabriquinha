@@ -1844,6 +1844,21 @@ da fonte permanecem preservados. Isso habilita somente uma nova decisão do CTO,
 nunca a implementação ou a aprovação de produto; a retomada nativa ainda requer
 validação real.
 
+Uma correção de instalação não substitui identidades já persistidas. Quando uma
+base legada foi copiada para um nome incompatível com a API, a recuperação verifica
+o recibo do job concluído, o manifesto e todos os hashes protegidos usando um
+contêiner sem rede e com mount somente leitura. O volume e o journal anteriores
+ficam preservados; uma intenção separada materializa a base canônica a partir
+da cópia inspecionada. O cadastro exige manutenção selada, decisões independentes
+autenticadas e nenhum autor iniciado. Não reinicia cards, não recria Red histórico
+nem concede aprovação de entrega. Esse caminho também exige validação nativa;
+os testes isolados não demonstram autonomia ponta a ponta.
+
+O bootstrap dessa manutenção usa metadados explícitos do teste-semente,
+autenticados pelo card, perfil, wakeup e fase atuais. Não fabrica um `old_red`
+para satisfazer caminhos legados: a obtenção dos hashes e a instrução nativa têm
+um ramo próprio, enquanto as revisões TDD históricas mantêm seu contrato original.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.

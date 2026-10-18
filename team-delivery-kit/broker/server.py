@@ -2183,7 +2183,12 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
                     trial=con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(issue.get('id'),)).fetchone()
                     trial=json.loads(trial[0]) if trial else {}
                     if trial.get('seed_previous_tests') is True:
-                        files=trial['old_red']['red']['test_sha256']
+                        if trial.get('literal_maintenance'):
+                            try:import literal_maintenance_effects
+                            except ImportError:from broker import literal_maintenance_effects
+                            files=literal_maintenance_effects.seeded_hashes(handoff_context(),issue['id'],task,trial)
+                        else:
+                            files=trial['old_red']['red']['test_sha256']
                         if len(files)!=1:raise ValueError('single seeded revision target required')
                         instruction+='\nDELIVERY_TEST_REVISION_V1:/workspace/'+next(iter(files))+'\n'
                         if trial.get('seeded_edit_required') is True:
@@ -2191,9 +2196,12 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
                         elif not surgical and 'DELIVERY_AUTHOR_READ_PAGE_V1:200' not in instruction:
                             instruction+='DELIVERY_AUTHOR_READ_PAGE_V1:200\n'
                 if trial.get('harness_maintenance_only'):
-                    try:import harness_repair_task
-                    except ImportError:from broker import harness_repair_task
-                    instruction=harness_repair_task.maintenance_prompt(instruction)
+                    if trial.get('literal_maintenance'):
+                        instruction=literal_maintenance_effects.maintenance_prompt(instruction)
+                    else:
+                        try:import harness_repair_task
+                        except ImportError:from broker import harness_repair_task
+                        instruction=harness_repair_task.maintenance_prompt(instruction)
                 if trial.get('harness_selector_experiment') or incremental_read_recovery.authorized(con,issue.get('id')):
                     instruction += '\nDELIVERY_DETERMINISTIC_READ_V1\n'
         elif phase == 'implement_after_red':

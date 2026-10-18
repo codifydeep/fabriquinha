@@ -56,6 +56,29 @@ def expected_note(cfg,s,phase):
     return prefix(phase)+' '+s['marker']+'\nSource: '+cfg['source']['author_task']+'\n'+flow.instruction(cfg,s,phase).strip()
 
 
+def copy_payload(cfg,identity,source_volume=None):
+    return dict(Image=cfg['image'],User='0:0',Entrypoint=['python'],
+        Cmd=['-c','from pathlib import Path;import base_copy;base_copy.TARGET=Path("/target");base_copy.main();print("base_copy_complete")'],
+        Env=['PYTHONDONTWRITEBYTECODE=1','PYTHONPATH=/'],Labels=identity['labels'],
+        HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],Memory=268435456,PidsLimit=64,
+            Mounts=[dict(Type='volume',Source=source_volume or cfg['base']['volume'],Target='/source',ReadOnly=True),
+                dict(Type='volume',Source=identity['name'],Target='/target',ReadOnly=False)]))
+
+
+def preparation_journal(con,cfg,s,identity):
+    """Never replace a legacy intent; only a qualified separate journal may follow it."""
+    con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+    old=con.execute('SELECT identity,state FROM literal_maintenance_volumes WHERE source_task=?',(cfg['source']['author_task'],)).fetchone()
+    if not old or json.loads(old[0])==identity:return 'literal_maintenance_volumes',cfg['base']['volume']
+    require(con.execute("SELECT 1 FROM sqlite_master WHERE name='literal_base_recoveries'").fetchone())
+    row=con.execute('SELECT receipt FROM literal_base_recoveries WHERE source_task=?',(cfg['source']['author_task'],)).fetchone();require(row)
+    receipt=json.loads(row[0]);require(s.get('canonical_base_recovery')==digest(receipt)
+        and receipt['config_sha256']==digest(cfg) and receipt['old_intent']==dict(identity=json.loads(old[0]),state=json.loads(old[1]))
+        and receipt['new_identity']==identity and receipt['previous_state']['decisions']==s['decisions']
+        and receipt['source_reset'] is False and receipt['delivery_approval'] is False)
+    return 'literal_maintenance_canonical_volumes',receipt['old_intent']['identity']['name']
+
+
 class Effects:
     def __init__(self,b):
         self.b=b;self.old=diagnostic.Effects(b);self.plans=self.old.plans;self.settings=self.plans.settings
@@ -117,23 +140,20 @@ class Effects:
         b=self.b;child=s['issue_id'];base=cfg['base'];name=b.PREFIX+'-base-'+child
         labels={'delivery-kit.owner':b.OWNER,'delivery-kit.issue-id':child,'delivery-kit.base-sha':base['base_sha']}
         with b.db() as con:
-            con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
-            row=con.execute('SELECT identity,state FROM literal_maintenance_volumes WHERE source_task=?',(cfg['source']['author_task'],)).fetchone()
             identity=dict(name=name,labels=labels)
+            table,source_volume=preparation_journal(con,cfg,s,identity)
+            con.execute('CREATE TABLE IF NOT EXISTS '+table+'(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+            row=con.execute('SELECT identity,state FROM '+table+' WHERE source_task=?',(cfg['source']['author_task'],)).fetchone()
             if row:require(json.loads(row[0])==identity);stage=json.loads(row[1])['stage']
             else:
                 require(b.docker('GET','/volumes/'+name) is None);stage='create_intent'
-                con.execute('INSERT INTO literal_maintenance_volumes VALUES(?,?,?)',(cfg['source']['author_task'],json.dumps(identity),json.dumps({'stage':stage})));con.commit()
+                con.execute('INSERT INTO '+table+' VALUES(?,?,?)',(cfg['source']['author_task'],json.dumps(identity),json.dumps({'stage':stage})));con.commit()
                 try:b.docker('POST','/volumes/create',dict(Name=name,Labels=labels))
                 except TimeoutError:raise validation_job.Pending('observe same literal-maintenance base volume') from None
         actual=b.docker('GET','/volumes/'+name)
         if actual is None:raise validation_job.Pending('observe exact owned maintenance volume; no repeated create')
         require(all(actual.get('Labels',{}).get(k)==v for k,v in labels.items()))
-        payload=dict(Image=cfg['image'],User='0:0',Entrypoint=['python'],
-            Cmd=['-c','from pathlib import Path;import base_copy;base_copy.TARGET=Path("/target");base_copy.main();print("base_copy_complete")'],
-            Env=['PYTHONDONTWRITEBYTECODE=1','PYTHONPATH=/'],Labels=labels,
-            HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],Memory=268435456,PidsLimit=64,
-                Mounts=[dict(Type='volume',Source=base['volume'],Target='/source',ReadOnly=True),dict(Type='volume',Source=name,Target='/target',ReadOnly=False)]))
+        payload=copy_payload(cfg,identity,source_volume)
         job=validation_job.run(b,cfg['source']['author_task'],'structure',payload)
         require(job['exit_code']==0 and job['output'].strip()=='base_copy_complete')
         b.register_issue_base(dict(issue_id=child,base_sha=base['base_sha'],volume=name,manifest_sha256=base['manifest_sha256']))
@@ -233,6 +253,27 @@ def seed_source(b,issue,trial):
     require(labels.get('delivery-kit.owner')==b.OWNER and labels.get(owner_key)==owner_task)
     return dict(mount=dict(Type='volume',Source=volume,Target='/previous',ReadOnly=True),
         selection=dict(manifest_sha256=manifest,test_sha256=hashes))
+
+
+def seeded_hashes(b,issue,task,trial):
+    """Explicit seed metadata, never a manufactured historical Red receipt."""
+    with b.db() as con:
+        match=current(con,issue);require(match)
+        cfg,s=match
+        require(author_context(con,{'id':issue},task) is not None)
+    selected=seed_source(b,issue,trial)['selection']['test_sha256']
+    require(set(selected)=={cfg['test_path']})
+    return selected
+
+
+def maintenance_prompt(instruction):
+    start=instruction.index('\nDELIVERY_TEST_ARTIFACT_V1:')
+    return ('LITERAL MAINTENANCE PHASE. Edit only the NODE_HARNESS literal in the declared NEW test. '
+        'Preserve every byte outside that literal, all assertions and every other file. '
+        'No product implementation, terminal, shell or tests. The controller freezes the submission, '
+        'checks preservation and executes fixed guarded/unguarded harness witnesses before independent review. '
+        'This is not historical Red, product Green, full regression or delivery approval. '
+        'Do not fabricate any execution report.'+instruction[start:])
 
 
 def mounts(b,binding):
