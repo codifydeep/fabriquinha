@@ -35,7 +35,8 @@ class SealedBackupTests(unittest.TestCase):
         output=io.StringIO()
         with patch.dict('sys.modules',{'broker':self.b,'controller_maintenance':self.m}),\
                 patch('sys.argv',['backup',self.operation]),contextlib.redirect_stdout(output):
-            exec(compile(script.PROGRAM,'sealed-backup','exec'),{})
+            try:exec(compile(script.PROGRAM,'sealed-backup','exec'),{})
+            except SystemExit as outcome:self.assertEqual(outcome.code,0)
         return json.loads(output.getvalue())
 
     def test_backup_restores_exact_rows_privately_and_never_replays(self):
@@ -45,8 +46,31 @@ class SealedBackupTests(unittest.TestCase):
         restored=sqlite3.connect(path);self.addCleanup(restored.close)
         self.assertEqual(restored.execute('SELECT value FROM protected').fetchone(),('preserve',))
         self.assertIs(receipt['delivery_approval'],False)
-        with self.assertRaises(FileExistsError):self.execute()
+        identity=(path.stat().st_ino,path.stat().st_mtime_ns);files=set(self.root.iterdir())
+        self.con.execute('UPDATE protected SET value="changed after backup"');self.con.commit()
+        self.assertEqual(self.execute(),receipt)
         self.assertEqual(path.read_bytes(),before)
+        self.assertEqual((path.stat().st_ino,path.stat().st_mtime_ns),identity)
+        self.assertEqual(set(self.root.iterdir()),files)
+        ack=self.root/('sealed-backup-'+self.operation+'.receipt.json')
+        self.assertEqual(ack.stat().st_mode&0o777,0o600)
+
+    def test_existing_backup_without_receipt_is_observed_never_recreated_or_approved(self):
+        path=self.root/('sealed-backup-'+self.operation+'.sqlite');path.write_bytes(b'unknown acknowledgment')
+        receipt=self.execute();self.assertEqual(receipt['stage'],'observe_existing_backup')
+        self.assertFalse(receipt['backup_repeated']);self.assertFalse(receipt['delivery_approval'])
+        self.assertNotIn('backup_integrity',receipt)
+        self.assertEqual(path.read_bytes(),b'unknown acknowledgment');self.assertEqual(set(self.root.iterdir()),{path})
+
+    def test_changed_backup_or_false_success_receipt_is_rejected(self):
+        receipt=self.execute();path=Path(receipt['path']);before=path.read_bytes()
+        path.write_bytes(before+b'corrupt')
+        with self.assertRaises(ValueError):self.execute()
+        path.write_bytes(before)
+        ack=self.root/('sealed-backup-'+self.operation+'.receipt.json')
+        for changed in (dict(delivery_approval=True),dict(active_leases=1),dict(operation_id='foreign')):
+            ack.write_text(json.dumps({**receipt,**changed}))
+            with self.assertRaises(ValueError):self.execute()
 
     def test_unsealed_wrong_operation_or_active_work_creates_no_backup(self):
         for mutate in (lambda:self.state.update(stage='draining'),

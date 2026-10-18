@@ -28,7 +28,7 @@ with b.LOCK,b.db() as con:
   observed=hashlib.sha256()
   with path.open("rb") as stream:
    for chunk in iter(lambda:stream.read(1048576),b""):observed.update(chunk)
-  if observed.hexdigest()!=receipt.get("sha256") or receipt.get("restore_integrity")!="ok" or receipt.get("backup_integrity")!="ok":raise ValueError("backup receipt verification failed")
+  if observed.hexdigest()!=receipt.get("sha256") or receipt.get("restore_integrity")!="ok" or receipt.get("backup_integrity")!="ok" or receipt.get("delivery_approval") is not False or receipt.get("native_active")!=0 or receipt.get("active_leases")!=0:raise ValueError("backup receipt verification failed")
   print(json.dumps(receipt));sys.exit(0)
  if path.exists():
   print(json.dumps({"operation_id":operation,"stage":"observe_existing_backup","path":str(path),"backup_repeated":False,"delivery_approval":False}));sys.exit(0)
