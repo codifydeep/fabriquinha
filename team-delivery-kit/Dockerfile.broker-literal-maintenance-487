@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261018.486
+COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py broker/literal_plan_preflight_recovery.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_maintenance_workflow,literal_maintenance_effects,literal_plan_preflight_recovery"

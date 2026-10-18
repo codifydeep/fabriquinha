@@ -20,6 +20,18 @@ with b.LOCK,b.db() as con:
  if maintenance.native_active(b):raise ValueError("native tasks active")
  if con.execute("SELECT count(*) FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()[0]:raise ValueError("leases active")
  path=b.STATE/("sealed-backup-"+operation+".sqlite")
+ ack=b.STATE/("sealed-backup-"+operation+".receipt.json")
+ if path.is_symlink() or ack.is_symlink():raise ValueError("unsafe backup identity")
+ if ack.is_file():
+  receipt=json.loads(ack.read_text())
+  if receipt.get("operation_id")!=operation or receipt.get("path")!=str(path):raise ValueError("backup receipt identity mismatch")
+  observed=hashlib.sha256()
+  with path.open("rb") as stream:
+   for chunk in iter(lambda:stream.read(1048576),b""):observed.update(chunk)
+  if observed.hexdigest()!=receipt.get("sha256") or receipt.get("restore_integrity")!="ok" or receipt.get("backup_integrity")!="ok":raise ValueError("backup receipt verification failed")
+  print(json.dumps(receipt));sys.exit(0)
+ if path.exists():
+  print(json.dumps({"operation_id":operation,"stage":"observe_existing_backup","path":str(path),"backup_repeated":False,"delivery_approval":False}));sys.exit(0)
  # Persist a new backup once. Unknown acknowledgments require observation,
  # never replacing a potentially completed backup.
  fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
@@ -47,7 +59,11 @@ with b.LOCK,b.db() as con:
  digest=hashlib.sha256()
  with path.open("rb") as stream:
   for chunk in iter(lambda:stream.read(1048576),b""):digest.update(chunk)
- print(json.dumps({"operation_id":operation,"path":str(path),"sha256":digest.hexdigest(),"backup_integrity":"ok","restore_integrity":"ok","native_active":0,"active_leases":0,"delivery_approval":False}))
+ receipt={"operation_id":operation,"path":str(path),"sha256":digest.hexdigest(),"backup_integrity":"ok","restore_integrity":"ok","native_active":0,"active_leases":0,"delivery_approval":False}
+ fd=os.open(ack,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+ with os.fdopen(fd,"w") as output:
+  json.dump(receipt,output);output.flush();os.fsync(output.fileno())
+ print(json.dumps(receipt))
 '''
 
 
@@ -58,7 +74,11 @@ def main():
     labels=json.loads(subprocess.check_output(['docker','inspect','--format','{{json .Config.Labels}}',owned],text=True))
     if labels.get('com.docker.compose.project')!=options.namespace or labels.get('com.docker.compose.service')!='execution-broker':
         raise ValueError('exact owned Compose controller required')
-    result=subprocess.check_output(['docker','exec','-w','/',owned,'python','-c',PROGRAM,options.operation],text=True,timeout=45)
+    try:result=subprocess.check_output(['docker','exec','-w','/',owned,'python','-c',PROGRAM,options.operation],text=True,timeout=45)
+    except subprocess.TimeoutExpired:
+        print(json.dumps(dict(operation_id=options.operation,stage='observation_timeout',
+            next_action='Observe the existing backup and durable receipt; never repeat backup creation',delivery_approval=False)))
+        return
     print(json.dumps(json.loads(result),sort_keys=True))
 
 

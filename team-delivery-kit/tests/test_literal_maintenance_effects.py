@@ -97,6 +97,8 @@ class LiteralEffectsTests(unittest.TestCase):
         compile(module.PROGRAM,'backup-program','exec')
         self.assertNotIn('sqlite3.connect(":memory:")',module.PROGRAM)
         self.assertIn('os.O_EXCL',module.PROGRAM)
+        self.assertIn('observe_existing_backup',module.PROGRAM)
+        self.assertIn('os.fsync',module.PROGRAM)
 
     def test_scheduler_does_not_depend_on_enabled_original_product_route(self):
         self.save()

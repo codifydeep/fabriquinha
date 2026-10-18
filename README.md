@@ -1835,6 +1835,15 @@ validadas. Aprovar a manutenção não comprova Red/Green, suíte completa, PR, 
 QA nem homologação e não libera automaticamente a tarefa original. A autonomia
 integral permanece não comprovada até a entrega ponta a ponta.
 
+A proposta do CTO tem preflight no contrato tipado antes do despacho. Uma falha
+local anterior só pode ser recuperada uma vez pelo controlador em manutenção
+selada: a lease deve estar fechada, sem ferramentas, e o ledger do proxy deve
+vincular a rejeição exata à execução. O próprio proxy valida o contrato corrigido
+offline, sem incrementar chamadas. O incidente, a decisão de triagem e os limites
+da fonte permanecem preservados. Isso habilita somente uma nova decisão do CTO,
+nunca a implementação ou a aprovação de produto; a retomada nativa ainda requer
+validação real.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.
