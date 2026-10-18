@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261018.487
+COPY broker/literal_plan_preflight_recovery.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_plan_preflight_recovery"

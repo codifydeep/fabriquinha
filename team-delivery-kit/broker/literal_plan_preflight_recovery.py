@@ -17,15 +17,14 @@ except ImportError:
     from broker import controller_maintenance as maintenance,native_scope_note
     from broker.provider_access_recovery import ERROR
 
-PROBE='''import sys,json;sys.path.insert(0,"/")
+PROBE='''import sys,json,hashlib;sys.path.insert(0,"/")
 import model_proxy as m,proxy_request_rejections as r
 from pathlib import Path
 from decision_schema import apply as schema
 from typed_decision_contract import apply as typed
-from generic_harness_calibration import digest
 path=Path(m.COUNTER_PATH);before=json.loads(path.read_text())["calls"]
 note=sys.argv[2];body=typed(schema(dict(messages=[dict(role="user",content=note)],tools=[])))
-policy=digest(dict(note=note,contract=body["tools"][0]["function"]["parameters"]))
+policy=hashlib.sha256(json.dumps(dict(note=note,contract=body["tools"][0]["function"]["parameters"]),sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
 print(json.dumps(dict(rejections=r.read(m.COUNTER_PATH,sys.argv[1]),policy_sha256=policy,
  calls_before=before,calls_after=json.loads(path.read_text())["calls"])))
 '''

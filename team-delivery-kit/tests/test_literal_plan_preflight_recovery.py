@@ -4,6 +4,11 @@ import unittest
 import json
 import sqlite3
 import threading
+import contextlib
+import io
+import tempfile
+from pathlib import Path
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock,patch
 from broker import literal_plan_preflight_recovery as recovery
@@ -63,6 +68,16 @@ class PlanRecoveryTests(unittest.TestCase):
     def test_fixed_embedded_programs_compile_and_never_use_upstream_http(self):
         for script in (recovery.PROBE,cli.PROGRAM):compile(script,'fixed-probe','exec')
         self.assertNotIn('urlopen',recovery.PROBE);self.assertNotIn('requests.',recovery.PROBE)
+
+    def test_fixed_probe_executes_actual_schema_without_controller_only_imports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            counter=Path(directory)/'calls.json';counter.write_text(json.dumps({'calls':6121}))
+            output=io.StringIO();ledger=SimpleNamespace(read=Mock(return_value=self.proof['rejections']))
+            modules={'model_proxy':SimpleNamespace(COUNTER_PATH=str(counter)),'proxy_request_rejections':ledger}
+            with patch.dict(sys.modules,modules),patch.object(sys,'argv',['probe',self.binding['request_id'],flow.instruction(self.cfg,self.state,'plan')]),contextlib.redirect_stdout(output):
+                exec(compile(recovery.PROBE,'fixed-probe','exec'),{})
+            self.assertEqual(json.loads(output.getvalue()),self.proof)
+            self.assertNotIn('generic_harness_calibration',recovery.PROBE)
 
     def database(self):
         con=sqlite3.connect(':memory:');con.row_factory=sqlite3.Row;self.addCleanup(con.close)
