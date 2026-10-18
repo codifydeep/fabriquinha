@@ -1796,6 +1796,45 @@ Testes e probes sintéticos não qualificam a autonomia integral: o ciclo com CT
 Tech Lead reais, nova submissão, calibração e posterior entrega ainda precisa ser
 comprovado ponta a ponta.
 
+## Manutenção isolada de um harness novo
+
+Há uma trilha persistente para um defeito **comprovado por execução** no driver
+de um teste novo. Não é permissão genérica para alterar testes nem reiniciar uma
+tarefa esgotada. O cadastro é administrativo, com a manutenção selada e sem
+workers ativos; a decisão de cada etapa continua sendo dos agentes responsáveis.
+
+```mermaid
+flowchart LR
+    E[Contraexemplo executado e preservado] --> L[Tech Lead: triagem]
+    L --> C[CTO: proposta técnica de escopo]
+    C --> P[Tech Lead: permissão independente]
+    P --> A[Autor original: nova cópia isolada]
+    A --> S[Snapshot imutável]
+    S --> V[Verificador fixo sem rede]
+    V --> R[Tech Lead: revisão somente leitura]
+    R -->|Mudanças: uma nova revisão| A
+    R -->|Aprovação vinculada ao snapshot| H[Artefato para admissão TDD normal]
+```
+
+O verificador permite mudar apenas o literal Python declarado `NODE_HARNESS`;
+todos os bytes externos, métodos, assertions e demais arquivos devem permanecer
+idênticos. Executa o harness com dois drivers diagnósticos: um com proteção contra
+respostas atrasadas e outro vulnerável. Um relatório constante de sucesso não
+passa nessa comparação. Esses drivers não são implementação do produto nem
+referências de calibração aprovadas. A revisão independente deve avaliar também
+se o novo driver realmente exercita os comportamentos exigidos.
+
+Wakeups têm intenção persistida antes do envio, observação do mesmo identificador
+quando o ACK é incerto, prazo, ator e instrução exatos. A revisão não ganha escrita
+no workspace do autor. Uma rejeição preserva a entrega anterior e retorna ao mesmo
+autor; a segunda mantém o impedimento com o CTO, sem retentativa idêntica infinita.
+
+**Limite de qualificação:** esta trilha tem testes offline de protocolo, isolamento
+estrutural e seletividade. Sua instalação e execução nativa ainda precisam ser
+validadas. Aprovar a manutenção não comprova Red/Green, suíte completa, PR, deploy,
+QA nem homologação e não libera automaticamente a tarefa original. A autonomia
+integral permanece não comprovada até a entrega ponta a ponta.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.

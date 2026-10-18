@@ -27,7 +27,11 @@ with b.LOCK,b.db() as con:
  try:
   con.backup(destination)
   if destination.execute("PRAGMA integrity_check").fetchone()[0]!="ok":raise ValueError("backup integrity failed")
-  restored=sqlite3.connect(":memory:")
+  # Keep restore verification off RAM: production history may exceed the
+  # controller's memory limit. Retain an interrupted proof for inspection.
+  proof=b.STATE/("sealed-restore-"+operation+".sqlite")
+  proof_fd=os.open(proof,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(proof_fd)
+  restored=sqlite3.connect(proof)
   try:
    destination.backup(restored)
    if restored.execute("PRAGMA integrity_check").fetchone()[0]!="ok":raise ValueError("restore proof failed")
@@ -38,8 +42,12 @@ with b.LOCK,b.db() as con:
     quoted='"'+table.replace('"','""')+'"'
     if destination.execute("SELECT count(*) FROM "+quoted).fetchone()!=restored.execute("SELECT count(*) FROM "+quoted).fetchone():raise ValueError("restore row count mismatch")
   finally:restored.close()
+  proof.unlink()
  finally:destination.close()
- print(json.dumps({"operation_id":operation,"path":str(path),"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"backup_integrity":"ok","restore_integrity":"ok","native_active":0,"active_leases":0,"delivery_approval":False}))
+ digest=hashlib.sha256()
+ with path.open("rb") as stream:
+  for chunk in iter(lambda:stream.read(1048576),b""):digest.update(chunk)
+ print(json.dumps({"operation_id":operation,"path":str(path),"sha256":digest.hexdigest(),"backup_integrity":"ok","restore_integrity":"ok","native_active":0,"active_leases":0,"delivery_approval":False}))
 '''
 
 

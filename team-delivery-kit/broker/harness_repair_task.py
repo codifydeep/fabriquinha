@@ -447,6 +447,12 @@ def mounts(b,binding):
 
 def tick(b):
     with b.db() as con:
+        literal_work=con.execute("SELECT 1 FROM sqlite_master WHERE name='literal_maintenance_workflows'").fetchone()
+    if literal_work:
+        try:import literal_maintenance_effects
+        except ImportError:from broker import literal_maintenance_effects
+        literal_maintenance_effects.tick(b)
+    with b.db() as con:
         initialize(con);rows=con.execute('SELECT source_task,config,state FROM harness_repair_tasks').fetchall()
     settings=json.loads((b.STATE/'native.json').read_text())
     for row in rows:
@@ -593,6 +599,10 @@ def tick(b):
 
 def registered_author(con, issue, author):
     """A paused maintenance route is not a generic dispatch authorization."""
+    if con.execute("SELECT 1 FROM sqlite_master WHERE name='literal_maintenance_workflows'").fetchone():
+        try:import literal_maintenance_effects
+        except ImportError:from broker import literal_maintenance_effects
+        if literal_maintenance_effects.registered_author(con,issue,author):return True
     if not con.execute("SELECT 1 FROM sqlite_master WHERE name='harness_repair_tasks'").fetchone():
         return False
     for row in con.execute('SELECT config,state FROM harness_repair_tasks'):
@@ -642,6 +652,11 @@ def current_diagnosis_context(con,issue,task):
 
 def current_maintenance_context(con,issue,task):
     """Native runtime phase overrides historical issue prose, never grants access."""
+    if con.execute("SELECT 1 FROM sqlite_master WHERE name='literal_maintenance_workflows'").fetchone():
+        try:import literal_maintenance_effects
+        except ImportError:from broker import literal_maintenance_effects
+        context=literal_maintenance_effects.author_context(con,issue,task)
+        if context is not None:return context
     if not con.execute("SELECT 1 FROM sqlite_master WHERE name='harness_repair_tasks'").fetchone():
         raise ValueError('current maintenance registration required')
     try:import driver_checkpoint_policy,maintenance_delivery

@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261015.484
+COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py /
+COPY broker/harness_repair_task.py broker/test_revision_review.py broker/calibration_controls_diagnostic.py /
+COPY calibration_harness_protocol_probe.py qualify_harness_protocol.py qualify_frozen_harness.py docker_grouping.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_maintenance_effects,harness_repair_task,test_revision_review,calibration_controls_diagnostic"

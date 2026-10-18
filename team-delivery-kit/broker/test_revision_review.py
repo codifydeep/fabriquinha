@@ -486,6 +486,10 @@ def seed_source(broker, issue_id):
         config = json.loads(row['config'])
         if config.get('seed_previous_tests') is not True:
             return None
+        if config.get('literal_maintenance'):
+            try:import literal_maintenance_effects
+            except ImportError:from broker import literal_maintenance_effects
+            return literal_maintenance_effects.seed_source(broker,issue_id,config)
         route = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
                                        (issue_id,)).fetchone()[0])
         parent = json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',
@@ -1330,6 +1334,11 @@ def planning_mounts(broker, request_id, *, scope_effects=None):
                               (request_id,)).fetchone()
         if not binding:
             return []
+        if con.execute("SELECT 1 FROM sqlite_master WHERE name='literal_maintenance_workflows'").fetchone():
+            try:import literal_maintenance_effects
+            except ImportError:from broker import literal_maintenance_effects
+            maintained=literal_maintenance_effects.mounts(broker,{**dict(binding),'request_id':request_id})
+            if maintained:return maintained
         try:import calibration_failure_plan
         except ImportError:from broker import calibration_failure_plan
         diagnosis=calibration_failure_plan.mounts(broker,{**dict(binding),'request_id':request_id})

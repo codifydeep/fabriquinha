@@ -1,0 +1,7 @@
+FROM delivery-kit-calibration-control-experiment:20261015.11
+USER root
+COPY --chmod=0444 literal_test_maintenance.py calibration_harness_protocol_probe.py portable_contract.py /
+COPY --chmod=0444 broker/base_copy.py /base_copy.py
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import literal_test_maintenance,base_copy"
+USER 10000:10000
+ENTRYPOINT ["python"]
