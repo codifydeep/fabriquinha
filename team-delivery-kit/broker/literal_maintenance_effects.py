@@ -114,7 +114,7 @@ class Effects:
         return dict(task_id=actual['id'],agent_id=role,wakeup_id=s['wakeup_id'],execution_id=binding['request_id'],
             output_sha256=hashlib.sha256(raw.encode()).hexdigest(),read_evidence=reads,value=value)
     def prepare(self,cfg,s):
-        b=self.b;child=s['issue_id'];base=cfg['base'];name=b.PREFIX+'-literal-base-'+child
+        b=self.b;child=s['issue_id'];base=cfg['base'];name=b.PREFIX+'-base-'+child
         labels={'delivery-kit.owner':b.OWNER,'delivery-kit.issue-id':child,'delivery-kit.base-sha':base['base_sha']}
         with b.db() as con:
             con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
