@@ -9,6 +9,7 @@ from generic_harness_calibration import digest,require
 from structured_response_contract import _unique
 import calibration_harness_protocol_probe as protocol
 import qualify_harness_protocol as qualification
+from literal_inspection_assessment import assess
 try:
     import literal_maintenance_workflow as flow,calibration_controls_diagnostic as diagnostic
     import native,native_scope_note,validation_job,handoff_runtime,test_revision_review
@@ -203,6 +204,7 @@ class Effects:
             and value['structure']['python_ast_preserved_except_literal'] is True and value['non_target_files_unchanged'] is True
             and value['node_syntax_valid'] is True and value['snapshot_unchanged'] is True
             and all(value[k] is False for k in protocol.FALSE_FLAGS))
+        assess(cfg,value)  # The aggregate must agree with the frozen original assertions.
     def reseed(self,cfg,s):
         last=s['history'][-1];require(last['revision']==s['revision']-1 and last['review']['agent_id']==cfg['reviewer']
             and last['review']['value']['action']=='reject_test_revision')

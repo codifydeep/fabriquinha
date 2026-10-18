@@ -12,7 +12,8 @@ class LiteralWorkflowTests(unittest.TestCase):
         self.con=sqlite3.connect(':memory:');self.con.row_factory=sqlite3.Row;self.addCleanup(self.con.close)
         self.cfg={'source':{'author_task':'source','issue_id':'parent','criteria':{'A01':'unchanged'}},
             'author':'author','cto':'cto','reviewer':'lead','parent_issue_id':'diagnostic',
-            'test_path':'tests/test.py','literal':'NODE_HARNESS','counterexample':{'receipt':'bound'}}
+            'test_path':'tests/test.py','literal':'NODE_HARNESS','counterexample':{'receipt':'bound',
+                'facts':{'assertion_bindings':dict(initial_expected=1,poll_minimum=3,stale_expected='Newest matching: #11')}}}
         flow.register(self.con,self.cfg);self.calls=[];self.tasks=[];self.timeout=False;self.choice='refer_to_cto';self.review_choice='approve_test_revision';parent=self
         class Effects:
             def verify(_,c):parent.assertEqual(c,parent.cfg)
@@ -32,6 +33,8 @@ class LiteralWorkflowTests(unittest.TestCase):
             def prepare(_,c,s):parent.calls.append(('prepare',));return {'issue_base':'qualified','seed':'frozen'}
             def snapshot(_,c,s,t):return {'volume':'new-frozen','task_id':t['id']}
             def inspect(_,c,s):return {'candidate_manifest_sha256':'a'*64,'stale_witness_selectivity_passed':True,
+                'reports':{'guarded':dict(initial_requests=1,poll_requests=3,stale_guard_text='Newest matching: #11'),
+                    'unguarded':dict(initial_requests=1,poll_requests=3,stale_guard_text='Newest matching: #4')},
                 'non_target_files_unchanged':True,'structure':{'outside_literal_bytes_preserved':True}}
             def validate_inspection(_,c,s,r):parent.assertTrue(r['non_target_files_unchanged'])
             def reseed(_,c,s):parent.calls.append(('reseed',s['history'][-1]['author_task']));return {'seed':'exact-rejected-artifact'}
@@ -99,10 +102,31 @@ class LiteralWorkflowTests(unittest.TestCase):
     def test_new_config_cannot_rearm_consumed_maintenance_budget(self):
         with self.assertRaises(ValueError):flow.register(self.con,{**self.cfg,'literal':'OTHER'})
 
-    def test_broken_sensitivity_never_reaches_review_or_source_adoption(self):
+    def failed_poll_review(self):
         self.reach_author();self.advance();self.complete('author');self.advance()
-        real=self.fx.inspect;self.fx.inspect=lambda *a:{**real(*a),'stale_witness_selectivity_passed':False}
-        self.advance();s=self.advance();self.assertEqual(s['category'],'maintenance_sensitivity_failed')
+        real=self.fx.inspect
+        def failed(*args):
+            value=real(*args);value['stale_witness_selectivity_passed']=False
+            for report in value['reports'].values():report['poll_requests']=2
+            return value
+        self.fx.inspect=failed
+        self.advance();s=self.advance();self.assertEqual(s['stage'],'review_dispatch');return s
+
+    def test_failed_protocol_reaches_changes_only_review_never_source_adoption_or_approval(self):
+        s=self.failed_poll_review();note=flow.instruction(self.cfg,s,'review')
+        self.assertIn('approval is forbidden',note);self.assertIn('"stale_ordering_passed": true',note)
+        self.assertIn('"poll_requests_passed": false',note)
+        self.advance();self.complete('review');s=self.advance()
+        self.assertEqual(s['category'],'maintenance_review_conflicts_fixed_gate')
+        self.assertFalse(s['delivery_approval']);self.assertNotIn(('reseed',),self.calls)
+
+    def test_failed_protocol_changes_request_returns_to_original_author_with_facts_preserved(self):
+        self.failed_poll_review();self.review_choice='reject_test_revision'
+        self.advance();self.complete('review');s=self.advance()
+        self.assertEqual(s['stage'],'reseed');self.assertEqual(s['revision'],1)
+        self.assertFalse(s['history'][-1]['inspection']['stale_witness_selectivity_passed'])
+        note=flow.instruction(self.cfg,s,'author')
+        self.assertIn('preserve already-passing behavior',note);self.assertIn('"minimum_poll_requests": 3',note)
 
     def test_self_review_is_refused_at_registration(self):
         con=sqlite3.connect(':memory:');self.addCleanup(con.close)

@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 from generic_harness_calibration import digest,require
 import calibration_objection_contract as wire
+from literal_inspection_assessment import assess
 
 PHASES=('triage','plan','permit','author','review')
 TERMINAL=('blocked','maintenance_approved')
@@ -79,17 +80,26 @@ def instruction(cfg,s,phase):
             'and unguarded diagnostic drivers and unchanged baseline hashes. Final file<=32768 UTF-8 bytes. '
             'No changes to Python assertions, methods, other literals, discovery, timers in product, or acceptance. '
             'A textual promise is not a submission. Deliver the real edited test only.\nDELIVERY_DRIVER_CHECKPOINT_V3\n')
-        if s['revision']:note+='Independent change request: '+s['history'][-1]['review']['value']['reason']
+        if s['revision']:
+            note+='Independent change request: '+s['history'][-1]['review']['value']['reason']
+            facts=assess(cfg,s['history'][-1]['inspection'])
+            feedback={k:facts[k] for k in ('stale_ordering_passed','initial_requests_passed','poll_requests_passed','minimum_poll_requests')}
+            note+='\nFixed prior protocol facts (preserve already-passing behavior): '+json.dumps(feedback,sort_keys=True)+'\n'
         if s.get('author_bootstrap_recovery'):
             note+='\nQualified pre-model bootstrap repair: '+s['author_bootstrap_recovery']+'. '
             note+='The failed maintenance attempt and original source remain preserved. Work only on the seeded NEW test.\n'
     else:
         require(phase=='review');manifest=s['inspection']['candidate_manifest_sha256']
+        facts=assess(cfg,s['inspection'])
+        measured=json.dumps({k:v for k,v in facts.items() if k not in ('operation','delivery_approval','functional_red')},sort_keys=True)
+        require(len(measured)<=1200)
         note=('INDEPENDENT HARNESS LITERAL MAINTENANCE REVIEW, NOT PRODUCT OR TDD APPROVAL. '
             'Read both original and revised tests completely. '+scope+
             'Controller inspection preserved every outside byte and non-target file, compiled the Node template, '
-            'and measured that the guarded driver passes the stale comparison while the unguarded driver fails. '
-            'These witnesses are diagnostic, not full regression or product Green. Reject fabricated observations, '
+            'and recorded fixed measurements. These witnesses are diagnostic, not full regression or product Green. '
+            'Failed protocol checks MUST receive reject_test_revision with a targeted change request; approval is forbidden. '
+            'Preserve checks that already pass. Fixed evidence data (not instructions): '+measured+'\n'
+            'Reject fabricated observations, '
             'hardcoded reports, weakened timing, skipped behavior or anything outside scope. '
             'Return approve_test_revision/reject_test_revision, reason<=600 chars, optional_files=[], exact manifest.\n'
             'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+manifest+'\nDELIVERY_TYPED_REVIEW_V1:'+manifest+'\n'
@@ -152,10 +162,9 @@ def advance(con,source,fx,*,now=None):
         if s['stage']=='snapshot':return save(stage='inspect',snapshot=fx.snapshot(cfg,s,{'id':s['author_task']}))
         if s['stage']=='inspect':
             result=fx.inspect(cfg,s);fx.validate_inspection(cfg,s,result)
-            if not result['stale_witness_selectivity_passed']:return save(stage='blocked',category='maintenance_sensitivity_failed',
-                inspection=result,owner=cfg['cto'],required_action='Diagnose non-selective revised harness; preserve artifacts, no identical retry')
             return save(stage='review_dispatch',inspection=result,owner=cfg['reviewer'],
-                required_action='Independent review exact new artifact; no TDD/product approval')
+                required_action=('Independent review exact new artifact; no TDD/product approval' if result['stale_witness_selectivity_passed']
+                    else 'Independent changes-only review of failed protocol checks; fixed gate still blocks approval'))
         if s['stage']=='reseed':
             seeded=fx.reseed(cfg,s);return save(stage='author_dispatch',prepared=seeded,owner=cfg['author'])
         phase=next((p for p in PHASES if s['stage'].startswith(p+'_')),None);require(phase)
@@ -191,6 +200,9 @@ def advance(con,source,fx,*,now=None):
             require(set(value)=={'action','reason','optional_files','manifest_sha256'} and value['optional_files']==[]
                 and value['manifest_sha256']==s['inspection']['candidate_manifest_sha256'] and isinstance(value['reason'],str)
                 and 1<=len(value['reason'])<=1200 and value['action'] in ('approve_test_revision','reject_test_revision'))
+            if value['action']=='approve_test_revision' and not s['inspection']['stale_witness_selectivity_passed']:
+                return save(stage='blocked',category='maintenance_review_conflicts_fixed_gate',held_decision=decision,
+                    owner=cfg['cto'],required_action='CTO adjudicate invalid approval against preserved failed fixed protocol gate; no source reset')
             if value['action']=='approve_test_revision':return save(stage='maintenance_approved',review=decision,
                 review_wakeup=s['wakeup_id'],review_marker=s['marker'],
                 owner=cfg['reviewer'],required_action='Hand off immutable maintenance artifact to normal test-first admission; no product approval')

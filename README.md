@@ -1876,6 +1876,18 @@ do card de manutenção muda. O digest do recibo distingue o novo despacho do an
 sem repetir o wakeup falho ou reiniciar o card original. A retomada nativa continua
 sendo uma validação separada, e não comprova a entrega ponta a ponta.
 
+Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
+classificador separa ordem das respostas, requisição inicial e contagem de polling,
+usando os valores das assertions congeladas. O campo legado de seletividade agrega
+esses checks; por isso `false` não significa necessariamente que a ordem falhou.
+Na versão de fonte revisada, uma entrega estruturalmente preservada com check
+funcional vermelho segue para revisão independente **somente para pedir mudanças**.
+Mesmo que o revisor tente aprovar, o controlador recusa enquanto o gate estiver
+vermelho. Uma rejeição devolve a entrega ao autor original, com fatos e histórico,
+sem baixar thresholds nem renovar limites. Falhas de preservação continuam
+bloqueadas. A adaptação dos registros antigos parados nessa barreira ainda exige
+qualificação antes de retomar; esse handoff negativo ainda precisa de ensaio nativo.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.

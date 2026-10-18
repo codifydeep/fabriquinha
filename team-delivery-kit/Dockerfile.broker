@@ -6,6 +6,7 @@ COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.p
 COPY broker/literal_plan_preflight_recovery.py /
 COPY broker/literal_base_recovery.py /
 COPY broker/literal_author_bootstrap_recovery.py /
+COPY literal_inspection_assessment.py /
 COPY calibration_harness_protocol_probe.py qualify_harness_protocol.py qualify_frozen_harness.py docker_grouping.py /
 COPY broker/validation_recovery.py /validation_recovery.py
 COPY broker/test_first_job.py /test_first_job.py
