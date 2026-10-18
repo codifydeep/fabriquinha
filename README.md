@@ -1866,6 +1866,16 @@ de contexto continua ativo. Para um card antigo já registrado com a cápsula
 incorreta, essa correção de criação não altera a rota imutável automaticamente;
 a recuperação do bootstrap existente ainda precisa ser qualificada separadamente.
 
+A recuperação desse bootstrap é administrativa e única: exige manutenção selada,
+lease encerrada, os eventos exatos de inicialização sem prompt/tarefas de ferramenta
+e as decisões de escopo ainda autenticadas. Um probe isolado do construtor deve
+reproduzir a rejeição da rota antiga e aceitar a rota filha corrigida. Isso prova
+o erro pré-transporte, não uma ausência universal de HTTP histórico, nem execução
+nativa bem-sucedida. A rota antiga e a falha ficam no recibo privado; só o contexto
+do card de manutenção muda. O digest do recibo distingue o novo despacho do antigo,
+sem repetir o wakeup falho ou reiniciar o card original. A retomada nativa continua
+sendo uma validação separada, e não comprova a entrega ponta a ponta.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.

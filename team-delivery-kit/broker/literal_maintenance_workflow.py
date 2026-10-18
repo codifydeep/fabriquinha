@@ -80,6 +80,9 @@ def instruction(cfg,s,phase):
             'No changes to Python assertions, methods, other literals, discovery, timers in product, or acceptance. '
             'A textual promise is not a submission. Deliver the real edited test only.\nDELIVERY_DRIVER_CHECKPOINT_V3\n')
         if s['revision']:note+='Independent change request: '+s['history'][-1]['review']['value']['reason']
+        if s.get('author_bootstrap_recovery'):
+            note+='\nQualified pre-model bootstrap repair: '+s['author_bootstrap_recovery']+'. '
+            note+='The failed maintenance attempt and original source remain preserved. Work only on the seeded NEW test.\n'
     else:
         require(phase=='review');manifest=s['inspection']['candidate_manifest_sha256']
         note=('INDEPENDENT HARNESS LITERAL MAINTENANCE REVIEW, NOT PRODUCT OR TDD APPROVAL. '

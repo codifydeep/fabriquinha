@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261018.491
+COPY broker/literal_maintenance_effects.py broker/literal_maintenance_workflow.py broker/literal_author_bootstrap_recovery.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_author_bootstrap_recovery,literal_maintenance_effects"
