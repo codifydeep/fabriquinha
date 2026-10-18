@@ -66,7 +66,7 @@ def instruction(cfg,s,phase):
             'failures, not fabricated success or a setup crash. No tools. '
             'Return request_test_revision with a concise concrete scope, or escalate_cto with a concrete restriction; '
             'optional_files=[]. reason<=300 chars. No release approval or resetting prior attempts.\n'
-            'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'
+            'DELIVERY_STRUCTURED_DECISION_V1:technical\nDELIVERY_TYPED_DECISION_V1\n'
             'Source binding: '+digest(cfg))
     elif phase=='author':
         note=('ISOLATED HARNESS MAINTENANCE. Repair the controller-seeded NEW test, not the product. '+scope+
@@ -91,6 +91,25 @@ def instruction(cfg,s,phase):
             'DELIVERY_STRUCTURED_DECISION_V1:test_review:'+manifest+'\nDELIVERY_TYPED_REVIEW_V1:'+manifest+'\n'
             'DELIVERY_DETERMINISTIC_READ_V1\n'+''.join('DELIVERY_REVIEW_READ_PATH:/evidence/'+role+'/'+path+'\n' for role in ('candidate','previous')))
     require(len(note)<=3800);return note
+
+
+def preflight_plan(cfg,s):
+    """Exercise the installed request contracts before spending a native task.
+
+    This checks only the technical scope proposal, never fabricates source reads
+    or submits a model decision. A findings diagnosis is a different contract.
+    """
+    from decision_schema import apply as schema
+    from typed_decision_contract import apply as typed,NAME
+    note=instruction(cfg,s,'plan')
+    body=typed(schema(dict(messages=[dict(role='user',content=note)],tools=[])))
+    props=body['tools'][0]['function']['parameters']['properties']
+    require(body['tool_choice']['function']['name']==NAME
+        and set(props)=={'action','reason','optional_files'}
+        and props['optional_files'].get('maxItems')==0
+        and set(props['action']['enum'])<={'request_correction','request_test_revision','escalate_cto'}
+        and 'DELIVERY_TYPED_TEST_DIAGNOSIS_V1' not in note)
+    return digest(dict(note=note,contract=body['tools'][0]['function']['parameters']))
 
 
 def authenticate(cfg,s,fx):

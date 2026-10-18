@@ -90,6 +90,7 @@ class Effects:
                 '. Original attempts, snapshots, acceptance, baseline and release gates remain unchanged. No product admission.',
             parent_issue_id=cfg['parent_issue_id'],project_id=parent.get('project_id'),stage=1,status='todo'),allow_create=first)
     def wake(self,cfg,s,phase,first):
+        if phase=='plan':flow.preflight_plan(cfg,s)
         function=native.ensure_unit_start if phase=='author' else native.ensure_planning_start
         return function(self.settings,s['issue_id'],flow.actor(cfg,phase),cfg['source']['author_task'],
             s['marker'],flow.instruction(cfg,s,phase),allow_create=first)

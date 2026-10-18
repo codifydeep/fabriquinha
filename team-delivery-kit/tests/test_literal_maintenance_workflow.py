@@ -2,6 +2,7 @@ import copy
 import json
 import sqlite3
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 from broker import literal_maintenance_workflow as flow
 
@@ -55,6 +56,12 @@ class LiteralWorkflowTests(unittest.TestCase):
         self.advance();self.complete('review');s=self.advance()
         self.assertEqual(s['stage'],'maintenance_approved');self.assertFalse(s['delivery_approval'])
         self.assertFalse(s['source_reset']);self.assertFalse(s['functional_red'])
+
+    def test_cto_scope_proposal_preflights_actual_typed_contract_without_findings_diagnosis(self):
+        self.assertEqual(len(flow.preflight_plan(self.cfg,{})),64)
+        actual=flow.instruction(self.cfg,{},'plan')
+        with patch.object(flow,'instruction',return_value=actual+'\nDELIVERY_TYPED_TEST_DIAGNOSIS_V1\n'):
+            with self.assertRaises(ValueError):flow.preflight_plan(self.cfg,{})
 
     def test_unknown_wakeup_ack_only_observes_same_intent_and_deadline(self):
         self.advance();self.timeout=True;self.advance();self.advance()
