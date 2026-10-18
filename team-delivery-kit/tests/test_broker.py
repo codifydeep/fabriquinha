@@ -206,9 +206,15 @@ class BrokerTests(unittest.TestCase):
 
     def test_literal_maintenance_native_prompt_uses_seed_hashes_without_fabricating_old_red(self):
         from broker import test_revision_review,literal_maintenance_effects as literal
+        from execution_context import freeze,reference
+        capsule=freeze('Parent product context.','Parent product review.')
+        parent=dict(issue_id='parent',enabled=True,author='author',execution_context=capsule,
+            review_instruction=reference(capsule,'review'))
         trial=dict(seed_previous_tests=True,seeded_edit_required=True,harness_maintenance_only=True,
             literal_maintenance={'source_task':'source','config_sha256':'a'*64})
         with broker.db() as con:
+            con.execute('CREATE TABLE delivery_routes(issue_id,config)')
+            con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps(literal.maintenance_route(parent,'issue'))))
             test_revision_review.initialize(con)
             con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',('issue','parent',json.dumps(trial),'{}'))
         issue=dict(id='issue',title='Isolated literal maintenance',description='Only the declared literal may change.')
@@ -226,6 +232,7 @@ class BrokerTests(unittest.TestCase):
         with broker.db() as con:
             stored=json.loads(con.execute('SELECT config FROM test_revision_trials WHERE issue_id="issue"').fetchone()[0])
         self.assertEqual(stored,trial);self.assertNotIn('old_red',stored)
+        self.assertEqual(parent['execution_context'],capsule)
 
     def test_portable_node_test_command_is_exact_and_immutable(self):
         issue = str(uuid.uuid4())

@@ -65,6 +65,14 @@ def copy_payload(cfg,identity,source_volume=None):
                 dict(Type='volume',Source=identity['name'],Target='/target',ReadOnly=False)]))
 
 
+def maintenance_route(parent,child):
+    """Keep tools/roles/contracts; do not inherit a different issue's capsule."""
+    route={k:v for k,v in parent.items() if k!='execution_context'}
+    return dict(route,issue_id=child,enabled=False,
+        review_instruction='Review only the controller-published immutable literal maintenance artifact. '
+            'No product implementation, historical Red, regression or delivery approval.')
+
+
 def preparation_journal(con,cfg,s,identity):
     """Never replace a legacy intent; only a qualified separate journal may follow it."""
     con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
@@ -162,7 +170,7 @@ class Effects:
             command=con.execute('SELECT command FROM issue_test_commands WHERE issue_id=?',(cfg['source']['issue_id'],)).fetchone()[0]
             route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(cfg['source']['issue_id'],)).fetchone()[0])
         require('/workspace/'+cfg['test_path'] in paths);b.register_issue_editables(dict(issue_id=child,paths=paths,test_command=command))
-        handoff_runtime.register(b,dict(route,issue_id=child,enabled=False))
+        handoff_runtime.register(b,maintenance_route(route,child))
         trial=dict(issue_id=child,parent_issue=cfg['source']['issue_id'],reviewer=cfg['reviewer'],base_sha=base['base_sha'],
             harness_maintenance_only=True,historic_functional_red=False,seed_previous_tests=True,seeded_edit_required=True,
             literal_maintenance=dict(source_task=cfg['source']['author_task'],config_sha256=digest(cfg)))

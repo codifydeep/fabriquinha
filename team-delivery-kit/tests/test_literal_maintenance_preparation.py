@@ -56,3 +56,18 @@ class LiteralPreparationTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.fx.prepare(self.cfg,self.state)
         self.assertEqual(self.con.execute('SELECT identity FROM literal_maintenance_volumes').fetchone()[0],old)
         self.assertEqual(self.calls,[])
+
+    def test_child_route_does_not_inherit_product_execution_capsule(self):
+        from execution_context import freeze,reference
+        capsule=freeze('Original approved product brief.','Original product review.')
+        parent=dict(issue_id='original',enabled=True,execution_context=capsule,
+            review_instruction=reference(capsule,'review'))
+        self.con.execute('UPDATE delivery_routes SET config=?',(json.dumps(parent),));self.con.commit()
+        with patch.object(effects.validation_job,'run',return_value=dict(exit_code=0,output='base_copy_complete\n')),\
+                patch.object(effects.handoff_runtime,'register') as registered:
+            self.fx.prepare(self.cfg,self.state)
+        child=registered.call_args.args[1]
+        self.assertNotIn('execution_context',child)
+        self.assertFalse(child['enabled']);self.assertEqual(child['issue_id'],self.state['issue_id'])
+        self.assertNotIn('DELIVERY_EXECUTION_CONTEXT',child['review_instruction'])
+        self.assertEqual(json.loads(self.con.execute('SELECT config FROM delivery_routes').fetchone()[0]),parent)

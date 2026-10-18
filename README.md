@@ -1859,6 +1859,13 @@ autenticados pelo card, perfil, wakeup e fase atuais. Não fabrica um `old_red`
 para satisfazer caminhos legados: a obtenção dos hashes e a instrução nativa têm
 um ramo próprio, enquanto as revisões TDD históricas mantêm seu contrato original.
 
+Cards novos dessa manutenção também recebem um briefing próprio: a rota filha
+preserva papéis, caminhos e contratos de testes, mas não herda a cápsula de
+contexto de produto da rota pai. A cápsula original permanece intacta e o guard
+de contexto continua ativo. Para um card antigo já registrado com a cápsula
+incorreta, essa correção de criação não altera a rota imutável automaticamente;
+a recuperação do bootstrap existente ainda precisa ser qualificada separadamente.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.
