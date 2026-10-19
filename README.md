@@ -1814,6 +1814,8 @@ flowchart LR
     V --> R[Tech Lead: revisão somente leitura]
     R -->|Mudanças: uma nova revisão| A
     R -->|Aprovação vinculada ao snapshot| H[Artefato para admissão TDD normal]
+    R -->|Segunda rejeição: sem terceiro retry| D[CTO: diagnóstico nativo somente leitura]
+    D --> X[Hipótese e experimento propostos; execução e patrocínio ainda exigidos]
 ```
 
 O verificador permite mudar apenas o literal Python declarado `NODE_HARNESS`;
@@ -1827,7 +1829,15 @@ se o novo driver realmente exercita os comportamentos exigidos.
 Wakeups têm intenção persistida antes do envio, observação do mesmo identificador
 quando o ACK é incerto, prazo, ator e instrução exatos. A revisão não ganha escrita
 no workspace do autor. Uma rejeição preserva a entrega anterior e retorna ao mesmo
-autor; a segunda mantém o impedimento com o CTO, sem retentativa idêntica infinita.
+autor; a segunda aciona uma única tarefa nativa do CTO, sem retentativa idêntica
+infinita. O controlador reautentica as duas rejeições, jobs concluídos, leases
+fechadas e snapshots preservados antes do despacho e durante a observação. O CTO
+lê integralmente as duas revisões rejeitadas em mounts somente leitura, compara
+as medições e questiona as recomendações anteriores. ACK incerto observa a mesma
+intenção; não cria outro diagnóstico. Sua proposta fica registrada, mas não
+executa um experimento, não autoriza uma terceira implementação e não aprova
+produto. A execução controlada do experimento e o patrocínio independente de
+eventual correção continuam obrigatórios e ainda precisam ser qualificados.
 
 **Limite de qualificação:** esta trilha tem testes offline de protocolo, isolamento
 estrutural e seletividade. Sua instalação e execução nativa ainda precisam ser

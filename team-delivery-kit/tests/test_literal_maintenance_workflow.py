@@ -25,7 +25,7 @@ class LiteralWorkflowTests(unittest.TestCase):
                 return {'id':phase+'-'+str(s.get('revision',0))}
             def runs(_,c,s):return parent.tasks
             def decision(_,c,s,phase,t):
-                if phase=='plan':value={'action':'request_test_revision','reason':'Preserve assertions; repair driver','optional_files':[]}
+                if phase in ('plan','diagnose'):value={'action':'request_test_revision','reason':'Preserve assertions; repair driver','optional_files':[]}
                 elif phase=='review':value={'action':parent.review_choice,'reason':'Measured selective driver, unchanged assertions','optional_files':[], 'manifest_sha256':s['inspection']['candidate_manifest_sha256']}
                 else:value={**flow.review_context(c,s,phase),'action':parent.choice,'reason':'Evidence justifies scoped author proposal',
                     'author_retry_authorized':False,'execution_authorized':False,'delivery_approval':False}
@@ -37,12 +37,13 @@ class LiteralWorkflowTests(unittest.TestCase):
                     'unguarded':dict(initial_requests=1,poll_requests=3,stale_guard_text='Newest matching: #4')},
                 'non_target_files_unchanged':True,'structure':{'outside_literal_bytes_preserved':True}}
             def validate_inspection(_,c,s,r):parent.assertTrue(r['non_target_files_unchanged'])
+            def preserved_submission(_,c,s):parent.calls.append(('preserved',s['author_task']))
             def reseed(_,c,s):parent.calls.append(('reseed',s['history'][-1]['author_task']));return {'seed':'exact-rejected-artifact'}
         self.fx=Effects()
 
     def advance(self,now=1):return flow.advance(self.con,'source',self.fx,now=now)
     def complete(self,phase,revision=0):
-        actor={'triage':'lead','plan':'cto','permit':'lead','author':'author','review':'lead'}[phase]
+        actor={'triage':'lead','plan':'cto','permit':'lead','author':'author','review':'lead','diagnose':'cto'}[phase]
         self.tasks.append({'id':phase+'-task-'+str(revision),'agent_id':actor,'issue_id':'maintenance',
             'status':'completed','wakeup_id':phase+'-'+str(revision)})
 
@@ -140,7 +141,55 @@ class LiteralWorkflowTests(unittest.TestCase):
         s=self.advance();self.assertEqual(s['stage'],'reseed');self.assertEqual(s['history'][0]['author_task'],'author-task-0')
         self.advance();self.submit_for_review(1);s=self.advance()
         self.assertEqual(s['category'],'maintenance_review_revision_exhausted');self.assertEqual(len(s['history']),2)
-        self.assertFalse(s['source_reset']);before=list(self.calls);self.advance();self.assertEqual(before,self.calls)
+        self.assertFalse(s['source_reset']);self.assertEqual(self.advance()['stage'],'diagnose_dispatch')
+
+    def exhausted(self):
+        self.reach_author();self.submit_for_review();self.review_choice='reject_test_revision';self.advance()
+        self.advance();self.submit_for_review(1);self.advance()
+
+    def test_exhaustion_wakes_cto_once_then_preserves_diagnosis_without_third_author_or_approval(self):
+        self.exhausted();s=self.advance();self.assertEqual(s['stage'],'diagnose_dispatch')
+        self.assertEqual(s['owner'],'cto');self.assertEqual(s['cto_escalation']['attempt_limit'],1)
+        self.assertFalse(s['cto_escalation']['author_retry_authorized'])
+        self.assertEqual(len([x for x in self.calls if x[0]=='preserved']),2)
+        self.advance();self.complete('diagnose',1);s=self.advance()
+        self.assertEqual(s['category'],'maintenance_cto_experiment_required')
+        self.assertEqual(s['diagnosis']['agent_id'],'cto');self.assertEqual(len(s['history']),2)
+        before=list(self.calls);self.advance();self.assertEqual(before,self.calls)
+        self.assertFalse(s['delivery_approval']);self.assertFalse(s['functional_red'])
+        self.assertEqual(len([x for x in self.calls if x[:2]==('wake','author')]),2)
+
+    def test_cto_diagnosis_uses_readonly_typed_contract_and_does_not_inherit_reviewer_authority(self):
+        self.exhausted();s=self.advance();note=flow.instruction(self.cfg,s,'diagnose')
+        self.assertIn('not necessarily correct',note);self.assertIn('No edits, shell, tests',note)
+        self.assertIn('Neither action authorizes another author attempt',note)
+        self.assertIn('DELIVERY_REVIEW_READ_PATH:/evidence/candidate/tests/test.py',note)
+        self.assertEqual(len(flow.preflight_plan(self.cfg,s,'diagnose')),64)
+        self.assertNotIn('DELIVERY_TYPED_REVIEW_V1',note)
+
+    def test_historical_rejection_or_artifact_drift_blocks_cto_dispatch(self):
+        self.exhausted()
+        with patch.object(self.fx,'preserved_submission',side_effect=ValueError('changed frozen artifact')):
+            state=self.advance()
+        self.assertEqual(state['category'],'maintenance_evidence_rejected')
+        self.assertNotIn('cto_escalation',state)
+        self.assertFalse(any(x[:2]==('wake','diagnose') for x in self.calls))
+
+    def test_unknown_cto_wakeup_ack_only_observes_same_intent_after_restart(self):
+        self.exhausted();self.advance();self.timeout=True;self.advance();s=self.advance()
+        wakes=[x for x in self.calls if x[:2]==('wake','diagnose')]
+        self.assertEqual([x[2] for x in wakes],[True,False]);self.assertEqual(wakes[0][3],wakes[1][3])
+        self.assertEqual(s['stage'],'diagnose_wait')
+
+    def test_cto_cannot_return_review_approval_or_reset_historical_attempts(self):
+        self.exhausted();self.advance();self.advance();self.complete('diagnose',1)
+        original=self.fx.decision
+        def invalid(c,s,p,t):
+            receipt=original(c,s,p,t)
+            if p=='diagnose':receipt['value']['action']='approve_test_revision'
+            return receipt
+        self.fx.decision=invalid;state=self.advance()
+        self.assertEqual(state['category'],'maintenance_evidence_rejected');self.assertEqual(len(state['history']),2)
 
     def test_drifted_native_scope_does_not_survive_until_preparation(self):
         self.advance()

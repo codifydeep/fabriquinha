@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261018.493
+COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_maintenance_effects"

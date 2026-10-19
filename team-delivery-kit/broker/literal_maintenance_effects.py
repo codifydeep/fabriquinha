@@ -132,7 +132,7 @@ class Effects:
                 '. Original attempts, snapshots, acceptance, baseline and release gates remain unchanged. No product admission.',
             parent_issue_id=cfg['parent_issue_id'],project_id=parent.get('project_id'),stage=1,status='todo'),allow_create=first)
     def wake(self,cfg,s,phase,first):
-        if phase=='plan':flow.preflight_plan(cfg,s)
+        if phase in ('plan','diagnose'):flow.preflight_plan(cfg,s,phase)
         function=native.ensure_unit_start if phase=='author' else native.ensure_planning_start
         return function(self.settings,s['issue_id'],flow.actor(cfg,phase),cfg['source']['author_task'],
             s['marker'],flow.instruction(cfg,s,phase),allow_create=first)
@@ -145,7 +145,7 @@ class Effects:
         binding=self.old.binding(actual,role)
         with self.b.db() as con:count=con.execute('SELECT coalesce(sum(tool_count),0) FROM tool_events WHERE request_id=?',(binding['request_id'],)).fetchone()[0]
         reads={}
-        if phase=='review':
+        if phase in ('review','diagnose'):
             observed=self.plans.reads(actual)
             for root in ('candidate','previous'):
                 path='/evidence/'+root+'/'+cfg['test_path'];r=observed.get(path,{})
@@ -155,6 +155,23 @@ class Effects:
         value=json.loads(raw,object_pairs_hook=_unique)
         return dict(task_id=actual['id'],agent_id=role,wakeup_id=s['wakeup_id'],execution_id=binding['request_id'],
             output_sha256=hashlib.sha256(raw.encode()).hexdigest(),read_evidence=reads,value=value)
+    def preserved_submission(self,cfg,s):
+        """Recheck journaled validation, closed author lease and durable snapshot."""
+        try:from literal_failed_inspection_review import completed_inspection
+        except ImportError:from broker.literal_failed_inspection_review import completed_inspection
+        actual=self.plans.task(s['author_task'],cfg['author'])
+        require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id']
+            and actual.get('agent_id')==cfg['author'])
+        with self.b.db() as con:
+            completed_inspection(con,self.b,cfg,s)
+            rows=con.execute('SELECT n.*,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.task_id=?',
+                (s['author_task'],)).fetchall();require(len(rows)==1);binding=dict(rows[0])
+            require(binding['status']=='closed' and binding['agent_id']==cfg['author'] and binding['issue_id']==s['issue_id']
+                and binding['scope'].split(':')[-2:]==['implementation',s['author_task']])
+            snapshot=con.execute('SELECT * FROM snapshots WHERE task_id=?',(s['author_task'],)).fetchone()
+            require(snapshot and snapshot['status']=='complete' and snapshot['volume']==s['snapshot']['volume'])
+        labels=(self.b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
+        require(labels.get('delivery-kit.owner')==self.b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
     def prepare(self,cfg,s):
         b=self.b;child=s['issue_id'];base=cfg['base'];name=b.PREFIX+'-base-'+child
         labels={'delivery-kit.owner':b.OWNER,'delivery-kit.issue-id':child,'delivery-kit.base-sha':base['base_sha']}
@@ -294,17 +311,20 @@ def mounts(b,binding):
     with b.db() as con:match=current(con,binding['issue_id'])
     if not match:return []
     cfg,s=match
-    if s['stage'] not in ('review_observe','review_wait'):return []
-    require(binding['agent_id']==cfg['reviewer'])
+    phase='diagnose' if s['stage'].startswith('diagnose_') else 'review'
+    if s['stage'] not in (phase+'_observe',phase+'_wait'):return []
+    role=flow.actor(cfg,phase);require(binding['agent_id']==role)
     fx=Effects(b);fx.verify(cfg);flow.authenticate(cfg,s,fx)
+    if phase=='diagnose':flow.authenticate_rejections(cfg,s,fx)
     with b.db() as con:
         row=con.execute('SELECT n.task_id,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.request_id=?',
             (binding['request_id'],)).fetchone();require(row and row['status'] in ('creating','starting','running'))
-        task=fx.plans.task(row['task_id'],cfg['reviewer']);s=authorize_phase(con,cfg,s,task,'review',fx.settings)
+        task=fx.plans.task(row['task_id'],role);s=authorize_phase(con,cfg,s,task,phase,fx.settings)
     labels=(b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
     require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
     return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in (
-        ('previous',cfg['source']['candidate_volume']),('candidate',s['snapshot']['volume']))]
+        ('previous',s['history'][0]['snapshot']['volume'] if phase=='diagnose' else cfg['source']['candidate_volume']),
+        ('candidate',s['snapshot']['volume']))]
 
 
 def handle(b,source):
