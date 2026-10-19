@@ -1870,6 +1870,27 @@ obtida. Aprovar uma manutenção não comprova Red/Green, suíte completa do pro
 PR, deploy, QA nem homologação e não libera automaticamente a tarefa original.
 A autonomia integral permanece não comprovada até a entrega ponta a ponta.
 
+### Feedback diagnóstico ao autor: sandbox qualificado, integração pendente
+
+`team-delivery-kit/literal_author_feedback.py` mede os dois drivers fixos e
+devolve dados estruturados: campos que falham, resultados observados, expectativas
+imutáveis e a atribuição exata que captura a métrica, com linha relativa ao
+literal. Assim, a falha `poll_requests` não é confundida com o bloco posterior de
+stale que já passa. A operação aceita hashes e caminhos controlados, não shell,
+comandos de teste fornecidos pelo agente ou alterações de critérios.
+
+A qualificação offline reproduziu a contagem 2 e localizou a captura na linha 177
+do literal nas três entregas rejeitadas, sem modificar seus bytes ou fazer chamadas
+ao modelo. O verificador rejeita hash desatualizado, symlink, mudança externa ao
+literal e alteração concorrente durante a medição. Ele **não verifica os demais
+arquivos do workspace**, não importa módulos Python do produto e não substitui
+snapshot, calibração, TDD, suíte completa ou revisão independente.
+
+Essa operação ainda **não está conectada às ferramentas dos workers**. Faltam o
+RPC vinculado à lease atual, entrega do feedback ao autor, deduplicação por hash
+do candidato, testes do caminho real de permissões e validação nativa. Nenhuma
+nova tentativa foi liberada por essa qualificação; o impedimento continua visível.
+
 A proposta do CTO tem preflight no contrato tipado antes do despacho. Uma falha
 local anterior só pode ser recuperada uma vez pelo controlador em manutenção
 selada: a lease deve estar fechada, sem ferramentas, e o ledger do proxy deve
