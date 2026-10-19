@@ -39,11 +39,24 @@ class LiteralWorkflowTests(unittest.TestCase):
             def validate_inspection(_,c,s,r):parent.assertTrue(r['non_target_files_unchanged'])
             def preserved_submission(_,c,s):parent.calls.append(('preserved',s['author_task']))
             def reseed(_,c,s):parent.calls.append(('reseed',s['history'][-1]['author_task']));return {'seed':'exact-rejected-artifact'}
-        self.fx=Effects()
+        self.fx=Effects();self.experiment_supported=True
+        def experiment(c,s):
+            self.calls.append(('experiment',s['diagnosis']['task_id']))
+            reports={name:{driver:dict(initial_requests=1,poll_requests=3 if name=='before_capture' else 2,
+                stale_guard_text='Newest matching: #11' if driver=='guarded' else 'Newest matching: #4')
+                for driver in ('guarded','unguarded')} for name in ('original','before_capture','after_capture')}
+            return dict(hypothesis_supported=self.experiment_supported,reports=reports,
+                assertion_bindings=dict(initial_expected=1,poll_minimum=3,stale_expected='Newest matching: #11'))
+        self.fx.experiment=experiment;self.fx.validate_experiment=lambda *args:None
+        decision=self.fx.decision;recorded={}
+        def immutable_decision(c,s,p,t):
+            if t['id'] not in recorded:recorded[t['id']]=decision(c,s,p,t)
+            return copy.deepcopy(recorded[t['id']])
+        self.fx.decision=immutable_decision
 
     def advance(self,now=1):return flow.advance(self.con,'source',self.fx,now=now)
     def complete(self,phase,revision=0):
-        actor={'triage':'lead','plan':'cto','permit':'lead','author':'author','review':'lead','diagnose':'cto'}[phase]
+        actor={'triage':'lead','plan':'cto','permit':'lead','author':'author','review':'lead','diagnose':'cto','sponsor':'lead'}[phase]
         self.tasks.append({'id':phase+'-task-'+str(revision),'agent_id':actor,'issue_id':'maintenance',
             'status':'completed','wakeup_id':phase+'-'+str(revision)})
 
@@ -155,7 +168,7 @@ class LiteralWorkflowTests(unittest.TestCase):
         self.advance();self.complete('diagnose',1);s=self.advance()
         self.assertEqual(s['category'],'maintenance_cto_experiment_required')
         self.assertEqual(s['diagnosis']['agent_id'],'cto');self.assertEqual(len(s['history']),2)
-        before=list(self.calls);self.advance();self.assertEqual(before,self.calls)
+        self.assertEqual(self.advance()['stage'],'capture_experiment')
         self.assertFalse(s['delivery_approval']);self.assertFalse(s['functional_red'])
         self.assertEqual(len([x for x in self.calls if x[:2]==('wake','author')]),2)
 
@@ -190,6 +203,45 @@ class LiteralWorkflowTests(unittest.TestCase):
             return receipt
         self.fx.decision=invalid;state=self.advance()
         self.assertEqual(state['category'],'maintenance_evidence_rejected');self.assertEqual(len(state['history']),2)
+
+    def diagnosed(self):
+        self.exhausted();self.advance();self.advance();self.complete('diagnose',1);self.advance()
+
+    def sponsored(self):
+        self.diagnosed();self.advance();s=self.advance();self.assertEqual(s['stage'],'sponsor_dispatch')
+        self.advance();self.complete('sponsor',1);return self.advance()
+
+    def test_executed_new_evidence_and_independent_sponsor_earn_exactly_one_additional_correction(self):
+        s=self.sponsored();self.assertEqual(s['stage'],'reseed');self.assertEqual(s['revision'],2)
+        self.assertEqual(s['repair_authorization']['additional_submission_limit'],1)
+        self.assertFalse(s['source_reset']);self.assertEqual(len(s['history']),2)
+        note=flow.instruction(self.cfg,s,'author');self.assertIn('Only the before-capture placement',note)
+        self.advance();self.review_choice='approve_test_revision';self.submit_for_review(2);s=self.advance()
+        self.assertEqual(s['stage'],'maintenance_approved');self.assertFalse(s['delivery_approval'])
+        self.assertEqual(len([x for x in self.calls if x[:2]==('wake','author')]),3)
+        self.assertEqual(len([x for x in self.calls if x[0]=='experiment']),1)
+
+    def test_unsupported_experiment_or_independent_hold_never_earns_extra_author_attempt(self):
+        self.diagnosed();self.experiment_supported=False;self.advance();s=self.advance()
+        self.assertEqual(s['category'],'maintenance_capture_hypothesis_unsupported')
+        self.assertNotIn('repair_authorization',s)
+        sample=LiteralWorkflowTests();sample.setUp();self.addCleanup(sample.doCleanups)
+        sample.diagnosed();sample.advance();sample.advance();sample.advance();sample.complete('sponsor',1)
+        sample.choice='retain_technical_hold';s=sample.advance()
+        self.assertEqual(s['category'],'maintenance_sponsor_hold');self.assertNotIn('repair_authorization',s)
+
+    def test_third_rejection_preserves_all_deliveries_without_second_cto_or_budget_reset(self):
+        self.sponsored();self.advance();self.submit_for_review(2);s=self.advance()
+        self.assertEqual(s['category'],'maintenance_evidence_replan_rejected');self.assertEqual(len(s['history']),3)
+        before=list(self.calls);self.advance();self.assertEqual(self.calls,before)
+        self.assertFalse(s['source_reset']);self.assertEqual(s['revision'],2)
+
+    def test_drifted_sponsorship_cannot_authorize_reseed_or_author(self):
+        self.sponsored();row=self.con.execute('SELECT state FROM literal_maintenance_workflows').fetchone()
+        s=json.loads(row[0]);s['repair_authorization']['additional_submission_limit']=2
+        self.con.execute('UPDATE literal_maintenance_workflows SET state=?',(json.dumps(s),))
+        s=self.advance();self.assertEqual(s['category'],'maintenance_evidence_rejected')
+        self.assertEqual(len([x for x in self.calls if x[:2]==('wake','author')]),2)
 
     def test_drifted_native_scope_does_not_survive_until_preparation(self):
         self.advance()

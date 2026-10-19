@@ -1815,7 +1815,10 @@ flowchart LR
     R -->|Mudanças: uma nova revisão| A
     R -->|Aprovação vinculada ao snapshot| H[Artefato para admissão TDD normal]
     R -->|Segunda rejeição: sem terceiro retry| D[CTO: diagnóstico nativo somente leitura]
-    D --> X[Hipótese e experimento propostos; execução e patrocínio ainda exigidos]
+    D --> X[Experimento fixo: antes x depois da captura]
+    X -->|Evidência nova executada| P2[Tech Lead: patrocínio independente]
+    P2 -->|Uma única correção adicional| A
+    P2 -->|Restrição concreta| B[Impedimento técnico visível]
 ```
 
 O verificador permite mudar apenas o literal Python declarado `NODE_HARNESS`;
@@ -1834,10 +1837,25 @@ infinita. O controlador reautentica as duas rejeições, jobs concluídos, lease
 fechadas e snapshots preservados antes do despacho e durante a observação. O CTO
 lê integralmente as duas revisões rejeitadas em mounts somente leitura, compara
 as medições e questiona as recomendações anteriores. ACK incerto observa a mesma
-intenção; não cria outro diagnóstico. Sua proposta fica registrada, mas não
-executa um experimento, não autoriza uma terceira implementação e não aprova
-produto. A execução controlada do experimento e o patrocínio independente de
-eventual correção continuam obrigatórios e ainda precisam ser qualificados.
+intenção; não cria outro diagnóstico. Sua proposta, por si só, não executa um
+experimento, não autoriza uma terceira implementação e não aprova produto.
+
+No caso qualificado de captura prematura da contagem de polling, o controlador
+tem uma operação fixa: executa o harness original e duas variantes temporárias,
+com um ciclo antes ou depois da atribuição da métrica. As seis medições usam os
+mesmos drivers diagnósticos com e sem proteção contra respostas atrasadas.
+Snapshots são montados somente para leitura; variantes existem apenas em memória
+e não são entregas do autor. Não há rede, credenciais, socket Docker ou comandos
+escolhidos pelo modelo. Um journal persistente observa o mesmo job em reinícios
+ou ACK incerto, sem executar novamente um experimento já capturado.
+
+Somente evidência causal nova, vinculada ao diagnóstico e ao snapshot exatos,
+pode seguir ao Tech Lead. Seu patrocínio independente permite **uma** correção
+adicional pelo autor original; não reseta o orçamento ordinário nem a tarefa
+original. Cada criação de workspace revalida esse patrocínio e o job preservado.
+Uma nova rejeição mantém todas as três entregas e encerra essa estratégia de
+correção, com impedimento visível: não dispara outro diagnóstico ou retry idêntico.
+Mesmo uma manutenção aprovada continua sujeita à admissão TDD normal.
 
 **Limite de qualificação:** além dos testes offline de protocolo, isolamento e
 seletividade, a execução nativa comprovou submissão imutável, revisão independente,

@@ -1,0 +1,6 @@
+FROM delivery-kit-literal-maintenance:20261018.12
+USER root
+COPY --chmod=0444 literal_poll_capture_experiment.py /literal_poll_capture_experiment.py
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import literal_poll_capture_experiment"
+USER 10000:10000
+ENTRYPOINT ["python"]

@@ -7,6 +7,7 @@ COPY broker/literal_plan_preflight_recovery.py /
 COPY broker/literal_base_recovery.py /
 COPY broker/literal_author_bootstrap_recovery.py /
 COPY literal_inspection_assessment.py /
+COPY literal_poll_capture_experiment.py /
 COPY broker/literal_failed_inspection_review.py /
 COPY calibration_harness_protocol_probe.py qualify_harness_protocol.py qualify_frozen_harness.py docker_grouping.py /
 COPY broker/validation_recovery.py /validation_recovery.py

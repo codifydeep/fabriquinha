@@ -10,6 +10,8 @@ from structured_response_contract import _unique
 import calibration_harness_protocol_probe as protocol
 import qualify_harness_protocol as qualification
 from literal_inspection_assessment import assess
+import literal_poll_capture_experiment as capture
+from docker_grouping import grouped_create
 try:
     import literal_maintenance_workflow as flow,calibration_controls_diagnostic as diagnostic
     import native,native_scope_note,validation_job,handoff_runtime,test_revision_review
@@ -82,6 +84,19 @@ def inspection_payload(cfg,s):
             Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'},Mounts=[
                 dict(Type='volume',Source=cfg['source']['candidate_volume'],Target='/previous',ReadOnly=True),
                 dict(Type='volume',Source=s['snapshot']['volume'],Target='/candidate',ReadOnly=True)]))
+
+
+def capture_payload(cfg,s):
+    image=os.environ.get('BROKER_LITERAL_CAPTURE_EXPERIMENT_IMAGE','')
+    require(bool(re.fullmatch('sha256:[a-f0-9]{64}',image)))
+    rejected=s['history'][1]
+    return dict(Image=image,User='10000:10000',Entrypoint=['python'],
+        Cmd=['/literal_poll_capture_experiment.py','/candidate',rejected['inspection']['candidate_manifest_sha256'],
+            cfg['test_path'],digest(s['diagnosis'])],Env=['PYTHONDONTWRITEBYTECODE=1','PYTHONPATH=/'],
+        Labels={'delivery-kit.literal-capture-experiment':digest(s['diagnosis'])},
+        HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
+            Memory=536870912,NanoCpus=1000000000,PidsLimit=64,Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'},
+            Mounts=[dict(Type='volume',Source=rejected['snapshot']['volume'],Target='/candidate',ReadOnly=True)]))
 
 
 def preparation_journal(con,cfg,s,identity):
@@ -172,6 +187,38 @@ class Effects:
             require(snapshot and snapshot['status']=='complete' and snapshot['volume']==s['snapshot']['volume'])
         labels=(self.b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
         require(labels.get('delivery-kit.owner')==self.b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
+    def experiment(self,cfg,s):
+        job=validation_job.run(self.b,s['diagnosis']['task_id'],'structure',capture_payload(cfg,s))
+        require(job['exit_code']==0 and job['output_sha256']==hashlib.sha256(job['output'].encode()).hexdigest())
+        return {**json.loads(job['output']),'validation_job':job}
+    def validate_experiment(self,cfg,s,value):
+        try:from test_first_job import digest as job_digest
+        except ImportError:from broker.test_first_job import digest as job_digest
+        b=self.b;task=s['diagnosis']['task_id'];h=s['history'][1]
+        payload=grouped_create('POST','/containers/create?name=validation',capture_payload(cfg,s),b.PREFIX)
+        key=job_digest(dict(task=task,kind='structure',payload=payload))
+        expected={**payload,'Labels':{**payload['Labels'],'delivery-kit.owner':b.OWNER,
+            'delivery-kit.source-task':task,'delivery-kit.validation-job':key}}
+        identity=dict(task=task,kind='structure',name=b.PREFIX+'-validation-job-'+task+'-'+key[:12],payload=expected)
+        with b.db() as con:
+            row=con.execute('SELECT identity,state FROM validation_jobs WHERE job_key=?',(key,)).fetchone();require(row)
+            recorded,job=map(json.loads,row);require(recorded==identity and job['stage']=='complete')
+        result=job['result'];require(result==value['validation_job'] and result['approval'] is False and result['exit_code']==0
+            and result['container_id']==job['container_id'] and result['validation_job_key']==key
+            and result['validation_contract_sha256']==job_digest(identity)
+            and result['output_sha256']==hashlib.sha256(result['output'].encode()).hexdigest()
+            and {**json.loads(result['output']),'validation_job':result}==value)
+        require(value['operation']=='literal_poll_capture_counterfactual_v1' and value['test_path']==cfg['test_path']
+            and value['candidate_manifest_sha256']==h['inspection']['candidate_manifest_sha256']
+            and value['test_sha256']==h['inspection']['structure']['candidate_test_sha256']
+            and value['diagnosis_sha256']==digest(s['diagnosis'])
+            and value['experiment_sha256']==hashlib.sha256(Path(capture.__file__).read_bytes()).hexdigest()
+            and value['assertion_bindings']=={k:cfg['counterexample']['facts']['assertion_bindings'][k]
+                for k in ('initial_expected','poll_minimum','stale_expected')}
+            and value['snapshot_unchanged'] is True and value['counterfactual_templates_only'] is True
+            and value['model_calls']==0 and all(value[k] is False for k in protocol.FALSE_FLAGS)
+            and value['template_sha256']['original']==h['inspection']['structure']['candidate_literal_sha256']
+            and value['hypothesis_supported'] is capture.supports(value['assertion_bindings'],value['reports']))
     def prepare(self,cfg,s):
         b=self.b;child=s['issue_id'];base=cfg['base'];name=b.PREFIX+'-base-'+child
         labels={'delivery-kit.owner':b.OWNER,'delivery-kit.issue-id':child,'delivery-kit.base-sha':base['base_sha']}
@@ -264,6 +311,9 @@ def author_context(con,issue,task):
     if not match:return None
     cfg,s=match;settings=json.loads((STATE/'native.json').read_text());s=authorize_phase(con,cfg,s,task,'author',settings)
     require(set(s['decisions'])=={'triage','plan','permit'})
+    # Full native/journal reauthentication also runs in seed_source before the
+    # isolated author workspace is populated; context alone grants no tool.
+    if s['revision']==2:require(s['repair_authorization']==flow.replan_authority(cfg,s))
     return dict(title='Active immutable-literal maintenance',description='CURRENT PHASE ONLY. '+flow.instruction(cfg,s,'author'),
         handoff_note=flow.instruction(cfg,s,'author'))
 
@@ -274,6 +324,7 @@ def seed_source(b,issue,trial):
         and s['stage'] in ('author_observe','author_wait') and trial['harness_maintenance_only'] is True
         and trial['base_sha']==b.issue_base(issue)['base_sha'] and set(s['decisions'])=={'triage','plan','permit'})
     fx=Effects(b);fx.verify(cfg);flow.authenticate(cfg,s,fx)
+    if s['revision']==2:flow.authenticate_replan(cfg,s,fx)
     if s['revision']:
         last=s['history'][-1];volume=last['snapshot']['volume'];manifest=last['inspection']['candidate_manifest_sha256']
         hashes={cfg['test_path']:last['inspection']['structure']['candidate_test_sha256']};owner_key='delivery-kit.source-task';owner_task=last['author_task']
