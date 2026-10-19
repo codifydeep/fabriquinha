@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261018.492
+COPY literal_inspection_assessment.py /
+COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py broker/literal_failed_inspection_review.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_maintenance_effects,literal_failed_inspection_review"

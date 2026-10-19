@@ -74,6 +74,16 @@ def maintenance_route(parent,child):
             'No product implementation, historical Red, regression or delivery approval.')
 
 
+def inspection_payload(cfg,s):
+    return dict(Image=cfg['image'],User='10000:10000',Entrypoint=['python'],
+        Cmd=['/literal_test_maintenance.py','/previous','/candidate',cfg['source']['prepared']['manifest_sha256'],'observe',cfg['test_path'],cfg['literal']],
+        Env=['PYTHONDONTWRITEBYTECODE=1','PYTHONPATH=/'],Labels={'delivery-kit.literal-maintenance':digest(cfg)},
+        HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],Memory=536870912,NanoCpus=1000000000,PidsLimit=64,
+            Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'},Mounts=[
+                dict(Type='volume',Source=cfg['source']['candidate_volume'],Target='/previous',ReadOnly=True),
+                dict(Type='volume',Source=s['snapshot']['volume'],Target='/candidate',ReadOnly=True)]))
+
+
 def preparation_journal(con,cfg,s,identity):
     """Never replace a legacy intent; only a qualified separate journal may follow it."""
     con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
@@ -186,13 +196,7 @@ class Effects:
         require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id'] and actual.get('wakeup_id')==s['author_wakeup'])
         return self.b.snapshot_submission({'task_id':task['id']})
     def inspect(self,cfg,s):
-        payload=dict(Image=cfg['image'],User='10000:10000',Entrypoint=['python'],
-            Cmd=['/literal_test_maintenance.py','/previous','/candidate',cfg['source']['prepared']['manifest_sha256'],'observe',cfg['test_path'],cfg['literal']],
-            Env=['PYTHONDONTWRITEBYTECODE=1','PYTHONPATH=/'],Labels={'delivery-kit.literal-maintenance':digest(cfg)},
-            HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],Memory=536870912,NanoCpus=1000000000,PidsLimit=64,
-                Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'},Mounts=[
-                    dict(Type='volume',Source=cfg['source']['candidate_volume'],Target='/previous',ReadOnly=True),
-                    dict(Type='volume',Source=s['snapshot']['volume'],Target='/candidate',ReadOnly=True)]))
+        payload=inspection_payload(cfg,s)
         job=validation_job.run(self.b,s['author_task'],'structure',payload)
         require(job['exit_code']==0 and hashlib.sha256(job['output'].encode()).hexdigest()==job['output_sha256'])
         value=json.loads(job['output']);return {**value,'validation_job':job}

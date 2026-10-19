@@ -1888,6 +1888,13 @@ sem baixar thresholds nem renovar limites. Falhas de preservação continuam
 bloqueadas. A adaptação dos registros antigos parados nessa barreira ainda exige
 qualificação antes de retomar; esse handoff negativo ainda precisa de ensaio nativo.
 
+O cadastro administrativo de um registro legado confere o payload e o resultado
+exatos no journal do verificador, incluindo identidade do contêiner, manifesto,
+snapshot e autoria encerrada. Não executa o helper novamente, mesmo se o prazo
+de observação original já tiver expirado. O recibo anterior permanece preservado
+e a única transição liberada é revisão somente leitura — não uma nova tentativa
+do autor nem a aprovação de uma entrega reprovada.
+
 ## Espaço ocupado pelos backups
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.
