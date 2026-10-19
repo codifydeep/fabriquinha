@@ -1814,11 +1814,12 @@ flowchart LR
     V --> R[Tech Lead: revisão somente leitura]
     R -->|Mudanças: uma nova revisão| A
     R -->|Aprovação vinculada ao snapshot| H[Artefato para admissão TDD normal]
-    R -->|Segunda rejeição: sem terceiro retry| D[CTO: diagnóstico nativo somente leitura]
+    R -->|Segunda rejeição ordinária| D[CTO: diagnóstico nativo somente leitura]
+    R -->|Correção patrocinada rejeitada| B[Impedimento técnico visível]
     D --> X[Experimento fixo: antes x depois da captura]
     X -->|Evidência nova executada| P2[Tech Lead: patrocínio independente]
     P2 -->|Uma única correção adicional| A
-    P2 -->|Restrição concreta| B[Impedimento técnico visível]
+    P2 -->|Restrição concreta| B
 ```
 
 O verificador permite mudar apenas o literal Python declarado `NODE_HARNESS`;
@@ -1860,11 +1861,14 @@ Mesmo uma manutenção aprovada continua sujeita à admissão TDD normal.
 **Limite de qualificação:** além dos testes offline de protocolo, isolamento e
 seletividade, a execução nativa comprovou submissão imutável, revisão independente,
 retorno ao autor, segunda rejeição e acionamento automático do CTO com recibos de
-leitura integral das duas entregas. O gate funcional continua vermelho; a proposta
-do CTO ainda exige experimento, e não é uma correção executada. Aprovar a manutenção
-não comprova Red/Green, suíte completa do produto, PR, deploy, QA nem homologação
-e não libera automaticamente a tarefa original. A autonomia integral permanece
-não comprovada até a entrega ponta a ponta.
+leitura integral das duas entregas. O experimento real confirmou as contagens
+2/3/2 (original/antes/depois da captura), sem mudar snapshots. O Lead patrocinou a
+correção adicional, mas ela voltou a alterar o bloco de stale e manteve a contagem
+em 2; a revisão independente a rejeitou e o limite impediu outro retry. Portanto,
+o encadeamento executa e preserva evidências, mas a correção funcional não foi
+obtida. Aprovar uma manutenção não comprova Red/Green, suíte completa do produto,
+PR, deploy, QA nem homologação e não libera automaticamente a tarefa original.
+A autonomia integral permanece não comprovada até a entrega ponta a ponta.
 
 A proposta do CTO tem preflight no contrato tipado antes do despacho. Uma falha
 local anterior só pode ser recuperada uma vez pelo controlador em manutenção
