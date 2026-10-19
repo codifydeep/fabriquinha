@@ -1839,11 +1839,14 @@ executa um experimento, não autoriza uma terceira implementação e não aprova
 produto. A execução controlada do experimento e o patrocínio independente de
 eventual correção continuam obrigatórios e ainda precisam ser qualificados.
 
-**Limite de qualificação:** esta trilha tem testes offline de protocolo, isolamento
-estrutural e seletividade. Sua instalação e execução nativa ainda precisam ser
-validadas. Aprovar a manutenção não comprova Red/Green, suíte completa, PR, deploy,
-QA nem homologação e não libera automaticamente a tarefa original. A autonomia
-integral permanece não comprovada até a entrega ponta a ponta.
+**Limite de qualificação:** além dos testes offline de protocolo, isolamento e
+seletividade, a execução nativa comprovou submissão imutável, revisão independente,
+retorno ao autor, segunda rejeição e acionamento automático do CTO com recibos de
+leitura integral das duas entregas. O gate funcional continua vermelho; a proposta
+do CTO ainda exige experimento, e não é uma correção executada. Aprovar a manutenção
+não comprova Red/Green, suíte completa do produto, PR, deploy, QA nem homologação
+e não libera automaticamente a tarefa original. A autonomia integral permanece
+não comprovada até a entrega ponta a ponta.
 
 A proposta do CTO tem preflight no contrato tipado antes do despacho. Uma falha
 local anterior só pode ser recuperada uma vez pelo controlador em manutenção
