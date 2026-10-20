@@ -1,0 +1,6 @@
+FROM delivery-kit-literal-diagnosis-bundle:20261020.16
+USER root
+COPY --chmod=0444 literal_review_claims.py /
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import literal_review_claims"
+USER 10000:10000
+ENTRYPOINT ["python"]

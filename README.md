@@ -2009,6 +2009,25 @@ Permanece pendente qualificar achados estruturados com localização e evidênci
 separando um defeito da entrega de uma alegação contradita pelos próprios
 snapshots. Não se repetem revisões até obter aprovação e nenhuma aprovação é
 inferida dessa divergência.
+
+`literal_review_claims.py` fornece o verificador factual para esse próximo
+contrato. Cada consulta declara base de comparação (`original_to_seed`,
+`seed_to_candidate` ou `original_to_candidate`), árvore, caminho, linha, coluna,
+citação e predicado (`line_changed` ou `outside_literal`). Uma citação inexistente
+é rejeitada; uma linha herdada ou apenas deslocada não se torna uma alteração
+atual. O escopo é conferido pelo intervalo em bytes do literal, incluindo offsets
+UTF-8. `line_changed` mede a linha, não afirma que toda substring nela mudou.
+O helper verifica os três manifests antes/depois, não executa o código entregue
+e nunca concede aprovação semântica, Red, retry ou substituição de revisão.
+
+`qualify_literal_review_claims.py` reautentica a revisão nativa preservada e
+executa consultas diagnósticas explícitas em um helper agrupado, UID 10000,
+somente leitura, sem rede, credenciais ou socket. O código do helper deve ter
+o hash local esperado. Resultados e intent ficam privados, com deduplicação;
+uma conclusão incerta não causa repetição cega. Essa qualificação passou nos
+snapshots reais e não consumiu modelos. **O verificador ainda não está ligado
+ao envio nativo de achados estruturados.** As consultas não são conversão de
+prosa antiga nem um motivo para reabrir o card ou autorizar outra revisão.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
