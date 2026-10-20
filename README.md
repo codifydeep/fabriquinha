@@ -2066,8 +2066,8 @@ revisão nativa independente concluiu com aprovação restrita à manutenção. 
 controlador verificou os quatro arquivos lidos byte a byte, aceitou o parecer no
 manifesto exato e manteve os históricos, sem reiniciar o autor ou a revisão do
 Lead. A suíte completa passou com 3.695 testes e oito skips preexistentes. O
-estado resultante é `maintenance_approved`, não aprovação de produto; a ligação
-desse artefato à calibração normal e ao Red funcional ainda está pendente.
+estado resultante é `maintenance_approved`, não aprovação de produto; a sequência
+posterior ainda precisa concluir a calibração normal e comprovar o Red funcional.
 
 O código de continuação `broker/maintained_test_calibration.py` usa uma projeção
 offline dos mesmos bytes aprovados para o formato de entrada test-first. O helper
@@ -2081,7 +2081,11 @@ independente da política e os controles positivos/negativos usam a calibração
 normal. Só depois dela o controlador pode executar a suíte real na base original
 com os mesmos testes, rejeitando erros de setup e regressões na base como Red
 funcional. Esse Red não habilita automaticamente implementação, merge ou deploy.
-A extensão passou na suíte offline; a continuação nativa ainda está pendente.
+A extensão está instalada e passou na suíte offline (3.717 testes, oito skips
+preexistentes). O job real de projeção concluiu com o mesmo manifesto e hashes do
+artefato aprovado. O controlador iniciou a tarefa nativa de proposta de
+calibração sem reiniciar o autor. A conclusão da calibração e o Red funcional
+continuam pendentes; uma tarefa em execução não comprova nenhum desses gates.
 Um impedimento recuperável na calibração permanece observado pelo coordenador,
 em vez de virar outro estado terminal que impediria a retomada do mesmo fluxo.
 O marco anterior de manutenção deixa de sobrescrever o status da continuação;
