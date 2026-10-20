@@ -2211,9 +2211,13 @@ O wrapper também compartilha um prazo de 95 segundos entre obtenção da
 capacidade e inicialização do worker, em vez de limitar a primeira operação a
 15 segundos. Cada observação usa somente o prazo restante. A emissão da
 capacidade continua sendo um único POST: um timeout não autoriza repetição nem
-novo orçamento. Essas mudanças de fonte **ainda exigem instalação controlada e
-validação nativa**; não recuperam automaticamente tarefas falhas, não autorizam
-novo ensaio e não comprovam entrega autônoma.
+novo orçamento. A instalação port2 usa as imagens broker `20261020.509` e
+wrapper `20261020.2`, com digests fixados no Compose. A instalação conferiu
+hashes de fonte, backup/restauração e isolamento dos locks no processo instalado.
+A suíte offline Linux executou 3.740 testes, com 8 skips existentes.
+**A recuperação nativa ainda precisa de qualificação própria**: a instalação
+não recupera automaticamente tarefas falhas, não autoriza novo ensaio e não
+comprova entrega autônoma.
 
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
