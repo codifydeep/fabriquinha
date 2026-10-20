@@ -66,12 +66,14 @@ def advance(con,key,cfg,fx,*,now=None):
         if s['stage']=='calibration':
             result=fx.calibration(cfg)
             require(result.get('execution_authorized') is False and result.get('delivery_approval') is False)
-            if result['stage']=='blocked':return hold('maintained_calibration_'+result['category'])
+            if result['stage']=='blocked':return save(calibration_stage='blocked',
+                category='maintained_calibration_'+result['category'],owner=result.get('owner') or cfg['cto'],
+                required_action=result.get('required_action') or 'Observe existing CTO-owned prerequisite recovery; no identical retry')
             if result['stage']!='calibration_ready':return save(calibration_stage=result['stage'],
-                owner=result.get('owner') or cfg['cto'],required_action=result.get('required_action') or
+                category=None,owner=result.get('owner') or cfg['cto'],required_action=result.get('required_action') or
                 'Observe exact native calibration prerequisite; never restart the author')
             return save(stage='red',calibration_receipt_sha256=digest(result['calibration_receipt']),
-                owner=cfg['cto'],
+                owner=cfg['cto'],category=None,
                 required_action='Execute full baseline plus same frozen NEW test; diagnostic witnesses are not Red')
         require(s['stage']=='red')
         receipt=fx.red(cfg,s)

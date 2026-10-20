@@ -33,11 +33,14 @@ class MaintainedCalibrationTests(unittest.TestCase):
     def test_pending_copy_observes_existing_phase_without_skipping_calibration(self):
         self.step();self.pending=True;self.assertEqual(self.step()['stage'],'volume_create_intent')
         self.pending=False;self.assertEqual(self.step()['stage'],'copy')
-    def test_native_calibration_hold_stays_owned_and_cannot_run_red(self):
+    def test_native_calibration_hold_stays_owned_and_can_resume_same_prerequisite(self):
         for _ in range(3):self.step()
         self.blocked=True;self.fx.red=lambda *args:self.fail('Red before calibration')
-        s=self.step();self.assertEqual(s['stage'],'blocked');self.assertEqual(s['owner'],'cto')
+        s=self.step();self.assertEqual(s['stage'],'calibration');self.assertEqual(s['calibration_stage'],'blocked')
+        self.assertEqual(s['owner'],'cto')
         self.assertEqual(self.step(),s)
+        self.blocked=False;resumed=self.step();self.assertEqual(resumed['stage'],'red')
+        self.assertIsNone(resumed['category'])
     def test_changed_copy_receipt_never_admits_calibration(self):
         self.step();self.step();self.fx.copy=lambda c:dict(exit_code=0,approval=False,output='{}',output_sha256='a'*64)
         self.fx.calibration=lambda *args:self.fail('invalid copy admitted')

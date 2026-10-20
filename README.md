@@ -2082,6 +2082,10 @@ normal. Só depois dela o controlador pode executar a suíte real na base origin
 com os mesmos testes, rejeitando erros de setup e regressões na base como Red
 funcional. Esse Red não habilita automaticamente implementação, merge ou deploy.
 A extensão passou na suíte offline; a continuação nativa ainda está pendente.
+Um impedimento recuperável na calibração permanece observado pelo coordenador,
+em vez de virar outro estado terminal que impediria a retomada do mesmo fluxo.
+O marco anterior de manutenção deixa de sobrescrever o status da continuação;
+falhas de notificação não repetem os efeitos Docker nem autorizam novas tarefas.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 

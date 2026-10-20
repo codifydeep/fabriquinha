@@ -430,12 +430,20 @@ def mounts(b,binding):
     return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in volumes]
 
 
+def notification_delegated(con,source,state):
+    """A parent milestone must not overwrite its active continuation's status."""
+    return bool(state.get('stage')=='maintenance_approved'
+        and con.execute("SELECT 1 FROM sqlite_master WHERE name='maintained_test_calibrations'").fetchone()
+        and con.execute('SELECT 1 FROM maintained_test_calibrations WHERE source_task=?',(source,)).fetchone())
+
+
 def handle(b,source):
     with b.db() as con:
         flow.initialize(con);row=con.execute('SELECT config FROM literal_maintenance_workflows WHERE source_task=?',(source,)).fetchone()
         if not row:return None
         cfg=json.loads(row[0]);state=flow.advance(con,source,Effects(b))
-    if state.get('issue_id'):
+        delegated=notification_delegated(con,source,state)
+    if state.get('issue_id') and not delegated:
         try:handoff_runtime.publish(b,dict(issue_id=state['issue_id'],enabled=True,techlead=cfg['reviewer']),
             dict(stage='literal_maintenance_'+state['stage'],owner=state['owner'],source_task=source,
                 data=json.dumps(dict(required_action=state.get('required_action'),delivery_approval=False))))

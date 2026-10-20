@@ -15,6 +15,15 @@ import enroll_literal_maintenance as enrollment
 
 
 class LiteralEffectsTests(unittest.TestCase):
+    def test_approved_parent_does_not_overwrite_its_continuation_status(self):
+        self.assertFalse(effects.notification_delegated(self.con,'source',{'stage':'maintenance_approved'}))
+        self.con.execute('CREATE TABLE maintained_test_calibrations(source_task TEXT PRIMARY KEY)')
+        self.con.execute('INSERT INTO maintained_test_calibrations VALUES(?)',('other',))
+        self.assertFalse(effects.notification_delegated(self.con,'source',{'stage':'maintenance_approved'}))
+        self.con.execute('INSERT INTO maintained_test_calibrations VALUES(?)',('source',))
+        self.assertTrue(effects.notification_delegated(self.con,'source',{'stage':'maintenance_approved'}))
+        self.assertFalse(effects.notification_delegated(self.con,'source',{'stage':'blocked'}))
+
     def setUp(self):
         self.con=sqlite3.connect(':memory:');self.con.row_factory=sqlite3.Row
         self.addCleanup(self.con.close)
