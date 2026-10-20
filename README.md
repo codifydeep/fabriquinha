@@ -2110,8 +2110,11 @@ e o experimento anteriores não são convertidos retroativamente em autorizaçã
 A autorização e o estado do coordenador são gravados na mesma transação; uma
 interrupção não pode liberar uma proposta sem seu recibo. A projeção do handoff
 principal acompanha o SPIKE ativo, mas mantém a rota de produto desabilitada.
-Essa extensão passou nos testes focados e no experimento com a fonte real;
-instalação e conclusão nativa ainda precisam ser qualificadas.
+Essa extensão está instalada e passou na suíte completa (3.732 testes, oito skips
+preexistentes). O controlador aceitou o experimento na fonte real, registrou a
+dependência sem leitura completa, reparou a projeção do handoff principal e criou
+automaticamente o SPIKE técnico. As duas avaliações nativas e a nova proposta
+ainda precisam concluir; nada disso comprova Red funcional ou homologação.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
