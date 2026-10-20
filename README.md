@@ -2061,8 +2061,13 @@ reconstrói e confere os hashes dos quatro arquivos a partir dos recibos de leit
 da própria tarefa. Aprovação exige os controles fixos; rejeição exige citações
 observadas do código. Os pareceres anteriores permanecem preservados. O prazo da
 nova operação é persistido antes da autenticação remota, para não herdar um prazo
-vencido após falha transitória de observação. Essa extensão passou nos testes
-focados; instalação e conclusão nativa ainda precisam ser comprovadas.
+vencido após falha transitória de observação. Essa extensão está instalada: a
+revisão nativa independente concluiu com aprovação restrita à manutenção. O
+controlador verificou os quatro arquivos lidos byte a byte, aceitou o parecer no
+manifesto exato e manteve os históricos, sem reiniciar o autor ou a revisão do
+Lead. A suíte completa passou com 3.695 testes e oito skips preexistentes. O
+estado resultante é `maintenance_approved`, não aprovação de produto; a ligação
+desse artefato à calibração normal e ao Red funcional ainda está pendente.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
