@@ -170,3 +170,56 @@ def prompt(b,frame,issue,task):
         require(not old or json.loads(old[0])==receipt)
         con.execute('INSERT OR IGNORE INTO author_feedback_prompt_presentations VALUES(?,?)',(selected['task_id'],json.dumps(receipt,sort_keys=True)))
     return {**frame,'params':{**frame['params'],'prompt':[dict(type='text',text=text)]}}
+
+
+def recover_metadata_bound(b,key,operation):
+    """One sealed, pre-author recovery of the 300-vs-900 metadata mismatch.
+
+    Revalidate real native decisions against their original typed contract.
+    Never edit those decisions, recreate wakeups, restart an author, change a
+    test or manufacture a successful submission. Retain the failed phase.
+    """
+    with b.db() as con:
+        seal=maintenance.current(con);require(seal and seal['stage']=='sealed' and seal['operation_id']==operation)
+        require(not con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone())
+        cfg,s=map(json.loads,con.execute('SELECT config,state FROM literal_maintenance_workflows WHERE source_task=?',(key,)).fetchone())
+        con.execute('CREATE TABLE IF NOT EXISTS literal_feedback_metadata_recoveries(workflow_key TEXT PRIMARY KEY,receipt TEXT)')
+        old=con.execute('SELECT receipt FROM literal_feedback_metadata_recoveries WHERE workflow_key=?',(key,)).fetchone()
+        if old:
+            receipt=json.loads(old[0]);require(receipt['config_sha256']==digest(cfg) and s.get('metadata_bound_recovery')==digest(receipt));return receipt
+    require(not maintenance.native_active(b));verify(b,cfg);p=cfg['feedback_strategy']['policy']
+    require(flow.workflow_key(cfg)==key and s['stage']=='blocked' and s['category']=='maintenance_evidence_rejected'
+        and s['last_error']['phase']=='prepare' and s['last_error']['type']=='ValueError'
+        and s['revision']==0 and s['history']==[] and set(s['decisions'])=={'plan','permit'}
+        and not any(s.get(k) for k in ('author_task','snapshot','inspection','metadata_bound_recovery')))
+    cto=admission.approval(b,p,'cto',s['decisions']['plan']['receipt']['task_id'])
+    sponsor=admission.approval(b,p,'sponsor',s['decisions']['permit']['receipt']['task_id'],cto)
+    bound=admission.wire.schema(admission.context(p))['properties']['reason']['maxLength']
+    require(bound==900 and 300<len(sponsor['value']['reason'])<=bound and len(cto['value']['reason'])<=300)
+    for phase,role,proof in (('plan','cto',cto),('permit','sponsor',sponsor)):
+        recorded=s['decisions'][phase];r=recorded['receipt']
+        require(recorded['wakeup_id']==proof['wakeup_id'] and recorded['marker']==admission.marker(p,role)
+            and all(r[k]==proof[k] for k in ('task_id','agent_id','wakeup_id','output_sha256','value'))
+            and r['execution_id']==proof['request_id'] and r['read_evidence']=={})
+    settings=json.loads((b.STATE/'native.json').read_text());runs=admission.native.issue_task_runs(settings,p['issue_id'])
+    require({t['id'] for t in runs}=={cto['task_id'],sponsor['task_id']} and all(t['status']=='completed' for t in runs))
+    with b.db() as con:
+        trial=con.execute('SELECT parent_issue,config FROM test_revision_trials WHERE issue_id=?',(p['issue_id'],)).fetchone()
+        require(trial and trial['parent_issue']==cfg['parent_issue_id']
+            and json.loads(trial['config'])['literal_maintenance']==dict(source_task=key,config_sha256=digest(cfg)))
+        if con.execute("SELECT 1 FROM sqlite_master WHERE name='author_feedback_admissions'").fetchone():
+            require(not con.execute('SELECT 1 FROM author_feedback_admissions WHERE scope_sha256=?',(digest(p),)).fetchone())
+    receipt=dict(operation='recover_literal_feedback_metadata_bound_v1',workflow_key=key,config_sha256=digest(cfg),
+        previous_state=s,maintenance_operation=operation,typed_reason_limit=bound,legacy_local_reason_limit=300,
+        reason_characters=len(sponsor['value']['reason']),revalidated_authority=dict(cto=cto,sponsor=sponsor),
+        legacy_rule_versioned_source_sha256='2d0ed041a725139cc7f30c9c560e917fccee12f6654764543e81a5aaf60872dd',
+        source_reset=False,author_retry_authorized=False,native_author_started=False,delivery_approval=False)
+    updated=dict(s,stage='prepare',owner=cfg['reviewer'],metadata_bound_recovery=digest(receipt),
+        required_action='Resume exact preparation after typed metadata validation; no native decision replay or source retry')
+    for field in ('category','last_error'):updated.pop(field,None)
+    with b.LOCK,b.db() as con:
+        con.execute('BEGIN IMMEDIATE');require(maintenance.current(con)==seal)
+        require(json.loads(con.execute('SELECT state FROM literal_maintenance_workflows WHERE source_task=?',(key,)).fetchone()[0])==s)
+        con.execute('INSERT INTO literal_feedback_metadata_recoveries VALUES(?,?)',(key,json.dumps(receipt,sort_keys=True)))
+        con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=?',(json.dumps(updated,sort_keys=True),key))
+    return receipt

@@ -1939,6 +1939,12 @@ nunca repetido cegamente. O predecessor, seus cards e seus limites não mudam.
 O registro da revisão deriva do predecessor imediato, preservando a restrição
 real de um filho por pai no SQLite. Conflitos de integridade tornam-se incidentes
 persistentes com responsável CTO; não ficam escapando para um loop do watchdog.
+O limite da justificativa vem do próprio schema tipado, sem uma segunda regra
+local divergente. Uma recuperação pré-autor desse conflito de metadados exige
+manutenção selada, reautenticação das duas decisões nativas, ausência de autor ou
+capacidade já iniciada e um recibo durável do estado anterior. Ela retoma somente
+a preparação, sem reescrever respostas, repetir modelos, alterar prazo ou testes,
+rearmar um autor ou conceder aprovação de entrega.
 
 O prompt dessa execução vem do escopo corrente autenticado, sem herdar a regra
 legada que forçava um patch antes da consulta ao feedback. Isso não amplia

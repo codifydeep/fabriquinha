@@ -103,7 +103,9 @@ def approval(b,p,phase,task_id,proposal=None):
         and native_scope_note.canonical(t.get('handoff_note',''),t['wakeup_id'])==note(p,phase,proposal))
     raw=(t.get('result') or {}).get('output');require(isinstance(raw,str) and 0<len(raw.encode())<=4096)
     value=json.loads(raw,object_pairs_hook=_unique);Draft202012Validator(wire.schema(context(p))).validate(value)
-    require(value['action']=='refer_to_cto' and len(value['reason'])<=300)
+    # The typed schema is the sole reason bound. A separate, narrower local
+    # check must not reject metadata that the actual native contract accepted.
+    require(value['action']=='refer_to_cto')
     with b.db() as con:
         rows=con.execute('SELECT n.request_id,n.task_id,n.agent_id,n.issue_id,l.status,g.mode FROM native_bindings n '
             'JOIN leases l USING(request_id) JOIN grants g USING(request_id) WHERE n.task_id=?',(task_id,)).fetchall()

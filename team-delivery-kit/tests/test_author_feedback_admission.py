@@ -134,6 +134,14 @@ class AdmissionTests(unittest.TestCase):
         self.tasks[self.approvals['sponsor']]['handoff_note']=admission.note(self.p,'cto')
         with self.assertRaises(ValueError):self.arm()
 
+    def test_metadata_reason_uses_the_actual_typed_schema_bound_not_a_second_local_limit(self):
+        sponsor=self.tasks[self.approvals['sponsor']]
+        value=json.loads(sponsor['result']['output']);value['reason']='x'*336
+        sponsor['result']['output']=json.dumps(value,sort_keys=True)
+        self.assertEqual(self.arm()['stage'],'armed')
+        value['reason']='x'*901;sponsor['result']['output']=json.dumps(value,sort_keys=True)
+        with self.assertRaises(ValidationError):self.arm()
+
     def test_qualification_limits_and_image_pins_are_not_advisory(self):
         for key in admission.FLAGS:
             q=copy.deepcopy(self.q);q['proof'][key]=False;p={**self.p,'qualification_sha256':admission.digest(q)}

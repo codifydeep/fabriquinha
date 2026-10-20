@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261020.499
+COPY broker/author_feedback_admission.py broker/literal_feedback_strategy.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_feedback_strategy,author_feedback_admission"
