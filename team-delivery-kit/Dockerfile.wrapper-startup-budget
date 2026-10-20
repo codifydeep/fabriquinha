@@ -1,0 +1,4 @@
+FROM delivery-kit-hermes-wrapper:20261008.1
+USER root
+COPY acp_wrapper.py /opt/acp_wrapper.py
+USER 10000:10000

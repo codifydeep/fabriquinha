@@ -12,6 +12,8 @@ import time
 import urllib.error
 
 from generic_harness_calibration import digest,require
+try:from calibration_coordination import LOCK as CALIBRATION_LOCK
+except ImportError:from broker.calibration_coordination import LOCK as CALIBRATION_LOCK
 
 
 def initialize(con):
@@ -206,7 +208,7 @@ def configuration(b,cfg,s):
 def handle(b,key):
     try:import handoff_runtime
     except ImportError:from broker import handoff_runtime
-    with b.LOCK:
+    with CALIBRATION_LOCK:
         with b.db() as con:
             row=con.execute('SELECT config,state FROM literal_maintenance_workflows WHERE source_task=?',(key,)).fetchone()
         if not row:return None

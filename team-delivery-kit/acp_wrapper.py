@@ -39,9 +39,29 @@ def stream_prompt(call_url, capability, frame, output):
                 raise ValueError('invalid prompt stream event')
 
 
-def await_startup(call,*,clock=time.monotonic,sleep=time.sleep):
+def startup_timeout(deadline, *, maximum=95, clock=time.monotonic):
+    remaining = deadline - clock()
+    if remaining <= 0:
+        raise TimeoutError('restricted worker startup deadline')
+    return min(maximum, remaining)
+
+
+def native_capability(identity, controller_token, *, deadline,
+                      clock=time.monotonic, opener=None):
+    """One admission POST only. An unknown acknowledgement is not replayable."""
+    request = urllib.request.Request(URL + '/v1/native-grants',
+        data=json.dumps(identity).encode(),
+        headers={'Authorization': 'Bearer ' + controller_token,
+                 'Content-Type': 'application/json'})
+    timeout = startup_timeout(deadline, clock=clock)
+    with (opener or urllib.request.urlopen)(request, timeout=timeout) as response:
+        return json.load(response)['capability']
+
+
+def await_startup(call,*,clock=time.monotonic,sleep=time.sleep,deadline=None):
     """Bounded observation using the same capability, no second acp-open."""
-    deadline=clock()+95
+    if deadline is None:deadline=clock()+95
+    else:startup_timeout(deadline,clock=clock)
     result=call('/v1/acp-startup',{})
     while result.get('startup_status')=='pending':
         if clock()>=deadline:raise TimeoutError('restricted worker startup deadline')
@@ -59,14 +79,12 @@ def main():
         print('Restricted ACP wrapper installed; execution requires controller authorization')
         return
     capability = os.environ.get('DELIVERY_EXECUTION_CAPABILITY', '')
+    startup_deadline = time.monotonic() + 95
     if not capability:
         # This wrapper is trusted controller code, never mounted in the worker.
         identity = {'task_id': os.environ['MULTICA_TASK_ID'], 'agent_id': os.environ['MULTICA_AGENT_ID']}
-        request = urllib.request.Request(URL + '/v1/native-grants', data=json.dumps(identity).encode(),
-            headers={'Authorization': 'Bearer ' + Path('/eval-state/broker-controller-token').read_text(),
-                     'Content-Type': 'application/json'})
-        with urllib.request.urlopen(request, timeout=15) as response:
-            capability = json.load(response)['capability']
+        capability = native_capability(identity,
+            Path('/eval-state/broker-controller-token').read_text(), deadline=startup_deadline)
     if not capability or len(capability) != 64:
         raise RuntimeError('controller-issued execution capability required')
     def call(path, payload, timeout=40):
@@ -74,7 +92,8 @@ def main():
             headers={'Authorization': 'Bearer ' + capability, 'Content-Type': 'application/json'})
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
-    opened = await_startup(call)
+    opened = await_startup(lambda path, payload: call(path, payload,
+        timeout=startup_timeout(startup_deadline, maximum=40)), deadline=startup_deadline)
     try:
         for line in sys.stdin:
             frame = {}

@@ -14,6 +14,8 @@ from generic_harness_calibration import digest
 from calibration_policy_adapter import version_for_engine
 try:import generic_calibration_gate as gate
 except ImportError:from broker import generic_calibration_gate as gate
+try:from calibration_coordination import LOCK as CALIBRATION_LOCK
+except ImportError:from broker.calibration_coordination import LOCK as CALIBRATION_LOCK
 
 
 def initialize(con):
@@ -223,7 +225,7 @@ def request(b,issue,author_task,*,engine=None):
     """
     try:import calibration_source as guard,remediation_admission,technical_remediation_plan as plans
     except ImportError:from broker import calibration_source as guard,remediation_admission,technical_remediation_plan as plans
-    with b.LOCK:
+    with CALIBRATION_LOCK:
         if engine is None:
             with b.db() as con:
                 exists=con.execute("SELECT 1 FROM sqlite_master WHERE name='generic_calibration_workflows'").fetchone()
@@ -457,7 +459,7 @@ class Effects:
 
 
 def tick(b):
-    with b.LOCK,b.db() as con:
+    with CALIBRATION_LOCK,b.db() as con:
         initialize(con)
         rows=con.execute('SELECT config,state FROM generic_calibration_workflows').fetchall()
         fx=None

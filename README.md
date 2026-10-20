@@ -2197,6 +2197,24 @@ do card de manutenção muda. O digest do recibo distingue o novo despacho do an
 sem repetir o wakeup falho ou reiniciar o card original. A retomada nativa continua
 sendo uma validação separada, e não comprova a entrega ponta a ponta.
 
+### Isolamento da admissão durante a calibração
+
+A revisão de fonte separa o mutex de admissão nativa da coordenação de
+calibração (`broker/calibration_coordination.py`). Cadastro, reconciliação e
+validação da entrega mantida compartilham um lock reentrante próprio; leituras
+externas demoradas não podem ocupar o mutex usado para admitir novos agentes.
+Transações SQLite, identidades imutáveis e controles de revisão permanecem ativos.
+Testes concorrentes reproduzem o bloqueio anterior e verificam tanto a admissão
+livre quanto a serialização preservada da calibração.
+
+O wrapper também compartilha um prazo de 95 segundos entre obtenção da
+capacidade e inicialização do worker, em vez de limitar a primeira operação a
+15 segundos. Cada observação usa somente o prazo restante. A emissão da
+capacidade continua sendo um único POST: um timeout não autoriza repetição nem
+novo orçamento. Essas mudanças de fonte **ainda exigem instalação controlada e
+validação nativa**; não recuperam automaticamente tarefas falhas, não autorizam
+novo ensaio e não comprovam entrega autônoma.
+
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
 usando os valores das assertions congeladas. O campo legado de seletividade agrega

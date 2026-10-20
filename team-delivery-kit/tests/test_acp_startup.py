@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import Mock,patch
 
 from broker import acp_startup as startup,worker_creation_intent as intents
-from acp_wrapper import await_startup
+from acp_wrapper import await_startup, native_capability, startup_timeout
 
 
 class StartupTests(unittest.TestCase):
@@ -208,6 +208,36 @@ class StartupTests(unittest.TestCase):
 
 
 class WrapperStartupTests(unittest.TestCase):
+    def test_admission_can_outlive_old_fifteen_second_timeout(self):
+        import io
+        opener=Mock(return_value=io.BytesIO(json.dumps({'capability':'a'*64}).encode()))
+        result=native_capability({'task_id':'task','agent_id':'agent'},'private-token',
+            deadline=195,clock=lambda:100,opener=opener)
+        self.assertEqual(result,'a'*64)
+        opener.assert_called_once()
+        self.assertEqual(opener.call_args.kwargs['timeout'],95)
+        self.assertEqual(opener.call_args.args[0].full_url,'http://execution-broker:8090/v1/native-grants')
+
+    def test_unknown_admission_acknowledgement_is_never_retried(self):
+        opener=Mock(side_effect=TimeoutError('acknowledgement unknown'))
+        with self.assertRaises(TimeoutError):
+            native_capability({'task_id':'task'},'private-token',deadline=195,
+                clock=lambda:100,opener=opener)
+        opener.assert_called_once()
+
+    def test_expired_budget_sends_no_admission_request(self):
+        opener=Mock()
+        with self.assertRaises(TimeoutError):
+            native_capability({},'private-token',deadline=100,clock=lambda:100,opener=opener)
+        opener.assert_not_called()
+
+    def test_worker_observation_uses_remaining_shared_budget(self):
+        self.assertEqual(startup_timeout(195,maximum=40,clock=lambda:180),15)
+        call=Mock(return_value={'startup_status':'pending'})
+        with self.assertRaises(TimeoutError):
+            await_startup(call,deadline=195,clock=lambda:196,sleep=Mock())
+        call.assert_not_called()
+
     def test_pending_polls_use_no_second_open_or_grant(self):
         call=Mock(side_effect=[{'startup_status':'pending'},{'startup_status':'pending'},{'startup_status':'ready','resume_session_id':'s'}])
         result=await_startup(call,sleep=Mock())
