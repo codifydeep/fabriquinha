@@ -2000,8 +2000,15 @@ pacote de evidências. Reinícios reautenticam as decisões nativas e as quatro
 leituras; uma confirmação de wakeup incerta é observada, nunca recriada.
 O autor não ganha outra execução. A nova revisão pode aprovar somente o manifesto
 exato com verificações fixas aprovadas, ou preservar uma nova rejeição com CTO
-responsável e sem loop de reconsiderações. O caminho tem testes offline e
-preflight sobre o estado real; sua validação nativa continua necessária.
+responsável e sem loop de reconsiderações. O caminho passou por uma execução
+nativa com as quatro leituras e uma nova rejeição preservada. Essa execução
+validou o handoff e a coleta do resultado, **não a qualidade factual da revisão**:
+o revisor atribuiu ao delta atual mudanças de um bloco herdado, enquanto o diff
+verificado mostrou apenas duas linhas novas antes da captura de polling.
+Permanece pendente qualificar achados estruturados com localização e evidência,
+separando um defeito da entrega de uma alegação contradita pelos próprios
+snapshots. Não se repetem revisões até obter aprovação e nenhuma aprovação é
+inferida dessa divergência.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
