@@ -2253,6 +2253,14 @@ atômica para `armed` foram confirmadas; o workflow comum retornou a
 nova proposta de calibração e todos os gates posteriores. Essas decisões não
 autorizam o autor a alterar a entrega nem constituem aprovação de produto.
 
+A execução seguinte observou integralmente os quatro arquivos obrigatórios,
+mas devolveu uma `calibration_objection` sobre o escopo dos controles sintéticos,
+não um bundle válido. O controlador preservou esse resultado, atribuiu o
+impedimento ao Tech Lead e abriu automaticamente um SPIKE limitado. Seu probe
+Path/Node isolado concluiu com código zero e evidência aceita para revisão;
+isso não resolve por si só a objeção de escopo nem valida controles completos.
+A decisão independente e a continuação da calibração permanecem necessárias.
+
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
 usando os valores das assertions congeladas. O campo legado de seletividade agrega
