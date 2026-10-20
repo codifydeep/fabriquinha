@@ -22,6 +22,7 @@ except ImportError:
     from broker.review_context_recovery import ERROR
 
 ROOT_SHA='2fb62b15773afe836c8b840ef514c3cb664c98e9016873e194ead72c0dca99fe'
+AUTHOR_FEEDBACK_ROOT_SHA='e6437bd64b1763f6d40c36ba34576c22637c59d21f09f5582e3cc2e783b0c73a'
 CONTEXT_SHA='7b182c770b2d0db0880571d4c254d1a158e852752801b69dca494db9c35f16ec'
 
 
@@ -56,7 +57,8 @@ def probe(b,cfg,s,task,old_route,new_route,trial,paths,issue):
     Never replace the running broker's globals or copy its whole private DB.
     """
     from execution_context import __file__ as context_file
-    require(hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()==ROOT_SHA
+    root_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
+    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA)
         and hashlib.sha256(Path(context_file).read_bytes()).hexdigest()==CONTEXT_SHA)
     spec=importlib.util.spec_from_file_location('isolated_literal_author_prompt',b.__file__)
     isolated=importlib.util.module_from_spec(spec);spec.loader.exec_module(isolated)
@@ -89,7 +91,7 @@ def probe(b,cfg,s,task,old_route,new_route,trial,paths,issue):
             with isolated.db() as con:con.execute('UPDATE delivery_routes SET config=?',(json.dumps(new_route),))
             out=isolated.native_task_prompt(frame,'implementation',issue,current)['params']['prompt'][0]['text']
         require(0<len(out)<=10000 and 'LITERAL MAINTENANCE PHASE' in out)
-    return dict(operation='literal_author_context_constructor_probe_v1',root_sha256=ROOT_SHA,context_sha256=CONTEXT_SHA,
+    return dict(operation='literal_author_context_constructor_probe_v1',root_sha256=root_sha,context_sha256=CONTEXT_SHA,
         old_guard_rejection='execution context role or route mismatch',new_prompt_sha256=hashlib.sha256(out.encode()).hexdigest(),
         new_prompt_characters=len(out),historical_scope_checked_separately=True,native_execution=False,delivery_approval=False)
 

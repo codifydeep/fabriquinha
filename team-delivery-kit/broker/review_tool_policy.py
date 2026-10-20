@@ -37,6 +37,13 @@ def observe_surgical_read(name,args,result):
 def controlled(name, args):
     """None delegates to the original handler; all other results are terminal."""
     mode = os.environ.get('DELIVERY_EXECUTION_MODE')
+    if mode=='implementation' and os.environ.get('DELIVERY_AUTHOR_FEEDBACK_JSON'):
+        try:
+            try:import author_feedback_client as feedback
+            except ImportError:from broker import author_feedback_client as feedback
+            return feedback.control(feedback.configured(),name,args)
+        except Exception:
+            return json.dumps(dict(error='author_feedback_operation_rejected',delivery_approval=False))
     additive=os.environ.get('DELIVERY_ADDITIVE_TEST_JSON')
     if mode=='implementation' and additive:
         try:
@@ -174,6 +181,10 @@ def controlled(name, args):
 
 def fence(name, handler, is_async=False):
     """Also fence direct calls to a registered handler, not only dispatch."""
+    if os.environ.get('DELIVERY_AUTHOR_FEEDBACK_JSON'):
+        try:import author_feedback_client as feedback
+        except ImportError:from broker import author_feedback_client as feedback
+        handler=feedback.wrap(name,handler,is_async)
     if is_async:
         async def guarded(args, **kwargs):
             result = controlled(name, args)

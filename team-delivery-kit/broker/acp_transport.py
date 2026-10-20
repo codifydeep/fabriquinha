@@ -60,7 +60,7 @@ def failure_diagnostics(stderr):
     return sorted(set(labels))
 
 
-def worker_env(mode, persistent, test_commands=(), review_suite_capability=None, execution_id=None):
+def worker_env(mode, persistent, test_commands=(), review_suite_capability=None, execution_id=None,author_feedback_config=None):
     if mode not in ('review', 'implementation', 'planning'):
         raise ValueError('invalid execution mode')
     values = ['HOME=/tmp', 'HERMES_HOME=' + ('/session-state' if persistent else '/tmp/hermes'),
@@ -77,6 +77,11 @@ def worker_env(mode, persistent, test_commands=(), review_suite_capability=None,
     if mode == 'implementation':
         values.append('HERMES_WRITE_SAFE_ROOT=/workspace')
         values.append('HERMES_FENCED_INPLACE_WRITES=1')
+    if author_feedback_config is not None:
+        if mode!='implementation' or not execution_id:raise ValueError('author feedback requires exact implementation execution')
+        from literal_feedback_wire import worker_config
+        worker_config(author_feedback_config,execution_id)
+        values.append('DELIVERY_AUTHOR_FEEDBACK_JSON='+json.dumps(author_feedback_config,sort_keys=True))
     return values
 
 
@@ -120,7 +125,7 @@ def permission_response(request, mode, editable_paths=frozenset(), test_commands
 
 class Transport:
     def __init__(self, docker, name, persistent=False, mode='review', editable_paths=(),
-                 test_commands=(), review_suite_capability=None):
+                 test_commands=(), review_suite_capability=None,author_feedback_config=None):
         if mode not in ('review', 'implementation', 'planning'):
             raise ValueError('invalid execution mode')
         self.mode = mode
@@ -135,7 +140,7 @@ class Transport:
             # Explicit offline marker, not a usable credential. Container network is none
             # and the ACP policy rejects every prompt. This only permits session setup.
             'Env': worker_env(mode, persistent, self.test_commands, review_suite_capability,
-                              name.rsplit('-job-', 1)[1]),
+                              name.rsplit('-job-', 1)[1],author_feedback_config),
             'WorkingDir': self.cwd})
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.settimeout(25)

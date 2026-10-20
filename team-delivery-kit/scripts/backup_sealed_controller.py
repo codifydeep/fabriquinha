@@ -5,9 +5,52 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import shutil
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from controller_maintenance_cli import arguments
+
+COMPRESSED_RUNNER='''
+import sys
+sys.path.insert(0,"/")
+import broker as b,controller_maintenance as maintenance
+operation=sys.argv[1]
+with b.LOCK,b.db() as con:
+ state=maintenance.current(con)
+ require(state and state["operation_id"]==operation and state["stage"]=="sealed")
+ require(not maintenance.native_active(b))
+ require(not con.execute("SELECT count(*) FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()[0])
+ path=b.STATE/("sealed-backup-"+operation+".sqlite.gz")
+ scratch=b.STATE/("sealed-compressed-proof-"+operation+".sqlite")
+ ack=b.STATE/("sealed-backup-"+operation+".gzip.receipt.json")
+ require(not any(p.is_symlink() for p in (path,scratch,ack)))
+ if ack.is_file():
+  receipt=json.loads(ack.read_text())
+  require(receipt.get("operation_id")==operation and receipt.get("path")==str(path))
+  require(receipt.get("operation")=="sealed_gzip_backup_restore_v1" and receipt.get("encoding")=="gzip")
+  require(receipt.get("backup_integrity")=="ok" and receipt.get("restore_integrity")=="ok")
+  require(receipt.get("delivery_approval") is False and receipt.get("source_reset") is False)
+  require(receipt.get("native_active")==0 and receipt.get("active_leases")==0 and not scratch.exists())
+  require(file_sha(path)==receipt.get("archive_sha256") and file_sha(path,True)==receipt.get("sha256"))
+ elif path.exists() or scratch.exists():
+  receipt=dict(operation_id=operation,stage="observe_existing_backup",path=str(path),backup_repeated=False,delivery_approval=False)
+ else:
+  size=con.execute("PRAGMA page_count").fetchone()[0]*con.execute("PRAGMA page_size").fetchone()[0]
+  require(int(sys.argv[2])>=size+67108864+1610612736)
+  receipt=backup(con,path,scratch,state)
+  receipt["operation_id"]=operation
+  fd=os.open(ack,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+  with os.fdopen(fd,"w") as output:
+   json.dump(receipt,output);output.flush();os.fsync(output.fileno())
+ print(json.dumps(receipt))
+'''
+
+
+def compressed_program():
+    # Trusted versioned source, not a command supplied by an agent. Older sealed
+    # controllers need not install a new image before making their backup.
+    source=Path(__file__).resolve().parents[1]/'broker'/'compressed_state_backup.py'
+    return source.read_text()+COMPRESSED_RUNNER
 
 PROGRAM='''import hashlib,json,os,sqlite3,sys
 from pathlib import Path
@@ -32,6 +75,8 @@ with b.LOCK,b.db() as con:
   print(json.dumps(receipt));sys.exit(0)
  if path.exists():
   print(json.dumps({"operation_id":operation,"stage":"observe_existing_backup","path":str(path),"backup_repeated":False,"delivery_approval":False}));sys.exit(0)
+ size=con.execute("PRAGMA page_count").fetchone()[0]*con.execute("PRAGMA page_size").fetchone()[0]
+ if int(sys.argv[2])<2*size+1610612736:raise ValueError("insufficient host backup headroom")
  # Persist a new backup once. Unknown acknowledgments require observation,
  # never replacing a potentially completed backup.
  fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
@@ -69,12 +114,16 @@ with b.LOCK,b.db() as con:
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--namespace',required=True);parser.add_argument('--operation',required=True)
+    parser.add_argument('--compressed',action='store_true',help='One scratch allocation with verified gzip restoration')
     options=parser.parse_args()
     owned=arguments(options.namespace,'seal',options.operation)[4]
     labels=json.loads(subprocess.check_output(['docker','inspect','--format','{{json .Config.Labels}}',owned],text=True))
     if labels.get('com.docker.compose.project')!=options.namespace or labels.get('com.docker.compose.service')!='execution-broker':
         raise ValueError('exact owned Compose controller required')
-    try:result=subprocess.check_output(['docker','exec','-w','/',owned,'python','-c',PROGRAM,options.operation],text=True,timeout=45)
+    program=compressed_program() if options.compressed else PROGRAM
+    command=['docker','exec','-w','/',owned,'python','-c',program,options.operation,
+        str(shutil.disk_usage(Path(__file__).resolve()).free)]
+    try:result=subprocess.check_output(command,text=True,timeout=45)
     except subprocess.TimeoutExpired:
         print(json.dumps(dict(operation_id=options.operation,stage='observation_timeout',
             next_action='Observe the existing backup and durable receipt; never repeat backup creation',delivery_approval=False)))

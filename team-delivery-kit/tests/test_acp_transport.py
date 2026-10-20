@@ -30,6 +30,17 @@ class ACPTests(unittest.TestCase):
         for mode in ('implementation', 'planning'):
             with self.assertRaises(ValueError):
                 transport.worker_env(mode, True, review_suite_capability=value)
+
+    def test_author_feedback_environment_requires_exact_implementation_request(self):
+        request='11111111-1111-4111-8111-111111111111'
+        cfg=dict(request_id=request,task_id='22222222-2222-4222-8222-222222222222',capability='a'*64,
+            test_path='tests/test.py',previous_manifest_sha256='b'*64,feedback_sha256='c'*64,
+            expected=dict(initial_expected=1,poll_minimum=3,stale_expected='Newest matching: #11'))
+        values=transport.worker_env('implementation',True,execution_id=request,author_feedback_config=cfg)
+        self.assertTrue(any(v.startswith('DELIVERY_AUTHOR_FEEDBACK_JSON=') for v in values))
+        for mode,execution in (('review',request),('planning',request),('implementation',None),
+                ('implementation','33333333-3333-4333-8333-333333333333')):
+            with self.assertRaises(ValueError):transport.worker_env(mode,True,execution_id=execution,author_feedback_config=cfg)
     def test_only_implementation_can_write_inside_task_workspace(self):
         implementer = transport.worker_env('implementation', True)
         reviewer = transport.worker_env('review', True)

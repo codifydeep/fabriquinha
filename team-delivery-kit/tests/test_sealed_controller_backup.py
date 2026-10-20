@@ -31,10 +31,10 @@ class SealedBackupTests(unittest.TestCase):
         self.active=[]
         self.m=SimpleNamespace(current=lambda con:self.state,native_active=lambda b:self.active)
 
-    def execute(self):
+    def execute(self,free=10**12):
         output=io.StringIO()
         with patch.dict('sys.modules',{'broker':self.b,'controller_maintenance':self.m}),\
-                patch('sys.argv',['backup',self.operation]),contextlib.redirect_stdout(output):
+                patch('sys.argv',['backup',self.operation,str(free)]),contextlib.redirect_stdout(output):
             try:exec(compile(script.PROGRAM,'sealed-backup','exec'),{})
             except SystemExit as outcome:self.assertEqual(outcome.code,0)
         return json.loads(output.getvalue())
@@ -81,4 +81,8 @@ class SealedBackupTests(unittest.TestCase):
             self.state=old;self.active=[]
         self.con.execute('INSERT INTO leases VALUES("closing")');self.con.commit()
         with self.assertRaises(ValueError):self.execute()
+        self.assertEqual(list(self.root.iterdir()),[])
+
+    def test_low_host_space_rejected_without_creating_files(self):
+        with self.assertRaisesRegex(ValueError,'insufficient host backup headroom'):self.execute(free=0)
         self.assertEqual(list(self.root.iterdir()),[])

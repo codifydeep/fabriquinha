@@ -26,6 +26,15 @@ def receipt(tool, raw):
                 diff_bytes=len(diff.encode()) if known_diff else 0,
                 evidence_scope='original_handler_result_not_final_snapshot',
                 delivery_approval=False,author_retry_authorized=False)
+    feedback=value.get('_author_feedback_v1')
+    if changed and isinstance(feedback,dict):
+        from literal_feedback_wire import FALSE_FLAGS
+        permitted=({'operation','candidate_sha256','checks_passed','failed_fields','capture','reports','expected',
+            'instruction','evidence_scope'} if feedback.get('operation')=='literal_author_feedback_v1' else
+            {'status','candidate_sha256','instruction'} if feedback.get('status') in ('pending','unavailable') else set())|set(FALSE_FLAGS)
+        if (permitted!=set(FALSE_FLAGS) and set(feedback)==permitted and all(feedback.get(k) is False for k in FALSE_FLAGS)
+                and len(json.dumps(feedback).encode())<=8192):
+            result['author_feedback']=feedback
     observation=value.get('_patch_persistence_v1')
     if (isinstance(observation,dict) and set(observation)=={'operation','path','before_sha256',
             'after_sha256','changed','evidence_scope','delivery_approval','author_retry_authorized'}

@@ -88,3 +88,26 @@ class MaintenanceTests(unittest.TestCase):
         self.con.execute('INSERT INTO grants VALUES(?,?,?)', ('launch', 1, time.time()+60))
         result = m.seal(self.b, self.operation)
         self.assertFalse(result['drained']); self.assertEqual(result['launching_grants'], 1)
+
+    def test_restarted_controller_cycle_is_interrupted_not_completed(self):
+        info={'Id':'a'*64,'Config':{'Labels':{'com.docker.compose.project':self.b.PREFIX,
+            'com.docker.compose.service':'execution-broker'}},'State':{'Running':True,'StartedAt':'first-start'}}
+        self.b.docker=lambda *args:info
+        self.assertTrue(m.begin_cycle(self.b));m.begin(self.b,self.operation)
+        self.assertFalse(m.seal(self.b,self.operation)['drained'])
+        info['State']['StartedAt']='second-start';m._cycle_ids.clear()
+        self.assertTrue(m.seal(self.b,self.operation)['drained'])
+        self.assertEqual(self.con.execute('SELECT stage FROM controller_maintenance_cycles').fetchone()[0],'interrupted')
+        import json
+        receipt=json.loads(self.con.execute('SELECT receipt FROM controller_cycle_interruptions').fetchone()[0])
+        self.assertFalse(receipt['delivery_approval']);self.assertFalse(receipt['cycle_completed'])
+        self.assertEqual(receipt['owner']['started_at'],'first-start')
+
+    def test_unobservable_cycle_owner_is_never_assumed_dead(self):
+        info={'Id':'a'*64,'Config':{'Labels':{'com.docker.compose.project':self.b.PREFIX,
+            'com.docker.compose.service':'execution-broker'}},'State':{'Running':True,'StartedAt':'first-start'}}
+        self.b.docker=lambda *args:info;m.begin_cycle(self.b);m.begin(self.b,self.operation)
+        def uncertain(*args):raise TimeoutError('inspect unresolved')
+        self.b.docker=uncertain
+        self.assertFalse(m.seal(self.b,self.operation)['drained'])
+        self.assertEqual(self.con.execute('SELECT stage FROM controller_maintenance_cycles').fetchone()[0],'active')

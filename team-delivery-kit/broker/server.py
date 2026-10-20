@@ -1690,10 +1690,16 @@ def open_granted_transport(row,result,scope):
         if row['mode'] == 'review' and binding:
             import review_suite_rpc
             suite_capability = review_suite_rpc.issue(handoff_context(), row['request_id'])
+        author_feedback_config=None
+        if row['mode']=='implementation' and binding:
+            try:import author_feedback_rpc
+            except ImportError:from broker import author_feedback_rpc
+            author_feedback_config=author_feedback_rpc.attached_config(handoff_context(),row['request_id'])
         SESSIONS[row['request_id']] = Transport(
             docker, result['name'], persistent=bool(binding), mode=row['mode'],
             editable_paths=editables, test_commands=test_commands,
-            review_suite_capability=suite_capability)
+            review_suite_capability=suite_capability,
+            **({'author_feedback_config':author_feedback_config} if author_feedback_config is not None else {}))
     except Exception as error:
         with db() as failed:
             failed.execute("UPDATE leases SET status='closing' WHERE request_id=?", (row['request_id'],))
@@ -2310,9 +2316,10 @@ class Handler(BaseHTTPRequestHandler):
         status, response = 200, {}
         authorization = self.headers.get('Authorization', '')
         suite_call = self.path == '/v1/review-suite' and authorization.startswith('Bearer ')
+        feedback_call=self.path=='/v1/author-feedback' and authorization.startswith('Bearer ')
         startup_call = self.path in ('/v1/acp-startup','/v1/acp-ready') and authorization.startswith('Bearer ')
         grant_call = self.path in ('/v1/acp-probe', '/v1/acp-open', '/v1/acp-message', '/v1/acp-message-stream', '/v1/acp-close') and authorization.startswith('Bearer ')
-        if not grant_call and not suite_call and not startup_call and not hmac.compare_digest(authorization, 'Bearer ' + TOKEN):
+        if not grant_call and not suite_call and not feedback_call and not startup_call and not hmac.compare_digest(authorization, 'Bearer ' + TOKEN):
             status, response = 401, {'error': 'unauthorized'}
         else:
             try:
@@ -2330,6 +2337,9 @@ class Handler(BaseHTTPRequestHandler):
                 elif suite_call:
                     import review_suite_rpc
                     response = review_suite_rpc.execute(handoff_context(), authorization[7:], payload)
+                elif feedback_call:
+                    import author_feedback_rpc
+                    response=author_feedback_rpc.execute(handoff_context(),authorization[7:],payload)
                 elif grant_call:
                     if self.path in ('/v1/acp-message', '/v1/acp-close'):
                         response = session_operation(authorization[7:], payload, self.path == '/v1/acp-close')

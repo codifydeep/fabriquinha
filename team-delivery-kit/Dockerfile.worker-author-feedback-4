@@ -1,0 +1,4 @@
+FROM delivery-kit-hermes-worker:20261015.3
+COPY broker/review_tool_policy.py broker/author_feedback_client.py broker/patch_receipt_contract.py /opt/hermes/
+COPY literal_feedback_wire.py literal_test_maintenance.py calibration_harness_protocol_probe.py generic_harness_calibration.py r3_snapshot_probe.py /opt/hermes/
+RUN PYTHONPATH=/opt/hermes PYTHONDONTWRITEBYTECODE=1 /opt/hermes/.venv/bin/python -c "import author_feedback_client,literal_test_maintenance"

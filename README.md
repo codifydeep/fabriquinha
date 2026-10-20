@@ -1870,7 +1870,7 @@ obtida. Aprovar uma manutenção não comprova Red/Green, suíte completa do pro
 PR, deploy, QA nem homologação e não libera automaticamente a tarefa original.
 A autonomia integral permanece não comprovada até a entrega ponta a ponta.
 
-### Feedback diagnóstico ao autor: sandbox qualificado, integração pendente
+### Feedback diagnóstico ao autor: RPC e ferramentas qualificados, ensaio nativo pendente
 
 `team-delivery-kit/literal_author_feedback.py` mede os dois drivers fixos e
 devolve dados estruturados: campos que falham, resultados observados, expectativas
@@ -1886,10 +1886,46 @@ literal e alteração concorrente durante a medição. Ele **não verifica os de
 arquivos do workspace**, não importa módulos Python do produto e não substitui
 snapshot, calibração, TDD, suíte completa ou revisão independente.
 
-Essa operação ainda **não está conectada às ferramentas dos workers**. Faltam o
-RPC vinculado à lease atual, entrega do feedback ao autor, deduplicação por hash
-do candidato, testes do caminho real de permissões e validação nativa. Nenhuma
-nova tentativa foi liberada por essa qualificação; o impedimento continua visível.
+O código agora inclui um RPC restrito à lease de implementação atual e uma
+capacidade HMAC por execução, card, autor, wakeup, instrução e imagem. O agente
+envia somente o hash do candidato: não escolhe comandos, caminhos ou imagens.
+A leitura do arquivo real é limitada, sem extração de arquivos Docker; o journal
+deduplica por hash e limita a quatro candidatos distintos por execução. Uma
+capacidade antiga, expirada, de outro autor ou de uma execução substituída não
+autoriza sequer a leitura de resultados em cache.
+
+Os handlers do worker entregam feedback após uma edição literal autorizada e
+oferecem a leitura virtual `/feedback/current.json`. Exigem leitura atual do
+arquivo antes de editar; bloqueiam terminal, escrita genérica, mudanças em
+assertions e alterações externas ao literal. O formatter ACP preserva o feedback
+sem transformá-lo em aprovação. O helper de medição não tem rede, credenciais ou
+socket Docker e recebe as duas entregas somente para leitura.
+
+Uma qualificação executou o registro real de ferramentas e os handlers na imagem
+do worker, sem rede, como UID 10000 e sem capabilities Linux. A tentativa de
+edição proibida foi rejeitada e o feedback atravessou o formatter real. **O
+transporte ao controlador foi simulado nesse probe**: ele não comprova o RPC
+com um agente nativo, não chamou modelos nem executou a suíte completa do produto.
+O cadastro continua opt-in pelo controlador; instalar o código não cadastra
+capacidades nem libera uma quarta tentativa idêntica. Faltam a ativação
+controlada por execução e o ensaio nativo completo. O impedimento permanece
+visível, e nenhuma entrega foi aprovada por essa qualificação.
+
+```mermaid
+flowchart LR
+    A[Autor: leitura atual e edição literal] --> W[Handler do worker]
+    W -->|Hash do arquivo + capacidade por execução| R[RPC do controlador]
+    R --> L{Lease, autor, tarefa e bytes atuais válidos?}
+    L -->|Não| N[Rejeitar sem executar]
+    L -->|Sim| J[Journal por hash: máximo 4 candidatos]
+    J --> S[Helper fixo: sem rede, entregas somente leitura]
+    S --> F[Feedback diagnóstico pelo formatter ACP]
+    F --> A
+    F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
+```
+
+Esse diagrama descreve o caminho implementado opt-in; não afirma que um ensaio
+nativo completo já o tenha percorrido. O worker não emite sua própria capacidade.
 
 A proposta do CTO tem preflight no contrato tipado antes do despacho. Uma falha
 local anterior só pode ser recuperada uma vez pelo controlador em manutenção
@@ -1952,6 +1988,24 @@ e a única transição liberada é revisão somente leitura — não uma nova te
 do autor nem a aprovação de uma entrega reprovada.
 
 ## Espaço ocupado pelos backups
+
+O backup administrativo do controlador selado pode usar
+`team-delivery-kit/scripts/backup_sealed_controller.py --namespace <instância>
+--operation <UUID> --compressed`. Essa opção exige a mesma barreira selada,
+nenhuma lease/tarefa ativa e margem de disco. Usa uma única cópia temporária:
+verifica o SQLite, comprime, zera os bytes da cópia e restaura a partir do gzip,
+conferindo hashes, integridade, identidade da manutenção e contagens de tabelas.
+O limite preventivo do arquivo comprimido é 64 MiB. Se for atingido, a operação
+falha e preserva os arquivos para observação; não sobrescreve nem repete a cópia.
+Um recibo durável válido permite consultar a mesma operação sem recriá-la.
+O backup convencional continua disponível e também verifica margem de disco.
+
+Os ciclos do controlador têm identidade de geração Docker (ID e `StartedAt`).
+Um ciclo interrompido por reinício só é classificado como `interrupted` depois
+de comprovação Docker; timeout não é prova de morte. Ciclos legados sem essa
+identidade exigem recuperação explícita com o controlador parado, backup e
+restauração verificados. Nenhuma dessas operações conclui cards ou releases,
+reproduz grants ou aprova entregas.
 
 Backups históricos de bancos podem ser compactados sem descartar seu conteúdo.
 Use somente diretórios de **cópias offline** chamados `backups`, nunca o banco
