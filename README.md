@@ -2233,14 +2233,20 @@ O novo despacho usa o hash desse recibo no marcador. A tarefa, o wakeup e a
 capacidade antigos permanecem intactos; um timeout de publicação observa o mesmo
 marcador, sem repetir a criação. O qualificador não renova o orçamento de dados
 nem do autor, não aprova testes e não prova a causa histórica do bloqueio.
-Essa recuperação tem testes offline, mas **ainda não foi exercida nativamente**.
+Essa recuperação tem testes offline; a qualificação nativa deve distinguir
+inicialização, decisão técnica, revisão independente e continuação da entrega.
 
 Na instalação port2, o broker `20261020.510` já conferiu e aceitou a qualificação
 administrativa: fonte instalada, ausência dos efeitos vedados e backup com
 restauração foram verificados antes da retomada. O estado técnico foi rearmado
 uma vez, preservando a falha e a capacidade anterior. Isso prova a transição
-administrativa; o novo despacho, as duas decisões técnicas independentes e a
-continuação da entrega continuam sendo verificações nativas separadas.
+administrativa. O novo despacho CTO completou `initialize`, `session/new` e
+`session/prompt` com sucesso e terminou em 25 segundos, com lease encerrada e
+decisão estruturada `request_correction`. A tarefa anterior continua falha e
+preservada. Isso comprova uma retomada técnica real, não as duas decisões
+independentes nem a continuação integral da entrega. O controlador aceitou a
+decisão e transferiu a responsabilidade para o Tech Lead em `review_dispatch`.
+A revisão independente e os gates posteriores permanecem separados.
 
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
