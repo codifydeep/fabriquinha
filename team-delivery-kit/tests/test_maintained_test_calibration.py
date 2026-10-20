@@ -6,11 +6,33 @@ import unittest
 import contextlib
 from types import SimpleNamespace
 from broker import maintained_test_calibration as lane
+from unittest.mock import patch
 
 
 class MaintainedCalibrationTests(unittest.TestCase):
+    def test_ordinary_prerequisite_projection_is_persisted_without_enabling_product_route(self):
+        from broker import generic_calibration_workflow as flow,handoffs
+        handoffs.initialize(self.con)
+        route=dict(issue_id='issue',enabled=False,cto='cto',author='author')
+        self.con.execute('INSERT INTO delivery_routes VALUES(?,?)',('issue',json.dumps(route)))
+        state=dict(stage='blocked',category='bundle_task_failed',owner='cto',execution_authorized=False,delivery_approval=False)
+        @contextlib.contextmanager
+        def db():
+            yield self.con
+            self.con.commit()
+        task=dict(id='author',status='completed',issue_id='issue',agent_id='author')
+        fx=lane.Effects(SimpleNamespace(db=db))
+        cfg=dict(self.cfg,author='author',engine='unittest_path_fixtures_v2')
+        with patch.object(flow,'request',return_value=state),patch.object(flow,'Effects',return_value=SimpleNamespace(
+                plans=SimpleNamespace(task=lambda *args:task))):
+            self.assertEqual(fx.calibration(cfg),state)
+        parent=handoffs.load(self.con,'author')
+        self.assertEqual(parent['stage'],'test_first_blocked')
+        self.assertEqual(json.loads(parent['data'])['calibration_prerequisite'],state)
+        self.assertFalse(json.loads(self.con.execute('SELECT config FROM delivery_routes').fetchone()[0])['enabled'])
+
     def setUp(self):
-        self.con=sqlite3.connect(':memory:');self.addCleanup(self.con.close)
+        self.con=sqlite3.connect(':memory:');self.con.row_factory=sqlite3.Row;self.addCleanup(self.con.close)
         self.cfg=dict(cto='cto',issue_id='issue',author_task='author',volume='owned-tests',
             prepared=dict(manifest_sha256='a'*64,test_sha256={'tests/test_one.py':'b'*64}))
         self.calls=[];self.pending=False;self.blocked=False

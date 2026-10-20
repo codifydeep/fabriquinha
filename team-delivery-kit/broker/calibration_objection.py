@@ -6,7 +6,7 @@ from generic_harness_calibration import digest,require
 from structured_response_contract import _unique
 
 
-def from_task(c,task,wakeup,execution,reads):
+def from_task(c,task,wakeup,execution,reads,*,required_paths=None):
     require(task.get('status')=='completed' and task.get('agent_id')==c['cto']
         and task.get('issue_id')==c['issue_id'] and task.get('wakeup_id')==wakeup
         and c['cto']!=c['reviewer'] and task['id']!=c['author_task'])
@@ -16,7 +16,9 @@ def from_task(c,task,wakeup,execution,reads):
     require(set(value)=={'action','reason','execution_authorized','delivery_approval'}
         and isinstance(value['reason'],str) and 1<=len(value['reason'])<=1200
         and value['execution_authorized'] is False and value['delivery_approval'] is False)
-    paths=sorted('/evidence/'+root+'/'+path for root in ('candidate','previous') for path in c['test_files'])
+    baseline=sorted('/evidence/'+root+'/'+path for root in ('candidate','previous') for path in c['test_files'])
+    paths=required_paths if required_paths is not None else baseline
+    require(isinstance(paths,list) and paths==sorted(set(paths)) and set(paths)>=set(baseline))
     expected=context('bundle',paths,digest(c),engine=c.get('calibration_engine') if 'calibration_engine' in c else None)
     require(request(dict(messages=[dict(role='user',content=task.get('handoff_note',''))]))==expected)
     for path in paths:
@@ -39,4 +41,14 @@ def collect(b,c,task,wakeup):
             (actual['id'],)).fetchall();require(len(rows)==1);binding=dict(rows[0])
         require(binding['status']=='closed' and binding['agent_id']==c['cto'] and binding['issue_id']==c['issue_id']
             and binding['scope'].split(':')[-2:]==['planning',actual['id']])
-    return from_task(c,actual,wakeup,binding['request_id'],fx.plans.reads(actual))
+    paths=None
+    with b.db() as con:
+        exists=con.execute("SELECT 1 FROM sqlite_master WHERE name='generic_calibration_workflows'").fetchone()
+        row=con.execute('SELECT state FROM generic_calibration_workflows WHERE issue_id=? AND author_task=?',
+            (c['issue_id'],c['author_task'])).fetchone() if exists else None
+        state=json.loads(row[0]) if row else {}
+        if state.get('dependency_read_recovery_id'):
+            try:import calibration_read_recovery as recovery
+            except ImportError:from broker import calibration_read_recovery as recovery
+            receipt=recovery.qualified(con,c,state);paths=receipt['measurement']['required_paths']
+    return from_task(c,actual,wakeup,binding['request_id'],fx.plans.reads(actual),required_paths=paths)

@@ -1,0 +1,6 @@
+FROM delivery-kit-maintained-test-snapshot:20261020.19
+USER root
+COPY --chmod=0444 calibration_dependency_probe.py calibration_response_contract.py artifact_read_evidence.py /
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import calibration_dependency_probe;calibration_dependency_probe.read_contract_experiment()"
+USER 10000:10000
+ENTRYPOINT ["python"]

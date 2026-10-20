@@ -40,6 +40,9 @@ def reconcile_existing(b,route,source,prior):
     except ImportError:from broker import calibration_incidents as incidents
     with b.db() as con:
         projected=incidents.projection(con,route['issue_id'],source['id'],state)
+        try:import calibration_read_recovery as read_recovery
+        except ImportError:from broker import calibration_read_recovery as read_recovery
+        projected=read_recovery.projection(con,route['issue_id'],source['id'],state) or projected
         if projected is None:
             try:import calibration_objection_runtime as objections
             except ImportError:from broker import calibration_objection_runtime as objections
@@ -90,6 +93,9 @@ def observe(b,route,source,prior,error):
     except ImportError:from broker import calibration_incidents as incidents
     with b.db() as con:
         projected=incidents.projection(con,route['issue_id'],source['id'],state)
+        try:import calibration_read_recovery as read_recovery
+        except ImportError:from broker import calibration_read_recovery as read_recovery
+        projected=read_recovery.projection(con,route['issue_id'],source['id'],state) or projected
         if projected is None:
             try:import calibration_objection_runtime as objections
             except ImportError:from broker import calibration_objection_runtime as objections

@@ -2090,6 +2090,28 @@ Um impedimento recuperável na calibração permanece observado pelo coordenador
 em vez de virar outro estado terminal que impediria a retomada do mesmo fluxo.
 O marco anterior de manutenção deixa de sobrescrever o status da continuação;
 falhas de notificação não repetem os efeitos Docker nem autorizam novas tarefas.
+
+A primeira proposta dessa continuação foi rejeitada pelo proxy por JSON inválido.
+O incidente técnico foi criado automaticamente; seu pedido nativo de experimento
+de framing não se aplicava à classe `invalid_json`. A resposta histórica não foi
+preservada e seu hash não permite afirmar a causa. A transcrição também não
+comprovou leitura completa de uma dependência grande do teste. O código
+`calibration_dependency_probe.py` resolve estaticamente globais `Path` nos testes
+imutáveis, sem importá-los, e demonstra que incluir essas dependências na cápsula
+existente força a paginação completa. Isso é nova evidência de um contrato de
+entrada mais forte, não prova de conserto da falha JSON.
+
+`broker/calibration_read_recovery.py` exige essa medição, reautentica o incidente
+anterior e pede duas novas avaliações técnicas: CTO e Tech Lead independente.
+Somente ambas favoráveis permitem uma nova proposta de **dados de calibração**,
+com o mesmo snapshot e todos os controles posteriores preservados. O limite é
+um por configuração de origem, não um por erro ou resposta do provedor. A decisão
+e o experimento anteriores não são convertidos retroativamente em autorização.
+A autorização e o estado do coordenador são gravados na mesma transação; uma
+interrupção não pode liberar uma proposta sem seu recibo. A projeção do handoff
+principal acompanha o SPIKE ativo, mas mantém a rota de produto desabilitada.
+Essa extensão passou nos testes focados e no experimento com a fonte real;
+instalação e conclusão nativa ainda precisam ser qualificadas.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
@@ -2121,6 +2143,9 @@ flowchart LR
     M -->|Revisão escalonada qualificada| CP[Projeção idêntica: entrada de calibração, sem novo autor]
     CP --> NC[Calibração normal: proposta, revisão independente e controles]
     NC --> FR[Red funcional: base original e mesmo teste congelado]
+    NC -->|JSON inválido; experimento anterior inaplicável| DP[Descoberta estática de dependências e paginação completa]
+    DP --> DR[CTO + Lead: duas avaliações novas do contrato de leitura]
+    DR -->|Duas decisões favoráveis; uma proposta de dados| NC
     FR --> DA[Admissão independente ainda necessária; sem habilitar rota de produto]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```

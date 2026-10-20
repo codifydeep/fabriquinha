@@ -156,8 +156,15 @@ def advance(con,c,fx,*,now=None):
             try:objection_receipt=objections.qualified(con,c,s)
             except (ValueError,KeyError,TypeError):return hold('objection_referral_binding_rejected','CTO verify exact independent SPIKE referral; no dispatch')
             marker=digest(dict(config_sha256=digest(c),phase='bundle',objection_referral=digest(objection_receipt)))
+        read_receipt=None
+        if s.get('dependency_read_recovery_id'):
+            try:import calibration_read_recovery as read_recovery
+            except ImportError:from broker import calibration_read_recovery as read_recovery
+            try:read_receipt=read_recovery.qualified(con,c,s)
+            except (ValueError,KeyError,TypeError):return hold('dependency_sponsorship_rejected','CTO verify preserved read-context sponsorship; no new dispatch')
+            marker=digest(dict(config_sha256=digest(c),phase='bundle',dependency_sponsorship=digest(read_receipt)))
         try:
-            note=instruction(c)
+            note=read_recovery.producer_instruction(c,read_receipt) if read_receipt else instruction(c)
             if objection_receipt:
                 note+=objections.addendum(objection_receipt);gate.require(len(note)<=3800)
         except ValueError:
@@ -475,6 +482,12 @@ def tick(b):
                     try:incidents.handle(b,con,c,s)
                     except (ValueError,KeyError,TypeError,RuntimeError,TimeoutError,urllib.error.URLError,incidents.ValidationError) as error:
                         incidents.enrollment_error(con,c,s,error) # One incident cannot starve the rest of the tick.
+                    if os.environ.get('BROKER_CALIBRATION_DEPENDENCY_PROBE_IMAGE'):
+                        try:import calibration_read_recovery as read_recovery
+                        except ImportError:from broker import calibration_read_recovery as read_recovery
+                        try:read_recovery.handle(b,con,c,s)
+                        except (ValueError,KeyError,TypeError,RuntimeError,TimeoutError,urllib.error.URLError) as error:
+                            incidents.enrollment_error(con,c,s,error)
             elif s['stage']!='calibration_ready':
                 if fx is None:fx=Effects(b)
                 advance(con,c,fx)
@@ -511,7 +524,13 @@ def prompt_contract(b,issue,task,note):
     matches=[(json.loads(r[0]),json.loads(r[1])) for r in rows if json.loads(r[1])['stage'] in phases]
     gate.require(len(matches)==1);c,s=matches[0]
     fx=Effects(b);fx.verify(c)
-    if s['stage']=='await_bundle':expected=instruction(c)
+    if s['stage']=='await_bundle':
+        if s.get('dependency_read_recovery_id'):
+            try:import calibration_read_recovery as read_recovery
+            except ImportError:from broker import calibration_read_recovery as read_recovery
+            with b.db() as con:receipt=read_recovery.qualified(con,c,s)
+            expected=read_recovery.producer_instruction(c,receipt)
+        else:expected=instruction(c)
     else:
         try:import generic_calibration_approvals as approvals
         except ImportError:from broker import generic_calibration_approvals as approvals

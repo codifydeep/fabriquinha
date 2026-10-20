@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261020.507
+COPY calibration_dependency_probe.py /
+COPY broker/calibration_read_recovery.py broker/generic_calibration_workflow.py broker/generic_calibration_red_bridge.py /
+COPY broker/calibration_objection.py broker/maintained_test_calibration.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_dependency_probe,calibration_read_recovery,generic_calibration_workflow,generic_calibration_red_bridge,calibration_objection,maintained_test_calibration"

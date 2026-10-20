@@ -68,6 +68,7 @@ def advance(con,key,cfg,fx,*,now=None):
             require(result.get('execution_authorized') is False and result.get('delivery_approval') is False)
             if result['stage']=='blocked':return save(calibration_stage='blocked',
                 category='maintained_calibration_'+result['category'],owner=result.get('owner') or cfg['cto'],
+                calibration_incident=result.get('calibration_incident'),
                 required_action=result.get('required_action') or 'Observe existing CTO-owned prerequisite recovery; no identical retry')
             if result['stage']!='calibration_ready':return save(calibration_stage=result['stage'],
                 category=None,owner=result.get('owner') or cfg['cto'],required_action=result.get('required_action') or
@@ -128,9 +129,25 @@ class Effects:
                     dict(Type='volume',Source=c['volume'],Target='/snapshot',ReadOnly=False)]))
         with self.b.db() as con:return test_first_job.run(self.b,con,c['author_task'],'copy',payload)
     def calibration(self,c):
-        try:import generic_calibration_workflow as flow
-        except ImportError:from broker import generic_calibration_workflow as flow
-        return flow.request(self.b,c['issue_id'],c['author_task'],engine=c['engine'])
+        try:import generic_calibration_workflow as flow,generic_calibration_red_bridge as bridge,handoffs
+        except ImportError:from broker import generic_calibration_workflow as flow,generic_calibration_red_bridge as bridge,handoffs
+        state=flow.request(self.b,c['issue_id'],c['author_task'],engine=c['engine'])
+        if state['stage']!='calibration_ready':
+            with self.b.db() as con:
+                route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(c['issue_id'],)).fetchone()[0])
+                prior=handoffs.load(con,c['author_task'])
+            # This stores only the actual prerequisite projection. It does not
+            # enable the disabled route or create a task, Red or approval.
+            actual=flow.Effects(self.b).plans.task(c['author_task'],c['author'])
+            require(actual['status']=='completed' and actual['issue_id']==c['issue_id'])
+            bridge.observe(self.b,route,actual,prior,bridge.Pending(c['issue_id'],c['author_task'],state))
+            with self.b.db() as con:parent=handoffs.load(con,c['author_task'])
+            projected=json.loads(parent['data']).get('calibration_incident')
+            if projected:
+                return {**state,'owner':projected['owner'],'calibration_incident':projected,
+                    'required_action':(str(projected.get('identifier'))+': ' if projected.get('identifier') else '')+
+                        projected['required_action']}
+        return state
     def red(self,c,s):
         try:import generic_calibration_registration as registration,generic_calibration_gate as gate,test_first_job
         except ImportError:from broker import generic_calibration_registration as registration,generic_calibration_gate as gate,test_first_job
