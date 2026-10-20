@@ -56,7 +56,7 @@ def prefix(phase):return 'DELIVERY_UNIT_START' if phase=='author' else 'DELIVERY
 
 
 def expected_note(cfg,s,phase):
-    return prefix(phase)+' '+s['marker']+'\nSource: '+cfg['source']['author_task']+'\n'+flow.instruction(cfg,s,phase).strip()
+    return prefix(phase)+' '+s['marker']+'\nSource: '+flow.dispatch_source(cfg)+'\n'+flow.instruction(cfg,s,phase).strip()
 
 
 def copy_payload(cfg,identity,source_volume=None):
@@ -101,6 +101,9 @@ def capture_payload(cfg,s):
 
 def preparation_journal(con,cfg,s,identity):
     """Never replace a legacy intent; only a qualified separate journal may follow it."""
+    if cfg.get('feedback_strategy'):
+        con.execute('CREATE TABLE IF NOT EXISTS literal_feedback_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+        return 'literal_feedback_volumes',cfg['base']['volume']
     con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
     old=con.execute('SELECT identity,state FROM literal_maintenance_volumes WHERE source_task=?',(cfg['source']['author_task'],)).fetchone()
     if not old or json.loads(old[0])==identity:return 'literal_maintenance_volumes',cfg['base']['volume']
@@ -117,6 +120,10 @@ class Effects:
     def __init__(self,b):
         self.b=b;self.old=diagnostic.Effects(b);self.plans=self.old.plans;self.settings=self.plans.settings
     def verify(self,cfg):
+        if cfg.get('feedback_strategy'):
+            try:import literal_feedback_strategy as strategy
+            except ImportError:from broker import literal_feedback_strategy as strategy
+            strategy.verify(self.b,cfg)
         c=cfg['source'];self.old.verify(cfg['diagnostic_config'])
         with self.b.db() as con:
             stored,state=map(json.loads,con.execute('SELECT config,state FROM calibration_control_experiments WHERE author_task=?',(c['author_task'],)).fetchone())
@@ -147,9 +154,9 @@ class Effects:
                 '. Original attempts, snapshots, acceptance, baseline and release gates remain unchanged. No product admission.',
             parent_issue_id=cfg['parent_issue_id'],project_id=parent.get('project_id'),stage=1,status='todo'),allow_create=first)
     def wake(self,cfg,s,phase,first):
-        if phase in ('plan','diagnose'):flow.preflight_plan(cfg,s,phase)
+        if phase in ('plan','diagnose') or (cfg.get('feedback_strategy') and phase=='permit'):flow.preflight_plan(cfg,s,phase)
         function=native.ensure_unit_start if phase=='author' else native.ensure_planning_start
-        return function(self.settings,s['issue_id'],flow.actor(cfg,phase),cfg['source']['author_task'],
+        return function(self.settings,s['issue_id'],flow.actor(cfg,phase),flow.dispatch_source(cfg),
             s['marker'],flow.instruction(cfg,s,phase),allow_create=first)
     def runs(self,cfg,s):return native.issue_task_runs(self.settings,s['issue_id'])
     def decision(self,cfg,s,phase,task):
@@ -226,11 +233,11 @@ class Effects:
             identity=dict(name=name,labels=labels)
             table,source_volume=preparation_journal(con,cfg,s,identity)
             con.execute('CREATE TABLE IF NOT EXISTS '+table+'(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
-            row=con.execute('SELECT identity,state FROM '+table+' WHERE source_task=?',(cfg['source']['author_task'],)).fetchone()
+            row=con.execute('SELECT identity,state FROM '+table+' WHERE source_task=?',(flow.workflow_key(cfg),)).fetchone()
             if row:require(json.loads(row[0])==identity);stage=json.loads(row[1])['stage']
             else:
                 require(b.docker('GET','/volumes/'+name) is None);stage='create_intent'
-                con.execute('INSERT INTO '+table+' VALUES(?,?,?)',(cfg['source']['author_task'],json.dumps(identity),json.dumps({'stage':stage})));con.commit()
+                con.execute('INSERT INTO '+table+' VALUES(?,?,?)',(flow.workflow_key(cfg),json.dumps(identity),json.dumps({'stage':stage})));con.commit()
                 try:b.docker('POST','/volumes/create',dict(Name=name,Labels=labels))
                 except TimeoutError:raise validation_job.Pending('observe same literal-maintenance base volume') from None
         actual=b.docker('GET','/volumes/'+name)
@@ -248,13 +255,19 @@ class Effects:
         handoff_runtime.register(b,maintenance_route(route,child))
         trial=dict(issue_id=child,parent_issue=cfg['source']['issue_id'],reviewer=cfg['reviewer'],base_sha=base['base_sha'],
             harness_maintenance_only=True,historic_functional_red=False,seed_previous_tests=True,seeded_edit_required=True,
-            literal_maintenance=dict(source_task=cfg['source']['author_task'],config_sha256=digest(cfg)))
+            literal_maintenance=dict(source_task=flow.workflow_key(cfg),config_sha256=digest(cfg)))
         with b.db() as con:
             test_revision_review.initialize(con)
             previous=con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(child,)).fetchone()
             if previous:require(json.loads(previous[0])==trial)
             else:con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',(child,cfg['source']['issue_id'],json.dumps(trial,sort_keys=True),'{}'))
-        return dict(base_manifest_sha256=base['manifest_sha256'],volume=name,copy_job=job,trial_sha256=digest(trial))
+        prepared=dict(base_manifest_sha256=base['manifest_sha256'],volume=name,copy_job=job,trial_sha256=digest(trial))
+        if cfg.get('feedback_strategy'):
+            try:import author_feedback_admission as admission
+            except ImportError:from broker import author_feedback_admission as admission
+            prepared['feedback_admission']=admission.arm(b,cfg['feedback_strategy']['policy'],cfg['feedback_strategy']['qualification'],
+                dict(cto=s['decisions']['plan']['receipt']['task_id'],sponsor=s['decisions']['permit']['receipt']['task_id']))
+        return prepared
     def snapshot(self,cfg,s,task):
         actual=self.plans.task(task['id'],cfg['author'])
         require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id'] and actual.get('wakeup_id')==s['author_wakeup'])
@@ -286,7 +299,7 @@ def registered_author(con,issue,author):
     match=current(con,issue)
     if not match:return False
     cfg,s=match
-    return cfg['author']==author and s['stage'] in ('author_observe','author_wait') and set(s['decisions'])=={'triage','plan','permit'}
+    return cfg['author']==author and s['stage'] in ('author_observe','author_wait') and set(s['decisions'])==flow.required_decisions(cfg)
 
 
 def authorize_phase(con,cfg,s,task,phase,settings):
@@ -296,12 +309,12 @@ def authorize_phase(con,cfg,s,task,phase,settings):
     require(native_scope_note.canonical(task.get('handoff_note',''),task['wakeup_id'])==expected_note(cfg,s,phase))
     if s['stage']==phase+'_wait':require(task['wakeup_id']==s['wakeup_id']);return s
     function=native.ensure_unit_start if phase=='author' else native.ensure_planning_start
-    wake=function(settings,s['issue_id'],flow.actor(cfg,phase),cfg['source']['author_task'],s['marker'],
+    wake=function(settings,s['issue_id'],flow.actor(cfg,phase),flow.dispatch_source(cfg),s['marker'],
         flow.instruction(cfg,s,phase),allow_create=False)
     require(wake and wake['id']==task['wakeup_id'])
     updated={**s,'stage':phase+'_wait','wakeup_id':wake['id']}
     changed=con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=? AND state=?',
-        (json.dumps(updated,sort_keys=True),cfg['source']['author_task'],json.dumps(s,sort_keys=True))).rowcount
+        (json.dumps(updated,sort_keys=True),flow.workflow_key(cfg),json.dumps(s,sort_keys=True))).rowcount
     if changed==1:return updated
     actual=current(con,s['issue_id']);require(actual and actual[1]['stage']==phase+'_wait' and actual[1]['wakeup_id']==wake['id']);return actual[1]
 
@@ -310,7 +323,7 @@ def author_context(con,issue,task):
     match=current(con,issue['id'])
     if not match:return None
     cfg,s=match;settings=json.loads((STATE/'native.json').read_text());s=authorize_phase(con,cfg,s,task,'author',settings)
-    require(set(s['decisions'])=={'triage','plan','permit'})
+    require(set(s['decisions'])==flow.required_decisions(cfg))
     # Full native/journal reauthentication also runs in seed_source before the
     # isolated author workspace is populated; context alone grants no tool.
     if s['revision']==2:require(s['repair_authorization']==flow.replan_authority(cfg,s))
@@ -320,12 +333,15 @@ def author_context(con,issue,task):
 
 def seed_source(b,issue,trial):
     with b.db() as con:match=current(con,issue)
-    require(match);cfg,s=match;require(trial['literal_maintenance']==dict(source_task=cfg['source']['author_task'],config_sha256=digest(cfg))
+    require(match);cfg,s=match;require(trial['literal_maintenance']==dict(source_task=flow.workflow_key(cfg),config_sha256=digest(cfg))
         and s['stage'] in ('author_observe','author_wait') and trial['harness_maintenance_only'] is True
-        and trial['base_sha']==b.issue_base(issue)['base_sha'] and set(s['decisions'])=={'triage','plan','permit'})
+        and trial['base_sha']==b.issue_base(issue)['base_sha'] and set(s['decisions'])==flow.required_decisions(cfg))
     fx=Effects(b);fx.verify(cfg);flow.authenticate(cfg,s,fx)
     if s['revision']==2:flow.authenticate_replan(cfg,s,fx)
-    if s['revision']:
+    if cfg.get('feedback_strategy'):
+        p=cfg['feedback_strategy']['policy'];volume=p['previous_volume'];manifest=p['previous_manifest_sha256']
+        hashes=cfg['feedback_strategy']['test_sha256'];owner_key='delivery-kit.source-task';owner_task=p['source_task']
+    elif s['revision']:
         last=s['history'][-1];volume=last['snapshot']['volume'];manifest=last['inspection']['candidate_manifest_sha256']
         hashes={cfg['test_path']:last['inspection']['structure']['candidate_test_sha256']};owner_key='delivery-kit.source-task';owner_task=last['author_task']
     else:

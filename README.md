@@ -1928,9 +1928,22 @@ bloquear cards de outros escopos.
 
 Testes executam o construtor real do controlador e o caminho de emissão RPC até
 o ambiente ACP, mas **simulam os registros do Multica e as respostas Docker**.
-Falta cadastrar e validar um novo fluxo nativo, com proposta, patrocínio, edição,
-feedback, snapshot e revisão independente. A instalação do mecanismo não inicia
-esse fluxo nem amplia os limites da tentativa anterior.
+`enroll_literal_feedback.py` cadastra esse fluxo em um card filho separado,
+somente sob o ID exato de uma manutenção selada. A matrícula reautentica os três
+snapshots rejeitados e suas revisões, o experimento e o patrocínio anteriores.
+O novo ciclo tem identidade própria e começa com proposta do CTO; o scheduler
+persistente conduz patrocínio do Lead, preparação, autor, snapshot, inspeção e
+revisão independente. A primeira chamada ao modelo só ocorre após liberar a
+barreira. Um POST de criação sem confirmação é observado pelo mesmo journal,
+nunca repetido cegamente. O predecessor, seus cards e seus limites não mudam.
+
+O prompt dessa execução vem do escopo corrente autenticado, sem herdar a regra
+legada que forçava um patch antes da consulta ao feedback. Isso não amplia
+permissões: os handlers continuam bloqueando shell, escrita genérica, assertions
+e alterações fora do literal. Rejeitar a nova entrega preserva seu snapshot e
+gera um impedimento técnico, não outra tentativa idêntica. Notificações com falha
+não alteram a autoridade técnica do predecessor. A execução nativa ainda precisa
+demonstrar o resultado completo; instalar ou cadastrar não é sucesso do ensaio.
 
 ```mermaid
 flowchart LR

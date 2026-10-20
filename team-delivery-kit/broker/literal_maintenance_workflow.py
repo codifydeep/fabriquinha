@@ -18,17 +18,33 @@ PHASES=('triage','plan','permit','author','review','diagnose','sponsor')
 TERMINAL=('blocked','maintenance_approved')
 
 
+def workflow_key(cfg):return cfg.get('workflow_key',cfg['source']['author_task'])
+
+
+def dispatch_source(cfg):return cfg.get('feedback_strategy',{}).get('policy',{}).get('source_task',cfg['source']['author_task'])
+
+
+def required_decisions(cfg):return {'plan','permit'} if cfg.get('feedback_strategy') else {'triage','plan','permit'}
+
+
 def initialize(con):
     con.execute('CREATE TABLE IF NOT EXISTS literal_maintenance_workflows(source_task TEXT PRIMARY KEY,config TEXT,state TEXT)')
 
 
 def register(con,cfg):
     initialize(con);require(len({cfg['author'],cfg['cto'],cfg['reviewer']})==3)
-    source=cfg['source']['author_task'];row=con.execute('SELECT config,state FROM literal_maintenance_workflows WHERE source_task=?',(source,)).fetchone()
+    if 'workflow_key' in cfg:
+        require(cfg.get('feedback_strategy') and cfg['workflow_key']==cfg['feedback_strategy']['policy']['source_task']
+            and cfg['workflow_key']!=cfg['source']['author_task'])
+    else:require(not cfg.get('feedback_strategy'))
+    source=workflow_key(cfg);row=con.execute('SELECT config,state FROM literal_maintenance_workflows WHERE source_task=?',(source,)).fetchone()
     if row:require(json.loads(row[0])==cfg);return json.loads(row[1])
     state=dict(stage='issue_pending',owner=cfg['reviewer'],revision=0,decisions={},history=[],
         source_reset=False,functional_red=False,delivery_approval=False,
         required_action='Create source-bound maintenance proposal, preserving the original technical hold')
+    if cfg.get('feedback_strategy'):
+        state.update(stage='plan_dispatch',issue_id=cfg['feedback_strategy']['policy']['issue_id'],owner=cfg['cto'],
+            required_action='CTO propose the new live-feedback scope; previous workflow and limits remain unchanged')
     con.execute('INSERT INTO literal_maintenance_workflows VALUES(?,?,?)',(source,json.dumps(cfg,sort_keys=True),json.dumps(state,sort_keys=True)));con.commit();return state
 
 
@@ -43,6 +59,11 @@ def review_context(cfg,s,phase):
 
 
 def instruction(cfg,s,phase):
+    if cfg.get('feedback_strategy') and phase in ('plan','permit','author'):
+        try:import author_feedback_admission as admission
+        except ImportError:from broker import author_feedback_admission as admission
+        p=cfg['feedback_strategy']['policy'];role={'plan':'cto','permit':'sponsor','author':'author'}[phase]
+        return admission.instruction(p,role,s['decisions']['plan']['receipt'] if phase=='permit' else None)
     path=cfg['test_path'];scope='Only the '+cfg['literal']+' literal in '+path+' may change. '
     scope+='Every byte outside that literal, every method/assertion and every product/baseline file must remain identical. '
     if phase=='sponsor':
@@ -158,6 +179,14 @@ def preflight_plan(cfg,s,phase='plan'):
     """
     from decision_schema import apply as schema
     from typed_decision_contract import apply as typed,NAME
+    if cfg.get('feedback_strategy'):
+        try:import author_feedback_admission as admission
+        except ImportError:from broker import author_feedback_admission as admission
+        require(phase in ('plan','permit'));note=instruction(cfg,s,phase)
+        body=wire.apply(dict(messages=[dict(role='user',content=note)],tools=[]))
+        require(body['response_format']['json_schema']['schema']==wire.schema(admission.context(cfg['feedback_strategy']['policy']))
+            and body['tools']==[] and body['tool_choice']=='none')
+        return digest(body)
     require(phase in ('plan','diagnose'));note=instruction(cfg,s,phase)
     if phase=='diagnose':
         # Exercise the real initial read contract. No synthetic read results are
@@ -293,8 +322,13 @@ def advance(con,source,fx,*,now=None):
         if s['stage'].endswith(('_dispatch','_observe')):
             first=s['stage'].endswith('_dispatch')
             if first and not fx.reserve():return save(required_action='Await maintenance model reserve; no wakeup created')
-            if first:save(stage=phase+'_observe',phase_started=now,marker=digest(dict(config=cfg,phase=phase,
-                instruction=instruction(cfg,s,phase),revision=s['revision'] if phase in ('author','review') else 0)))
+            if first:
+                mark=digest(dict(config=cfg,phase=phase,instruction=instruction(cfg,s,phase),revision=s['revision'] if phase in ('author','review') else 0))
+                if cfg.get('feedback_strategy') and phase in ('plan','permit','author'):
+                    try:import author_feedback_admission as admission
+                    except ImportError:from broker import author_feedback_admission as admission
+                    mark=admission.marker(cfg['feedback_strategy']['policy'],{'plan':'cto','permit':'sponsor','author':'author'}[phase])
+                save(stage=phase+'_observe',phase_started=now,marker=mark)
             try:wake=fx.wake(cfg,s,phase,first)
             except (TimeoutError,urllib.error.URLError):wake=None
             if wake is None:return hold('maintenance_'+phase+'_wakeup_unobserved') if now-s['phase_started']>=600 else s
@@ -310,7 +344,12 @@ def advance(con,source,fx,*,now=None):
             required_action='Freeze completed maintenance author; original source remains immutable')
         decision=fx.decision(cfg,s,phase,task);require(decision['task_id']==task['id'] and decision['agent_id']==actor(cfg,phase))
         value=decision['value']
-        if phase in ('triage','permit','sponsor'):
+        if cfg.get('feedback_strategy') and phase in ('plan','permit'):
+            try:import author_feedback_admission as admission
+            except ImportError:from broker import author_feedback_admission as admission
+            Draft202012Validator(wire.schema(admission.context(cfg['feedback_strategy']['policy']))).validate(value)
+            if value['action']=='retain_technical_hold':return save(stage='blocked',category='maintenance_feedback_scope_hold',held_decision=decision,owner=cfg['cto'])
+        elif phase in ('triage','permit','sponsor'):
             Draft202012Validator(wire.schema(review_context(cfg,s,phase))).validate(value)
             if value['action']=='retain_technical_hold':return save(stage='blocked',category='maintenance_'+phase+'_hold',
                 held_decision=decision,owner=cfg['cto'],required_action='CTO address concrete independently retained restriction; no identical retry')
@@ -338,6 +377,8 @@ def advance(con,source,fx,*,now=None):
                 owner=cfg['reviewer'],required_action='Hand off immutable maintenance artifact to normal test-first admission; no product approval')
             history=[*s['history'],dict(snapshot=s['snapshot'],inspection=s['inspection'],author_task=s['author_task'],
                 review=decision,wakeup_id=s['wakeup_id'],marker=s['marker'],revision=s['revision'])]
+            if cfg.get('feedback_strategy'):return save(stage='blocked',category='maintenance_feedback_strategy_rejected',history=history,
+                owner=cfg['cto'],required_action='CTO diagnose preserved live-feedback evidence; no identical retry or reset')
             if s['revision']>=1:return save(stage='blocked',category=('maintenance_evidence_replan_rejected' if s['revision']==2 else
                 'maintenance_review_revision_exhausted'),history=history,
                 owner=cfg['cto'],required_action='Diagnose second independent rejection; no source reset or identical retry')

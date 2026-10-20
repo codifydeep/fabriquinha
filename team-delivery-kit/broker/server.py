@@ -1989,6 +1989,11 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         raise ValueError('invalid native mode')
     if frame.get('method') != 'session/prompt':
         raise ValueError('prompt frame required')
+    if mode=='implementation' and re.search(r'^DELIVERY_AUTHOR_FEEDBACK_V1$',task.get('handoff_note') or '',re.M):
+        if correction is not None:raise ValueError('feedback scope cannot mix generic correction authority')
+        try:import literal_feedback_strategy
+        except ImportError:from broker import literal_feedback_strategy
+        return literal_feedback_strategy.prompt(handoff_context(),frame,issue,task)
     if mode=='planning' and 'DELIVERY_PRODUCT_SCOPE_V1:' in (task.get('handoff_note') or ''):
         try:import product_scope_execution
         except ImportError:from broker import product_scope_execution

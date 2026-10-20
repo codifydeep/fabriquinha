@@ -83,7 +83,7 @@ def instruction(p,phase,proposal=None):
         'No shell, generic writes, compiler, arbitrary tests or claimed test execution. '
         'The controller freezes the final artifact for normal inspection and independent review. '
         'Diagnostic success is not TDD Red/Green, full regression, product or release approval. '
-        'Finish with a real artifact or an objective technical blocker.\nDELIVERY_AUTHOR_FEEDBACK_V1\n')
+        'Finish with a real artifact or an objective technical blocker.\nDELIVERY_AUTHOR_FEEDBACK_V1\nDELIVERY_DRIVER_CHECKPOINT_V3\n')
 
 
 def marker(p,phase):return digest(dict(scope=digest(p),phase=phase))
