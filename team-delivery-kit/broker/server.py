@@ -492,6 +492,15 @@ def config(request_id, scenario):
                 result['Image']=driver['worker_image']
                 surgical=driver['surgical']
             if surgical:result['Env'].append('DELIVERY_SURGICAL_TEST_JSON='+json.dumps(surgical))
+            try:import author_feedback_admission
+            except ImportError:from broker import author_feedback_admission
+            feedback=author_feedback_admission.select(handoff_context(),request_id,bound['issue_id'])
+            if feedback:
+                if additive or surgical or scope_selection:raise ValueError('conflicting author feedback capabilities')
+                selected=docker('GET','/images/'+feedback['worker_image']+'/json')
+                if not selected or selected.get('Id')!=feedback['worker_image']:
+                    raise ValueError('qualified author feedback worker image missing')
+                result['Image']=feedback['worker_image']
         elif native_mode(request_id) == 'review':
             try:import u3_delivery_review
             except ImportError:from broker import u3_delivery_review
@@ -626,6 +635,9 @@ def tick():
             except DockerOperationTimeout:continue
             con.execute('UPDATE leases SET status=? WHERE request_id=?', (status, row['request_id']))
             con.commit()
+    try:import author_feedback_admission
+    except ImportError:from broker import author_feedback_admission
+    author_feedback_admission.reconcile(handoff_context())
 
 
 def submit(payload, trusted_acp=False):
@@ -1694,7 +1706,11 @@ def open_granted_transport(row,result,scope):
         if row['mode']=='implementation' and binding:
             try:import author_feedback_rpc
             except ImportError:from broker import author_feedback_rpc
-            author_feedback_config=author_feedback_rpc.attached_config(handoff_context(),row['request_id'])
+            try:import author_feedback_admission
+            except ImportError:from broker import author_feedback_admission
+            author_feedback_config=author_feedback_admission.attach(handoff_context(),row['request_id'])
+            if author_feedback_config is None:
+                author_feedback_config=author_feedback_rpc.attached_config(handoff_context(),row['request_id'])
         SESSIONS[row['request_id']] = Transport(
             docker, result['name'], persistent=bool(binding), mode=row['mode'],
             editable_paths=editables, test_commands=test_commands,

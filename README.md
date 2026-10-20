@@ -1907,12 +1907,36 @@ edição proibida foi rejeitada e o feedback atravessou o formatter real. **O
 transporte ao controlador foi simulado nesse probe**: ele não comprova o RPC
 com um agente nativo, não chamou modelos nem executou a suíte completa do produto.
 O cadastro continua opt-in pelo controlador; instalar o código não cadastra
-capacidades nem libera uma quarta tentativa idêntica. Faltam a ativação
-controlada por execução e o ensaio nativo completo. O impedimento permanece
+capacidades nem libera uma quarta tentativa idêntica. O impedimento permanece
 visível, e nenhuma entrega foi aprovada por essa qualificação.
+
+`broker/author_feedback_admission.py` liga a seleção da imagem à emissão da
+capacidade. O registro exige uma proposta nativa concluída do CTO e patrocínio
+independente do Lead; o handoff do Lead inclui o hash e o resultado exato da
+proposta do CTO. Ambas as decisões precisam corresponder ao mesmo escopo e a
+execuções de planejamento encerradas sem ferramentas. O escopo fixa snapshot,
+critérios, imagens e qualificação; não seleciona comandos ou libera gates.
+
+Somente o handoff exato do autor pode consumir esse registro, uma vez, por tarefa,
+wakeup e request. A imagem é selecionada antes da criação do worker; a capacidade
+só é emitida após a lease estar em execução. Revisor, tarefa histórica, execução
+duplicada, grant substituído ou decisão adulterada não recebem a permissão.
+O controlador aposenta o escopo automaticamente apenas depois de confirmar tarefa
+nativa terminal, lease encerrada e ausência real do container. Incerteza fica
+registrada com o CTO responsável, sem classificar a entrega como concluída ou
+bloquear cards de outros escopos.
+
+Testes executam o construtor real do controlador e o caminho de emissão RPC até
+o ambiente ACP, mas **simulam os registros do Multica e as respostas Docker**.
+Falta cadastrar e validar um novo fluxo nativo, com proposta, patrocínio, edição,
+feedback, snapshot e revisão independente. A instalação do mecanismo não inicia
+esse fluxo nem amplia os limites da tentativa anterior.
 
 ```mermaid
 flowchart LR
+    C[Proposta nativa do CTO] --> P[Patrocínio independente do Lead]
+    P --> E[Registro de um handoff exato]
+    E -->|Imagem qualificada + capacidade por execução| W
     A[Autor: leitura atual e edição literal] --> W[Handler do worker]
     W -->|Hash do arquivo + capacidade por execução| R[RPC do controlador]
     R --> L{Lease, autor, tarefa e bytes atuais válidos?}

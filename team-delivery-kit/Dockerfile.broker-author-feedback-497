@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261020.496
+COPY broker/server.py /broker.py
+COPY broker/author_feedback_admission.py /
+COPY broker/review_context_recovery.py broker/literal_author_bootstrap_recovery.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import author_feedback_admission"

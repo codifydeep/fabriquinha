@@ -23,6 +23,7 @@ except ImportError:
 
 ROOT_SHA='2fb62b15773afe836c8b840ef514c3cb664c98e9016873e194ead72c0dca99fe'
 AUTHOR_FEEDBACK_ROOT_SHA='e6437bd64b1763f6d40c36ba34576c22637c59d21f09f5582e3cc2e783b0c73a'
+AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA='f4f258f63dd8b37315ddc6dd29c4ed7d25c074cb5ef9f7b7aceaab4692626168'
 CONTEXT_SHA='7b182c770b2d0db0880571d4c254d1a158e852752801b69dca494db9c35f16ec'
 
 
@@ -58,7 +59,7 @@ def probe(b,cfg,s,task,old_route,new_route,trial,paths,issue):
     """
     from execution_context import __file__ as context_file
     root_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
-    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA)
+    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA,AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA)
         and hashlib.sha256(Path(context_file).read_bytes()).hexdigest()==CONTEXT_SHA)
     spec=importlib.util.spec_from_file_location('isolated_literal_author_prompt',b.__file__)
     isolated=importlib.util.module_from_spec(spec);spec.loader.exec_module(isolated)
