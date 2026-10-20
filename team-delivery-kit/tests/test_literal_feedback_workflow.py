@@ -16,9 +16,14 @@ class FeedbackWorkflowTests(unittest.TestCase):
             expected=dict(initial_expected=1,poll_minimum=3,stale_expected='Newest matching: #11'))
         self.f.cfg=dict(self.f.cfg,workflow_key='rejected-author',feedback_strategy=dict(policy=self.p))
         flow.register(self.f.con,self.f.cfg)
-        self.audit_action='request_review_reconsideration';self.audit_verified=True
+        self.audit_action='request_review_reconsideration';self.audit_verified=True;self.escalated_choice='approve_test_revision'
         old=self.f.fx.decision
         def decision(cfg,s,phase,t):
+            if phase=='escalated':
+                return dict(task_id=t['id'],agent_id=t['agent_id'],wakeup_id=t['wakeup_id'],value=dict(
+                    action=self.escalated_choice,reason='Independent CTO review of unchanged backend artifact',optional_files=[],
+                    manifest_sha256=s['inspection']['candidate_manifest_sha256'],findings=[] if self.escalated_choice=='approve_test_revision' else [
+                        dict(kind='invalid_harness',tree='candidate',path='tests/test.py',test='__module__',line=1,quote='code',expected='coverage',observed='concern')]))
             if phase=='audit':
                 finding=dict(kind='review_disagreement',tree='candidate',path='tests/test.py',test='__module__',line=1,
                     quote='code',expected='seed_to_candidate.line_changed=true',observed='seed_to_candidate.line_changed=false')
@@ -37,8 +42,14 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.f.fx.diagnosis_bundle=lambda cfg,s:dict(volume='frozen-evidence',manifest_sha256='b'*64)
         self.f.fx.validate_diagnosis_bundle=lambda cfg,s,value:self.assertEqual(value['volume'],'frozen-evidence')
         self.f.fx.finding_audit_policy=lambda cfg,s:dict(image='sha256:'+'a'*64,native_attempt_limit=1)
-        self.f.fx.assess_finding_audit=lambda cfg,s:dict(factual_disagreement_verified=self.audit_verified)
+        self.f.fx.assess_finding_audit=lambda cfg,s:dict(factual_disagreement_verified=self.audit_verified,
+            facts=dict(claims=[dict(claim=dict(basis='seed_to_candidate',tree='candidate',path='tests/test.py',line=1,
+                predicate='line_changed'),supported=False)]))
         self.f.fx.validate_finding_audit=lambda cfg,s,value:self.assertIs(type(value['factual_disagreement_verified']),bool)
+        def validate_escalated(cfg,s,d):
+            self.assertNotEqual(d['agent_id'],cfg['author'])
+            return dict(read_bytes_verified=True,decision_sha256=flow.digest(d['value']),delivery_approval=False,source_reset=False)
+        self.f.fx.validate_escalated_review=validate_escalated
 
     def advance(self):return flow.advance(self.f.con,'rejected-author',self.f.fx,now=1)
 
@@ -123,8 +134,72 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.assertEqual(s['category'],'maintenance_review_fact_disagreement_verified')
         self.assertEqual(s['history'],history);self.assertEqual(s['reconsideration'],rejection)
         self.assertFalse(s['delivery_approval']);self.assertFalse(s['source_reset'])
-        calls=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),s);self.assertEqual(self.f.calls,calls)
-        self.assertEqual([c[1] for c in calls if c[0]=='wake'],['plan','permit','author','review','diagnose','reconsider','audit'])
+        self.assertEqual([c[1] for c in self.f.calls if c[0]=='wake'],['plan','permit','author','review','diagnose','reconsider','audit'])
+
+    def reach_escalated_review(self):
+        self.reach_audit();self.advance();self.complete_audit();self.advance();self.advance()
+        self.assertEqual(self.advance()['stage'],'escalated_prepare')
+        return self.advance()
+
+    def complete_escalated_review(self):
+        self.f.tasks.append(dict(id='escalated-cto-review',agent_id='cto',issue_id='maintenance',status='completed',wakeup_id='escalated-0'))
+
+    def test_verified_facts_handoff_to_cto_review_not_another_lead_or_author_execution(self):
+        s=self.reach_escalated_review();self.assertEqual(s['stage'],'escalated_dispatch')
+        snapshot=copy.deepcopy(s['snapshot']);history=copy.deepcopy(s['history']);prior=copy.deepcopy(s['reconsideration'])
+        self.assertEqual(self.advance()['stage'],'escalated_wait');self.escalated_choice='approve_test_revision'
+        self.complete_escalated_review();s=self.advance()
+        self.assertEqual(s['stage'],'maintenance_approved');self.assertEqual(s['review_phase'],'escalated')
+        self.assertEqual(s['review']['agent_id'],'cto');self.assertEqual(s['snapshot'],snapshot)
+        self.assertEqual(s['history'],history);self.assertEqual(s['reconsideration'],prior)
+        self.assertFalse(s['delivery_approval']);self.assertFalse(s['source_reset'])
+        calls=copy.deepcopy(self.f.calls);self.advance();self.assertEqual(self.f.calls,calls)
+        self.assertEqual([c[1] for c in calls if c[0]=='wake'].count('author'),1)
+        self.assertEqual([c[1] for c in calls if c[0]=='wake'].count('reconsider'),1)
+
+    def test_escalated_rejection_is_retained_without_approval_or_a_retry_loop(self):
+        self.reach_escalated_review();self.advance();self.escalated_choice='reject_test_revision';self.complete_escalated_review();s=self.advance()
+        self.assertEqual(s['category'],'maintenance_escalated_review_changes_requested')
+        self.assertEqual(s['escalated_review']['task_id'],'escalated-cto-review');self.assertNotIn('review',s)
+        calls=copy.deepcopy(self.f.calls);self.advance();self.assertEqual(self.f.calls,calls)
+
+    def test_escalated_unknown_wakeup_only_observes_its_original_marker(self):
+        self.reach_escalated_review();self.f.timeout=True
+        self.assertEqual(self.advance()['stage'],'escalated_observe');self.assertEqual(self.advance()['stage'],'escalated_wait')
+        wakes=[c for c in self.f.calls if c[0]=='wake' and c[1]=='escalated']
+        self.assertEqual([c[2] for c in wakes],[True,False]);self.assertEqual(wakes[0][3],wakes[1][3])
+
+    def test_escalated_preparation_does_not_inherit_an_expired_prior_deadline(self):
+        self.reach_audit();self.advance();self.complete_audit();self.advance();self.advance()
+        s=json.loads(self.f.con.execute('SELECT state FROM literal_maintenance_workflows WHERE source_task=?',('rejected-author',)).fetchone()[0])
+        s['phase_started']=-5000
+        self.f.con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=?',(json.dumps(s),'rejected-author'));self.f.con.commit()
+        calls=[]
+        def timeout(*args):calls.append(True);raise TimeoutError()
+        self.f.fx.verify=timeout
+        self.assertEqual(self.advance()['stage'],'escalated_prepare');self.assertEqual(calls,[])
+        self.assertEqual(self.advance()['stage'],'escalated_prepare');self.assertEqual(calls,[True])
+
+    def test_escalated_approval_requires_the_validation_receipt_not_just_model_text(self):
+        self.reach_escalated_review();self.advance();self.complete_escalated_review()
+        self.f.fx.validate_escalated_review=lambda *args:None
+        s=self.advance();self.assertEqual(s['category'],'maintenance_escalated_review_evidence_invalid')
+        self.assertNotIn('review',s);self.assertFalse(s['delivery_approval'])
+
+    def test_prior_reviewer_cannot_impersonate_the_assigned_escalated_reviewer(self):
+        self.reach_escalated_review();self.advance();self.complete_escalated_review()
+        self.f.tasks[-1]['agent_id']='lead'
+        self.assertEqual(self.advance()['category'],'maintenance_evidence_rejected')
+
+    def test_escalated_approval_cannot_bypass_failed_fixed_protocol(self):
+        inspect=self.f.fx.inspect
+        def failed(*args):
+            result=inspect(*args);result['stale_witness_selectivity_passed']=False
+            for report in result['reports'].values():report['poll_requests']=2
+            return result
+        self.f.fx.inspect=failed
+        self.reach_escalated_review();self.advance();self.complete_escalated_review()
+        self.assertEqual(self.advance()['category'],'maintenance_review_conflicts_fixed_gate')
 
     def test_unproven_new_cto_observation_is_retained_without_another_review(self):
         self.reach_audit();self.advance();self.complete_audit();self.advance();self.audit_verified=False;s=self.advance()

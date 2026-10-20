@@ -2051,8 +2051,18 @@ achados estruturados e teve as observações confirmadas pelo helper nos mesmos
 snapshots. Isso qualificou a integração de coleta e verificação factual, não a
 entrega. A justificativa livre ainda continha uma frase contraditória e não foi
 usada como prova. O fluxo preservou as rejeições e os limites e não concedeu
-aprovação ou outra tentativa de revisão. Continua pendente qualificar o handoff
-da divergência factual confirmada para uma resolução técnica independente.
+aprovação ou outra tentativa de revisão.
+
+O próximo handoff implementado é uma única revisão de escalonamento pelo CTO,
+distinto do autor do código e do revisor anterior. A autoridade é vinculada ao
+manifesto, à auditoria nativa e aos fatos medidos; não rearma a reconsideração do
+Lead nem permite nova implementação. Antes de aceitar o parecer, o controlador
+reconstrói e confere os hashes dos quatro arquivos a partir dos recibos de leitura
+da própria tarefa. Aprovação exige os controles fixos; rejeição exige citações
+observadas do código. Os pareceres anteriores permanecem preservados. O prazo da
+nova operação é persistido antes da autenticação remota, para não herdar um prazo
+vencido após falha transitória de observação. Essa extensão passou nos testes
+focados; instalação e conclusão nativa ainda precisam ser comprovadas.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
@@ -2076,7 +2086,10 @@ flowchart LR
     C1 -->|Restrição não resolvida| H[Impedimento técnico visível com CTO; sem retry idêntico]
     RR -->|Rejeita| FA[CTO: auditoria única com achados estruturados]
     FA --> FV[Helper verifica citação, base do diff e literal]
-    FV --> H
+    FV -->|Divergência não confirmada| H
+    FV -->|Fatos confirmados e autoridade reautenticada| ER[CTO: uma revisão independente do mesmo artefato]
+    ER -->|Rejeita com citação observada| H
+    ER -->|Aprova + bytes lidos e controles válidos| M
     RR -->|Aprova + verificações fixas válidas| M[Manutenção aprovada; calibração e TDD ainda exigidos]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```
