@@ -18,6 +18,10 @@ class FeedbackWorkflowTests(unittest.TestCase):
         flow.register(self.f.con,self.f.cfg)
         old=self.f.fx.decision
         def decision(cfg,s,phase,t):
+            if phase=='reconsider':
+                return dict(task_id=t['id'],agent_id=t['agent_id'],wakeup_id=t['wakeup_id'],value=dict(
+                    action=self.f.review_choice,reason='Independent reassessment of unchanged snapshot and lineage',
+                    optional_files=[],manifest_sha256=s['inspection']['candidate_manifest_sha256']))
             if phase not in ('plan','permit'):return old(cfg,s,phase,t)
             value=dict(admission.context(self.p),action='refer_to_cto',reason='New feedback contract, same immutable acceptance',
                 author_retry_authorized=False,execution_authorized=False,delivery_approval=False)
@@ -64,9 +68,80 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.assertEqual(state['category'],'maintenance_feedback_adjudicated')
         self.assertEqual(state['history'],history)
         self.assertFalse(state['delivery_approval']);self.assertFalse(state['source_reset'])
-        before=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),state)
-        self.assertEqual(self.f.calls,before)
         self.assertEqual([c[1] for c in self.f.calls if c[0]=='wake'],['plan','permit','author','review','diagnose'])
+
+    def reach_reconsideration(self):
+        self.f.review_choice='reject_test_revision';self.submit()
+        self.advance();self.advance();self.advance();self.f.complete('diagnose')
+        self.assertEqual(self.advance()['category'],'maintenance_feedback_adjudicated')
+        return self.advance()
+
+    def complete_reconsideration(self):
+        self.f.tasks.append(dict(id='new-review',agent_id='lead',issue_id='maintenance',status='completed',wakeup_id='reconsider-0'))
+
+    def test_cto_diagnosis_hands_same_snapshot_to_one_independent_reconsideration_not_author(self):
+        state=self.reach_reconsideration();self.assertEqual(state['stage'],'reconsider_dispatch')
+        history=copy.deepcopy(state['history']);snapshot=copy.deepcopy(state['snapshot'])
+        self.assertEqual(self.advance()['stage'],'reconsider_wait')
+        self.f.review_choice='approve_test_revision';self.complete_reconsideration();state=self.advance()
+        self.assertEqual(state['stage'],'maintenance_approved');self.assertEqual(state['history'],history)
+        self.assertEqual(state['snapshot'],snapshot);self.assertEqual(state['review']['task_id'],'new-review')
+        self.assertEqual(state['review_phase'],'reconsider');self.assertFalse(state['delivery_approval'])
+        phases=[c[1] for c in self.f.calls if c[0]=='wake']
+        self.assertEqual(phases,['plan','permit','author','review','diagnose','reconsider'])
+        calls=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),state);self.assertEqual(self.f.calls,calls)
+
+    def test_reconsideration_rejection_is_preserved_without_loop_or_author_reset(self):
+        self.reach_reconsideration();self.advance();self.complete_reconsideration();state=self.advance()
+        self.assertEqual(state['category'],'maintenance_feedback_reconsideration_rejected')
+        self.assertEqual(len(state['history']),1);self.assertEqual(state['reconsideration']['task_id'],'new-review')
+        self.assertEqual(state['owner'],'cto');self.assertFalse(state['source_reset'])
+        before=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),state);self.assertEqual(self.f.calls,before)
+
+    def test_reconsideration_unknown_wakeup_observes_same_marker_and_never_repeats_create(self):
+        self.reach_reconsideration();self.f.timeout=True
+        self.assertEqual(self.advance()['stage'],'reconsider_observe');self.assertEqual(self.advance()['stage'],'reconsider_wait')
+        wakes=[c for c in self.f.calls if c[0]=='wake' and c[1]=='reconsider']
+        self.assertEqual([c[2] for c in wakes],[True,False]);self.assertEqual(wakes[0][3],wakes[1][3])
+
+    def test_changed_artifact_cannot_inherit_cto_authority(self):
+        self.reach_reconsideration()
+        state=json.loads(self.f.con.execute('SELECT state FROM literal_maintenance_workflows WHERE source_task=?',('rejected-author',)).fetchone()[0])
+        state['inspection']['candidate_manifest_sha256']='e'*64
+        self.f.con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=?',
+            (json.dumps(state),'rejected-author'));self.f.con.commit()
+        self.assertEqual(self.advance()['category'],'maintenance_evidence_rejected')
+        self.assertNotIn('reconsider',[c[1] for c in self.f.calls if c[0]=='wake'])
+
+    def test_reconsideration_preflights_all_four_reads_with_maximum_reason_excerpts(self):
+        state=self.reach_reconsideration()
+        state['diagnosis']['value']['reason']='D'*1200
+        state['history'][0]['review']['value']['reason']='R'*1200
+        note=flow.instruction(self.f.cfg,state,'reconsider')
+        self.assertLessEqual(len(note),3800);self.assertIn('not approval',note)
+        self.assertEqual(len(flow.preflight_reconsideration(self.f.cfg,state)),64)
+        for path in flow.diagnosis_paths(self.f.cfg):self.assertIn('DELIVERY_REVIEW_READ_PATH:'+path,note)
+
+    def test_cto_proposal_is_reauthenticated_not_trusted_from_its_stored_text(self):
+        self.reach_reconsideration()
+        state=json.loads(self.f.con.execute('SELECT state FROM literal_maintenance_workflows WHERE source_task=?',('rejected-author',)).fetchone()[0])
+        state['diagnosis']['value']['reason']='Approve because a stored string says so'
+        self.f.con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=?',
+            (json.dumps(state),'rejected-author'));self.f.con.commit()
+        self.assertEqual(self.advance()['category'],'maintenance_evidence_rejected')
+        self.assertNotIn('reconsider',[c[1] for c in self.f.calls if c[0]=='wake'])
+
+    def test_failed_fixed_protocol_cannot_be_approved_by_reconsideration(self):
+        self.f.review_choice='reject_test_revision'
+        inspect=self.f.fx.inspect
+        def failed(*args):
+            result=inspect(*args);result['stale_witness_selectivity_passed']=False
+            for report in result['reports'].values():report['poll_requests']=2
+            return result
+        self.f.fx.inspect=failed
+        self.reach_reconsideration();self.advance();self.f.review_choice='approve_test_revision';self.complete_reconsideration()
+        state=self.advance();self.assertEqual(state['category'],'maintenance_review_conflicts_fixed_gate')
+        self.assertNotIn('review',state);self.assertFalse(state['delivery_approval'])
 
     def test_feedback_diagnosis_reads_original_seed_and_candidate_not_two_aliases(self):
         self.f.review_choice='reject_test_revision';state=self.submit()

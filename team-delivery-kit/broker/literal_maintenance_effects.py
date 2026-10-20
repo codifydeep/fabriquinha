@@ -154,6 +154,7 @@ class Effects:
                 '. Original attempts, snapshots, acceptance, baseline and release gates remain unchanged. No product admission.',
             parent_issue_id=cfg['parent_issue_id'],project_id=parent.get('project_id'),stage=1,status='todo'),allow_create=first)
     def wake(self,cfg,s,phase,first):
+        if phase=='reconsider':flow.preflight_reconsideration(cfg,s)
         if phase in ('plan','diagnose') or (cfg.get('feedback_strategy') and phase=='permit'):flow.preflight_plan(cfg,s,phase)
         function=native.ensure_unit_start if phase=='author' else native.ensure_planning_start
         return function(self.settings,s['issue_id'],flow.actor(cfg,phase),flow.dispatch_source(cfg),
@@ -167,9 +168,9 @@ class Effects:
         binding=self.old.binding(actual,role)
         with self.b.db() as con:count=con.execute('SELECT coalesce(sum(tool_count),0) FROM tool_events WHERE request_id=?',(binding['request_id'],)).fetchone()[0]
         reads={}
-        if phase in ('review','diagnose'):
+        if phase in ('review','diagnose','reconsider'):
             observed=self.plans.reads(actual)
-            paths=flow.diagnosis_paths(cfg) if phase=='diagnose' else ['/evidence/'+root+'/'+cfg['test_path'] for root in ('candidate','previous')]
+            paths=flow.diagnosis_paths(cfg) if phase in ('diagnose','reconsider') else ['/evidence/'+root+'/'+cfg['test_path'] for root in ('candidate','previous')]
             for path in paths:
                 r=observed.get(path,{})
                 require(type(r.get('lines')) is int and r['lines']>0 and r['lines']==r.get('total_lines'));reads[path]=r
@@ -388,10 +389,11 @@ def mounts(b,binding):
     with b.db() as con:match=current(con,binding['issue_id'])
     if not match:return []
     cfg,s=match
-    phase='diagnose' if s['stage'].startswith('diagnose_') else 'review'
+    phase=next((p for p in ('diagnose','reconsider') if s['stage'].startswith(p+'_')),'review')
     if s['stage'] not in (phase+'_observe',phase+'_wait'):return []
     role=flow.actor(cfg,phase);require(binding['agent_id']==role)
     fx=Effects(b);fx.verify(cfg);flow.authenticate(cfg,s,fx)
+    if phase=='reconsider':flow.authenticate_reconsideration(cfg,s,fx)
     if phase=='diagnose':flow.authenticate_rejections(cfg,s,fx)
     if phase=='diagnose' and cfg.get('feedback_strategy'):fx.validate_diagnosis_bundle(cfg,s,s['diagnosis_bundle'])
     with b.db() as con:
@@ -400,7 +402,7 @@ def mounts(b,binding):
         task=fx.plans.task(row['task_id'],role);s=authorize_phase(con,cfg,s,task,phase,fx.settings)
     labels=(b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
     require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
-    previous=(s['diagnosis_bundle']['volume'] if cfg.get('feedback_strategy') else s['history'][0]['snapshot']['volume']) if phase=='diagnose' else cfg['source']['candidate_volume']
+    previous=(s['diagnosis_bundle']['volume'] if cfg.get('feedback_strategy') else s['history'][0]['snapshot']['volume']) if phase in ('diagnose','reconsider') else cfg['source']['candidate_volume']
     volumes=[('previous',previous),('candidate',s['snapshot']['volume'])]
     return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in volumes]
 

@@ -1962,8 +1962,9 @@ predecessor e correção atual. A resposta exige leituras completas dos três, p
 não atribuir alterações herdadas à última execução nem confundir código dentro
 do literal autorizado com código externo. Wakeups sem confirmação são observados
 pelo mesmo identificador; não se repetem autor ou revisor. O diagnóstico registra
-uma proposta técnica: **não anula a rejeição nem autoriza edição, nova revisão,
-TDD ou entrega**. A execução da próxima operação ainda exige qualificação própria.
+uma proposta técnica: **não anula a rejeição nem autoriza edição, TDD ou
+entrega**. O controlador precisa reautenticar essa proposta e registrar a
+autoridade limitada da próxima operação antes de despachar outro worker.
 O ensaio nativo demonstrou o despacho automático, mas **não validou o diagnóstico**:
 o proxy instalado conduziu apenas as leituras `candidate` e `previous`, ignorando
 o terceiro root `seed`. O controlador rejeitou a decisão sem a leitura obrigatória;
@@ -1989,10 +1990,20 @@ Não se aplica a falhas arbitrárias nem pode ser usada para rearmar limites.
 Uma execução nativa dessa retomada completou as quatro leituras, com recibos
 autenticados, e o controlador aceitou o diagnóstico do CTO. O diagnóstico
 distinguiu as alterações herdadas das atuais e propôs reexaminar a rejeição.
-Isso **não aprovou a entrega**: o encaminhamento dessa proposta a uma nova
-revisão independente do mesmo snapshot ainda é uma etapa pendente. Testes
-offline, projeção íntegra e diagnóstico aceito não substituem revisão,
-calibração completa, TDD ou homologação.
+Isso **não aprovou a entrega**. O encaminhamento implementado solicita uma única
+nova revisão independente do mesmo snapshot quando o CTO propõe uma operação
+técnica (`request_test_revision`), sem interpretar palavras da justificativa
+como autoridade. Essa reavaliação precede qualquer alteração; não significa
+que o controlador ou CTO concordem com uma aprovação. A autoridade persistida
+vincula configuração, rejeição anterior, diagnóstico real, manifesto, autor e
+pacote de evidências. Reinícios reautenticam as decisões nativas e as quatro
+leituras; uma confirmação de wakeup incerta é observada, nunca recriada.
+O autor não ganha outra execução. A nova revisão pode aprovar somente o manifesto
+exato com verificações fixas aprovadas, ou preservar uma nova rejeição com CTO
+responsável e sem loop de reconsiderações. O caminho tem testes offline e
+preflight sobre o estado real; sua validação nativa continua necessária.
+Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
+completa, TDD, revisão de produto ou homologação.
 
 ```mermaid
 flowchart LR
@@ -2008,9 +2019,12 @@ flowchart LR
     S --> F[Feedback diagnóstico pelo formatter ACP]
     F --> A
     A --> I[Snapshot e revisão independente]
-    I -->|Rejeição preservada| C1[CTO: diagnóstico único dos três snapshots]
-    C1 --> B1[Original + seed projetados em previous; candidato preservado]
-    B1 --> H[Quatro leituras verificadas e proposta técnica; sem aprovação ou retry implícito]
+    I -->|Rejeição preservada| B1[Original + seed projetados em previous; candidato preservado]
+    B1 --> C1[CTO: quatro leituras verificadas e proposta técnica]
+    C1 -->|Proposta reautenticada; sem editar| RR[Lead: uma reconsideração independente do mesmo manifesto]
+    C1 -->|Restrição não resolvida| H[Impedimento técnico visível com CTO; sem retry idêntico]
+    RR -->|Rejeita| H
+    RR -->|Aprova + verificações fixas válidas| M[Manutenção aprovada; calibração e TDD ainda exigidos]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```
 

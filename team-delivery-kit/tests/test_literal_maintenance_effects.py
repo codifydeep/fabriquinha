@@ -158,6 +158,32 @@ class LiteralEffectsTests(unittest.TestCase):
             with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'diagnose',actual)
             for path in flow.diagnosis_paths(self.cfg):reads[path]['lines']=9
             self.assertEqual(len(fx.decision(self.cfg,self.s,'diagnose',actual)['read_evidence']),4)
+            self.s['stage']='reconsider_wait';actual['agent_id']='lead'
+            actual['handoff_note']=effects.expected_note(self.cfg,self.s,'reconsider')
+            self.assertEqual(len(fx.decision(self.cfg,self.s,'reconsider',actual)['read_evidence']),4)
+            reads['/evidence/previous/report.json']['lines']=8
+            with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'reconsider',actual)
+
+    def test_reconsideration_mounts_same_projection_readonly_and_reauthenticates_cto_before_access(self):
+        self.cfg.update(feedback_strategy={'policy':{}},workflow_key='rejected-author')
+        self.s.update(stage='reconsider_wait',snapshot=dict(volume='frozen-candidate'),author_task='author-task',
+            diagnosis_bundle=dict(volume='frozen-projection'))
+        self.con.execute('UPDATE literal_maintenance_workflows SET config=? WHERE source_task=?',(json.dumps(self.cfg),'source'));self.save()
+        self.con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT)')
+        self.con.execute('CREATE TABLE leases(request_id TEXT,status TEXT)')
+        self.con.execute("INSERT INTO native_bindings VALUES('request','review-task')")
+        self.con.execute("INSERT INTO leases VALUES('request','running')")
+        b=SimpleNamespace(db=lambda:self.con,OWNER='owner',docker=lambda *args:
+            dict(Labels={'delivery-kit.owner':'owner','delivery-kit.source-task':'author-task'}))
+        fx=SimpleNamespace(verify=lambda cfg:None,plans=SimpleNamespace(task=lambda *args:dict(id='review-task')),settings={})
+        with patch.object(effects,'Effects',return_value=fx),patch.object(flow,'authenticate'),\
+                patch.object(flow,'authenticate_reconsideration') as auth,patch.object(effects,'authorize_phase',return_value=self.s):
+            mounts=effects.mounts(b,dict(issue_id='maintenance',agent_id='lead',request_id='request'))
+            auth.assert_called_once()
+            for actor in ('author','cto'):
+                with self.assertRaises(ValueError):effects.mounts(b,dict(issue_id='maintenance',agent_id=actor,request_id='request'))
+        self.assertEqual(mounts,[dict(Type='volume',Source='frozen-projection',Target='/evidence/previous',ReadOnly=True),
+            dict(Type='volume',Source='frozen-candidate',Target='/evidence/candidate',ReadOnly=True)])
 
     def test_registration_does_not_authorize_unrelated_or_pre_permit_work(self):
         self.save();self.assertFalse(effects.registered_author(self.con,'maintenance','author'))
