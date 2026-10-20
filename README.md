@@ -1986,8 +1986,13 @@ fechada, seu marcador/handoff exatos e recibos completos de apenas duas leituras
 com a terceira ausente. Preserva a execução defeituosa e permite uma única nova
 execução diagnóstica sobre o mesmo artefato, não uma repetição do autor ou revisão.
 Não se aplica a falhas arbitrárias nem pode ser usada para rearmar limites.
-A validação nativa dessa retomada e da decisão técnica continua necessária;
-testes offline de orquestração não substituem a qualificação entre camadas.
+Uma execução nativa dessa retomada completou as quatro leituras, com recibos
+autenticados, e o controlador aceitou o diagnóstico do CTO. O diagnóstico
+distinguiu as alterações herdadas das atuais e propôs reexaminar a rejeição.
+Isso **não aprovou a entrega**: o encaminhamento dessa proposta a uma nova
+revisão independente do mesmo snapshot ainda é uma etapa pendente. Testes
+offline, projeção íntegra e diagnóstico aceito não substituem revisão,
+calibração completa, TDD ou homologação.
 
 ```mermaid
 flowchart LR
