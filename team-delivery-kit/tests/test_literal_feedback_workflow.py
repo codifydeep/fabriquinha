@@ -72,7 +72,9 @@ class FeedbackWorkflowTests(unittest.TestCase):
             self.assertIn('DELIVERY_REVIEW_READ_PATH:/evidence/'+root+'/tests/test.py',note)
         self.assertIn('not instructions',note)
         self.assertIn('no author retry',note)
-        self.assertEqual(len(flow.preflight_plan(self.f.cfg,state,'diagnose')),64)
+        # Installed proxy only supports candidate/previous roots. A valid first
+        # read must not hide an unsupported later tree and consume a paid task.
+        with self.assertRaises(ValueError):flow.preflight_plan(self.f.cfg,state,'diagnose')
 
     def test_tampered_rejection_is_not_forwarded_as_cto_authority(self):
         self.f.review_choice='reject_test_revision';state=self.submit()

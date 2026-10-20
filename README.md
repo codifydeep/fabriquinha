@@ -1964,7 +1964,14 @@ do literal autorizado com código externo. Wakeups sem confirmação são observ
 pelo mesmo identificador; não se repetem autor ou revisor. O diagnóstico registra
 uma proposta técnica: **não anula a rejeição nem autoriza edição, nova revisão,
 TDD ou entrega**. A execução da próxima operação ainda exige qualificação própria.
-Esse caminho tem testes offline; a validação nativa dessa escalada está pendente.
+O ensaio nativo demonstrou o despacho automático, mas **não validou o diagnóstico**:
+o proxy instalado conduziu apenas as leituras `candidate` e `previous`, ignorando
+o terceiro root `seed`. O controlador rejeitou a decisão sem a leitura obrigatória;
+não houve aprovação ou nova tentativa do autor. O preflight agora verifica cada
+caminho separadamente, sem inventar recibos de leitura, para recusar essa
+incompatibilidade antes de outra chamada paga. Disponibilizar os três artefatos
+por um contrato de leitura suportado continua pendente; os testes offline de
+orquestração não substituem essa qualificação entre camadas.
 
 ```mermaid
 flowchart LR

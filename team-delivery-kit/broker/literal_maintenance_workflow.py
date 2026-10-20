@@ -223,6 +223,18 @@ def preflight_plan(cfg,s,phase='plan'):
     if phase=='diagnose':
         # Exercise the real initial read contract. No synthetic read results are
         # inserted to pretend the terminal decision is already authorized.
+        # Probe EVERY required path separately too: accepting the first two
+        # roots does not prove the proxy can ever request a third evidence tree.
+        import re
+        declared=re.findall(r'^DELIVERY_REVIEW_READ_PATH:(.+)$',note,re.M)
+        require(len(declared)==len(diagnosis_roots(cfg)))
+        for path in declared:
+            isolated=re.sub(r'^DELIVERY_REVIEW_READ_PATH:.+\n?','',note,flags=re.M)
+            isolated+='\nDELIVERY_REVIEW_READ_PATH:'+path+'\n'
+            probe=schema(dict(messages=[dict(role='user',content=isolated)],
+                tools=[dict(type='function',function=dict(name='read_file',parameters={}))]))
+            require(probe.get('tool_choice')==dict(type='function',function=dict(name='read_file'))
+                and probe['tools'][0]['function']['parameters']['properties']['path']['enum']==[path])
         body=schema(dict(messages=[dict(role='user',content=note)],
             tools=[dict(type='function',function=dict(name='read_file',parameters={}))]))
         require(body['tool_choice']==dict(type='function',function=dict(name='read_file'))
