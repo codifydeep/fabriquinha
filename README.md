@@ -2235,6 +2235,13 @@ marcador, sem repetir a criação. O qualificador não renova o orçamento de da
 nem do autor, não aprova testes e não prova a causa histórica do bloqueio.
 Essa recuperação tem testes offline, mas **ainda não foi exercida nativamente**.
 
+Na instalação port2, o broker `20261020.510` já conferiu e aceitou a qualificação
+administrativa: fonte instalada, ausência dos efeitos vedados e backup com
+restauração foram verificados antes da retomada. O estado técnico foi rearmado
+uma vez, preservando a falha e a capacidade anterior. Isso prova a transição
+administrativa; o novo despacho, as duas decisões técnicas independentes e a
+continuação da entrega continuam sendo verificações nativas separadas.
+
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
 usando os valores das assertions congeladas. O campo legado de seletividade agrega
