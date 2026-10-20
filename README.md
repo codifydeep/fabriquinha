@@ -2245,8 +2245,13 @@ administrativa. O novo despacho CTO completou `initialize`, `session/new` e
 decisão estruturada `request_correction`. A tarefa anterior continua falha e
 preservada. Isso comprova uma retomada técnica real, não as duas decisões
 independentes nem a continuação integral da entrega. O controlador aceitou a
-decisão e transferiu a responsabilidade para o Tech Lead em `review_dispatch`.
-A revisão independente e os gates posteriores permanecem separados.
+decisão e transferiu a responsabilidade para o Tech Lead. A tarefa independente
+concluiu em 16 segundos, também com ACP bem-sucedido e lease encerrada; seu
+recibo foi aceito. A revalidação dos dois recibos e do probe e a transição
+atômica para `armed` foram confirmadas; o workflow comum retornou a
+`bundle_dispatch`, limitado a uma nova submissão. Ainda são necessárias a
+nova proposta de calibração e todos os gates posteriores. Essas decisões não
+autorizam o autor a alterar a entrega nem constituem aprovação de produto.
 
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
