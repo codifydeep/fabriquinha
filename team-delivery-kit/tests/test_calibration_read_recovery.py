@@ -76,6 +76,29 @@ class ReadRecoveryTests(unittest.TestCase):
     def test_unknown_wakeup_only_observes_original_marker(self):
         self.step();self.step();self.uncertain=True;self.assertEqual(self.step()['stage'],'cto_observe')
         self.step();self.assertEqual([x[1] for x in self.wakes],[True,False]);self.assertEqual(self.wakes[0][2],self.wakes[1][2])
+
+    def test_qualified_bootstrap_changes_marker_once_and_unknown_ack_only_observes_it(self):
+        from broker import calibration_admission_recovery as admission
+        self.step();self.step();self.step()
+        self.runs=[dict(id='failed',wakeup_id='cto-wake',agent_id='cto',status='failed')]
+        old=copy.deepcopy(self.step());self.assertEqual(old['stage'],'blocked')
+        failed=dict(self.runs[0],issue_id=old['issue_id'],started_at='2026-10-20T21:25:27Z',
+            completed_at='2026-10-20T21:25:42Z',error='hermes initialize failed: hermes process exited',
+            failure_reason='agent_error.process_failure')
+        admission.transition(self.con,recovery.key(self.c),self.cfg,old,task=failed,
+            binding=dict(task_id='failed',agent_id='cto',issue_id=old['issue_id'],request_id='request',scope='ws:cto:planning:failed'),
+            grant=dict(task_id='failed',attempt=1,mode='planning',request_id='request',deadline=1792532027.5787756,used=0),
+            counts={k:0 for k in admission.EMPTY_TABLES},
+            installation=dict(operation='installed_admission_isolation_v1',runtime_image=admission.RUNTIME_IMAGE,
+                source_hashes=dict(admission.SOURCE_HASHES),lock_isolation=True,shared_lane_lock=True),
+            barrier=dict(stage='sealed',drained=True,namespace='owned',operation_id='maintenance'),namespace='owned',now=1792534000)
+        self.uncertain=True
+        self.assertEqual(self.step()['stage'],'cto_observe')
+        self.assertNotEqual(self.wakes[-1][2],old['marker'])
+        self.step()
+        self.assertEqual(self.wakes[-1][1],False)
+        self.assertEqual(self.wakes[-1][2],self.wakes[-2][2])
+        self.assertEqual(self.con.execute('SELECT count(*) FROM calibration_admission_recoveries').fetchone()[0],1)
     def test_changed_parent_or_missing_prerequisite_projection_cannot_be_armed(self):
         self.ready_review();self.finish('review')
         self.con.execute('DELETE FROM delivery_handoffs');self.con.commit()

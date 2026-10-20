@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261020.509
+COPY broker/calibration_admission_recovery.py broker/calibration_read_recovery.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_admission_recovery,calibration_read_recovery"

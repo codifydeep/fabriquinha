@@ -25,6 +25,12 @@ def initialize(con):
 def key(c):return digest(dict(source=digest(c),protocol='full_dependency_reads_v1'))
 
 
+def dispatch_marker(cfg,state,phase):
+    value=dict(config=digest(cfg),phase=phase,note=instruction(cfg,state,phase))
+    if state.get('admission_recovery_sha256'):value['admission_recovery_sha256']=state['admission_recovery_sha256']
+    return digest(value)
+
+
 def inapplicable_json_request(cfg,state):
     diagnostic=cfg.get('rejection',{}).get('diagnostic',{})
     decision=state.get('cto_decision',{}).get('value',{})
@@ -95,6 +101,10 @@ def advance(con,cfg,fx,*,now=None):
         required_action='CTO diagnose '+category+' from preserved evidence; no identical data submission or author retry')
     try:
         fx.verify(cfg)
+        if s.get('admission_recovery_sha256'):
+            try:import calibration_admission_recovery as admission
+            except ImportError:from broker import calibration_admission_recovery as admission
+            admission.qualified(con,k,cfg,s)
         if s['stage']=='measure':
             job=fx.measure(cfg);raw=job['output']
             require(job['approval'] is False and type(job['exit_code']) is int and job['exit_code']==0
@@ -142,7 +152,7 @@ def advance(con,cfg,fx,*,now=None):
             first=s['stage']==phase+'_dispatch'
             if first:
                 if not fx.reserve():return s
-                save(stage=phase+'_observe',marker=digest(dict(config=digest(cfg),phase=phase,note=instruction(cfg,s,phase))),phase_started=now)
+                save(stage=phase+'_observe',marker=dispatch_marker(cfg,s,phase),phase_started=now)
             wake=fx.wake(cfg,s,phase,first)
             if wake is None:return hold('dependency_wakeup_unobserved') if now-s['phase_started']>=600 else s
             return save(stage=phase+'_wait',wakeup_id=wake['id'],owner=actor,

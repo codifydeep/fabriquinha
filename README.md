@@ -2219,6 +2219,22 @@ A suíte offline Linux executou 3.740 testes, com 8 skips existentes.
 não recupera automaticamente tarefas falhas, não autoriza novo ensaio e não
 comprova entrega autônoma.
 
+O qualificador administrativo `controller_calibration_admission_cli.py` limita a
+recuperação pré-prompt a uma vez por experimento de leitura. Exige manutenção
+selada, tarefas/leases ociosos, a tarefa CTO e seu wakeup exatos, uma única
+capacidade expirada e nunca usada, nenhuma lease/inicialização/ocorrência ACP ou
+de ferramenta, e emissão posterior ao encerramento nativo. O horário de emissão
+é derivado somente da versão fixa do controlador que usa validade de 480 segundos.
+Os hashes e o isolamento dos locks instalados são conferidos por código local,
+nunca por declaração de um agente. Uma transação grava o recibo e a retomada
+juntos; falha intermediária não pode deixar meia autorização.
+
+O novo despacho usa o hash desse recibo no marcador. A tarefa, o wakeup e a
+capacidade antigos permanecem intactos; um timeout de publicação observa o mesmo
+marcador, sem repetir a criação. O qualificador não renova o orçamento de dados
+nem do autor, não aprova testes e não prova a causa histórica do bloqueio.
+Essa recuperação tem testes offline, mas **ainda não foi exercida nativamente**.
+
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
 usando os valores das assertions congeladas. O campo legado de seletividade agrega
