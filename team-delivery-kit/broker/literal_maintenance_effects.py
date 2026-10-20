@@ -169,8 +169,9 @@ class Effects:
         reads={}
         if phase in ('review','diagnose'):
             observed=self.plans.reads(actual)
-            for root in (flow.diagnosis_roots(cfg) if phase=='diagnose' else ('candidate','previous')):
-                path='/evidence/'+root+'/'+cfg['test_path'];r=observed.get(path,{})
+            paths=flow.diagnosis_paths(cfg) if phase=='diagnose' else ['/evidence/'+root+'/'+cfg['test_path'] for root in ('candidate','previous')]
+            for path in paths:
+                r=observed.get(path,{})
                 require(type(r.get('lines')) is int and r['lines']>0 and r['lines']==r.get('total_lines'));reads[path]=r
         else:require(count==0)
         raw=(actual.get('result') or {}).get('output');require(isinstance(raw,str) and 0<len(raw.encode())<=8192)
@@ -194,6 +195,14 @@ class Effects:
             require(snapshot and snapshot['status']=='complete' and snapshot['volume']==s['snapshot']['volume'])
         labels=(self.b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
         require(labels.get('delivery-kit.owner')==self.b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
+    def diagnosis_bundle(self,cfg,s):
+        try:import literal_diagnosis_evidence as evidence
+        except ImportError:from broker import literal_diagnosis_evidence as evidence
+        return evidence.prepare(self.b,cfg,s)
+    def validate_diagnosis_bundle(self,cfg,s,value):
+        try:import literal_diagnosis_evidence as evidence
+        except ImportError:from broker import literal_diagnosis_evidence as evidence
+        evidence.validate(self.b,cfg,s,value)
     def experiment(self,cfg,s):
         job=validation_job.run(self.b,s['diagnosis']['task_id'],'structure',capture_payload(cfg,s))
         require(job['exit_code']==0 and job['output_sha256']==hashlib.sha256(job['output'].encode()).hexdigest())
@@ -384,16 +393,15 @@ def mounts(b,binding):
     role=flow.actor(cfg,phase);require(binding['agent_id']==role)
     fx=Effects(b);fx.verify(cfg);flow.authenticate(cfg,s,fx)
     if phase=='diagnose':flow.authenticate_rejections(cfg,s,fx)
+    if phase=='diagnose' and cfg.get('feedback_strategy'):fx.validate_diagnosis_bundle(cfg,s,s['diagnosis_bundle'])
     with b.db() as con:
         row=con.execute('SELECT n.task_id,l.status FROM native_bindings n JOIN leases l USING(request_id) WHERE n.request_id=?',
             (binding['request_id'],)).fetchone();require(row and row['status'] in ('creating','starting','running'))
         task=fx.plans.task(row['task_id'],role);s=authorize_phase(con,cfg,s,task,phase,fx.settings)
     labels=(b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
     require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
-    volumes=[('previous',s['history'][0]['snapshot']['volume'] if phase=='diagnose' and not cfg.get('feedback_strategy')
-        else cfg['source']['candidate_volume']),('candidate',s['snapshot']['volume'])]
-    if phase=='diagnose' and cfg.get('feedback_strategy'):
-        volumes.append(('seed',cfg['feedback_strategy']['policy']['previous_volume']))
+    previous=(s['diagnosis_bundle']['volume'] if cfg.get('feedback_strategy') else s['history'][0]['snapshot']['volume']) if phase=='diagnose' else cfg['source']['candidate_volume']
+    volumes=[('previous',previous),('candidate',s['snapshot']['volume'])]
     return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in volumes]
 
 

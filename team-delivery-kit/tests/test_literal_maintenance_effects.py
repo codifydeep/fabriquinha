@@ -119,7 +119,7 @@ class LiteralEffectsTests(unittest.TestCase):
         self.cfg.update(workflow_key='rejected-author',feedback_strategy=dict(policy=dict(previous_volume='inherited-frozen')))
         self.cfg['source']['candidate_volume']='original-frozen'
         self.s.update(stage='diagnose_wait',snapshot={'volume':'current-frozen'},author_task='current-author',
-            history=[{'snapshot':{'volume':'current-frozen'}}])
+            history=[{'snapshot':{'volume':'current-frozen'}}],diagnosis_bundle={'volume':'evidence-projection'})
         self.con.execute('UPDATE literal_maintenance_workflows SET config=? WHERE source_task=?',
             (json.dumps(self.cfg),'source'));self.save()
         self.con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT)')
@@ -128,12 +128,13 @@ class LiteralEffectsTests(unittest.TestCase):
         self.con.execute("INSERT INTO leases VALUES('request','running')")
         b=SimpleNamespace(db=lambda:self.con,OWNER='owner',docker=lambda *args:
             {'Labels':{'delivery-kit.owner':'owner','delivery-kit.source-task':'current-author'}})
-        fx=SimpleNamespace(verify=lambda cfg:None,plans=SimpleNamespace(task=lambda *args:{'id':'diagnose-task'}),settings={})
+        fx=SimpleNamespace(verify=lambda cfg:None,plans=SimpleNamespace(task=lambda *args:{'id':'diagnose-task'}),settings={},
+            validate_diagnosis_bundle=lambda *args:None)
         with patch.object(effects,'Effects',return_value=fx),patch.object(flow,'authenticate'),\
                 patch.object(flow,'authenticate_rejections'),patch.object(effects,'authorize_phase',return_value=self.s):
             mounts=effects.mounts(b,dict(issue_id='maintenance',agent_id='cto',request_id='request'))
-        self.assertEqual({m['Target']:m['Source'] for m in mounts},{'/evidence/previous':'original-frozen',
-            '/evidence/seed':'inherited-frozen','/evidence/candidate':'current-frozen'})
+        self.assertEqual({m['Target']:m['Source'] for m in mounts},{'/evidence/previous':'evidence-projection',
+            '/evidence/candidate':'current-frozen'})
         self.assertTrue(all(m['ReadOnly'] for m in mounts))
 
     def test_cto_decision_requires_complete_actual_reads_of_both_frozen_tests(self):
@@ -153,10 +154,10 @@ class LiteralEffectsTests(unittest.TestCase):
             reads[paths[1]]['lines']=10
             self.cfg['feedback_strategy']={'policy':{'previous_volume':'seed'}}
             with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'diagnose',actual)
-            reads['/evidence/seed/tests/test.py']=dict(lines=8,total_lines=9)
+            for path in flow.diagnosis_paths(self.cfg):reads[path]=dict(lines=8,total_lines=9)
             with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'diagnose',actual)
-            reads['/evidence/seed/tests/test.py']['lines']=9
-            self.assertEqual(len(fx.decision(self.cfg,self.s,'diagnose',actual)['read_evidence']),3)
+            for path in flow.diagnosis_paths(self.cfg):reads[path]['lines']=9
+            self.assertEqual(len(fx.decision(self.cfg,self.s,'diagnose',actual)['read_evidence']),4)
 
     def test_registration_does_not_authorize_unrelated_or_pre_permit_work(self):
         self.save();self.assertFalse(effects.registered_author(self.con,'maintenance','author'))

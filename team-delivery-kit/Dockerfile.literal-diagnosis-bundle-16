@@ -1,0 +1,7 @@
+FROM delivery-kit-literal-author-feedback:20261018.15
+USER root
+COPY --chmod=0444 literal_diagnosis_bundle.py /
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import literal_diagnosis_bundle" \
+    && mkdir -p /bundle && chown 10000:10000 /bundle && chmod 0700 /bundle
+USER 10000:10000
+ENTRYPOINT ["python"]

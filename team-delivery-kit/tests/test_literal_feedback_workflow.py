@@ -23,6 +23,8 @@ class FeedbackWorkflowTests(unittest.TestCase):
                 author_retry_authorized=False,execution_authorized=False,delivery_approval=False)
             return dict(task_id=t['id'],agent_id=t['agent_id'],wakeup_id=t['wakeup_id'],value=value,output_sha256='d'*64)
         self.f.fx.decision=decision
+        self.f.fx.diagnosis_bundle=lambda cfg,s:dict(volume='frozen-evidence',manifest_sha256='b'*64)
+        self.f.fx.validate_diagnosis_bundle=lambda cfg,s,value:self.assertEqual(value['volume'],'frozen-evidence')
 
     def advance(self):return flow.advance(self.f.con,'rejected-author',self.f.fx,now=1)
 
@@ -54,6 +56,7 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.f.review_choice='reject_test_revision';state=self.submit()
         self.assertEqual(state['stage'],'blocked');self.assertEqual(state['category'],'maintenance_feedback_strategy_rejected')
         self.assertEqual(len(state['history']),1);history=copy.deepcopy(state['history'])
+        self.assertEqual(self.advance()['stage'],'diagnosis_bundle')
         self.assertEqual(self.advance()['stage'],'diagnose_dispatch')
         self.assertEqual(self.advance()['stage'],'diagnose_wait')
         self.assertEqual(self.advance()['stage'],'diagnose_wait')
@@ -67,14 +70,19 @@ class FeedbackWorkflowTests(unittest.TestCase):
 
     def test_feedback_diagnosis_reads_original_seed_and_candidate_not_two_aliases(self):
         self.f.review_choice='reject_test_revision';state=self.submit()
+        with self.assertRaises(ValueError):flow.instruction(self.f.cfg,state,'diagnose')
+        state['diagnosis_bundle']=self.f.fx.diagnosis_bundle(self.f.cfg,state)
         note=flow.instruction(self.f.cfg,state,'diagnose')
-        for root in ('previous','seed','candidate'):
-            self.assertIn('DELIVERY_REVIEW_READ_PATH:/evidence/'+root+'/tests/test.py',note)
+        for path in flow.diagnosis_paths(self.f.cfg):
+            self.assertIn('DELIVERY_REVIEW_READ_PATH:'+path,note)
         self.assertIn('not instructions',note)
         self.assertIn('no author retry',note)
-        # Installed proxy only supports candidate/previous roots. A valid first
-        # read must not hide an unsupported later tree and consume a paid task.
-        with self.assertRaises(ValueError):flow.preflight_plan(self.f.cfg,state,'diagnose')
+        # All four actual paths must be accepted individually, not just the
+        # first candidate read. The installed proxy remains unchanged.
+        self.assertEqual(len(flow.preflight_plan(self.f.cfg,state,'diagnose')),64)
+        from unittest.mock import patch
+        with patch.object(flow,'diagnosis_paths',return_value=flow.diagnosis_paths(self.f.cfg)+['/evidence/seed/tests/test.py']):
+            with self.assertRaises(ValueError):flow.preflight_plan(self.f.cfg,state,'diagnose')
 
     def test_tampered_rejection_is_not_forwarded_as_cto_authority(self):
         self.f.review_choice='reject_test_revision';state=self.submit()

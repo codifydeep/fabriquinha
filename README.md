@@ -1969,9 +1969,25 @@ o proxy instalado conduziu apenas as leituras `candidate` e `previous`, ignorand
 o terceiro root `seed`. O controlador rejeitou a decisão sem a leitura obrigatória;
 não houve aprovação ou nova tentativa do autor. O preflight agora verifica cada
 caminho separadamente, sem inventar recibos de leitura, para recusar essa
-incompatibilidade antes de outra chamada paga. Disponibilizar os três artefatos
-por um contrato de leitura suportado continua pendente; os testes offline de
-orquestração não substituem essa qualificação entre camadas.
+incompatibilidade antes de outra chamada paga. O helper fixo
+`literal_diagnosis_bundle.py` agora projeta os bytes exatos do original e da versão
+herdada em `previous/original` e `previous/seed`, com relatório de limites do
+literal em `previous/report.json`; o candidato continua no próprio snapshot.
+O helper roda como UID 10000, sem capabilities, rede, credenciais ou socket,
+verifica os três manifests antes/depois e não executa o código entregue.
+Seu diretório de saída tem propriedade preparada na imagem para o volume novo;
+os workers recebem a projeção somente leitura. Criação de volume e execução são
+journaladas: confirmações incertas são observadas, nunca repetidas cegamente.
+
+Os três snapshots reais passaram nessa projeção e no preflight dos quatro
+caminhos com o proxy inalterado. `recover_literal_diagnosis_reads.py` exige
+manutenção selada, nenhuma execução ativa, a tarefa nativa concluída e lease
+fechada, seu marcador/handoff exatos e recibos completos de apenas duas leituras
+com a terceira ausente. Preserva a execução defeituosa e permite uma única nova
+execução diagnóstica sobre o mesmo artefato, não uma repetição do autor ou revisão.
+Não se aplica a falhas arbitrárias nem pode ser usada para rearmar limites.
+A validação nativa dessa retomada e da decisão técnica continua necessária;
+testes offline de orquestração não substituem a qualificação entre camadas.
 
 ```mermaid
 flowchart LR
@@ -1988,7 +2004,8 @@ flowchart LR
     F --> A
     A --> I[Snapshot e revisão independente]
     I -->|Rejeição preservada| C1[CTO: diagnóstico único dos três snapshots]
-    C1 --> H[Proposta técnica persistida; sem aprovação ou retry implícito]
+    C1 --> B1[Original + seed projetados em previous; candidato preservado]
+    B1 --> H[Quatro leituras verificadas e proposta técnica; sem aprovação ou retry implícito]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```
 

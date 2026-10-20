@@ -1,0 +1,4 @@
+FROM delivery-kit-execution-broker:20261020.501
+COPY literal_diagnosis_bundle.py /
+COPY broker/literal_diagnosis_evidence.py broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_diagnosis_evidence,literal_maintenance_workflow,literal_maintenance_effects"
