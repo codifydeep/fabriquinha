@@ -2046,7 +2046,13 @@ CTO; não vira falha fictícia da implementação nem aprovação automática. U
 confirmado também não substitui revisão independente: a próxima resolução
 técnica ou reatribuição de revisor precisa ser qualificada. A integração passou
 nos testes offline, casos positivo/negativo com fontes reais e preflight do
-schema terminal completo; sua execução nativa ainda precisa ser demonstrada.
+schema terminal completo. Uma execução nativa completou as quatro leituras e apresentou dois
+achados estruturados e teve as observações confirmadas pelo helper nos mesmos
+snapshots. Isso qualificou a integração de coleta e verificação factual, não a
+entrega. A justificativa livre ainda continha uma frase contraditória e não foi
+usada como prova. O fluxo preservou as rejeições e os limites e não concedeu
+aprovação ou outra tentativa de revisão. Continua pendente qualificar o handoff
+da divergência factual confirmada para uma resolução técnica independente.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
