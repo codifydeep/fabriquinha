@@ -169,7 +169,7 @@ class Effects:
         reads={}
         if phase in ('review','diagnose'):
             observed=self.plans.reads(actual)
-            for root in ('candidate','previous'):
+            for root in (flow.diagnosis_roots(cfg) if phase=='diagnose' else ('candidate','previous')):
                 path='/evidence/'+root+'/'+cfg['test_path'];r=observed.get(path,{})
                 require(type(r.get('lines')) is int and r['lines']>0 and r['lines']==r.get('total_lines'));reads[path]=r
         else:require(count==0)
@@ -390,9 +390,11 @@ def mounts(b,binding):
         task=fx.plans.task(row['task_id'],role);s=authorize_phase(con,cfg,s,task,phase,fx.settings)
     labels=(b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
     require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
-    return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in (
-        ('previous',s['history'][0]['snapshot']['volume'] if phase=='diagnose' else cfg['source']['candidate_volume']),
-        ('candidate',s['snapshot']['volume']))]
+    volumes=[('previous',s['history'][0]['snapshot']['volume'] if phase=='diagnose' and not cfg.get('feedback_strategy')
+        else cfg['source']['candidate_volume']),('candidate',s['snapshot']['volume'])]
+    if phase=='diagnose' and cfg.get('feedback_strategy'):
+        volumes.append(('seed',cfg['feedback_strategy']['policy']['previous_volume']))
+    return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in volumes]
 
 
 def handle(b,source):

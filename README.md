@@ -1954,6 +1954,18 @@ gera um impedimento técnico, não outra tentativa idêntica. Notificações com
 não alteram a autoridade técnica do predecessor. A execução nativa ainda precisa
 demonstrar o resultado completo; instalar ou cadastrar não é sucesso do ensaio.
 
+O encaminhamento de uma rejeição desse fluxo ao CTO é persistente e limitado a
+um diagnóstico nativo, não apenas uma atribuição de responsável. Antes do
+despacho, o controlador reautentica a revisão, a inspeção e a entrega preservada.
+O CTO recebe três snapshots somente leitura: teste original, versão herdada do
+predecessor e correção atual. A resposta exige leituras completas dos três, para
+não atribuir alterações herdadas à última execução nem confundir código dentro
+do literal autorizado com código externo. Wakeups sem confirmação são observados
+pelo mesmo identificador; não se repetem autor ou revisor. O diagnóstico registra
+uma proposta técnica: **não anula a rejeição nem autoriza edição, nova revisão,
+TDD ou entrega**. A execução da próxima operação ainda exige qualificação própria.
+Esse caminho tem testes offline; a validação nativa dessa escalada está pendente.
+
 ```mermaid
 flowchart LR
     C[Proposta nativa do CTO] --> P[Patrocínio independente do Lead]
@@ -1967,6 +1979,9 @@ flowchart LR
     J --> S[Helper fixo: sem rede, entregas somente leitura]
     S --> F[Feedback diagnóstico pelo formatter ACP]
     F --> A
+    A --> I[Snapshot e revisão independente]
+    I -->|Rejeição preservada| C1[CTO: diagnóstico único dos três snapshots]
+    C1 --> H[Proposta técnica persistida; sem aprovação ou retry implícito]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```
 

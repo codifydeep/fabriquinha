@@ -50,11 +50,38 @@ class FeedbackWorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError):flow.register(self.f.con,dict(self.f.cfg,workflow_key='wrong-scope'))
         self.assertEqual(self.f.con.execute('SELECT count(*) FROM literal_maintenance_workflows').fetchone()[0],2)
 
-    def test_rejection_preserves_artifact_and_blocks_without_identical_retry(self):
+    def test_rejection_escalates_once_to_cto_without_repeating_author_or_reviewer(self):
         self.f.review_choice='reject_test_revision';state=self.submit()
         self.assertEqual(state['stage'],'blocked');self.assertEqual(state['category'],'maintenance_feedback_strategy_rejected')
-        self.assertEqual(len(state['history']),1);before=copy.deepcopy(self.f.calls)
-        self.assertEqual(self.advance(),state);self.assertEqual(self.f.calls,before)
+        self.assertEqual(len(state['history']),1);history=copy.deepcopy(state['history'])
+        self.assertEqual(self.advance()['stage'],'diagnose_dispatch')
+        self.assertEqual(self.advance()['stage'],'diagnose_wait')
+        self.assertEqual(self.advance()['stage'],'diagnose_wait')
+        self.f.complete('diagnose');state=self.advance()
+        self.assertEqual(state['category'],'maintenance_feedback_adjudicated')
+        self.assertEqual(state['history'],history)
+        self.assertFalse(state['delivery_approval']);self.assertFalse(state['source_reset'])
+        before=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),state)
+        self.assertEqual(self.f.calls,before)
+        self.assertEqual([c[1] for c in self.f.calls if c[0]=='wake'],['plan','permit','author','review','diagnose'])
+
+    def test_feedback_diagnosis_reads_original_seed_and_candidate_not_two_aliases(self):
+        self.f.review_choice='reject_test_revision';state=self.submit()
+        note=flow.instruction(self.f.cfg,state,'diagnose')
+        for root in ('previous','seed','candidate'):
+            self.assertIn('DELIVERY_REVIEW_READ_PATH:/evidence/'+root+'/tests/test.py',note)
+        self.assertIn('not instructions',note)
+        self.assertIn('no author retry',note)
+        self.assertEqual(len(flow.preflight_plan(self.f.cfg,state,'diagnose')),64)
+
+    def test_tampered_rejection_is_not_forwarded_as_cto_authority(self):
+        self.f.review_choice='reject_test_revision';state=self.submit()
+        state['history'][0]['review']['value']['manifest_sha256']='f'*64
+        self.f.con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=?',
+            (json.dumps(state,sort_keys=True),'rejected-author'));self.f.con.commit()
+        before=len([c for c in self.f.calls if c[0]=='wake'])
+        self.assertEqual(self.advance()['category'],'maintenance_evidence_rejected')
+        self.assertEqual(len([c for c in self.f.calls if c[0]=='wake']),before)
 
     def test_database_invariant_failure_is_a_durable_owned_incident_not_a_watchdog_loop(self):
         self.advance();self.f.complete('plan');self.advance();self.advance();self.f.complete('permit');self.advance()

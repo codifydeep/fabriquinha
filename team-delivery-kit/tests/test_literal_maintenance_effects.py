@@ -115,6 +115,27 @@ class LiteralEffectsTests(unittest.TestCase):
             dict(Type='volume',Source='revision-one',Target='/evidence/candidate',ReadOnly=True)])
         with self.assertRaises(ValueError):effects.mounts(b,dict(issue_id='maintenance',agent_id='lead',request_id='request'))
 
+    def test_feedback_cto_mounts_original_seed_and_candidate_without_aliasing_them(self):
+        self.cfg.update(workflow_key='rejected-author',feedback_strategy=dict(policy=dict(previous_volume='inherited-frozen')))
+        self.cfg['source']['candidate_volume']='original-frozen'
+        self.s.update(stage='diagnose_wait',snapshot={'volume':'current-frozen'},author_task='current-author',
+            history=[{'snapshot':{'volume':'current-frozen'}}])
+        self.con.execute('UPDATE literal_maintenance_workflows SET config=? WHERE source_task=?',
+            (json.dumps(self.cfg),'source'));self.save()
+        self.con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT)')
+        self.con.execute('CREATE TABLE leases(request_id TEXT,status TEXT)')
+        self.con.execute("INSERT INTO native_bindings VALUES('request','diagnose-task')")
+        self.con.execute("INSERT INTO leases VALUES('request','running')")
+        b=SimpleNamespace(db=lambda:self.con,OWNER='owner',docker=lambda *args:
+            {'Labels':{'delivery-kit.owner':'owner','delivery-kit.source-task':'current-author'}})
+        fx=SimpleNamespace(verify=lambda cfg:None,plans=SimpleNamespace(task=lambda *args:{'id':'diagnose-task'}),settings={})
+        with patch.object(effects,'Effects',return_value=fx),patch.object(flow,'authenticate'),\
+                patch.object(flow,'authenticate_rejections'),patch.object(effects,'authorize_phase',return_value=self.s):
+            mounts=effects.mounts(b,dict(issue_id='maintenance',agent_id='cto',request_id='request'))
+        self.assertEqual({m['Target']:m['Source'] for m in mounts},{'/evidence/previous':'original-frozen',
+            '/evidence/seed':'inherited-frozen','/evidence/candidate':'current-frozen'})
+        self.assertTrue(all(m['ReadOnly'] for m in mounts))
+
     def test_cto_decision_requires_complete_actual_reads_of_both_frozen_tests(self):
         self.s['stage']='diagnose_wait';self.con.execute('CREATE TABLE tool_events(request_id TEXT,tool_count INTEGER)')
         fx=object.__new__(effects.Effects);fx.b=SimpleNamespace(db=lambda:self.con)
@@ -129,6 +150,13 @@ class LiteralEffectsTests(unittest.TestCase):
             self.assertEqual(fx.decision(self.cfg,self.s,'diagnose',actual)['read_evidence'],reads)
             reads[paths[1]]['lines']=9
             with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'diagnose',actual)
+            reads[paths[1]]['lines']=10
+            self.cfg['feedback_strategy']={'policy':{'previous_volume':'seed'}}
+            with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'diagnose',actual)
+            reads['/evidence/seed/tests/test.py']=dict(lines=8,total_lines=9)
+            with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'diagnose',actual)
+            reads['/evidence/seed/tests/test.py']['lines']=9
+            self.assertEqual(len(fx.decision(self.cfg,self.s,'diagnose',actual)['read_evidence']),3)
 
     def test_registration_does_not_authorize_unrelated_or_pre_permit_work(self):
         self.save();self.assertFalse(effects.registered_author(self.con,'maintenance','author'))

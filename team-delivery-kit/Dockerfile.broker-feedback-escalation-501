@@ -1,0 +1,4 @@
+# Installed base ID: sha256:c70dc2d585639c9b4642cf665faf46b6099ea4ca312eee1272ff663c7ace17d2
+FROM delivery-kit-execution-broker:20261020.500
+COPY broker/literal_maintenance_workflow.py broker/literal_maintenance_effects.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import literal_maintenance_workflow,literal_maintenance_effects"
