@@ -15,7 +15,7 @@ from generic_harness_calibration import digest,require
 import calibration_objection_contract as wire
 from literal_inspection_assessment import assess
 
-PHASES=('triage','plan','permit','author','review','diagnose','sponsor','reconsider')
+PHASES=('triage','plan','permit','author','review','diagnose','sponsor','reconsider','audit')
 TERMINAL=('blocked','maintenance_approved')
 
 
@@ -49,7 +49,13 @@ def register(con,cfg):
     con.execute('INSERT INTO literal_maintenance_workflows VALUES(?,?,?)',(source,json.dumps(cfg,sort_keys=True),json.dumps(state,sort_keys=True)));con.commit();return state
 
 
-def actor(cfg,phase):return cfg['author'] if phase=='author' else cfg['cto'] if phase in ('plan','diagnose') else cfg['reviewer']
+def actor(cfg,phase):return cfg['author'] if phase=='author' else cfg['cto'] if phase in ('plan','diagnose','audit') else cfg['reviewer']
+
+
+def audit_module():
+    try:import literal_review_audit
+    except ImportError:from broker import literal_review_audit
+    return literal_review_audit
 
 
 def diagnosis_paths(cfg):
@@ -74,6 +80,7 @@ def review_context(cfg,s,phase):
 
 
 def instruction(cfg,s,phase):
+    if phase=='audit':return audit_module().instruction(cfg,s)
     if cfg.get('feedback_strategy') and phase in ('plan','permit','author'):
         try:import author_feedback_admission as admission
         except ImportError:from broker import author_feedback_admission as admission
@@ -355,6 +362,22 @@ def authenticate_reconsideration(cfg,s,fx):
     authenticate_feedback_diagnosis(cfg,s,fx)
 
 
+def authenticate_reconsidered_review(cfg,s,fx):
+    authenticate_reconsideration(cfg,s,fx)
+    expected=s['reconsideration'];require(expected['agent_id']==cfg['reviewer']
+        and expected['value']['action']=='reject_test_revision'
+        and expected['value']['manifest_sha256']==s['inspection']['candidate_manifest_sha256'])
+    shadow={**s,'wakeup_id':s['reconsideration_wakeup'],'marker':s['reconsideration_marker']}
+    matches=[t for t in fx.runs(cfg,s) if t.get('id')==expected['task_id']]
+    require(len(matches)==1 and matches[0]['status']=='completed' and fx.decision(cfg,shadow,'reconsider',matches[0])==expected)
+
+
+def authenticate_finding_audit(cfg,s,fx):
+    authenticate_reconsidered_review(cfg,s,fx)
+    require(s['finding_audit_policy']==fx.finding_audit_policy(cfg,s)
+        and s['finding_audit_authority']==audit_module().authority(cfg,s,s['finding_audit_policy']))
+
+
 def replan_authority(cfg,s):
     return dict(config_sha256=digest(cfg),diagnosis_sha256=digest(s['diagnosis']),
         experiment_sha256=digest(s['experiment']),sponsor_sha256=digest(s['sponsor']),
@@ -381,7 +404,9 @@ def advance(con,source,fx,*,now=None):
         and s.get('category')=='maintenance_feedback_adjudicated'
         and s.get('diagnosis',{}).get('value',{}).get('action')=='request_test_revision'
         and not s.get('reconsideration_authority'))
-    if s['stage'] in TERMINAL and not (escalation_due or experiment_due or reconsider_due):return s
+    audit_due=(bool(cfg.get('feedback_strategy')) and s['stage']=='blocked'
+        and s.get('category')=='maintenance_feedback_reconsideration_rejected' and not s.get('finding_audit_authority'))
+    if s['stage'] in TERMINAL and not (escalation_due or experiment_due or reconsider_due or audit_due):return s
     def save(**updates):
         s.update(updates);con.execute('UPDATE literal_maintenance_workflows SET state=? WHERE source_task=?',
             (json.dumps(s,sort_keys=True),source));con.commit();return s
@@ -389,6 +414,21 @@ def advance(con,source,fx,*,now=None):
         required_action='CTO diagnose '+category+' using preserved evidence; no source reset or identical retry')
     try:
         fx.verify(cfg);authenticate(cfg,s,fx)
+        if audit_due:
+            authenticate_reconsidered_review(cfg,s,fx);policy=fx.finding_audit_policy(cfg,s)
+            return save(stage='audit_dispatch',owner=cfg['cto'],phase_started=now,category=None,last_error=None,
+                finding_audit_policy=policy,finding_audit_authority=audit_module().authority(cfg,s,policy),
+                required_action='CTO submit one new structured factual disagreement; previous reviews and their limits remain preserved')
+        if s['stage'].startswith('audit_'):
+            authenticate_finding_audit(cfg,s,fx)
+            if s['stage']=='audit_assess':
+                expected=s['finding_audit_decision'];shadow={**s,'wakeup_id':s['finding_audit_wakeup'],'marker':s['finding_audit_marker']}
+                matches=[t for t in fx.runs(cfg,s) if t.get('id')==expected['task_id']]
+                require(len(matches)==1 and fx.decision(cfg,shadow,'audit',matches[0])==expected)
+                result=fx.assess_finding_audit(cfg,s);fx.validate_finding_audit(cfg,s,result)
+                return save(stage='blocked',owner=cfg['cto'],finding_audit_facts=result,
+                    category='maintenance_review_fact_disagreement_verified' if result['factual_disagreement_verified'] else 'maintenance_review_fact_observation_contradicted',
+                    required_action='Qualify technical resolution or independent reviewer reassignment from preserved facts; no approval, repeated review or author retry')
         if reconsider_due:
             authenticate_feedback_diagnosis(cfg,s,fx)
             return save(stage='reconsider_dispatch',owner=cfg['reviewer'],phase_started=now,
@@ -468,7 +508,14 @@ def advance(con,source,fx,*,now=None):
             required_action='Freeze completed maintenance author; original source remains immutable')
         decision=fx.decision(cfg,s,phase,task);require(decision['task_id']==task['id'] and decision['agent_id']==actor(cfg,phase))
         value=decision['value']
-        if cfg.get('feedback_strategy') and phase in ('plan','permit'):
+        if phase=='audit':
+            save(finding_audit_decision=decision,finding_audit_wakeup=s['wakeup_id'],finding_audit_marker=s['marker'])
+            try:audit_module().findings.validate_decision(value)
+            except ValueError:return hold('maintenance_review_fact_audit_invalid_contract')
+            if value['action']!='request_review_reconsideration':
+                return hold('maintenance_review_fact_audit_retained_hold' if value['action']=='escalate_cto' else 'maintenance_review_fact_audit_semantic_experiment_required')
+            return save(stage='audit_assess',phase_started=now,required_action='Fixed sandbox verify new CTO citations and fact tokens; no verdict override or source mutation')
+        elif cfg.get('feedback_strategy') and phase in ('plan','permit'):
             try:import author_feedback_admission as admission
             except ImportError:from broker import author_feedback_admission as admission
             Draft202012Validator(wire.schema(admission.context(cfg['feedback_strategy']['policy']))).validate(value)

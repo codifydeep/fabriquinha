@@ -1,0 +1,6 @@
+FROM delivery-kit-literal-review-claims:20261020.17
+USER root
+COPY --chmod=0444 literal_review_findings.py /
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import literal_review_findings"
+USER 10000:10000
+ENTRYPOINT ["python"]

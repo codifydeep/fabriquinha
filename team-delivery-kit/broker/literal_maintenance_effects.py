@@ -154,6 +154,7 @@ class Effects:
                 '. Original attempts, snapshots, acceptance, baseline and release gates remain unchanged. No product admission.',
             parent_issue_id=cfg['parent_issue_id'],project_id=parent.get('project_id'),stage=1,status='todo'),allow_create=first)
     def wake(self,cfg,s,phase,first):
+        if phase=='audit':flow.audit_module().preflight(cfg,s)
         if phase=='reconsider':flow.preflight_reconsideration(cfg,s)
         if phase in ('plan','diagnose') or (cfg.get('feedback_strategy') and phase=='permit'):flow.preflight_plan(cfg,s,phase)
         function=native.ensure_unit_start if phase=='author' else native.ensure_planning_start
@@ -168,9 +169,9 @@ class Effects:
         binding=self.old.binding(actual,role)
         with self.b.db() as con:count=con.execute('SELECT coalesce(sum(tool_count),0) FROM tool_events WHERE request_id=?',(binding['request_id'],)).fetchone()[0]
         reads={}
-        if phase in ('review','diagnose','reconsider'):
+        if phase in ('review','diagnose','reconsider','audit'):
             observed=self.plans.reads(actual)
-            paths=flow.diagnosis_paths(cfg) if phase in ('diagnose','reconsider') else ['/evidence/'+root+'/'+cfg['test_path'] for root in ('candidate','previous')]
+            paths=flow.diagnosis_paths(cfg) if phase in ('diagnose','reconsider','audit') else ['/evidence/'+root+'/'+cfg['test_path'] for root in ('candidate','previous')]
             for path in paths:
                 r=observed.get(path,{})
                 require(type(r.get('lines')) is int and r['lines']>0 and r['lines']==r.get('total_lines'));reads[path]=r
@@ -200,6 +201,19 @@ class Effects:
         try:import literal_diagnosis_evidence as evidence
         except ImportError:from broker import literal_diagnosis_evidence as evidence
         return evidence.prepare(self.b,cfg,s)
+    def finding_audit_policy(self,cfg,s):return flow.audit_module().policy(self.b)
+    def assess_finding_audit(self,cfg,s):
+        job=validation_job.run(self.b,s['finding_audit_decision']['task_id'],'structure',flow.audit_module().payload(cfg,s))
+        require(job['exit_code']==0 and job['output_sha256']==hashlib.sha256(job['output'].encode()).hexdigest())
+        result=json.loads(job['output']);p=cfg['feedback_strategy']['policy']
+        require(result['operation']=='literal_review_finding_assessment_v1'
+            and result['decision_sha256']==digest(s['finding_audit_decision']['value'])
+            and result['source_manifests']==dict(original=cfg['source']['prepared']['manifest_sha256'],
+                seed=p['previous_manifest_sha256'],candidate=s['inspection']['candidate_manifest_sha256'])
+            and type(result['factual_disagreement_verified']) is bool and result['model_calls']==0
+            and all(result[k] is False for k in flow.audit_module().findings.FALSE_FLAGS))
+        return dict(result,validation_job=job)
+    def validate_finding_audit(self,cfg,s,value):require(value==self.assess_finding_audit(cfg,s))
     def validate_diagnosis_bundle(self,cfg,s,value):
         try:import literal_diagnosis_evidence as evidence
         except ImportError:from broker import literal_diagnosis_evidence as evidence
@@ -389,10 +403,11 @@ def mounts(b,binding):
     with b.db() as con:match=current(con,binding['issue_id'])
     if not match:return []
     cfg,s=match
-    phase=next((p for p in ('diagnose','reconsider') if s['stage'].startswith(p+'_')),'review')
+    phase=next((p for p in ('diagnose','reconsider','audit') if s['stage'].startswith(p+'_')),'review')
     if s['stage'] not in (phase+'_observe',phase+'_wait'):return []
     role=flow.actor(cfg,phase);require(binding['agent_id']==role)
     fx=Effects(b);fx.verify(cfg);flow.authenticate(cfg,s,fx)
+    if phase=='audit':flow.authenticate_finding_audit(cfg,s,fx)
     if phase=='reconsider':flow.authenticate_reconsideration(cfg,s,fx)
     if phase=='diagnose':flow.authenticate_rejections(cfg,s,fx)
     if phase=='diagnose' and cfg.get('feedback_strategy'):fx.validate_diagnosis_bundle(cfg,s,s['diagnosis_bundle'])
@@ -402,7 +417,7 @@ def mounts(b,binding):
         task=fx.plans.task(row['task_id'],role);s=authorize_phase(con,cfg,s,task,phase,fx.settings)
     labels=(b.docker('GET','/volumes/'+s['snapshot']['volume']) or {}).get('Labels',{})
     require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.source-task')==s['author_task'])
-    previous=(s['diagnosis_bundle']['volume'] if cfg.get('feedback_strategy') else s['history'][0]['snapshot']['volume']) if phase in ('diagnose','reconsider') else cfg['source']['candidate_volume']
+    previous=(s['diagnosis_bundle']['volume'] if cfg.get('feedback_strategy') else s['history'][0]['snapshot']['volume']) if phase in ('diagnose','reconsider','audit') else cfg['source']['candidate_volume']
     volumes=[('previous',previous),('candidate',s['snapshot']['volume'])]
     return [dict(Type='volume',Source=volume,Target='/evidence/'+role,ReadOnly=True) for role,volume in volumes]
 

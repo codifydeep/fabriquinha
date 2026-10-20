@@ -163,6 +163,11 @@ class LiteralEffectsTests(unittest.TestCase):
             self.assertEqual(len(fx.decision(self.cfg,self.s,'reconsider',actual)['read_evidence']),4)
             reads['/evidence/previous/report.json']['lines']=8
             with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'reconsider',actual)
+            self.s['stage']='audit_wait';actual['agent_id']='cto'
+            actual['handoff_note']=effects.expected_note(self.cfg,self.s,'audit')
+            with self.assertRaises(ValueError):fx.decision(self.cfg,self.s,'audit',actual)
+            reads['/evidence/previous/report.json']['lines']=9
+            self.assertEqual(len(fx.decision(self.cfg,self.s,'audit',actual)['read_evidence']),4)
 
     def test_reconsideration_mounts_same_projection_readonly_and_reauthenticates_cto_before_access(self):
         self.cfg.update(feedback_strategy={'policy':{}},workflow_key='rejected-author')

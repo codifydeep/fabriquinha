@@ -2025,9 +2025,28 @@ executa consultas diagnósticas explícitas em um helper agrupado, UID 10000,
 somente leitura, sem rede, credenciais ou socket. O código do helper deve ter
 o hash local esperado. Resultados e intent ficam privados, com deduplicação;
 uma conclusão incerta não causa repetição cega. Essa qualificação passou nos
-snapshots reais e não consumiu modelos. **O verificador ainda não está ligado
-ao envio nativo de achados estruturados.** As consultas não são conversão de
+snapshots reais e não consumiu modelos. As consultas não são conversão de
 prosa antiga nem um motivo para reabrir o card ou autorizar outra revisão.
+
+A integração nativa usa uma única auditoria nova do CTO após a reconsideração
+rejeitada. Antes do despacho, reautentica as decisões anteriores, o manifesto,
+o pacote somente leitura e a política imutável dos dois scripts verificadores.
+O schema existente de diagnóstico com citações observadas exige quatro leituras
+completas e não contém uma ação de aprovação. `literal_review_findings.py` liga
+seus campos ao verificador: `expected` e `observed` são tokens fechados como
+`seed_to_candidate.line_changed=true` / `seed_to_candidate.line_changed=false`,
+com a mesma base e predicado e valores opostos. A citação deve ser única na linha
+do código, não uma paráfrase do relatório ou uma inferência sobre a prosa antiga.
+O helper mede a observação do CTO nos snapshots antes de aceitá-la como fato.
+
+Essa auditoria tem limite próprio de uma execução e não rearma a reconsideração,
+o autor ou a release. Um contrato inválido, observação contradita, restrição
+retida ou necessidade de experimento semântico fica preservado com responsável
+CTO; não vira falha fictícia da implementação nem aprovação automática. Um fato
+confirmado também não substitui revisão independente: a próxima resolução
+técnica ou reatribuição de revisor precisa ser qualificada. A integração passou
+nos testes offline, casos positivo/negativo com fontes reais e preflight do
+schema terminal completo; sua execução nativa ainda precisa ser demonstrada.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
@@ -2049,7 +2068,9 @@ flowchart LR
     B1 --> C1[CTO: quatro leituras verificadas e proposta técnica]
     C1 -->|Proposta reautenticada; sem editar| RR[Lead: uma reconsideração independente do mesmo manifesto]
     C1 -->|Restrição não resolvida| H[Impedimento técnico visível com CTO; sem retry idêntico]
-    RR -->|Rejeita| H
+    RR -->|Rejeita| FA[CTO: auditoria única com achados estruturados]
+    FA --> FV[Helper verifica citação, base do diff e literal]
+    FV --> H
     RR -->|Aprova + verificações fixas válidas| M[Manutenção aprovada; calibração e TDD ainda exigidos]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```

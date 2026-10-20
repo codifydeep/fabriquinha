@@ -16,8 +16,15 @@ class FeedbackWorkflowTests(unittest.TestCase):
             expected=dict(initial_expected=1,poll_minimum=3,stale_expected='Newest matching: #11'))
         self.f.cfg=dict(self.f.cfg,workflow_key='rejected-author',feedback_strategy=dict(policy=self.p))
         flow.register(self.f.con,self.f.cfg)
+        self.audit_action='request_review_reconsideration';self.audit_verified=True
         old=self.f.fx.decision
         def decision(cfg,s,phase,t):
+            if phase=='audit':
+                finding=dict(kind='review_disagreement',tree='candidate',path='tests/test.py',test='__module__',line=1,
+                    quote='code',expected='seed_to_candidate.line_changed=true',observed='seed_to_candidate.line_changed=false')
+                return dict(task_id=t['id'],agent_id=t['agent_id'],wakeup_id=t['wakeup_id'],value=dict(
+                    action=self.audit_action,reason='A new typed fact query, not an override',optional_files=[],
+                    findings=[] if self.audit_action=='escalate_cto' else [finding]))
             if phase=='reconsider':
                 return dict(task_id=t['id'],agent_id=t['agent_id'],wakeup_id=t['wakeup_id'],value=dict(
                     action=self.f.review_choice,reason='Independent reassessment of unchanged snapshot and lineage',
@@ -29,6 +36,9 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.f.fx.decision=decision
         self.f.fx.diagnosis_bundle=lambda cfg,s:dict(volume='frozen-evidence',manifest_sha256='b'*64)
         self.f.fx.validate_diagnosis_bundle=lambda cfg,s,value:self.assertEqual(value['volume'],'frozen-evidence')
+        self.f.fx.finding_audit_policy=lambda cfg,s:dict(image='sha256:'+'a'*64,native_attempt_limit=1)
+        self.f.fx.assess_finding_audit=lambda cfg,s:dict(factual_disagreement_verified=self.audit_verified)
+        self.f.fx.validate_finding_audit=lambda cfg,s,value:self.assertIs(type(value['factual_disagreement_verified']),bool)
 
     def advance(self):return flow.advance(self.f.con,'rejected-author',self.f.fx,now=1)
 
@@ -96,7 +106,57 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.assertEqual(state['category'],'maintenance_feedback_reconsideration_rejected')
         self.assertEqual(len(state['history']),1);self.assertEqual(state['reconsideration']['task_id'],'new-review')
         self.assertEqual(state['owner'],'cto');self.assertFalse(state['source_reset'])
-        before=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),state);self.assertEqual(self.f.calls,before)
+        self.assertEqual([c[1] for c in self.f.calls if c[0]=='wake'].count('reconsider'),1)
+
+    def reach_audit(self):
+        self.reach_reconsideration();self.advance();self.complete_reconsideration();self.advance()
+        return self.advance()
+
+    def complete_audit(self):
+        self.f.tasks.append(dict(id='cto-fact-audit',agent_id='cto',issue_id='maintenance',status='completed',wakeup_id='audit-0'))
+
+    def test_rejected_reconsideration_dispatches_one_readonly_cto_fact_audit(self):
+        s=self.reach_audit();self.assertEqual(s['stage'],'audit_dispatch')
+        history=copy.deepcopy(s['history']);rejection=copy.deepcopy(s['reconsideration'])
+        self.assertEqual(self.advance()['stage'],'audit_wait');self.complete_audit()
+        self.assertEqual(self.advance()['stage'],'audit_assess');s=self.advance()
+        self.assertEqual(s['category'],'maintenance_review_fact_disagreement_verified')
+        self.assertEqual(s['history'],history);self.assertEqual(s['reconsideration'],rejection)
+        self.assertFalse(s['delivery_approval']);self.assertFalse(s['source_reset'])
+        calls=copy.deepcopy(self.f.calls);self.assertEqual(self.advance(),s);self.assertEqual(self.f.calls,calls)
+        self.assertEqual([c[1] for c in calls if c[0]=='wake'],['plan','permit','author','review','diagnose','reconsider','audit'])
+
+    def test_unproven_new_cto_observation_is_retained_without_another_review(self):
+        self.reach_audit();self.advance();self.complete_audit();self.advance();self.audit_verified=False;s=self.advance()
+        self.assertEqual(s['category'],'maintenance_review_fact_observation_contradicted')
+        self.assertFalse(s['delivery_approval']);self.assertNotIn('review',s)
+        calls=copy.deepcopy(self.f.calls);self.advance();self.assertEqual(self.f.calls,calls)
+
+    def test_cto_can_retain_hold_or_require_semantic_experiment_without_author_capacity(self):
+        self.reach_audit();self.advance();self.audit_action='escalate_cto';self.complete_audit();s=self.advance()
+        self.assertEqual(s['category'],'maintenance_review_fact_audit_retained_hold')
+        calls=copy.deepcopy(self.f.calls);self.advance();self.assertEqual(self.f.calls,calls)
+
+    def test_fact_audit_observes_unknown_wakeup_without_recreating_it(self):
+        self.reach_audit();self.f.timeout=True
+        self.assertEqual(self.advance()['stage'],'audit_observe');self.assertEqual(self.advance()['stage'],'audit_wait')
+        wakes=[c for c in self.f.calls if c[0]=='wake' and c[1]=='audit']
+        self.assertEqual([c[2] for c in wakes],[True,False]);self.assertEqual(wakes[0][3],wakes[1][3])
+
+    def test_fact_audit_invalid_new_claim_is_preserved_but_never_executes_helper(self):
+        self.reach_audit();self.advance();self.complete_audit();original=self.f.fx.decision
+        def malformed(cfg,s,phase,t):
+            r=original(cfg,s,phase,t)
+            if phase=='audit':r['value']['findings'][0]['observed']='a prose claim with no token'
+            return r
+        self.f.fx.decision=malformed;s=self.advance()
+        self.assertEqual(s['category'],'maintenance_review_fact_audit_invalid_contract')
+        self.assertEqual(s['finding_audit_decision']['task_id'],'cto-fact-audit');self.assertNotIn('finding_audit_facts',s)
+
+    def test_fact_audit_policy_cannot_change_after_the_handoff(self):
+        self.reach_audit();self.f.fx.finding_audit_policy=lambda *args:dict(image='sha256:'+'b'*64,native_attempt_limit=1)
+        self.assertEqual(self.advance()['category'],'maintenance_evidence_rejected')
+        self.assertNotIn('audit',[c[1] for c in self.f.calls if c[0]=='wake'])
 
     def test_reconsideration_unknown_wakeup_observes_same_marker_and_never_repeats_create(self):
         self.reach_reconsideration();self.f.timeout=True
