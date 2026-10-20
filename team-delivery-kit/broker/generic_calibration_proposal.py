@@ -100,8 +100,8 @@ def store(con,issue,author_task,record):
 
 def collect(b,issue,author_task,producer_task,wakeup,*,expected_engine='unittest_path_fixture_v1'):
     """No caller-provided role, output, approval or source facts accepted."""
-    try:import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans,generic_calibration_registration as registration
-    except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans,generic_calibration_registration as registration
+    try:import calibration_source as guard,remediation_admission,technical_remediation_plan as plans,generic_calibration_registration as registration
+    except ImportError:from broker import calibration_source as guard,remediation_admission,technical_remediation_plan as plans,generic_calibration_registration as registration
     with b.LOCK:
         version_for_engine(expected_engine)
         value=guard.qualified(b,issue)

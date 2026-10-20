@@ -310,8 +310,8 @@ class Effects:
             require(r['status']=='closed' and r['agent_id']==actor and r['issue_id']==task['issue_id']
                 and r['scope'].split(':')[-2:]==['planning',task['id']]);return r
     def collect(self,cfg,s,task):
-        try:import generic_calibration_proposal as proposal,remediation_runtime_guard as guard
-        except ImportError:from broker import generic_calibration_proposal as proposal,remediation_runtime_guard as guard
+        try:import generic_calibration_proposal as proposal,calibration_source as guard
+        except ImportError:from broker import generic_calibration_proposal as proposal,calibration_source as guard
         c=cfg['source'];actual=self.plans.task(task['id'],c['cto']);binding=self.binding(actual,c['cto'])
         if s.get('transport'):require(self.transport()==s['transport'])
         require(actual.get('status')=='completed' and actual.get('issue_id')==s['issue_id'] and actual.get('wakeup_id')==s['wakeup_id']

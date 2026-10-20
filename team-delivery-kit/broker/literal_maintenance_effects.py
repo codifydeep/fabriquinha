@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import time
+import urllib.error
 from generic_harness_calibration import digest,require
 from structured_response_contract import _unique
 import calibration_harness_protocol_probe as protocol
@@ -458,4 +459,13 @@ def tick(b):
     """
     with b.db() as con:
         rows=con.execute('SELECT source_task FROM literal_maintenance_workflows').fetchall()
-    for row in rows:handle(b,row[0])
+    for row in rows:
+        handle(b,row[0])
+        if os.environ.get('BROKER_MAINTAINED_TEST_SNAPSHOT_IMAGE'):
+            try:import maintained_test_calibration as continuation
+            except ImportError:from broker import maintained_test_calibration as continuation
+            try:continuation.handle(b,row[0])
+            except (ValueError,KeyError,TypeError,RuntimeError,TimeoutError,urllib.error.URLError) as error:
+                with b.db() as con:
+                    con.execute('CREATE TABLE IF NOT EXISTS maintained_test_errors(source_task TEXT PRIMARY KEY,category TEXT)')
+                    con.execute('INSERT OR REPLACE INTO maintained_test_errors VALUES(?,?)',(row[0],type(error).__name__))

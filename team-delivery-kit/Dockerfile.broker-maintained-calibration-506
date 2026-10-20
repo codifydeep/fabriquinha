@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261020.505
+COPY broker/calibration_source.py broker/maintained_test_calibration.py /
+COPY broker/generic_calibration_workflow.py broker/generic_calibration_proposal.py broker/generic_calibration_registration.py /
+COPY broker/calibration_controls_diagnostic.py broker/literal_maintenance_effects.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_source,maintained_test_calibration,generic_calibration_workflow,generic_calibration_proposal,generic_calibration_registration,calibration_controls_diagnostic,literal_maintenance_effects"

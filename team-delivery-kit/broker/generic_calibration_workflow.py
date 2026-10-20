@@ -214,8 +214,8 @@ def request(b,issue,author_task,*,engine=None):
     An explicit engine remains a selection, never a migration authorization.
     The reconstructed config, native author and original copy are still checked.
     """
-    try:import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans
-    except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission,technical_remediation_plan as plans
+    try:import calibration_source as guard,remediation_admission,technical_remediation_plan as plans
+    except ImportError:from broker import calibration_source as guard,remediation_admission,technical_remediation_plan as plans
     with b.LOCK:
         if engine is None:
             with b.db() as con:
@@ -276,8 +276,8 @@ class Effects:
         except ImportError:from broker import technical_remediation_plan as plans
         self.b=b;self.plans=plans.Effects(b)
     def verify(self,c):
-        try:import remediation_runtime_guard as guard,remediation_admission
-        except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission
+        try:import calibration_source as guard,remediation_admission
+        except ImportError:from broker import calibration_source as guard,remediation_admission
         engine=c.get('calibration_engine','unittest_path_fixture_v1');version_for_engine(engine)
         if engine=='unittest_path_fixtures_v2':
             import re
@@ -329,8 +329,8 @@ class Effects:
         except ImportError:from broker import generic_calibration_materialization as jobs
         with self.b.db() as con:return jobs.run(self.b,con,c['issue_id'],c['author_task'])
     def approval_source(self,c,s):
-        try:import generic_calibration_materialization as jobs,remediation_runtime_guard as guard
-        except ImportError:from broker import generic_calibration_materialization as jobs,remediation_runtime_guard as guard
+        try:import generic_calibration_materialization as jobs,calibration_source as guard
+        except ImportError:from broker import generic_calibration_materialization as jobs,calibration_source as guard
         self.verify(c)
         with self.b.db() as con:
             producer=con.execute('SELECT record FROM generic_calibration_proposals WHERE issue_id=? AND author_task=?',
@@ -417,8 +417,8 @@ class Effects:
             and intake['proposal_task']==s['attestation_task'] and intake['review_task']==s['review_task'])
         return intake
     def input_probe(self,c,s,intake):
-        try:import generic_calibration_registration as registration,remediation_runtime_guard as guard
-        except ImportError:from broker import generic_calibration_registration as registration,remediation_runtime_guard as guard
+        try:import generic_calibration_registration as registration,calibration_source as guard
+        except ImportError:from broker import generic_calibration_registration as registration,calibration_source as guard
         value=guard.qualified(self.b,c['issue_id'])
         gate.require(value and digest(value)==c['execution_sha256'])
         with self.b.db() as con:

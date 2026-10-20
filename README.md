@@ -2068,6 +2068,20 @@ manifesto exato e manteve os históricos, sem reiniciar o autor ou a revisão do
 Lead. A suíte completa passou com 3.695 testes e oito skips preexistentes. O
 estado resultante é `maintenance_approved`, não aprovação de produto; a ligação
 desse artefato à calibração normal e ao Red funcional ainda está pendente.
+
+O código de continuação `broker/maintained_test_calibration.py` usa uma projeção
+offline dos mesmos bytes aprovados para o formato de entrada test-first. O helper
+`maintained_test_snapshot.py` verifica o manifesto, a base inteira e os hashes dos
+testes; não importa nem executa o código entregue. Uma intenção persistente por
+volume e os journals de jobs impedem repetir efeitos após perda de confirmação.
+O adaptador `broker/calibration_source.py` vale somente para a calibração: ele
+reautentica a revisão nativa e o plano original, exige a rota filha desabilitada
+e não substitui o guard de permissões dos workers. A proposta, a aprovação
+independente da política e os controles positivos/negativos usam a calibração
+normal. Só depois dela o controlador pode executar a suíte real na base original
+com os mesmos testes, rejeitando erros de setup e regressões na base como Red
+funcional. Esse Red não habilita automaticamente implementação, merge ou deploy.
+A extensão passou na suíte offline; a continuação nativa ainda está pendente.
 Projeção íntegra, diagnóstico ou manutenção aprovada não substituem calibração
 completa, TDD, revisão de produto ou homologação.
 
@@ -2096,6 +2110,10 @@ flowchart LR
     ER -->|Rejeita com citação observada| H
     ER -->|Aprova + bytes lidos e controles válidos| M
     RR -->|Aprova + verificações fixas válidas| M[Manutenção aprovada; calibração e TDD ainda exigidos]
+    M -->|Revisão escalonada qualificada| CP[Projeção idêntica: entrada de calibração, sem novo autor]
+    CP --> NC[Calibração normal: proposta, revisão independente e controles]
+    NC --> FR[Red funcional: base original e mesmo teste congelado]
+    FR --> DA[Admissão independente ainda necessária; sem habilitar rota de produto]
     F -. Não aprova nem substitui .-> G[TDD, snapshot, revisão, CI, deploy e QA]
 ```
 

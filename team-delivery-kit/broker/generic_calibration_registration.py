@@ -166,8 +166,8 @@ def run_inputs(b,con,intake,value,route,*,now=None):
 
 
 def register(b,issue,author_task):
-    try:import remediation_runtime_guard as guard,remediation_admission,native,technical_remediation_plan as plans,harness_qualification
-    except ImportError:from broker import remediation_runtime_guard as guard,remediation_admission,native,technical_remediation_plan as plans,harness_qualification
+    try:import calibration_source as guard,remediation_admission,native,technical_remediation_plan as plans,harness_qualification
+    except ImportError:from broker import calibration_source as guard,remediation_admission,native,technical_remediation_plan as plans,harness_qualification
     with b.LOCK:
         value=guard.qualified(b,issue)
         gate.require(value and value.get('amendment',{}).get('kind')=='inherited_frozen_suite')

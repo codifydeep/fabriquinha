@@ -1,0 +1,7 @@
+FROM delivery-kit-literal-review-findings:20261020.18
+USER root
+COPY --chmod=0444 maintained_test_snapshot.py /
+COPY --chmod=0444 broker/test_first_protocol.py /test_first_protocol.py
+RUN PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/ python -c "import maintained_test_snapshot"
+USER 10000:10000
+ENTRYPOINT ["python"]
