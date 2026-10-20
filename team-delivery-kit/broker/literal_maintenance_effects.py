@@ -253,14 +253,15 @@ class Effects:
             route=json.loads(con.execute('SELECT config FROM delivery_routes WHERE issue_id=?',(cfg['source']['issue_id'],)).fetchone()[0])
         require('/workspace/'+cfg['test_path'] in paths);b.register_issue_editables(dict(issue_id=child,paths=paths,test_command=command))
         handoff_runtime.register(b,maintenance_route(route,child))
-        trial=dict(issue_id=child,parent_issue=cfg['source']['issue_id'],reviewer=cfg['reviewer'],base_sha=base['base_sha'],
+        parent_issue=cfg['parent_issue_id'] if cfg.get('feedback_strategy') else cfg['source']['issue_id']
+        trial=dict(issue_id=child,parent_issue=parent_issue,reviewer=cfg['reviewer'],base_sha=base['base_sha'],
             harness_maintenance_only=True,historic_functional_red=False,seed_previous_tests=True,seeded_edit_required=True,
             literal_maintenance=dict(source_task=flow.workflow_key(cfg),config_sha256=digest(cfg)))
         with b.db() as con:
             test_revision_review.initialize(con)
             previous=con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',(child,)).fetchone()
             if previous:require(json.loads(previous[0])==trial)
-            else:con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',(child,cfg['source']['issue_id'],json.dumps(trial,sort_keys=True),'{}'))
+            else:con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',(child,parent_issue,json.dumps(trial,sort_keys=True),'{}'))
         prepared=dict(base_manifest_sha256=base['manifest_sha256'],volume=name,copy_job=job,trial_sha256=digest(trial))
         if cfg.get('feedback_strategy'):
             try:import author_feedback_admission as admission

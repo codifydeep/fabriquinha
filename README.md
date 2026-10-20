@@ -1936,6 +1936,9 @@ persistente conduz patrocínio do Lead, preparação, autor, snapshot, inspeçã
 revisão independente. A primeira chamada ao modelo só ocorre após liberar a
 barreira. Um POST de criação sem confirmação é observado pelo mesmo journal,
 nunca repetido cegamente. O predecessor, seus cards e seus limites não mudam.
+O registro da revisão deriva do predecessor imediato, preservando a restrição
+real de um filho por pai no SQLite. Conflitos de integridade tornam-se incidentes
+persistentes com responsável CTO; não ficam escapando para um loop do watchdog.
 
 O prompt dessa execução vem do escopo corrente autenticado, sem herdar a regra
 legada que forçava um patch antes da consulta ao feedback. Isso não amplia

@@ -1,6 +1,7 @@
 import copy
 import json
 import unittest
+import sqlite3
 from broker import literal_maintenance_workflow as flow
 from broker import author_feedback_admission as admission
 import test_literal_maintenance_workflow as fixture
@@ -54,6 +55,15 @@ class FeedbackWorkflowTests(unittest.TestCase):
         self.assertEqual(state['stage'],'blocked');self.assertEqual(state['category'],'maintenance_feedback_strategy_rejected')
         self.assertEqual(len(state['history']),1);before=copy.deepcopy(self.f.calls)
         self.assertEqual(self.advance(),state);self.assertEqual(self.f.calls,before)
+
+    def test_database_invariant_failure_is_a_durable_owned_incident_not_a_watchdog_loop(self):
+        self.advance();self.f.complete('plan');self.advance();self.advance();self.f.complete('permit');self.advance()
+        calls=[]
+        def conflict(*args):calls.append(True);raise sqlite3.IntegrityError('UNIQUE constraint failed: test_revision_trials.parent_issue')
+        self.f.fx.prepare=conflict;state=self.advance()
+        self.assertEqual(state['stage'],'blocked');self.assertEqual(state['category'],'maintenance_database_invariant_conflict')
+        self.assertEqual(state['owner'],'cto');self.assertEqual(state['last_error']['type'],'IntegrityError')
+        self.assertEqual(self.advance(),state);self.assertEqual(calls,[True])
 
     def test_uncertain_wakeup_is_observed_never_recreated(self):
         self.f.timeout=True;self.assertEqual(self.advance()['stage'],'plan_observe')

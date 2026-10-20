@@ -8,6 +8,7 @@ import json
 import hashlib
 import time
 import urllib.error
+import sqlite3
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 from generic_harness_calibration import digest,require
@@ -392,9 +393,9 @@ def advance(con,source,fx,*,now=None):
             owner=cfg['cto'] if phase=='triage' else cfg['reviewer'])
     except (TimeoutError,urllib.error.URLError):
         return hold('maintenance_evidence_deadline') if now-s.get('phase_started',now)>=1800 else s
-    except (ValueError,KeyError,TypeError,ValidationError) as error:
+    except (ValueError,KeyError,TypeError,ValidationError,sqlite3.IntegrityError) as error:
         # Preserve the failing phase and a stable diagnostic without copying
         # model text, source files or credentials into a public status payload.
         save(last_error=dict(phase=s['stage'],type=type(error).__name__,
             sha256=hashlib.sha256(str(error).encode()).hexdigest()))
-        return hold('maintenance_evidence_rejected')
+        return hold('maintenance_database_invariant_conflict' if isinstance(error,sqlite3.IntegrityError) else 'maintenance_evidence_rejected')

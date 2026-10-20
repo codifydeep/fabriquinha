@@ -5,10 +5,11 @@ import json
 import sqlite3
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 from broker import literal_maintenance_effects as effects
 from broker import literal_maintenance_workflow as flow
 from broker import harness_repair_task
+from broker import test_revision_review,author_feedback_admission
 import literal_test_maintenance as inspector
 import enroll_literal_maintenance as enrollment
 
@@ -31,6 +32,40 @@ class LiteralEffectsTests(unittest.TestCase):
     def task(self):
         return dict(id='new-task',agent_id='author',issue_id='maintenance',wakeup_id='wake',
             handoff_note=effects.expected_note(self.cfg,self.s,'author'))
+
+    def test_feedback_trial_uses_immediate_predecessor_without_relaxing_real_unique_parent_constraint(self):
+        test_revision_review.initialize(self.con)
+        self.con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',('old-maintenance','original','{}','{}'))
+        self.con.execute('CREATE TABLE issue_editables(issue_id,path)')
+        self.con.execute('CREATE TABLE issue_test_commands(issue_id,command)')
+        self.con.execute('CREATE TABLE delivery_routes(issue_id,config)')
+        self.con.execute('INSERT INTO issue_editables VALUES(?,?)',('original','/workspace/tests/test.py'))
+        self.con.execute('INSERT INTO issue_test_commands VALUES(?,?)',('original','python -m unittest discover'))
+        self.con.execute('INSERT INTO delivery_routes VALUES(?,?)',('original','{}'));self.con.commit()
+        cfg=dict(self.cfg,workflow_key='rejected-author',parent_issue_id='old-maintenance',image='sha256:'+'a'*64,
+            base=dict(base_sha='b'*40,manifest_sha256='c'*64,volume='owned-original-base'),
+            feedback_strategy=dict(policy={'source_task':'rejected-author'},qualification={}))
+        state=dict(self.s,issue_id='feedback-maintenance',decisions=dict(plan=dict(receipt={'task_id':'cto-plan'}),permit=dict(receipt={'task_id':'lead-sponsor'})))
+        labels={'delivery-kit.owner':'owner','delivery-kit.issue-id':'feedback-maintenance','delivery-kit.base-sha':'b'*40}
+        self.con.execute('CREATE TABLE literal_feedback_volumes(source_task TEXT PRIMARY KEY,identity TEXT,state TEXT)')
+        self.con.execute('INSERT INTO literal_feedback_volumes VALUES(?,?,?)',('rejected-author',
+            json.dumps(dict(name='delivery-kit-test-base-feedback-maintenance',labels=labels)),json.dumps(dict(stage='create_intent'))))
+        self.con.commit()
+        @contextlib.contextmanager
+        def db():
+            with self.con:yield self.con
+        b=SimpleNamespace(db=db,OWNER='owner',PREFIX='delivery-kit-test',register_issue_base=Mock(),register_issue_editables=Mock(),
+            docker=lambda *args:dict(Labels=labels))
+        fx=object.__new__(effects.Effects);fx.b=b
+        with patch.object(effects.validation_job,'run',return_value=dict(exit_code=0,output='base_copy_complete')),\
+                patch.object(effects.handoff_runtime,'register'),patch.object(author_feedback_admission,'arm',return_value=dict(stage='armed')):
+            fx.prepare(cfg,state);fx.prepare(cfg,state)
+        rows=[tuple(r) for r in self.con.execute('SELECT issue_id,parent_issue FROM test_revision_trials ORDER BY issue_id')]
+        self.assertEqual(rows,[('feedback-maintenance','old-maintenance'),('old-maintenance','original')])
+        trial=json.loads(self.con.execute('SELECT config FROM test_revision_trials WHERE issue_id=?',('feedback-maintenance',)).fetchone()[0])
+        self.assertEqual(trial['parent_issue'],'old-maintenance')
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.con.execute('INSERT INTO test_revision_trials VALUES(?,?,?,?)',('duplicate','old-maintenance','{}','{}'))
 
     def test_exact_author_note_identity_and_deadline_are_required(self):
         with patch.object(effects.flow,'instruction',return_value='phase-only'),patch.object(effects.time,'time',return_value=101):
