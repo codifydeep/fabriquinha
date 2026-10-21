@@ -1,0 +1,3 @@
+FROM delivery-kit-execution-broker:20261021.511
+COPY broker/test_first_job.py broker/calibration_capability_review.py broker/calibration_capability_mount_recovery.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import test_first_job,calibration_capability_review,calibration_capability_mount_recovery"

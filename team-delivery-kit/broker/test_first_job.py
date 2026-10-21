@@ -26,6 +26,28 @@ def normalized_mounts(mounts):
     return result
 
 
+def observed_mounts(info,image,expected):
+    """Accept Docker's null empty-list encoding only with no data mounts.
+
+    A missing list is not generally an empty list. Require the independent
+    actual mount inventory, no bind/volume inheritance, and at most explicitly
+    configured anonymous tmpfs entries. Never alter the observed object.
+    """
+    host=info.get('HostConfig',{});actual=host.get('Mounts')
+    if actual is not None:return normalized_mounts(actual)
+    mounts=info.get('Mounts');tmpfs=expected['HostConfig'].get('Tmpfs',{})
+    if (expected['HostConfig'].get('Mounts')!=[] or not isinstance(mounts,list)
+            or host.get('Binds') not in (None,[]) or host.get('VolumesFrom') not in (None,[])
+            or image.get('Config',{}).get('Volumes') not in (None,{})):
+        raise ValueError('unproven empty fixed mounts')
+    for mount in mounts:
+        if (not isinstance(mount,dict) or mount.get('Type')!='tmpfs'
+                or mount.get('Destination') not in tmpfs or mount.get('Source') not in (None,'')
+                or mount.get('RW') is not True):
+            raise ValueError('unexpected mount in empty fixed job')
+    return []
+
+
 def verify(b,info,expected):
     config=info.get('Config',{});host=info.get('HostConfig',{})
     image=b.docker('GET','/images/'+expected['Image']+'/json') or {}
@@ -38,7 +60,7 @@ def verify(b,info,expected):
             any(config.get(k)!=expected[k] for k in ('User','Entrypoint','Cmd'))
             or ('WorkingDir' in expected and config.get('WorkingDir')!=expected['WorkingDir'])
             or any(config.get('Labels',{}).get(k)!=v for k,v in expected['Labels'].items())
-            or any((normalized_mounts(host.get(k))!=normalized_mounts(v) if k=='Mounts'
+            or any((observed_mounts(info,image,expected)!=normalized_mounts(v) if k=='Mounts'
                     else host.get(k)!=v) for k,v in expected['HostConfig'].items())
             or (config.get('NetworkDisabled') not in (True,False) and not omitted_network_flag)
             or host.get('NetworkMode')!='none'):

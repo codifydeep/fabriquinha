@@ -2288,13 +2288,28 @@ O diagnóstico reutiliza o sandbox e os gates existentes, mas mantém todos os
 arquivos de leitura integral do pedido original e explicita que referências
 executáveis não alteram o candidato. Uma decisão antiga ou um simples texto
 do modelo não concede essa admissão. A revisão de capacidade é código com
-testes offline: **a instalação e seu ciclo nativo ainda estão pendentes**.
+testes offline. A integração port2 está instalada no broker `20261021.511`, com
+hashes e backup/restauração conferidos; **o ciclo nativo dessa admissão ainda
+precisa de evidência própria**. A suíte offline executou 3.767 testes com 8 skips
+existentes, sem substituir esse gate nativo.
 
 A conferência de dependências encontrou ainda o executor v2 coexistindo com um
 materializador v1 no broker incremental. A imagem `Dockerfile.broker-capability-review-511`
 inclui o materializador versionado e valida um bundle v2 durante o build. O
 adaptador mantém a seleção explícita v1/v2 e rejeita recibos misturados; essa
 correção não converte evidências históricas nem dispensa a calibração real.
+
+O verificador de jobs também trata `HostConfig.Mounts=null` como lista vazia
+somente quando o contrato exige zero mounts, o inventário real está completo e
+não há bind, herança de volumes ou volumes implícitos da imagem. Os demais
+controles permanecem exatos. A recuperação administrativa
+`controller_calibration_mount_cli.py` exige manutenção selada, decisões nativas
+reautenticadas e o mesmo contêiner comprovadamente nunca iniciado. Preserva os
+estados anteriores em recibo atômico e concede uma única janela de observação,
+sem repetir criação/start, reiniciar autor ou renovar orçamento de tentativas.
+Essa recuperação tem testes offline; sua instalação e execução reais ainda
+precisam de qualificação. A suíte Linux revisada passou 3.778 testes, com 8 skips
+preexistentes; isso não comprova autonomia ponta a ponta.
 
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,

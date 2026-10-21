@@ -85,6 +85,13 @@ def measured(job):
     return probe.validate(json.loads(job['output']))
 
 
+def measurement_payload(cfg):
+    return dict(Image=cfg['image'],User='10000:10000',Entrypoint=['python','-B','/reference_fixture_capability_probe.py'],Cmd=[],
+        NetworkDisabled=True,Env=['PYTHONDONTWRITEBYTECODE=1'],Labels={'delivery-kit.reference-capability':digest(cfg)},
+        HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
+            Memory=268435456,NanoCpus=1000000000,PidsLimit=64,Mounts=[],Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'}))
+
+
 def advance(con,cfg,fx,*,now=None):
     now=time.time() if now is None else now;c=cfg['source'];register(con,cfg)
     s=json.loads(con.execute('SELECT state FROM calibration_capability_reviews WHERE issue_id=? AND author_task=?',
@@ -98,6 +105,10 @@ def advance(con,cfg,fx,*,now=None):
     if 'started' not in s:save(started=now)
     try:
         fx.verify(cfg)
+        if s.get('mount_observation_recovery_sha256'):
+            try:import calibration_capability_mount_recovery as recovery
+            except ImportError:from broker import calibration_capability_mount_recovery as recovery
+            recovery.qualified(con,cfg,s)
         if s['stage']=='measure':
             job=fx.measure(cfg);value=measured(job)
             instruction(cfg,{**s,'measurement':value}) # Bounds before issuing any native task.
@@ -132,6 +143,8 @@ def advance(con,cfg,fx,*,now=None):
         receipt=dict(operation='independent_reference_capability_admission_v1',config_sha256=digest(cfg),
             capability_request=cfg['capability_request'],hold=cfg['hold'],measurement_job=s['measurement_job'],decision=decision,
             diagnostic_attempt_limit=1,**{k:False for k in FALSE_FLAGS})
+        if s.get('mount_observation_recovery_sha256'):
+            receipt['mount_observation_recovery_sha256']=s['mount_observation_recovery_sha256']
         return save(stage='permitted',receipt=receipt,receipt_sha256=digest(receipt),owner=c['cto'],
             required_action='One separate untrusted reference diagnostic; source delivery remains blocked')
     except (TimeoutError,urllib.error.URLError):
@@ -150,6 +163,11 @@ def qualified(con,cfg,state):
         and all(r[k] is False and state[k] is False for k in FALSE_FLAGS)
         and r['decision']['agent_id']==c['reviewer'] and r['decision']['value']['action']=='refer_to_cto'
         and measured(r['measurement_job'])==state['measurement'])
+    if state.get('mount_observation_recovery_sha256'):
+        try:import calibration_capability_mount_recovery as recovery
+        except ImportError:from broker import calibration_capability_mount_recovery as recovery
+        recovery.qualified(con,cfg,state)
+        require(r.get('mount_observation_recovery_sha256')==state['mount_observation_recovery_sha256'])
     Draft202012Validator(contract.schema(context(cfg,state))).validate(r['decision']['value']);return r
 
 
@@ -185,11 +203,7 @@ class Effects:
     def measure(self,cfg):
         try:import validation_job
         except ImportError:from broker import validation_job
-        payload=dict(Image=cfg['image'],User='10000:10000',Entrypoint=['python','-B','/reference_fixture_capability_probe.py'],Cmd=[],
-            NetworkDisabled=True,Env=['PYTHONDONTWRITEBYTECODE=1'],Labels={'delivery-kit.reference-capability':digest(cfg)},
-            HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
-                Memory=268435456,NanoCpus=1000000000,PidsLimit=64,Mounts=[],Tmpfs={'/tmp':'rw,nosuid,nodev,size=64m,mode=1777'}))
-        return validation_job.run(self.b,cfg['capability_request']['task_id'],'structure',payload)
+        return validation_job.run(self.b,cfg['capability_request']['task_id'],'structure',measurement_payload(cfg))
     def reserve(self):return self.plans.native.remaining_calls()>=32
     def issue(self,cfg,first):
         parent=self.plans.issues.request('/issues/'+cfg['parent_issue_id'])

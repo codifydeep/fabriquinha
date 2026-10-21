@@ -9,6 +9,48 @@ TASK='22222222-2222-4222-8222-222222222222'
 
 
 class TestFirstJobTests(unittest.TestCase):
+    def empty_mount_case(self):
+        expected=copy.deepcopy(self.payload);expected['HostConfig']['Mounts']=[]
+        info=dict(Id='id',Image=expected['Image'],Config=copy.deepcopy(expected),Mounts=[],
+            HostConfig={**expected['HostConfig'],'Mounts':None},State=dict(Status='created',ExitCode=0))
+        return expected,info
+
+    def test_docker_null_empty_mounts_requires_complete_empty_actual_mount_inventory(self):
+        expected,info=self.empty_mount_case()
+        verify(self.b,info,expected)
+        self.assertIsNone(info['HostConfig']['Mounts']) # Observation must not rewrite Docker metadata.
+
+    def test_null_mount_omission_cannot_hide_bind_volume_or_incomplete_inventory(self):
+        expected,original=self.empty_mount_case()
+        for mutate in (lambda i:i.update(Mounts=[dict(Type='volume',Name='secret',Destination='/secret',RW=False)]),
+                lambda i:i['HostConfig'].update(Binds=['/private:/secret:ro']),
+                lambda i:i['HostConfig'].update(VolumesFrom=['foreign']),
+                lambda i:i.pop('Mounts')):
+            info=copy.deepcopy(original);mutate(info)
+            with self.subTest(mutate=mutate),self.assertRaises(ValueError):verify(self.b,info,expected)
+
+    def test_null_mounts_cannot_satisfy_nonempty_expected_mounts_or_image_volumes(self):
+        expected,info=self.empty_mount_case()
+        nonempty=copy.deepcopy(expected)
+        nonempty['HostConfig']['Mounts']=[dict(Type='volume',Source='owned',Target='/candidate',ReadOnly=True)]
+        with self.assertRaises(ValueError):verify(self.b,info,nonempty)
+        old=self.b.docker
+        def image_with_volume(method,path,payload=None):
+            value=old(method,path,payload)
+            if path.startswith('/images/'):value['Config']['Volumes']={'/implicit':{}}
+            return value
+        self.b.docker=image_with_volume
+        with self.assertRaises(ValueError):verify(self.b,info,expected)
+
+    def test_only_explicit_anonymous_tmpfs_can_appear_with_omitted_empty_host_mounts(self):
+        expected,info=self.empty_mount_case()
+        expected['HostConfig']['Tmpfs']={'/tmp':'rw,mode=1777'}
+        info['HostConfig']['Tmpfs']=dict(expected['HostConfig']['Tmpfs'])
+        info['Mounts']=[dict(Type='tmpfs',Destination='/tmp',Source='',RW=True)]
+        verify(self.b,info,expected)
+        info['Mounts'][0]['Destination']='/unexpected'
+        with self.assertRaises(ValueError):verify(self.b,info,expected)
+
     def setUp(self):
         self.con=sqlite3.connect(':memory:');self.con.row_factory=sqlite3.Row;self.addCleanup(self.con.close)
         self.info=None;self.calls=[];self.timeout_create=False;self.timeout_start=False
