@@ -36,6 +36,11 @@ def register(con,cfg):
 
 def producer_context(cfg):
     c=cfg['source'];paths=['/evidence/'+root+'/'+p for root in ('candidate','previous') for p in c['test_files']]
+    if cfg.get('capability_admission'):
+        admission=cfg['capability_admission'];required=admission['required_paths']
+        require(admission.get('operation')=='reference_capability_diagnostic_v1'
+            and required==sorted(set(required)) and set(required)>set(paths))
+        paths=required
     return wire.context('bundle',paths,digest(cfg),engine=c['calibration_engine'])
 
 
@@ -72,8 +77,9 @@ def instruction(cfg,s,phase):
         try:import generic_calibration_workflow as workflow
         except ImportError:from broker import generic_calibration_workflow as workflow
         body=workflow.instruction(c).split('\n',2)[2]
-        if s.get('control_revision'):
+        if s.get('control_revision') or cfg.get('capability_admission'):
             require(c['calibration_engine']=='unittest_path_fixtures_v2')
+            decision=s['control_revision']['decision'] if s.get('control_revision') else cfg['capability_admission']['decision']
             # This is a separate diagnostic contract, not truncated product scope.
             # Read paths live in the capsule; every criterion remains literal.
             body=('CTO reference DATA proposal, engine=unittest_path_fixtures_v2. '
@@ -92,7 +98,7 @@ def instruction(cfg,s,phase):
                 'The adapter redirects declared Path globals to these separate fixtures before running unchanged tests; '
                 'therefore a positive may implement missing behavior and negatives deliberately break it. '
                 'Do not edit Node harness, mocks, tests, assertions, criteria or candidate. '
-                'Only actual sandbox results can prove controls. Independent Lead decision SHA: '+digest(s['control_revision']['decision'])+
+                'Only actual sandbox results can prove controls. Independent Lead decision SHA: '+digest(decision)+
                 '\nAcceptance (unchanged): '+json.dumps(c['criteria'],separators=(',',':')))
         note=wire.capsule(producer_context(cfg))+('ISOLATED DIAGNOSTIC DATA ONLY, not a delivery submission. '
             'Positive references must exercise test bodies; each negative must fail its declared assertion, never setup/teardown. '
@@ -283,6 +289,10 @@ class Effects:
             receipt=receipt,initial_transport=transport.binding(dict(messages=[dict(role='user',content=actual.get('handoff_note',''))])),
             required_read_evidence={p:reads[p] for p in producer_context(cfg)['required_paths']},execution_authorized=False,delivery_approval=False)
     def verify(self,cfg):
+        if cfg.get('capability_admission'):
+            try:import calibration_capability_review as capability
+            except ImportError:from broker import calibration_capability_review as capability
+            return capability.verify_diagnostic(self.b,cfg)
         self.parent.verify(cfg['objection_config']);c=cfg['source']
         with self.b.db() as con:original,state=map(json.loads,con.execute('SELECT config,state FROM calibration_objections WHERE issue_id=? AND author_task=?',(c['issue_id'],c['author_task'])).fetchone())
         require(original==cfg['objection_config'] and original['source']==c and state['decision']==cfg['hold']
@@ -351,6 +361,12 @@ class Effects:
 def handle(b,con,original,state):
     c=original['source'];cfg=dict(source=c,objection_config=original,hold=state['decision'],
         plan_evidence={k:state['experiment'][k] for k in ('proposal','review')},parent_issue_id=state['issue_id'])
+    return handle_config(b,con,original,state,cfg)
+
+
+def handle_config(b,con,original,state,cfg):
+    c=original['source']
+    require(cfg['source']==c and cfg['objection_config']==original and cfg['hold']==state['decision'])
     register(con,cfg);fx=Effects(b);result=advance(con,c['issue_id'],c['author_task'],fx)
     state.update(owner=result['owner'],required_action=(result.get('identifier') or 'Diagnostic')+': '+result['required_action'],
         control_diagnostic={k:result.get(k) for k in ('stage','category','identifier','issue_id')})
@@ -360,8 +376,16 @@ def handle(b,con,original,state):
     if result.get('issue_id'):
         try:import handoff_runtime
         except ImportError:from broker import handoff_runtime
-        handoff_runtime.publish(b,dict(issue_id=result['issue_id'],enabled=True,techlead=c['reviewer']),
-            dict(stage=result['stage'],owner=result['owner'],source_task=c['author_task'],data=json.dumps(dict(required_action=result['required_action']))))
+        try:
+            handoff_runtime.publish(b,dict(issue_id=result['issue_id'],enabled=True,techlead=c['reviewer']),
+                dict(stage=result['stage'],owner=result['owner'],source_task=c['author_task'],data=json.dumps(dict(required_action=result['required_action']))))
+        except Exception as error:
+            # UI metadata is retried from durable state; it cannot revoke a
+            # capability decision or prevent the diagnostic's next transition.
+            con.execute('CREATE TABLE IF NOT EXISTS calibration_control_publication_errors('
+                'issue_id TEXT,author_task TEXT,category TEXT,PRIMARY KEY(issue_id,author_task))')
+            con.execute('INSERT OR REPLACE INTO calibration_control_publication_errors VALUES(?,?,?)',
+                (c['issue_id'],c['author_task'],type(error).__name__));con.commit()
     return result
 
 

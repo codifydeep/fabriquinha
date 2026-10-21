@@ -9,6 +9,28 @@ from generic_harness_calibration import digest
 
 
 class ControlsDiagnosticTests(unittest.TestCase):
+    def test_capability_admission_keeps_dependency_reads_and_names_reference_code_semantics(self):
+        cfg=copy.deepcopy(self.cfg);cfg.pop('plan_evidence')
+        paths=['/evidence/candidate/app/app.js','/evidence/candidate/app/index.html',
+            '/evidence/candidate/tests/test.py','/evidence/previous/tests/test.py']
+        cfg['capability_admission']=dict(operation='reference_capability_diagnostic_v1',required_paths=paths,
+            receipt_sha256='a'*64,decision={'actual':'independent'})
+        self.assertEqual(runtime.producer_context(cfg)['required_paths'],paths)
+        note=runtime.instruction(cfg,{},'producer')
+        self.assertLessEqual(len(note),3800)
+        self.assertIn('a positive may implement missing behavior',note)
+        self.assertEqual(runtime.wire.request(dict(messages=[dict(role='user',content=note)])),runtime.producer_context(cfg))
+        self.assertEqual(runtime.producer_context(self.cfg)['required_paths'],
+            ['/evidence/candidate/tests/test.py','/evidence/previous/tests/test.py'])
+
+    def test_capability_diagnostic_cannot_use_legacy_plan_review_as_its_authority(self):
+        from broker import calibration_capability_review as capability
+        cfg=copy.deepcopy(self.cfg);cfg.pop('plan_evidence');cfg['capability_admission']={'new':'receipt'}
+        b=object()
+        with patch.object(capability,'verify_diagnostic') as verify:
+            runtime.Effects.verify(SimpleNamespace(b=b),cfg)
+            verify.assert_called_once_with(b,cfg)
+
     def setUp(self):
         self.con=sqlite3.connect(':memory:');self.con.row_factory=sqlite3.Row;self.addCleanup(self.con.close);runtime.initialize(self.con)
         self.c=dict(issue_id='origin',author_task='author',cto='cto',reviewer='lead',test_files=['tests/test.py'],

@@ -54,6 +54,9 @@ def advance(con,issue,author,fx,*,now=None):
     now=time.time() if now is None else now
     cfg,s=map(json.loads,con.execute('SELECT config,state FROM calibration_objections WHERE issue_id=? AND author_task=?',(issue,author)).fetchone())
     c=cfg['source']
+    if (s['stage']=='blocked' and s.get('category')=='experiment_requires_engineering_capability'
+            and getattr(fx,'capability_enabled',lambda:False)()):
+        return fx.capability_step(con,cfg,s)
     if s['stage']=='blocked' and s.get('category')=='experiment_plan_rejected' and getattr(fx,'controls_enabled',lambda:False)():
         fx.controls_step(con,cfg,s);return s
     if s['stage']=='blocked' and s.get('category') in ('objection_hold_retained','experiment_evidence_rejected','experiment_native_failed'):
@@ -191,6 +194,11 @@ class Effects:
         except ImportError:from broker import generic_calibration_workflow as workflow,native
         self.b=b;self.workflow=workflow;self.native=native;self.source=workflow.Effects(b);self.plans=self.source.plans
     def controls_enabled(self):return bool(os.environ.get('BROKER_GENERIC_CALIBRATION_CONTROLS_IMAGE'))
+    def capability_enabled(self):return bool(os.environ.get('BROKER_REFERENCE_CAPABILITY_PROBE_IMAGE'))
+    def capability_step(self,con,cfg,s):
+        try:import calibration_capability_review as capability
+        except ImportError:from broker import calibration_capability_review as capability
+        return capability.handle(self.b,con,cfg,s)
     def controls_step(self,con,cfg,s):
         try:import calibration_controls_diagnostic as diagnostic
         except ImportError:from broker import calibration_controls_diagnostic as diagnostic

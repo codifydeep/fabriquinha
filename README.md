@@ -2274,9 +2274,27 @@ O sandbox não monta snapshots do produto, rede, credenciais ou socket Docker.
 Isso comprova uma capacidade do adaptador, não a viabilidade de controles para
 qualquer feature nem a calibração do produto atual. Todos os indicadores de
 Red, produto verde, autorização do autor e entrega continuam falsos. A prova
-não autoriza repetir uma proposta rejeitada. Ainda falta integrar uma revisão
-independente dessa capacidade declarada ausente e um encaminhamento limitado
-ao diagnóstico de referências, preservando o pedido original de engenharia.
+não autoriza repetir uma proposta rejeitada.
+
+`broker/calibration_capability_review.py` acrescenta a revisão independente da
+capacidade declarada ausente. O ramo é habilitado por imagem fixa de probe e
+preserva o pedido do CTO, o parecer anterior, a fonte e os orçamentos originais.
+Depois da medição sintética, uma tarefa nova do Lead decide se cabe **um
+diagnóstico separado** de referências ou se o impedimento deve permanecer.
+Não aprova o plano rejeitado. A admissão é vinculada ao source, à medição e à
+execução nativa exatos; drift, falha ou retenção não repetem a mesma intervenção.
+
+O diagnóstico reutiliza o sandbox e os gates existentes, mas mantém todos os
+arquivos de leitura integral do pedido original e explicita que referências
+executáveis não alteram o candidato. Uma decisão antiga ou um simples texto
+do modelo não concede essa admissão. A revisão de capacidade é código com
+testes offline: **a instalação e seu ciclo nativo ainda estão pendentes**.
+
+A conferência de dependências encontrou ainda o executor v2 coexistindo com um
+materializador v1 no broker incremental. A imagem `Dockerfile.broker-capability-review-511`
+inclui o materializador versionado e valida um bundle v2 durante o build. O
+adaptador mantém a seleção explícita v1/v2 e rejeita recibos misturados; essa
+correção não converte evidências históricas nem dispensa a calibração real.
 
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,

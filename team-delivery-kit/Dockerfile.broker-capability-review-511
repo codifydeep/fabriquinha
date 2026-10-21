@@ -1,0 +1,5 @@
+FROM delivery-kit-execution-broker:20261020.510
+COPY reference_fixture_capability_probe.py /
+COPY generic_calibration_bundle_writer.py calibration_policy_adapter.py /
+COPY broker/calibration_capability_review.py broker/calibration_objection_runtime.py broker/calibration_controls_diagnostic.py /
+RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import reference_fixture_capability_probe as p,calibration_capability_review,calibration_objection_runtime,calibration_controls_diagnostic;from generic_calibration_bundle_writer import expected_files;from generic_harness_calibration import digest;_,b=p.fixture_bundle();expected_files(b,digest(b))"
