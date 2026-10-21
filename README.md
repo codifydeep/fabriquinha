@@ -2307,9 +2307,12 @@ controles permanecem exatos. A recuperação administrativa
 reautenticadas e o mesmo contêiner comprovadamente nunca iniciado. Preserva os
 estados anteriores em recibo atômico e concede uma única janela de observação,
 sem repetir criação/start, reiniciar autor ou renovar orçamento de tentativas.
-Essa recuperação tem testes offline; sua instalação e execução reais ainda
-precisam de qualificação. A suíte Linux revisada passou 3.778 testes, com 8 skips
-preexistentes; isso não comprova autonomia ponta a ponta.
+Essa recuperação foi instalada no broker `20261021.512`, com hashes e
+backup/restauração conferidos. O controlador iniciou o mesmo helper preservado
+e capturou a medição sintética com sucesso; a revisão nativa do Lead e a
+continuação diagnóstica ainda precisam de evidência própria. A suíte Linux
+revisada passou 3.778 testes, com 8 skips preexistentes; isso não comprova
+autonomia ponta a ponta.
 
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
