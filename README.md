@@ -12,6 +12,12 @@ contagem; o próximo ciclo real ainda precisa passar por todos os gates.
 
 **Estado: experimental — autonomia completa ainda não qualificada.** Este repositório publica o código da plataforma em construção, não uma promessa de instalação pronta para produção. Ensaios descartáveis já percorreram implementação, revisão independente, PR, CI e QA no mesmo commit. Ainda faltam demonstrar um novo ciclo integral sem reparos do operador e simplificar a instalação para terceiros.
 
+O [contrato de qualidade v2](team-delivery-kit/contracts/quality-lifecycle-v2.md)
+foi aprovado: Red real → revisão e congelamento dos testes → Green → controles
+negativos obrigatórios antes do merge. Sua política e executor offline estão
+implementados; a integração e qualificação nativas ainda estão pendentes. Não é
+uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
+
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de
 evidências históricas, o controlador pode produzir uma única evidência nova com
 um experimento fixo, sintético e isolado, sem chamadas ao modelo ou testes do
