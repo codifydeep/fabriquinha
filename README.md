@@ -2261,6 +2261,23 @@ Path/Node isolado concluiu com código zero e evidência aceita para revisão;
 isso não resolve por si só a objeção de escopo nem valida controles completos.
 A decisão independente e a continuação da calibração permanecem necessárias.
 
+### Referências executáveis não são alterações no candidato
+
+`reference_fixture_capability_probe.py` é uma prova fixa e sintética dessa
+distinção no adaptador `unittest_path_fixtures_v2`. Usa o mesmo executor da
+instalação, com fontes conferidas por hash, e executa referências JS/HTML
+separadas que implementam um comportamento ausente no candidato sintético.
+Três testes positivos passam; dois controles negativos falham nas assertions
+do corpo dos testes. O candidato e os testes permanecem byte a byte iguais.
+O sandbox não monta snapshots do produto, rede, credenciais ou socket Docker.
+
+Isso comprova uma capacidade do adaptador, não a viabilidade de controles para
+qualquer feature nem a calibração do produto atual. Todos os indicadores de
+Red, produto verde, autorização do autor e entrega continuam falsos. A prova
+não autoriza repetir uma proposta rejeitada. Ainda falta integrar uma revisão
+independente dessa capacidade declarada ausente e um encaminhamento limitado
+ao diagnóstico de referências, preservando o pedido original de engenharia.
+
 Uma falha funcional nos witnesses não é aprovação nem falha estrutural. O
 classificador separa ordem das respostas, requisição inicial e contagem de polling,
 usando os valores das assertions congeladas. O campo legado de seletividade agrega

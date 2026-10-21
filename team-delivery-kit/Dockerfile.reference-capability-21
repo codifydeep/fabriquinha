@@ -1,0 +1,4 @@
+FROM delivery-kit-calibration-control-experiment:20261015.11
+COPY reference_fixture_capability_probe.py /
+USER 10000:10000
+ENTRYPOINT ["python", "-B", "/reference_fixture_capability_probe.py"]
