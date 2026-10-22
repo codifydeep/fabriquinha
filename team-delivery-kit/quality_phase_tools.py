@@ -2,6 +2,7 @@
 import json
 from pathlib import PurePosixPath
 import uuid
+from portable_contract import MAX_FILE_BYTES
 
 KEY='DELIVERY_QUALITY_PHASE_JSON'
 CONFLICTS=('DELIVERY_AUTHOR_FEEDBACK_JSON','DELIVERY_ADDITIVE_TEST_JSON',
@@ -11,7 +12,7 @@ CONFLICTS=('DELIVERY_AUTHOR_FEEDBACK_JSON','DELIVERY_ADDITIVE_TEST_JSON',
 def validate(config,execution):
     if (not isinstance(config,dict) or set(config)!={'version','phase','request_id','editable_paths','read_paths'}
             or type(config['version']) is not int or config['version']!=2
-            or config['phase'] not in ('tests_only_v2','test_review_v2')
+            or config['phase'] not in ('tests_only_v2','test_review_v2','implementation_v2')
             or not isinstance(execution,str) or str(uuid.UUID(execution))!=execution
             or config['request_id']!=execution):raise ValueError('exact tests-only execution contract required')
     reviewing=config['phase']=='test_review_v2'
@@ -46,8 +47,10 @@ def controlled(name,args,environment):
             if config['phase']=='test_review_v2' and (set(args)!={'path','offset','limit'}
                     or not 1<=args['limit']<=100):return deny()
             return None
-        if config['phase']=='tests_only_v2' and name=='write_file' and set(args)=={'path','content'} and path in config['editable_paths']:
+        if config['phase'] in ('tests_only_v2','implementation_v2') and name=='write_file' and set(args)=={'path','content'} and path in config['editable_paths']:
             content=args['content']
-            if isinstance(content,str) and 0<len(content.encode())<=32768:return None
+            maximum=MAX_FILE_BYTES if config['phase']=='implementation_v2' else 32768
+            minimum=0 if config['phase']=='implementation_v2' else 1
+            if isinstance(content,str) and minimum<=len(content.encode())<=maximum:return None
         return deny()
     except (ValueError,TypeError,KeyError,UnicodeError):return deny()

@@ -123,5 +123,16 @@ class QualityPhaseToolsTests(unittest.TestCase):
         bad={**env,'DELIVERY_EXECUTION_MODE':'implementation'}
         self.assertIn('error',json.loads(self.control('read_file',dict(path='/delivery/app.py',offset=1,limit=100),bad)))
 
+    def test_implementation_phase_edits_product_but_never_frozen_tests_or_tools(self):
+        config=dict(version=2,phase='implementation_v2',request_id=self.request,
+            editable_paths=['/workspace/app.py'],read_paths=['/workspace/app.py','/workspace/tests/test_old.py','/workspace/tests/test_new.py'])
+        env={phase.KEY:json.dumps(config),'DELIVERY_EXECUTION_MODE':'implementation','DELIVERY_MODEL_EXECUTION_ID':self.request}
+        self.assertIsNone(self.control('write_file',dict(path='/workspace/app.py',content='x'*65536),env))
+        for name,args in [('write_file',dict(path='/workspace/tests/test_new.py',content='weakened')),
+                ('write_file',dict(path='/workspace/tests/test_old.py',content='weakened')),
+                ('write_file',dict(path='/workspace/app.py',content='x'*(2*1024*1024+1))),
+                ('terminal',dict(command='python -m unittest')),('patch',{}),('python',{})]:
+            with self.subTest(name=name):self.assertIn('error',json.loads(self.control(name,args,env)))
+
 
 if __name__=='__main__':unittest.main()

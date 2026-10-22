@@ -126,8 +126,8 @@ def qualify(namespace,image,worker_image=None):
                     or actual.get('Labels')!={'delivery-kit.owner':owner,'delivery-kit.qualification':operation,
                         'delivery-kit.lifecycle':'qualification-proof','com.docker.compose.project':namespace+'-tests'}):
                 raise ValueError('created volume ownership drift; preserve for inspection')
-        c=dict(source=dict(task_id=fixture.task,run_id='synthetic-qualification'),volume=volumes['work'],
-            selection=dict(base=dict(volume=volumes['base'],manifest_sha256=hashlib.sha256((fixture.base/'manifest.json').read_bytes()).hexdigest()),
+        c=dict(source=dict(task_id=fixture.task,run_id='synthetic-qualification',phase='tests_only_v2'),volume=volumes['work'],
+            selection=dict(phase='tests_only_v2',base=dict(volume=volumes['base'],manifest_sha256=hashlib.sha256((fixture.base/'manifest.json').read_bytes()).hexdigest()),
                 editable_paths=['/workspace/tests/test_new.py']))
         b=SimpleNamespace(QUALITY_PREP_IMAGE=image_id,OWNER=owner)
         outcomes=[]

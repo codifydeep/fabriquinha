@@ -48,6 +48,19 @@ def payload(b,c,phase):
         Tmpfs={'/tmp':'rw,nosuid,nodev,size=32m,mode=1777'},Mounts=[
             dict(Type='volume',Source=c['selection']['base']['volume'],Target='/base',ReadOnly=True),
             dict(Type='volume',Source=c['volume'],Target='/workspace')])
+    selected=c['selection']
+    require(selected['phase']==c['source']['phase'] and selected['phase'] in ('tests_only_v2','implementation_v2'))
+    if selected['phase']=='implementation_v2':
+        frozen=selected['frozen_seed']
+        require(isinstance(frozen,dict) and set(frozen)=={'volume','manifest_sha256','test_sha256'}
+            and re.fullmatch('[A-Za-z0-9_.-]{1,200}',str(frozen['volume']))
+            and re.fullmatch('[a-f0-9]{64}',str(frozen['manifest_sha256']))
+            and isinstance(frozen['test_sha256'],dict) and bool(frozen['test_sha256'])
+            and not set(frozen['test_sha256'])&{p.removeprefix('/workspace/') for p in selected['editable_paths']})
+        if not root:
+            env+=['REVISION_SEED_JSON='+json.dumps({k:v for k,v in frozen.items() if k!='volume'})]
+            host['Mounts'].append(dict(Type='volume',Source=frozen['volume'],Target='/previous',ReadOnly=True))
+    else:require('frozen_seed' not in selected)
     if root:host['CapAdd']=['CHOWN','DAC_OVERRIDE']
     return dict(Image=image,User='0:0' if root else '10000:10000',Entrypoint=['python'],
         Cmd=['/workspace_lockdown.py' if root else '/seed_workspace.py'],NetworkDisabled=True,Env=env,
@@ -84,17 +97,19 @@ def executed(b,c,phase):
     return dict(job_key=key,result_sha256=admission.quality.digest(result),container_id=result['container_id'])
 
 
-def prepare(b,request_id,*,now=None):
+def prepare(b,request_id,*,now=None,admission_adapter=None):
     admission.enrollment.canonical(request_id)
+    authority=admission_adapter or admission
     with b.db() as con:
-        source=admission.load(con,request_id);require(source is not None)
+        source=authority.load(con,request_id);require(source is not None)
     # All preparation and source observation serialize by the actual source task.
     with capture.observation_lock(b,source['task_id']):
-        return _prepare(b,request_id,source,time.time() if now is None else now)
+        return _prepare(b,request_id,source,time.time() if now is None else now,authority)
 
 
-def _prepare(b,request_id,source,now):
-    selected=admission.selection(b,request_id)
+def _prepare(b,request_id,source,now,authority=None):
+    authority=authority or admission
+    selected=authority.selection(b,request_id)
     volume=b.PREFIX+'-work-'+hashlib.sha256(source['scope'].encode()).hexdigest()[:32]
     labels={'delivery-kit.owner':b.OWNER,'delivery-kit.scope':source['scope'],
         'delivery-kit.quality-run':source['run_id'],'delivery-kit.lifecycle':'workspace',
@@ -114,7 +129,7 @@ def _prepare(b,request_id,source,now):
         require(grant is not None and grant['used']==0 and grant['deadline']>now
             and not con.execute('SELECT 1 FROM leases WHERE request_id=?',(request_id,)).fetchone())
     settings=json.loads((b.STATE/'native.json').read_text())
-    with b.db() as con:e=admission.enrollment.lookup(con,source['issue_id'])
+    with b.db() as con:e=authority.enrollment.lookup(con,source['issue_id'])
     require(e is not None and settings['workspace_id']==e['workspace_id']
         and settings['runtime_id']==e['runtime_id'] and settings['agents'].get(source['agent_id'])=='implementation')
     observed=native.task_record(settings,source['task_id'],source['agent_id'])
@@ -132,7 +147,7 @@ def _prepare(b,request_id,source,now):
         state=dict(stage='prepared',owner=source['agent_id'],worker_launch_authorized=False,delivery_approval=False)
         with b.LOCK,b.db() as con:
             maintenance.require_admission(con)
-            require(admission.load(con,request_id)==source)
+            require(authority.load(con,request_id)==source)
             con.execute('INSERT INTO quality_author_workspaces VALUES(?,?,?,?,?)',
                 (request_id,json.dumps(c,sort_keys=True),json.dumps(state,sort_keys=True),
                     admission.quality.digest(c),admission.quality.digest(state)))

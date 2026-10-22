@@ -2,6 +2,7 @@
 import hashlib
 import json
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 from broker import quality_author_worker as worker
 from docker_grouping import grouped_create
@@ -56,6 +57,37 @@ class AuthorWorkerTests(unittest.TestCase):
         self.assertEqual(json.loads(lock['Env'][0].split('=',1)[1]),['tests/test_new.py'])
         with patch.object(worker.validation_job,'run',side_effect=AssertionError('no replay')):
             self.assertEqual(self.call(),receipt)
+
+    def test_implementation_seed_uses_frozen_new_tests_but_locks_every_test(self):
+        source=worker.admission.load
+        with self.b.db() as con:context=source(con,self.request)
+        context={**context,'phase':'implementation_v2'}
+        selected=worker.admission.selection(self.b,self.request)
+        selected={**selected,'phase':'implementation_v2','editable_paths':['/workspace/app.py'],
+            'frozen_seed':dict(volume='frozen-snapshot',manifest_sha256='e'*64,test_sha256={'tests/test_new.py':'f'*64})}
+        adapter=SimpleNamespace(load=lambda con,request:context,selection=lambda b,request:selected,
+            enrollment=worker.admission.enrollment)
+        def job(b,task,kind,payload):
+            if kind=='scope_base_verify':
+                # The existing fake job emits its expected allowlist. Rebind
+                # this fixture report to the implementation scope, not tests.
+                original=self.job(b,task,kind,payload)
+                output=json.dumps(dict(allowed=['app.py'],baseline_files=3))
+                updated={**original,'output':output,'output_sha256':hashlib.sha256(output.encode()).hexdigest()}
+                with b.db() as con:
+                    key=original['validation_job_key']
+                    state=json.loads(con.execute('SELECT state FROM validation_jobs WHERE job_key=?',(key,)).fetchone()[0])
+                    state['result']=updated
+                    con.execute('UPDATE validation_jobs SET state=? WHERE job_key=?',(json.dumps(state),key))
+                return updated
+            return self.job(b,task,kind,payload)
+        with patch.object(worker.validation_job,'run',side_effect=job) as jobs:
+            result=worker.prepare(self.b,self.request,now=101,admission_adapter=adapter)
+        self.assertEqual(result['stage'],'workspace_locked')
+        seed,lock=[call.args[3] for call in jobs.call_args_list]
+        self.assertIn('REVISION_SEED_JSON='+json.dumps({k:v for k,v in selected['frozen_seed'].items() if k!='volume'}),seed['Env'])
+        self.assertIn(dict(Type='volume',Source='frozen-snapshot',Target='/previous',ReadOnly=True),seed['HostConfig']['Mounts'])
+        self.assertEqual(json.loads(lock['Env'][0].split('=',1)[1]),['app.py'])
 
     def test_unknown_create_ack_is_observed_without_creating_another_volume(self):
         self.unknown=True

@@ -41,7 +41,16 @@ está implementada em fonte: exige tarefa nativa concluída, lease encerrado,
 inspeção do worker, leituras ACP reais byte a byte e veredito estruturado no mesmo
 snapshot. Seus controles passaram com fixtures de autoridade; as leituras dos
 handlers reais também coincidiram com o manifesto em Docker. A qualificação com
-o agente real, a continuação Green e a instalação seguem pendentes. Um pacote,
+o agente real e a instalação seguem pendentes. A admissão da primeira execução
+Green está implementada em fonte, sem ligação ao gateway: exige congelamento
+atestado, nova tarefa do autor original, mesmo brief/base e identidade do volume
+imutável. O preparo aceita os testes congelados como entrada somente leitura e
+os handlers permitem escrita exclusivamente nos arquivos declarados do produto.
+A fila de capacidade registra a espera antes de acionar o autor, sinaliza dez
+minutos e encaminha trinta minutos sem vaga ao Tech Lead; confirmações incertas
+não repetem o acionamento nativo. Esses controles passaram com fixtures, mas o
+lançamento Green, sua captura de evidências e a execução nativa ainda precisam
+ser integrados e qualificados. Um pacote,
 uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.
 O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
 Docker: leitura registrada funciona; escrita, terminal e tentativa direta de
