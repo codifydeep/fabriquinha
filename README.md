@@ -33,7 +33,10 @@ usuário sem privilégios, inclusive contra chmod, renomeação e subprocessos.
 O transporte ACP agora pode vincular a fase à execução exata; o registry e os
 handlers diretos do Hermes passaram por prova real em Docker: leitura declarada
 e escrita do teste novo funcionam, enquanto shell, Python e alterações de código
-ou testes antigos são recusados. A ligação ao lançamento nativo segue pendente.
+ou testes antigos são recusados. A ligação ao lançamento nativo e ao bootstrap
+assíncrono está implementada em fonte, desligada por padrão. Seus testes isolados
+cobrem confirmações Docker perdidas e abertura única do transporte; ainda faltam
+a qualificação desse caminho instalado e a revisão independente da nova cadeia.
 Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de

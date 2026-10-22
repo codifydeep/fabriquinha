@@ -45,6 +45,14 @@ if 'BROKER_VALIDATOR_IMAGE' in os.environ and not re.fullmatch(r'sha256:[a-f0-9]
 MODEL_NETWORK = os.environ.get('BROKER_MODEL_NETWORK', '')
 TOKEN = ''
 SESSIONS = {}
+# BEGIN QUALITY_V2 launch_config
+QUALITY_V2_ENABLED = os.environ.get('BROKER_QUALITY_V2_ENABLED', '0') == '1'
+QUALITY_PREP_IMAGE = os.environ.get('BROKER_QUALITY_PREP_IMAGE')
+QUALITY_WORKER_IMAGE = os.environ.get('BROKER_QUALITY_WORKER_IMAGE')
+QUALITY_COPY_IMAGE = os.environ.get('BROKER_QUALITY_COPY_IMAGE')
+QUALITY_RED_IMAGE = os.environ.get('BROKER_QUALITY_RED_IMAGE')
+QUALITY_TECHLEAD = os.environ.get('BROKER_QUALITY_TECHLEAD')
+# END QUALITY_V2 launch_config
 
 
 class RequiredTestMissing(ValueError):
@@ -738,6 +746,13 @@ def native_grant(payload):
     binding = task_binding(settings, **payload)
     if not binding['issue_id']:
         raise ValueError('native task missing issue identity')
+    # BEGIN QUALITY_V2 native_admission
+    if QUALITY_V2_ENABLED:
+        try:import quality_author_admission as v2_admission
+        except ImportError:from broker import quality_author_admission as v2_admission
+        with db() as con:v2_issue=v2_admission.enrollment.lookup(con,binding['issue_id'])
+        if v2_issue is not None:return v2_admission.admit(handoff_context(),payload['task_id'],payload['agent_id'])
+    # END QUALITY_V2 native_admission
     try:import quality_lifecycle_enrollment
     except ImportError:from broker import quality_lifecycle_enrollment
     with LOCK, db() as con:
@@ -1636,6 +1651,14 @@ def change_request_reason(content):
 
 
 def execute_grant(token, payload, streaming=False, defer_transport=False):
+    # BEGIN QUALITY_V2 execute_dispatch
+    try:import quality_author_launch as v2_launch
+    except ImportError:from broker import quality_author_launch as v2_launch
+    with db() as con:
+        v2_row=con.execute('SELECT request_id FROM grants WHERE digest=?',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+    if v2_row and v2_launch.owns(handoff_context(),v2_row[0]):
+        return v2_launch.execute(handoff_context(),token,payload,streaming,defer_transport)
+    # END QUALITY_V2 execute_dispatch
     if payload != {}:
         raise ValueError('execution parameters are controller-owned')
     with LOCK, db() as con:
@@ -1676,6 +1699,12 @@ def execute_grant(token, payload, streaming=False, defer_transport=False):
 
 def open_granted_transport(row,result,scope):
     """Open only after startup authorization; callers own the single-use intent."""
+    # BEGIN QUALITY_V2 transport_dispatch
+    try:import quality_author_launch as v2_launch
+    except ImportError:from broker import quality_author_launch as v2_launch
+    if v2_launch.owns(handoff_context(),row['request_id']):
+        return v2_launch.open_transport(handoff_context(),row,result,scope)
+    # END QUALITY_V2 transport_dispatch
     from acp_transport import Transport
     try:
         with db() as lookup:
@@ -1748,6 +1777,14 @@ def open_granted_transport(row,result,scope):
 
 
 def assert_review_task_running(row):
+    # BEGIN QUALITY_V2 running_identity
+    try:import quality_author_launch as v2_launch
+    except ImportError:from broker import quality_author_launch as v2_launch
+    if v2_launch.owns(handoff_context(),dict(row).get('request_id')):
+        current=v2_launch.current(handoff_context(),row['request_id'])
+        if any(current[k]!=row[k] for k in ('task_id','agent_id','scope')):raise ValueError('native v2 scope drift')
+        return
+    # END QUALITY_V2 running_identity
     from native import task_binding
     current = task_binding(json.loads((STATE / 'native.json').read_text()),
                            row['task_id'], row['agent_id'])
@@ -1772,6 +1809,12 @@ def session_operation(token, payload, close=False, on_notification=None):
         if binding and not close:
             from native import task_binding
             current = task_binding(json.loads((STATE / 'native.json').read_text()), binding['task_id'], binding['agent_id'])
+            # BEGIN QUALITY_V2 session_identity
+            try:import quality_author_launch as v2_launch
+            except ImportError:from broker import quality_author_launch as v2_launch
+            if v2_launch.owns(handoff_context(),binding['request_id']):
+                current = v2_launch.current(handoff_context(),binding['request_id'])
+            # END QUALITY_V2 session_identity
             if current['scope'] != binding['scope']:
                 raise ValueError('native scope changed')
         session = SESSIONS.get(grant['request_id'])
@@ -1795,7 +1838,7 @@ def session_operation(token, payload, close=False, on_notification=None):
         from native import issue_record
         settings = json.loads((STATE / 'native.json').read_text())
         issue = issue_record(settings, binding['issue_id'])
-        correction = verified_correction(current, binding['issue_id']) if grant['mode'] == 'implementation' else None
+        correction = verified_correction(current, binding['issue_id']) if grant['mode'] == 'implementation' and not current.get('quality_request_id') else None
         frame = native_task_prompt(frame, grant['mode'], issue, current, correction)
     try:
         result = session.exchange(frame, on_notification=on_notification) if on_notification else session.exchange(frame)
@@ -1996,6 +2039,13 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         raise ValueError('invalid native mode')
     if frame.get('method') != 'session/prompt':
         raise ValueError('prompt frame required')
+    # BEGIN QUALITY_V2 prompt_dispatch
+    if task.get('quality_request_id'):
+        if mode!='implementation':raise ValueError('v2 tests-only mode required')
+        try:import quality_author_launch as v2_launch
+        except ImportError:from broker import quality_author_launch as v2_launch
+        return v2_launch.prompt(handoff_context(),frame,issue,task,correction)
+    # END QUALITY_V2 prompt_dispatch
     if mode=='implementation' and re.search(r'^DELIVERY_AUTHOR_FEEDBACK_V1$',task.get('handoff_note') or '',re.M):
         if correction is not None:raise ValueError('feedback scope cannot mix generic correction authority')
         try:import literal_feedback_strategy

@@ -266,6 +266,56 @@ result and retired exact helpers; an unknown/missing result remains unresolved.
 Neither these proofs nor a successful metadata readback authorize native launch,
 test review, implementation continuation or homologation.
 
+### Opt-in native launch integration (source only)
+
+`broker/quality_author_launch.py` is wired into native admission, asynchronous
+startup, exact task-scope checks, transport opening and controller prompt
+construction. `BROKER_QUALITY_V2_ENABLED` defaults off; worker/prep/copy/observer
+images and the technical escalation identity are explicit operator settings.
+The installed controller remains unchanged and sealed pending qualification.
+
+The first capability is consumed only after durable workspace seed/lock and
+reauthentication of the current running native author. The worker must use the
+configured immutable dedicated image, with no inherited volumes/credential env,
+only the owned workspace mount, a read-only root and the owned internal model
+network. No legacy route, seed, calibration, editable list or session is selected.
+The same transaction records consumption, lease and immutable Docker payload.
+Create/start intent precedes its sole POST; lost acknowledgments are observed by
+the existing startup journal, not treated as permission for another worker.
+
+The launch path requires asynchronous startup, not a second synchronous execution
+route. Pending fixed preparation jobs are observed under the original startup
+budget. A persisted phase authorizes the exact task scope; agent notes cannot
+override it. Startup and session checks reauthenticate that phase against native
+ownership/status rather than confusing the fresh task scope with the generic
+issue session scope. Controller prompts replace agent-supplied prompt text with
+the tests-only instructions and registered acceptance/test mapping, treating
+issue description as requirements data, not tool/approval authority.
+The authenticated native issue title/description and a bounded context capsule
+are frozen in the admission context before minting the capability. Prompt
+construction requires the current issue to match those exact fields and uses
+that persisted capsule for the transport's trusted controller envelope. It never
+manufactures a larger-prompt exception from current agent text or silently
+updates scope after admission. Missing/oversized context rejects admission
+without partial authority; changed issue text requires explicit technical
+replanning, not a hidden refresh of the authorized test objective.
+
+Transport opening requires the current capability, running lease, exact original
+worker payload and matching durable inspection of that container/image/policy.
+An opening intent precedes Docker exec; a lost/failed opening cannot silently
+recreate a transport. The real ACP transport receives the same execution-bound
+handler policy and new-test editables. It grants no test-review, implementation,
+merge or delivery approval. The v2 hooks are disabled for legacy tasks; regression
+reconstructs the exact earlier pinned server bytes after removing only those
+hooks and the explicit phase-specific correction exclusion. Historical pins and
+holds remain valid without being converted into new evidence.
+
+These launch tests use actual controller/startup entrypoints with isolated DBs
+and mocked native/Docker observations. They are not proof of native agents,
+installed startup, paid model execution, independent review or end-to-end delivery.
+Qualify the new launch path and remaining review/Green/sensitivity chain before
+enabling it for any product work.
+
 `broker/quality_lifecycle_enrollment.py` binds a new run and previously unexecuted
 native issue to the complete portable contract, repository, registered base SHA,
 base-volume manifest, native workspace/runtime and independent author/reviewer.

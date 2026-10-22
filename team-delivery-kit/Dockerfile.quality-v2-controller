@@ -1,0 +1,14 @@
+# Qualification layer over the current local legacy controller. This does not
+# replace the canonical distribution build or enable v2 in a running service.
+FROM delivery-kit-execution-broker:20261021.512
+COPY broker/server.py /broker.py
+COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /
+COPY broker/controller_maintenance.py broker/maintenance_job_clock.py /
+COPY broker/handoff_runtime.py /
+COPY broker/quality_lifecycle_v2.py broker/quality_lifecycle_enrollment.py broker/quality_red_capture.py /
+COPY broker/quality_red_snapshot.py broker/quality_author_admission.py broker/quality_author_worker.py broker/quality_author_launch.py /
+COPY broker/literal_author_bootstrap_recovery.py broker/review_context_recovery.py /
+COPY quality_phase_tools.py execution_context.py /
+ENV BROKER_QUALITY_V2_ENABLED=0
+RUN BROKER_WORKER_IMAGE=sha256:0000000000000000000000000000000000000000000000000000000000000000 PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import broker, quality_author_launch, quality_red_snapshot; assert broker.QUALITY_V2_ENABLED is False"
+LABEL delivery-kit.component="quality-v2-controller" delivery-kit.qualification="not-native-delivery"

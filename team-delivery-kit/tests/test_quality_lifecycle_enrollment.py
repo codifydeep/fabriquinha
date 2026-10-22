@@ -63,7 +63,8 @@ class QualityEnrollmentTests(unittest.TestCase):
             protected_files=['AGENTS.md','tests/test_old.py','tests/test_new.py'],
             criterion_tests={'A01':[dict(path='tests/test_new.py',method='test_new')]})
         self.payload=dict(plan=self.plan,contract=self.spec,maintenance_operation=self.operation)
-        for name,value in [('native_active',[]),('issue_record',dict(id=self.issue,workspace_id='workspace')),
+        for name,value in [('native_active',[]),('issue_record',dict(id=self.issue,workspace_id='workspace',
+                title='Fixture acceptance',description='Acceptance data: A01 requires new behavior.')),
                            ('issue_task_runs',[])]:
             target=enrollment.maintenance if name=='native_active' else enrollment.native
             p=patch.object(target,name,return_value=value)
@@ -215,7 +216,7 @@ class QualityEnrollmentTests(unittest.TestCase):
         path=Path(__file__).resolve().parents[1]/'broker/server.py'
         spec=importlib.util.spec_from_file_location('quality_enrollment_broker_test',path)
         module=importlib.util.module_from_spec(spec)
-        with patch.dict(os.environ,{'BROKER_WORKER_IMAGE':'sha256:'+'a'*64}):
+        with patch.dict(os.environ,{'BROKER_WORKER_IMAGE':'sha256:'+'a'*64,'BROKER_QUALITY_V2_ENABLED':'0'}):
             spec.loader.exec_module(module)
         for key,value in [('db',self.b.db),('STATE',self.root),('LOCK',self.b.LOCK)]:
             p=patch.object(module,key,value);self.addCleanup(p.stop);p.start()
@@ -266,9 +267,19 @@ class QualityEnrollmentTests(unittest.TestCase):
         with self.b.db() as con:self.assertEqual(con.execute('SELECT count(*) FROM delivery_routes').fetchone()[0],0)
 
     def test_legacy_source_pins_admit_only_exact_additive_fences_without_other_changes(self):
-        import hashlib
+        import hashlib,re
         from broker import literal_author_bootstrap_recovery as author,review_context_recovery as review
         source=(Path(__file__).resolve().parents[1]/'broker/server.py').read_bytes()
+        self.assertEqual(hashlib.sha256(source).hexdigest(),author.V2_AUTHOR_LAUNCH_ROOT_SHA)
+        self.assertEqual(author.V2_AUTHOR_LAUNCH_ROOT_SHA,review.V2_AUTHOR_LAUNCH_SERVER_SHA)
+        additions=rb'(?ms)^([ ]*)# BEGIN QUALITY_V2 ([a-z_]+)\n.*?^\1# END QUALITY_V2 \2\n'
+        self.assertEqual([kind.decode() for _,kind in re.findall(additions,source)],
+            ['launch_config','native_admission','execute_dispatch','transport_dispatch',
+             'running_identity','session_identity','prompt_dispatch'])
+        source=re.sub(additions,b'',source)
+        changed=b"if grant['mode'] == 'implementation' and not current.get('quality_request_id') else None"
+        self.assertEqual(source.count(changed),1)
+        source=source.replace(changed,b"if grant['mode'] == 'implementation' else None",1)
         self.assertEqual(hashlib.sha256(source).hexdigest(),author.V2_ENROLLMENT_FENCE_ROOT_SHA)
         self.assertEqual(author.V2_ENROLLMENT_FENCE_ROOT_SHA,review.V2_ENROLLMENT_FENCE_SERVER_SHA)
         blocks=[

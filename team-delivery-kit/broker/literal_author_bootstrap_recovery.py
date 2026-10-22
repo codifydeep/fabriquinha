@@ -27,6 +27,8 @@ AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA='f4f258f63dd8b37315ddc6dd29c4ed7d25c074cb5ef9
 AUTHOR_FEEDBACK_STRATEGY_ROOT_SHA='03f2b0cd18dce00b0a9fba0098c6bd66ba1ba966da5e61790a2c9c8fd3f51e8b'
 # Same legacy constructor, with only the two source-qualified v2 admission fences.
 V2_ENROLLMENT_FENCE_ROOT_SHA='ab414dc1d296e694102288028b769b06f66f2b381be931fdba6568023583af41'
+# Additive opt-in v2 launch hooks; legacy bytes are reconstructed by regression.
+V2_AUTHOR_LAUNCH_ROOT_SHA='8d823023b3bf3dad3a1fa03ca7352abdb6aa1c47874321bda3c6222b8c6db550'
 CONTEXT_SHA='7b182c770b2d0db0880571d4c254d1a158e852752801b69dca494db9c35f16ec'
 
 
@@ -62,7 +64,7 @@ def probe(b,cfg,s,task,old_route,new_route,trial,paths,issue):
     """
     from execution_context import __file__ as context_file
     root_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
-    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA,AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA,AUTHOR_FEEDBACK_STRATEGY_ROOT_SHA,V2_ENROLLMENT_FENCE_ROOT_SHA)
+    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA,AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA,AUTHOR_FEEDBACK_STRATEGY_ROOT_SHA,V2_ENROLLMENT_FENCE_ROOT_SHA,V2_AUTHOR_LAUNCH_ROOT_SHA)
         and hashlib.sha256(Path(context_file).read_bytes()).hexdigest()==CONTEXT_SHA)
     spec=importlib.util.spec_from_file_location('isolated_literal_author_prompt',b.__file__)
     isolated=importlib.util.module_from_spec(spec);spec.loader.exec_module(isolated)

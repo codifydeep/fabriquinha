@@ -61,7 +61,10 @@ def authority(b,token):
         row=dict(row);binding=dict(binding)
     try:import native
     except ImportError:from broker import native
-    current=native.task_binding(json.loads((Path(b.STATE)/'native.json').read_text()),binding['task_id'],binding['agent_id'])
+    try:import quality_author_launch as v2_launch
+    except ImportError:from broker import quality_author_launch as v2_launch
+    current=(v2_launch.current(b,row['request_id']) if v2_launch.owns(b,row['request_id']) else
+        native.task_binding(json.loads((Path(b.STATE)/'native.json').read_text()),binding['task_id'],binding['agent_id']))
     if (current['scope']!=binding['scope'] or binding['task_id']!=row['task_id']
             or current['mode']!=row['mode'] or current['issue_id']!=binding['issue_id']):
         raise ValueError('native startup identity drift')
@@ -173,6 +176,13 @@ def run(b,token,request_id,state):
             if row['request_id']!=request_id:raise ValueError('startup identity changed')
             if not row['used']:
                 try:b.execute_grant(token,{},streaming=True,defer_transport=True)
+                except TimeoutError as error:
+                    try:import validation_job
+                    except ImportError:from broker import validation_job
+                    if isinstance(error,validation_job.Pending):
+                        time.sleep(0.25);continue
+                    if not isinstance(error,b.DockerOperationTimeout):raise
+                    if error.operation not in ('containers_create','containers_start'):raise
                 except b.DockerOperationTimeout as error:
                     if error.operation not in ('containers_create','containers_start'):raise
                 continue

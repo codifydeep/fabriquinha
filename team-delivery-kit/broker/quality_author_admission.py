@@ -10,6 +10,7 @@ import json
 import secrets
 import time
 import uuid
+from execution_context import freeze,validate as validate_capsule
 
 try:
     from . import quality_lifecycle_enrollment as enrollment,quality_lifecycle_v2 as quality
@@ -36,6 +37,8 @@ def load(con,request_id):
         (request_id,)).fetchone()
     if not row:return None
     context=json.loads(row[0]);require(quality.digest(context)==row[1])
+    validate_capsule(context['capsule'])
+    require(context['capsule']['description']==issue_text(context['issue']))
     e=enrollment.lookup(con,context['issue_id'])
     require(e is not None and quality.digest(e)==context['enrollment_sha256'])
     require(context['request_id']==request_id and context['phase']=='tests_only_v2'
@@ -74,6 +77,13 @@ def tool_config(b,request_id):
         editable_paths=selected['editable_paths'],read_paths=selected['read_paths'])
 
 
+def issue_text(issue):
+    require(isinstance(issue,dict) and set(issue)=={'id','workspace_id','title','description'}
+        and isinstance(issue['title'],str) and 1<=len(issue['title'])<=240
+        and isinstance(issue['description'],str) and bool(issue['description'].strip()))
+    return 'Issue: '+issue['title']+'\nDescription: '+issue['description']
+
+
 def admit(b,task_id,agent_id,*,now=None):
     for value in (task_id,agent_id):enrollment.canonical(value)
     now=time.time() if now is None else now
@@ -92,6 +102,10 @@ def admit(b,task_id,agent_id,*,now=None):
     # Native and Docker observations do not hold a database writer/global lock.
     runs=native.issue_task_runs(settings,issue)
     require(len(runs)==1 and runs[0].get('id')==task_id and runs[0].get('agent_id')==agent_id)
+    observed_issue=native.issue_record(settings,issue)
+    frozen_issue={k:observed_issue.get(k) for k in ('id','workspace_id','title','description')}
+    require(frozen_issue['id']==issue and frozen_issue['workspace_id']==e['workspace_id'])
+    capsule=freeze(issue_text(frozen_issue),'Independently review the frozen tests against the registered acceptance criteria; do not implement or edit them.')
     base=b.issue_base(issue)
     require(all(base.get(k)==e[v] for k,v in (('issue_id','issue_id'),('base_sha','base_sha'),
         ('volume','base_volume'),('manifest_sha256','base_manifest_sha256'))))
@@ -121,7 +135,7 @@ def admit(b,task_id,agent_id,*,now=None):
         request_id=str(uuid.uuid4());token=secrets.token_hex(32)
         context=dict(namespace=b.PREFIX,issue_id=issue,task_id=task_id,agent_id=agent_id,scope=scope,
             request_id=request_id,mode='implementation',attempt=1,run_id=e['run_id'],phase='tests_only_v2',
-            plan_sha256=quality.digest(plan),enrollment_sha256=quality.digest(e),base=dict(base))
+            plan_sha256=quality.digest(plan),enrollment_sha256=quality.digest(e),base=dict(base),issue=frozen_issue,capsule=capsule)
         con.execute('INSERT INTO grants(digest,task_id,attempt,mode,request_id,deadline,used) VALUES(?,?,?,?,?,?,?)',
             (hashlib.sha256(token.encode()).hexdigest(),task_id,1,'implementation',request_id,now+480,0))
         con.execute('INSERT INTO native_bindings VALUES(?,?,?,?,?)',(request_id,task_id,agent_id,scope,issue))
