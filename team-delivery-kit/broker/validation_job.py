@@ -5,8 +5,10 @@ import uuid
 from docker_grouping import grouped_create
 try:
     from test_first_job import digest, verify
+    import maintenance_job_clock as clock
 except ImportError:
     from broker.test_first_job import digest, verify
+    from broker import maintenance_job_clock as clock
 
 
 class Pending(TimeoutError):
@@ -34,6 +36,8 @@ def run(b, task, kind, payload, *, now=None):
             if state['stage'] == 'complete': return state['result']
             if state['stage'] == 'blocked': raise ValueError('validation observation blocked; preserve handle')
         else:
+            try:clock.deadline(con,b.PREFIX,now+600,now)
+            except TimeoutError as error:raise Pending(str(error)) from error
             if b.docker('GET', '/containers/' + name + '/json'):
                 raise ValueError('unregistered validation job')
             state = dict(stage='prepared', deadline=now+600, approval=False)
@@ -44,7 +48,10 @@ def run(b, task, kind, payload, *, now=None):
         with b.db() as con:
             con.execute('UPDATE validation_jobs SET state=? WHERE job_key=?',
                         (json.dumps(state, sort_keys=True), key))
-    if now >= state['deadline']:
+    with b.db() as con:
+        try:observation_deadline=clock.deadline(con,b.PREFIX,state['deadline'],now)
+        except TimeoutError as error:raise Pending(str(error)) from error
+    if now >= observation_deadline:
         save(stage='blocked', category='observation_deadline')
         raise ValueError('validation observation deadline; preserve exact handle')
     try:

@@ -20,9 +20,11 @@ bloqueios contra uso do fluxo legado por uma issue v2. O observador de Red real
 também passou por controles sintéticos em Docker isolado, sem uma implementação
 positiva prévia. A ingestão persistente de Red também está implementada em fonte:
 exige fase, tarefa, cópia e job reais vinculados pelo controlador, sem aceitar
-relatos do agente como prova. Isso ainda não qualifica uma entrega dos agentes nem
-autoriza workers: admissão v2, produtor de snapshots, revisão, instalação e
-qualificação nativa seguem pendentes.
+relatos do agente como prova. O produtor persistente de snapshots está implementado
+em fonte; a cópia real em Docker passou pelos controles de duplicação e alteração
+indevida, preservando os hashes e a execução sem privilégios. Isso ainda não
+qualifica uma entrega dos agentes nem autoriza workers: admissão v2, integração
+do produtor, revisão, instalação e qualificação nativa seguem pendentes.
 Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de

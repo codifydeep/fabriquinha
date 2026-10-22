@@ -57,11 +57,8 @@ def execution_args(namespace,name,image_id,request=None):
     return command+[image_id]
 
 
-def qualify(namespace,image,input_mode='file'):
+def require_idle(namespace):
     if not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}',namespace):raise ValueError('exact delivery namespace required')
-    if input_mode not in ('file','env'):raise ValueError('fixed input mode required')
-    if not re.fullmatch(r'delivery-kit-quality-red-observer:[A-Za-z0-9_.-]{1,64}',image):
-        raise ValueError('locally built fixed observer image required')
     from controller_maintenance_cli import arguments
     maintenance=json.loads(subprocess.check_output(arguments(namespace,'status',''),text=True))
     if maintenance.get('stage')!='sealed' or maintenance.get('drained') is not True:
@@ -75,6 +72,14 @@ def qualify(namespace,image,input_mode='file'):
     idle=json.loads(subprocess.check_output(['docker','exec',namespace+'-execution-broker-1',
         'python','-c',program],text=True,timeout=90))
     if idle!={'native_active':0,'active_leases':0}:raise ValueError('qualification must not compete with active work')
+    return maintenance,idle
+
+
+def qualify(namespace,image,input_mode='file'):
+    if input_mode not in ('file','env'):raise ValueError('fixed input mode required')
+    if not re.fullmatch(r'delivery-kit-quality-red-observer:[A-Za-z0-9_.-]{1,64}',image):
+        raise ValueError('locally built fixed observer image required')
+    maintenance,idle=require_idle(namespace)
     unsettled=subprocess.check_output(['docker','ps','-aq','--filter',
         'label=delivery-kit.owner='+namespace+'-quality-red-probe'],text=True).strip()
     if unsettled:raise ValueError('existing probe handle must be observed before another qualification')

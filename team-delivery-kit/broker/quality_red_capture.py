@@ -121,7 +121,8 @@ def job_identity(b,task,payload):
     return key,dict(task=task,kind='suite',name=name,payload=expected)
 
 
-def prepare(b,task):
+def authorize_source(b,task):
+    """Read-only authority shared with the fixed snapshot producer."""
     with b.LOCK,b.db() as con:
         binding=source(con,task)
         e=enrollment.lookup(con,binding['issue_id']);require(e is not None and e['namespace']==b.PREFIX)
@@ -129,7 +130,6 @@ def prepare(b,task):
         plan,spec=enrollment.request(json.loads(con.execute('SELECT config FROM quality_lifecycle_enrollments '
             'WHERE issue_id=?',(e['issue_id'],)).fetchone()[0]))
         require(binding['run_id']==plan['run_id'] and binding['plan_sha256']==quality.digest(plan))
-        copied=copy_record(b,con,e,plan,spec,task,binding)
     settings=json.loads((b.STATE/'native.json').read_text())
     lead=getattr(b,'QUALITY_TECHLEAD',None);enrollment.canonical(lead)
     require(settings['workspace_id']==e['workspace_id'] and settings['runtime_id']==e['runtime_id']
@@ -153,11 +153,6 @@ def prepare(b,task):
         and copy_config.get('Labels',{}).get('delivery-kit.component')=='quality-red-copy'
         and not any(re.search(r'token|secret|password|api.?key|credential|^aws_',str(v).split('=',1)[0],re.I)
             for v in copy_config.get('Env',[])))
-    volume=b.PREFIX+'-quality-red-'+task
-    snapshot=b.docker('GET','/volumes/'+volume) or {}
-    labels=snapshot.get('Labels',{})
-    require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.test-first-task')==task
-        and labels.get('delivery-kit.quality-run')==e['run_id'])
     image=getattr(b,'QUALITY_RED_IMAGE',None)
     require(isinstance(image,str) and bool(re.fullmatch(r'sha256:[a-f0-9]{64}',image)))
     actual=b.docker('GET','/images/'+spec['test_image']+'/json') or {}
@@ -167,6 +162,17 @@ def prepare(b,task):
         and cfg.get('User')=='10000:10000' and not cfg.get('Volumes')
         and not any(re.search(r'token|secret|password|api.?key|credential|^aws_',str(v).split('=',1)[0],re.I)
             for v in cfg.get('Env',[])))
+    return e,plan,spec,binding,lead
+
+
+def prepare(b,task):
+    e,plan,spec,binding,lead=authorize_source(b,task)
+    with b.db() as con:copied=copy_record(b,con,e,plan,spec,task,binding)
+    volume=b.PREFIX+'-quality-red-'+task
+    snapshot=b.docker('GET','/volumes/'+volume) or {}
+    labels=snapshot.get('Labels',{})
+    require(labels.get('delivery-kit.owner')==b.OWNER and labels.get('delivery-kit.test-first-task')==task
+        and labels.get('delivery-kit.quality-run')==e['run_id'])
     context=dict(enrollment_sha256=quality.digest(e),plan=plan,source=binding,copy=copied,
         reviewer=e['reviewer'],techlead=lead,payload=observer_payload(b,e,plan,task,copied['prepared']))
     state=dict(stage='validation_pending',owner=e['author'],execution_authorized=False,delivery_approval=False)

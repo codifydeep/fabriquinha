@@ -2,8 +2,9 @@
 
 Status: owner-approved design; policy, offline sensitivity executor, persistent
 operator enrollment, legacy admission fences, standalone full-suite Red observer
-and durable controller Red ingestion implemented in source. The Red observer also passed synthetic Docker
-isolation checks. The v2 chain is not installed, enrolled or enabled in the
+and durable controller Red ingestion/snapshot producer implemented in source.
+The observer and dedicated snapshot copier also passed synthetic Docker
+isolation/integrity checks. The v2 chain is not installed, enrolled or enabled in the
 running controller. Historical runs retain v1.
 
 ## Required order
@@ -150,6 +151,35 @@ still does not mint `tests_only_v2` capabilities, the fixed copy producer is not
 wired to a new v2 coordinator, and independent review dispatch/attestation remain
 to implement and qualify. Do not populate scope/proof tables manually to bypass
 these missing stages or enable v2 based on observer/ingestion tests alone.
+
+### Durable fixed snapshot production
+
+`broker/quality_red_snapshot.py` shares the ingestion source authentication and
+per-task OS lock. It persists the exact volume identity and creation intent
+before any Docker effect, then delegates to the durable fixed copy-job journal.
+An unknown create acknowledgment is observed using the same name, never retried
+as another POST. Existing unregistered volumes are not adopted; changed labels,
+creation identity, scope or source evidence fail closed. Completed snapshots
+retain a hash-bound receipt without authorizing Red, implementation or delivery.
+The `advance` entrypoint connects this producer to ingestion but is not a worker
+endpoint or native admission adapter. Its controller provenance tests use mocks,
+not live native authority.
+
+`Dockerfile.quality-red-copy` has no inherited volumes or credentials and prepares
+the snapshot directory for user 10000. `qualify_quality_snapshot.py` exercises the
+actual image and named-volume copy-up with synthetic inputs: genuine copy,
+duplicate destination rejection, and pre-Red product modification rejection.
+Each case reads back the same manifest and unprivileged ownership. Jobs are
+networkless, bounded, read-only except the explicitly owned destination volume,
+grouped under `-tests`, and retired with `--rm`. The small proof volume and private
+intents/results remain preserved for recovery; no volume pruning is performed.
+These checks are not a native task, test review, or delivery qualification.
+
+Fixed validation jobs now exclude only proven sealed operator-maintenance
+intervals from their observation budget, like the existing copy jobs. Sealed
+maintenance prevents new effects; release resumes the same immutable job and
+original deadline. Draining or ordinary inactivity does not extend the budget,
+and neither a pause nor a restart resets attempts or grants an approval.
 
 ### Immutable enrollment and legacy fences
 

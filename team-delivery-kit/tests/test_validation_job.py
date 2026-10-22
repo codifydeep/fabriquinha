@@ -76,6 +76,40 @@ class ValidationJobTests(unittest.TestCase):
         for task,kind in ((TASK,'shell'),('wrong','suite')):
             with self.assertRaises(ValueError):job.run(self.b,task,kind,self.payload)
 
+    def maintenance(self,stage,start,end=None):
+        with self.db() as con:
+            con.execute('CREATE TABLE IF NOT EXISTS controller_maintenance(stage TEXT,receipt TEXT)')
+            con.execute('INSERT INTO controller_maintenance VALUES(?,?)',(stage,json.dumps(dict(
+                namespace=self.b.PREFIX,sealed_at=start,released_at=end))))
+
+    def test_sealed_maintenance_prevents_new_docker_effects(self):
+        self.maintenance('sealed',100)
+        with self.assertRaises(job.Pending):self.call(101)
+        self.assertEqual(self.calls,[])
+
+    def test_released_maintenance_preserves_original_deadline_and_same_job(self):
+        with self.assertRaises(job.Pending):self.call(1)
+        self.maintenance('sealed',100)
+        count=len(self.calls)
+        with self.assertRaises(job.Pending):self.call(1100)
+        self.assertEqual(len(self.calls),count)
+        with self.db() as con:con.execute('DELETE FROM controller_maintenance')
+        self.maintenance('released',100,1100)
+        self.info['State'].update(Status='exited',ExitCode=0)
+        result=self.call(1200)
+        self.assertEqual(result['exit_code'],0)
+        with self.db() as con:
+            state=json.loads(con.execute('SELECT state FROM validation_jobs').fetchone()[0])
+        self.assertEqual(state['deadline'],601)
+        self.assertEqual(sum(m=='POST' and '/create' in p for m,p in self.calls),1)
+        self.assertEqual(sum(m=='POST' and p.endswith('/start') for m,p in self.calls),1)
+
+    def test_draining_maintenance_does_not_extend_deadline(self):
+        with self.assertRaises(job.Pending):self.call(1)
+        self.maintenance('draining',100)
+        with self.assertRaises(ValueError):self.call(602)
+        self.assertEqual(sum(m=='POST' and '/create' in p for m,p in self.calls),1)
+
     def test_large_test_failure_log_is_complete_and_cached_without_reexecution(self):
         import hashlib
         output='AssertionError: '+('source context\n'*8000)
