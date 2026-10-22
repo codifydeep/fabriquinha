@@ -27,6 +27,9 @@ qualifica uma entrega dos agentes nem autoriza workers. A primeira admissão v2
 está implementada em fonte, com fase/capacidade atômicas e seleção de edição
 restrita aos testes novos. A integração ao lançamento e ao produtor, a revisão,
 a instalação e a qualificação nativa seguem pendentes.
+O preparo persistente do workspace (seed e lockdown) está implementado em fonte;
+o bloqueio real de arquivos já passou por qualificação sintética Docker como
+usuário sem privilégios, inclusive contra chmod, renomeação e subprocessos.
 Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de

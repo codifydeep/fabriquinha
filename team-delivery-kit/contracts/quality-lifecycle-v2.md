@@ -208,6 +208,34 @@ back every authority row. These tests use synthetic native fixtures, not a live
 agent run. No admission module is exposed as a worker endpoint or enabled merely
 because its unit tests pass.
 
+`broker/quality_author_worker.py` prepares a freshly admitted tests-only workspace
+through two fixed durable validation jobs: nonroot seed, then controller-only
+root lockdown with only CHOWN/DAC_OVERRIDE. It does not call route-dependent
+legacy selectors. The exact new-test list, immutable prep image and base manifest
+are controller-owned. The dedicated prep image has no inherited volumes, network
+credentials or host access. Helpers have no Docker socket; only the workspace
+destination is writable, and the base is mounted read-only.
+
+The workspace journal records volume creation intent before effects and retains
+the exact creation identity. Unknown acknowledgments are observed without
+another POST; unregistered or recreated volumes cannot be adopted. Seed/lock
+results must match complete durable fixed-job identity, container and output
+hashes, not a worker success claim. Maintenance, expired/consumed capability or
+changed native runtime prevents new preparation. Completed readback does not
+rerun jobs and explicitly grants neither launch nor delivery; the later launch
+adapter must reauthenticate the current task/capability and actual workspace.
+
+`Dockerfile.quality-author-prep` and `qualify_quality_author_workspace.py` exercise
+these seed/lock commands with baked synthetic inputs, using named proof volumes
+instead of host mounts. A nonprivileged Docker probe can write the selected new
+test but cannot write product/baseline files, chmod, unlink, rename, create an
+undeclared file/symlink, or bypass the fence with a child process. Protected
+hashes remain unchanged. Helpers use grouped `--rm` jobs; the two small proof
+volumes and private intents/results remain for recovery. This is real filesystem
+isolation evidence, not live Hermes tool-handler, native launch, independent
+test-review or release qualification. The current server/worker-image launch
+integration and remaining chain are still disabled pending those gates.
+
 `broker/quality_lifecycle_enrollment.py` binds a new run and previously unexecuted
 native issue to the complete portable contract, repository, registered base SHA,
 base-volume manifest, native workspace/runtime and independent author/reviewer.
