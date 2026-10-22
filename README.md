@@ -16,10 +16,11 @@ O [contrato de qualidade v2](team-delivery-kit/contracts/quality-lifecycle-v2.md
 foi aprovado: Red real → revisão e congelamento dos testes → Green → controles
 negativos obrigatórios antes do merge. A política, o executor offline e o cadastro
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
-bloqueios contra uso do fluxo legado por uma issue v2. O cadastro ainda não
-autoriza workers; instalação, integração das etapas e qualificação nativa seguem
-pendentes. Não é uma dispensa dos gates existentes nem uma aprovação de ensaios
-bloqueados.
+bloqueios contra uso do fluxo legado por uma issue v2. O observador de Red real
+também passou por controles sintéticos em Docker isolado, sem uma implementação
+positiva prévia. Isso ainda não autentica uma entrega dos agentes nem autoriza
+workers: instalação, integração das etapas e qualificação nativa seguem pendentes.
+Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de
 evidências históricas, o controlador pode produzir uma única evidência nova com

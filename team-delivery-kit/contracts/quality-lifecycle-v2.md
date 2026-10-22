@@ -1,9 +1,10 @@
 # Quality lifecycle v2
 
-Status: owner-approved design; policy, offline sensitivity executor and persistent
-operator enrollment implemented in source. The legacy admission fences are also
-implemented in source. Not installed, enrolled or enabled in the running
-controller. Historical runs retain v1.
+Status: owner-approved design; policy, offline sensitivity executor, persistent
+operator enrollment, legacy admission fences and standalone full-suite Red
+observer implemented in source. The Red observer also passed synthetic Docker
+isolation checks. The v2 chain is not installed, enrolled or enabled in the
+running controller. Historical runs retain v1.
 
 ## Required order
 
@@ -67,6 +68,44 @@ These modules must not be exposed as worker authorization endpoints. A controlle
 adapter must authenticate native identities, independent decisions, complete
 reads, fixed-job isolation, immutable manifests and actual execution receipts
 before persisting a qualified transition. Caller-supplied booleans are not proof.
+
+### Actual Red observation, without a positive prerequisite
+
+`quality_red_observation.py` verifies the immutable base manifest, complete portable
+contract, original product/protected bytes, baseline hashes and frozen snapshot.
+The initial adapter executes Python unittest discovery over the complete pinned
+test root. Static class/method inventory is compared with actual discovery;
+`load_tests` selection hooks, undiscovered files/methods, skips, expected failures,
+import errors, baseline regressions and setup/teardown/cleanup assertions cannot
+become Red. Each accepted failure must have an actual traceback frame in the new
+test method. An assertion in a body cannot hide a second teardown failure.
+
+No positive fixture or implementation is supplied. Output is captured as a digest;
+test/product data and assertion messages are not emitted as diagnostic prose.
+The result contains `observed_red_v2` facts, not a controller grant, authenticated
+native review, implementation approval or delivery approval. Unsupported runners
+are rejected rather than silently substituted. Other runner adapters remain work
+to qualify, not a claim of universal framework support.
+
+`Dockerfile.quality-red-observer` builds this fixed entrypoint on a pinned Python
+base without package downloads. `qualify_quality_red_observer.py` runs synthetic
+Red, all-Green, setup-assertion and snapshot-write controls, baking inputs into
+disposable test images. Jobs use a read-only root, no network, mounts, credentials
+or Docker socket, an unprivileged user and bounded CPU/memory/PIDs. They are
+grouped under the instance's `-tests` Compose project and synchronously retired
+with `--rm`. Private contexts, commands, build logs and results are retained for
+inspection; obsolete image retirement still follows the separate scoped policy.
+The write-negative attempts chmod before writing, so a file's initial mode alone
+cannot satisfy the check; each negative must fail for its expected category.
+Delayed Docker removal is observed by the same exact name without repeating a
+run/delete. An unsettled earlier probe blocks a new qualification invocation.
+
+These Docker checks qualify only the observer on synthetic inputs. They do not
+authenticate a completed native author task or persist a controller Red transition.
+That adapter still must bind the exact source lease, immutable copy job, qualified
+observer image and durable execution result to the enrolled issue before sending
+an independent review. No historical `test_first_red` or calibration receipt is
+upgraded by this component.
 
 ### Immutable enrollment and legacy fences
 
