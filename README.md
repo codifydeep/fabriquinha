@@ -66,8 +66,16 @@ O verificador Git passou em repositórios locais reais: confere parent, escopo,
 modos e blobs de todos os arquivos contra o snapshot e os testes congelados,
 sem alterar o checkout, publicar branches ou aprovar merge. Ainda é um componente
 separado, não uma captura nativa completa.
-A captura persistente dessas evidências e a execução nativa ainda precisam ser
-integradas e qualificadas. Um pacote,
+A captura persistente pós-implementação está implementada em fonte, ainda sem
+despacho automático: exige admissão Green, identidade nativa, prompt ACP bem
+sucedido, lease fechado, inspeção do worker e workspace original. Se o worker
+já foi retirado, exige também seu recibo exato de retirada; ausência isolada não
+vale como término. Volume e job têm intenções persistidas antes dos efeitos,
+com reconferência após a cópia, alerta aos dez minutos e impedimento técnico
+após trinta, sem reiniciar o prazo ou repetir uma execução incerta. Seus testes
+usam autoridade sintética e terminam em `awaiting_git_binding`, nunca em Green.
+A ligação Git/Green à captura, o despacho automático e a execução nativa ainda
+precisam ser integrados e qualificados. Um pacote,
 uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.
 O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
 Docker: leitura registrada funciona; escrita, terminal e tentativa direta de

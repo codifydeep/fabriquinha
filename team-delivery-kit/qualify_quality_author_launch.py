@@ -33,6 +33,7 @@ SOURCES={
     'broker/quality_review_reads.py':'quality_review_reads.py','broker/quality_review_attestation.py':'quality_review_attestation.py',
     'broker/quality_implementation_admission.py':'quality_implementation_admission.py',
     'broker/quality_implementation_launch.py':'quality_implementation_launch.py',
+    'broker/quality_delivery_capture.py':'quality_delivery_capture.py',
     'broker/read_stream_receipts.py':'read_stream_receipts.py','artifact_read_evidence.py':'artifact_read_evidence.py',
     'broker/validation_job.py':'validation_job.py',
     'broker/test_first_job.py':'test_first_job.py','broker/worker_creation_intent.py':'worker_creation_intent.py',

@@ -96,6 +96,7 @@ COPY broker/quality_worker_runtime.py broker/quality_review_launch.py broker/qua
 COPY broker/quality_review_reads.py broker/quality_review_attestation.py /
 COPY broker/quality_implementation_admission.py /
 COPY broker/quality_implementation_launch.py /
+COPY broker/quality_delivery_capture.py /
 COPY broker/controller_maintenance.py broker/maintenance_job_clock.py /
 COPY broker/planning_review_observation.py /planning_review_observation.py
 COPY tests/acp_initialize_probe.py /acp_initialize_probe.py
