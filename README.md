@@ -14,9 +14,12 @@ contagem; o próximo ciclo real ainda precisa passar por todos os gates.
 
 O [contrato de qualidade v2](team-delivery-kit/contracts/quality-lifecycle-v2.md)
 foi aprovado: Red real → revisão e congelamento dos testes → Green → controles
-negativos obrigatórios antes do merge. Sua política e executor offline estão
-implementados; a integração e qualificação nativas ainda estão pendentes. Não é
-uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
+negativos obrigatórios antes do merge. A política, o executor offline e o cadastro
+persistente e imutável de novas execuções estão implementados em fonte, incluindo
+bloqueios contra uso do fluxo legado por uma issue v2. O cadastro ainda não
+autoriza workers; instalação, integração das etapas e qualificação nativa seguem
+pendentes. Não é uma dispensa dos gates existentes nem uma aprovação de ensaios
+bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de
 evidências históricas, o controlador pode produzir uma única evidência nova com
@@ -1216,7 +1219,12 @@ Os arquivos da implementação ativa não foram movidos: builds e testes depende
 
 ## Começar sem gastar tokens
 
-Pré-requisitos para testes offline: Git, Python 3.14 e `venv`. A referência operacional utiliza macOS com Docker Desktop e containers Linux ARM64. Outras plataformas não foram qualificadas ponta a ponta.
+Pré-requisitos para testes offline: Git, Python 3.14, `venv` e Node.js executável
+no sistema host (a referência atual foi testada com Node 24). Um binário Linux
+copiado de um container não funciona no macOS, mesmo em ARM64: confira
+`node --version` antes de rodar a suíte. A referência operacional utiliza macOS
+com Docker Desktop e containers Linux ARM64. Outras plataformas não foram
+qualificadas ponta a ponta.
 
 ```bash
 git clone https://github.com/codifydeep/fabriquinha.git

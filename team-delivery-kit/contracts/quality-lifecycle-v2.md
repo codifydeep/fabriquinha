@@ -1,7 +1,9 @@
 # Quality lifecycle v2
 
-Status: owner-approved design; policy and offline sensitivity executor implemented.
-Not enrolled or enabled in the installed controller. Historical runs retain v1.
+Status: owner-approved design; policy, offline sensitivity executor and persistent
+operator enrollment implemented in source. The legacy admission fences are also
+implemented in source. Not installed, enrolled or enabled in the running
+controller. Historical runs retain v1.
 
 ## Required order
 
@@ -66,10 +68,45 @@ adapter must authenticate native identities, independent decisions, complete
 reads, fixed-job isolation, immutable manifests and actual execution receipts
 before persisting a qualified transition. Caller-supplied booleans are not proof.
 
+### Immutable enrollment and legacy fences
+
+`broker/quality_lifecycle_enrollment.py` binds a new run and previously unexecuted
+native issue to the complete portable contract, repository, registered base SHA,
+base-volume manifest, native workspace/runtime and independent author/reviewer.
+Its contract digest is the canonical compact JSON digest used by the v2 policy;
+it is not silently substituted for any legacy digest format.
+
+Enrollment requires the exact sealed/drained maintenance operation, no active
+native tasks/leases/controller cycles and no outstanding execution capabilities.
+Any prior native run, delivery route, handoff, contract revision or scope-recovery
+record rejects conversion. A new plan cannot overwrite an existing issue/run.
+SQLite serializes short admission transactions; slow native and Docker evidence
+reads happen outside the admission lock and writer transaction. Durable authority
+and base metadata are checked again before the final atomic insert. A timeout
+persists no enrollment; a restart or duplicate request reads the same committed
+record without creating a second run or replaying an external operation.
+
+The initial state is **`enrolled_pending_adapter`**, not runnable or approved.
+The baseline hashes are expectations bound to the frozen base; enrollment does
+not claim that a runner already verified those bytes. No task, wakeup, tool grant,
+model call, delivery approval or legacy-evidence conversion is produced.
+
+The source admission checks in `native_grant`, `execute_grant` and legacy route
+registration refuse enrolled v2 issues. In particular, a capability minted before
+enrollment is checked again at launch. Legacy issues continue unchanged. These
+checks are exercised through the actual Python entrypoints with isolated test
+databases, not treated as installed/native end-to-end evidence.
+
+There is deliberately no worker HTTP registration endpoint and no global v2
+switch. Do not copy only the enrollment module into the installed controller:
+the matching admission fences and remaining execution chain must be qualified
+and installed together before any new v2 work is enabled.
+
 ## Installation gates still required
 
-1. Immutable enrollment before any task/grant in a fresh run; bind repository,
-   base, contract and role identities. Reject reuse of a legacy blocked issue.
+1. Qualify and install the source enrollment and legacy fences before any
+   task/grant in a fresh run. Bind repository, base, contract and role identities;
+   reject reuse of a legacy blocked issue.
 2. Capture genuine Red without calling the old positive calibration prerequisite;
    reauthenticate its runner receipt before independent test review and freezing.
 3. Bind the existing author continuation and immutable delivery to the new plan.

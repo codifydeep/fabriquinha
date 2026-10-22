@@ -76,6 +76,9 @@ def register(broker, route):
         raise ValueError('invalid route limits')
     broker.issue_base(route['issue_id'])
     with broker.LOCK, broker.db() as con:
+        try:import quality_lifecycle_enrollment
+        except ImportError:from broker import quality_lifecycle_enrollment
+        quality_lifecycle_enrollment.require_legacy_issue(con, route['issue_id'])
         if route.get('test_first'):
             editable = {r[0].removeprefix('/workspace/') for r in con.execute(
                 'SELECT path FROM issue_editables WHERE issue_id=?', (route['issue_id'],))}

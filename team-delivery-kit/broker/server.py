@@ -738,6 +738,10 @@ def native_grant(payload):
     binding = task_binding(settings, **payload)
     if not binding['issue_id']:
         raise ValueError('native task missing issue identity')
+    try:import quality_lifecycle_enrollment
+    except ImportError:from broker import quality_lifecycle_enrollment
+    with LOCK, db() as con:
+        quality_lifecycle_enrollment.require_legacy_issue(con, binding['issue_id'])
     try:
         try:import u3_delivery_review
         except ImportError:from broker import u3_delivery_review
@@ -1654,6 +1658,9 @@ def execute_grant(token, payload, streaming=False, defer_transport=False):
             current = task_binding(json.loads((STATE / 'native.json').read_text()), binding['task_id'], binding['agent_id'])
             if current['scope'] != scope:
                 raise ValueError('native scope changed before launch')
+            try:import quality_lifecycle_enrollment
+            except ImportError:from broker import quality_lifecycle_enrollment
+            quality_lifecycle_enrollment.require_legacy_issue(con, binding['issue_id'])
         if scope and con.execute("SELECT 1 FROM native_bindings n JOIN leases l USING(request_id) WHERE n.scope=? AND l.status IN ('creating','running')", (scope,)).fetchone():
             raise ValueError('persistent session scope busy')
         con.execute('UPDATE grants SET used=1 WHERE digest=?', (row['digest'],))

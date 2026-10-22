@@ -1,2 +1,4 @@
 # Matches the existing pinned Hermes runtime dependency; no global install needed.
 jsonschema==4.26.0
+# The governed worker configuration regression test parses YAML.
+PyYAML==6.0.3
