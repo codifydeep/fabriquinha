@@ -270,6 +270,11 @@ class QualityEnrollmentTests(unittest.TestCase):
         import hashlib,re
         from broker import literal_author_bootstrap_recovery as author,review_context_recovery as review
         source=(Path(__file__).resolve().parents[1]/'broker/server.py').read_bytes()
+        self.assertEqual(hashlib.sha256(source).hexdigest(),author.V2_PROGRESS_ROOT_SHA)
+        self.assertEqual(author.V2_PROGRESS_ROOT_SHA,review.V2_PROGRESS_SERVER_SHA)
+        progress_hook=rb'(?ms)^([ ]*)# BEGIN QUALITY_V2 progress_reconciliation\n.*?^\1# END QUALITY_V2 progress_reconciliation\n'
+        self.assertEqual(len(re.findall(progress_hook,source)),1)
+        source=re.sub(progress_hook,b'',source)
         self.assertEqual(hashlib.sha256(source).hexdigest(),author.V2_AUTHOR_LAUNCH_ROOT_SHA)
         self.assertEqual(author.V2_AUTHOR_LAUNCH_ROOT_SHA,review.V2_AUTHOR_LAUNCH_SERVER_SHA)
         additions=rb'(?ms)^([ ]*)# BEGIN QUALITY_V2 ([a-z_]+)\n.*?^\1# END QUALITY_V2 \2\n'

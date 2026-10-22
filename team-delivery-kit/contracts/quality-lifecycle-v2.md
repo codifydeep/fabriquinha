@@ -11,7 +11,9 @@ running controller. Historical runs retain v1.
 
 ```mermaid
 flowchart LR
-    T[Tests-only snapshot] --> R[Actual full-suite Red]
+    A[Closed tests-only author and native completion] --> Q[Durable fair reconciliation]
+    Q --> T[Immutable tests-only snapshot]
+    T --> R[Actual full-suite Red]
     R --> V[Independent read-only test review]
     V --> F[Frozen test hashes and criterion witnesses]
     F --> I[Implementation and full-suite Green]
@@ -69,6 +71,32 @@ These modules must not be exposed as worker authorization endpoints. A controlle
 adapter must authenticate native identities, independent decisions, complete
 reads, fixed-job isolation, immutable manifests and actual execution receipts
 before persisting a qualified transition. Caller-supplied booleans are not proof.
+
+### Persistent source-to-review reconciliation (source only)
+
+`broker/quality_progress.py` is wired into the opt-in watchdog before legacy
+reconciliation. It discovers only consumed, closed `tests_only_v2` bindings;
+native completion may lag a lease close and is observed without creating another
+author. Per-source identity/state and the discovery fairness cursor survive
+restarts. Each tick handles at most two sources in least-recently-observed order.
+A rejected source cannot occupy the front of every tick. Pending snapshot/Red
+jobs retain their original identity; two identical external/discovery failures
+produce a visible technical hold for the Tech Lead, not another execution or a
+CEO question. Failure messages/private data are not copied into diagnostic prose.
+
+A private OS lock prevents concurrent reconciliations without guessing that an
+old timestamp means a process died. Slow operations hold neither the global
+admission lock nor a SQLite writer. Maintenance and default-off v2 prevent new
+effects. A crash between a completed capture and packet persistence resumes by
+reading that exact durable capture, not rerunning its suite.
+
+The review-ready packet binds plan, Red, snapshot manifest, author, reviewer,
+candidate test hashes and capture digests. It is produced only from authenticated
+controller capture rows, never the worker's returned report. It does **not**
+freeze/approve tests, start a reviewer, authorize Green or grant delivery. The
+independent read-only review admission/attestation adapter remains to implement
+and qualify. This hook is not installed or enabled in the live controller; its
+database/native-fixture tests are not proof of autonomous native delivery.
 
 ### Actual Red observation, without a positive prerequisite
 
@@ -315,6 +343,42 @@ and mocked native/Docker observations. They are not proof of native agents,
 installed startup, paid model execution, independent review or end-to-end delivery.
 Qualify the new launch path and remaining review/Green/sensitivity chain before
 enabling it for any product work.
+
+### Real Docker/ACP qualification with synthetic native authority
+
+`qualify_quality_author_launch.py` and `tests/quality_launch_docker_probe.py`
+exercise the candidate controller's actual admission, asynchronous startup,
+workspace seed/lock, worker launch, single transport, ACP `initialize` and
+`session/new` paths against real Docker and Hermes. Native records/roles are
+explicit fixtures in a separate private SQLite DB; no Multica issue is created,
+no candidate HTTP server starts, and the installed controller's DB/maintenance
+is not replaced or released. This is not a native-agent or delivery qualification.
+
+The harness reuses an exec process in the already-authorized controller, rather
+than mounting the Docker socket in another container. The candidate source is
+copied into a unique private tmpfs directory, hash-checked before import and run
+only against that isolated state. Transfer/export use tar streams through exec:
+Docker Desktop's archive API cannot reliably address the same tmpfs directory.
+No installed source file is overwritten. The model proxy must already be stopped;
+only initialize/session-new frames are sent, never session/prompt or a model call.
+
+Private source/input manifests, intents, DB, protocol response digests and logs
+remain archived. After the actual process terminates successfully, exact owned
+workers/helpers are archived, stopped if necessary and removed without force or
+volume deletion. IDs come from `docker ps --no-trunc`; short/full-ID comparisons
+must not be treated as ownership evidence. Unknown stop/delete outcomes are
+observed, never repeated. `--finish-retirement` cannot rerun the candidate or
+mint a grant. `--resume-before-execution` requires no process intent/state and
+continues the original allocation/base; it cannot restart a candidate execution.
+Any unfinished operation fences a fresh run until its actual effects are settled.
+
+The reference proof passed with one native-fixture capability, two complete fixed
+preparation jobs, one worker, one transport and two successful real ACP events.
+Its three containers were retired; proof volumes and evidence were retained.
+The installed controller stayed sealed with no native workers, and no model
+prompt was sent. Native-agent execution, snapshot/Red handoff, independent test
+review, Green, sensitivity, PR/CI and same-SHA deployment/QA still require their
+new-chain integration and end-to-end qualification.
 
 `broker/quality_lifecycle_enrollment.py` binds a new run and previously unexecuted
 native issue to the complete portable contract, repository, registered base SHA,

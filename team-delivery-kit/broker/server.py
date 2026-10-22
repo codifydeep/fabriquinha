@@ -2645,6 +2645,11 @@ def main():
                     context = handoff_context()
                     if controller_maintenance.begin_cycle(context):
                         try:
+                            # BEGIN QUALITY_V2 progress_reconciliation
+                            if QUALITY_V2_ENABLED:
+                                import quality_progress
+                                quality_progress.tick(context)
+                            # END QUALITY_V2 progress_reconciliation
                             reconcile_review_outcomes()
                             reconcile_review_retries()
                             reconcile_change_requests()

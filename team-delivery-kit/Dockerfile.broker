@@ -90,6 +90,7 @@ COPY broker/acp_transport.py /acp_transport.py
 COPY quality_phase_tools.py /quality_phase_tools.py
 COPY broker/quality_lifecycle_v2.py broker/quality_lifecycle_enrollment.py broker/quality_red_capture.py /
 COPY broker/quality_red_snapshot.py broker/quality_author_admission.py broker/quality_author_worker.py broker/quality_author_launch.py /
+COPY broker/quality_progress.py /
 COPY broker/controller_maintenance.py broker/maintenance_job_clock.py /
 COPY broker/planning_review_observation.py /planning_review_observation.py
 COPY tests/acp_initialize_probe.py /acp_initialize_probe.py

@@ -25,8 +25,13 @@ em fonte; a cópia real em Docker passou pelos controles de duplicação e alter
 indevida, preservando os hashes e a execução sem privilégios. Isso ainda não
 qualifica uma entrega dos agentes nem autoriza workers. A primeira admissão v2
 está implementada em fonte, com fase/capacidade atômicas e seleção de edição
-restrita aos testes novos. A integração ao lançamento e ao produtor, a revisão,
-a instalação e a qualificação nativa seguem pendentes.
+restrita aos testes novos. A integração opt-in ao lançamento passou por Docker e
+ACP reais com autoridade nativa sintética, sem chamada ao modelo. A reconciliação
+persistente término do autor → snapshot → Red → pacote para revisão está ligada
+ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
+bloqueio de falhas repetidas. Continua desabilitada no controlador instalado.
+A admissão da revisão independente, Green, instalação e qualificação nativa
+integral seguem pendentes; um pacote pronto para revisão não aprova os testes.
 O preparo persistente do workspace (seed e lockdown) está implementado em fonte;
 o bloqueio real de arquivos já passou por qualificação sintética Docker como
 usuário sem privilégios, inclusive contra chmod, renomeação e subprocessos.
@@ -35,8 +40,11 @@ handlers diretos do Hermes passaram por prova real em Docker: leitura declarada
 e escrita do teste novo funcionam, enquanto shell, Python e alterações de código
 ou testes antigos são recusados. A ligação ao lançamento nativo e ao bootstrap
 assíncrono está implementada em fonte, desligada por padrão. Seus testes isolados
-cobrem confirmações Docker perdidas e abertura única do transporte; ainda faltam
-a qualificação desse caminho instalado e a revisão independente da nova cadeia.
+cobrem confirmações Docker perdidas e abertura única do transporte. Uma prova
+isolada também percorreu admissão, seed/lock, lançamento e initialize/session-new
+com Docker e Hermes ACP reais, sem prompts ao modelo. A identidade nativa dessa
+prova é sintética, com DB separado: ainda faltam agentes nativos reais, revisão
+independente e entrega completa pela nova cadeia antes de habilitar o produto.
 Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de
