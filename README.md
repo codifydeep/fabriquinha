@@ -74,6 +74,16 @@ vale como término. Volume e job têm intenções persistidas antes dos efeitos,
 com reconferência após a cópia, alerta aos dez minutos e impedimento técnico
 após trinta, sem reiniciar o prazo ou repetir uma execução incerta. Seus testes
 usam autoridade sintética e terminam em `awaiting_git_binding`, nunca em Green.
+O coordenador v2 também está ligado ao watchdog em fonte, sob uma flag separada
+desligada por padrão. Ele encaminha Red → revisão dos testes → autor Green →
+captura por registros persistentes, com fila por observação mais antiga, limite
+de dois workers e espera antes de acionar um perfil ocupado. Um card com
+autoridade inválida é colocado em quarentena sem impedir os seguintes; saúde,
+etapas, responsáveis e configuração bloqueada podem ser consultados sem modelo.
+Seus testes usam identidades nativas sintéticas. Solicitações de revisão ainda
+registram `test_revision_adapter_required`; falta o executor dessa correção e da
+recuperação técnica hierárquica, além dos gates posteriores. Não está habilitado
+no ambiente instalado e não qualifica autonomia completa.
 A ligação Git/Green à captura, o despacho automático e a execução nativa ainda
 precisam ser integrados e qualificados. Um pacote,
 uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.
@@ -311,6 +321,9 @@ flowchart TB
     W --> P[Proxy de modelo: identidade e teto de chamadas]
     P --> M[Provedor LLM configurado]
     B --> E[Snapshots imutáveis e validação controlada]
+    B -.->|Opt-in em fonte, desligado| V2[Coordenador v2: fila e handoffs duráveis]
+    V2 -.->|Revisão e autor Green| MC
+    V2 -.->|Captura; ainda sem aprovação Git/Green| E
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]
@@ -1184,9 +1197,14 @@ flowchart TD
     C -->|Sim| D[CTO: decisões técnicas e arquitetura]
     D --> E[Tech Lead: grafo de cards e dependências]
     E --> F[Design, Backend/Data, Frontend ou Mobile conforme escopo]
-    F --> CG{Calibração aplicável válida?}
-    CG -->|Sim / não aplicável| G[TDD: Red registrado, Green e suíte completa]
-    G -->|Suíte congelada falha| AD[Tech Lead e CTO: diagnóstico da entrega imutável]
+    F --> CG{Contrato de qualidade ativo validado?}
+    CG -->|Sim| G[TDD: Red real registrado]
+    G --> TR[Revisão independente e congelamento dos testes]
+    TR -->|Solicita mudanças nos testes novos| F
+    TR -->|Aprova os testes exatos| GG[Implementação Green e suíte completa congelada]
+    GG --> NG[Controles negativos obrigatórios no mesmo commit]
+    GG -->|Suíte congelada falha| AD[Tech Lead e CTO: diagnóstico da entrega imutável]
+    NG -->|Defeito não detectado| AD
     AD -->|CTO ainda não adjudicou| SP[SPIKE fixo: suíte sem tracing e com tracing]
     SP -->|Observações equivalentes| AJ[CTO decide com evidência; sem autorização implícita]
     SP -->|Contaminação ou evidência incompleta| RB
@@ -1201,7 +1219,7 @@ flowchart TD
     EF -->|Defeito de produto comprovado| F
     EF -->|Evidência insuficiente| RB
     DP --> QE[Qualificar executor limitado; sem retry ou aprovação implícitos]
-    G --> H[Snapshot durável da entrega]
+    NG -->|Passa| H[Snapshot durável da entrega]
     H --> I[Revisor independente: leitura e validações permitidas]
     I -->|Erro ACP sem parecer; leituras integrais| RO[Uma observação de transporte: mesma entrega somente leitura]
     RO -->|Nova execução com diagnóstico durável| I

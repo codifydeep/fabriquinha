@@ -229,6 +229,8 @@ def tick(b, *, limit=2):
     require(type(limit) is int and 1 <= limit <= 2)
     if getattr(b, 'QUALITY_V2_ENABLED', False) is not True:
         return dict(stage='disabled', observed=[], delivery_approval=False)
+    if getattr(b,'QUALITY_TEAM_ENABLED',False) is True:
+        return dict(stage='team_managed',observed=[],delivery_approval=False)
     with exclusive(b):
         with b.db() as con:
             if maintenance.current(con):

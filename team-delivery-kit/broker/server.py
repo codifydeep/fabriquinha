@@ -61,6 +61,10 @@ QUALITY_CTO = os.environ.get('BROKER_QUALITY_CTO')
 # BEGIN QUALITY_V2_GREEN config
 QUALITY_IMPLEMENTATION_ENABLED = os.environ.get('BROKER_QUALITY_IMPLEMENTATION_ENABLED', '0') == '1'
 # END QUALITY_V2_GREEN config
+# BEGIN QUALITY_V2_TEAM config
+QUALITY_TEAM_ENABLED = os.environ.get('BROKER_QUALITY_TEAM_ENABLED', '0') == '1'
+QUALITY_GREEN_JOB_IMAGE = os.environ.get('BROKER_QUALITY_GREEN_JOB_IMAGE')
+# END QUALITY_V2_TEAM config
 
 
 class RequiredTestMissing(ValueError):
@@ -2737,6 +2741,11 @@ def main():
                     context = handoff_context()
                     if controller_maintenance.begin_cycle(context):
                         try:
+                            # BEGIN QUALITY_V2_TEAM coordination
+                            if QUALITY_TEAM_ENABLED:
+                                import quality_team_progress
+                                quality_team_progress.tick(context)
+                            # END QUALITY_V2_TEAM coordination
                             # BEGIN QUALITY_V2 progress_reconciliation
                             if QUALITY_V2_ENABLED:
                                 import quality_progress
