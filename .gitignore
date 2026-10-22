@@ -44,6 +44,7 @@
 **/snapshots/
 **/artifacts/
 **/quality-git-candidates/
+**/quality-delivery-exports/
 /team-delivery-kit/sandbox-github/
 /team-delivery-kit/sandbox-github2/
 /team-delivery-kit/evaluation/SEARCH-1-INTAKE-2026-10-02.md

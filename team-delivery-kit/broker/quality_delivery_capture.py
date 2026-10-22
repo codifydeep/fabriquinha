@@ -67,6 +67,35 @@ def image_id(b):
     return image
 
 
+def export_descriptor(b,request):
+    """Trusted local bridge only; durable capture, not live agent assertions.
+
+    Revalidates enrollment, frozen review and actual volume incarnation. No
+    native API call, new execution, or conversion of old receipts is involved.
+    """
+    admission.enrollment.canonical(request)
+    previous=load(b,request);require(previous is not None)
+    context,state=previous;c=context['admission']
+    require(state['stage']=='awaiting_git_binding')
+    with b.db() as con:require(admission.load(con,request)==c)
+    frozen,enrolled=admission.frozen(b,c['source_task'])
+    require(frozen==context['freeze'] and quality.digest(frozen)==c['frozen_sha256']
+        and quality.digest(enrolled)==context['enrollment_sha256'])
+    report=state['copy']['report']
+    require(state['snapshot_volume']==context['name'] and state['manifest_sha256']==report['manifest_sha256']
+        and report['plan_sha256']==quality.digest(frozen['plan'])
+        and report['tests']==frozen['frozen_tests'] and report['execution_authorized'] is False
+        and report['delivery_approval'] is False
+        and admission.snapshot.volume_identity(b.docker('GET','/volumes/'+context['name']),
+            dict(name=context['name'],labels=context['labels']))==state['volume_identity'])
+    return dict(operation='quality_delivery_export_authority_v2',namespace=b.PREFIX,owner=b.OWNER,
+        request_id=request,task_id=c['task_id'],issue_id=c['issue_id'],run_id=c['run_id'],
+        manifest_sha256=report['manifest_sha256'],file_inventory=report['file_inventory'],
+        capture_context_sha256=quality.digest(context),capture_state_sha256=quality.digest(state),
+        plan_sha256=quality.digest(frozen['plan']),frozen_sha256=c['frozen_sha256'],
+        image=image_id(b),volume_identity=state['volume_identity'])
+
+
 def copy_payload(b,context):
     frozen=context['freeze'];evidence=dict(operation='snapshot_after_implementation_v2',plan=frozen['plan'],
         base_manifest_sha256=context['base']['manifest_sha256'],reviewed_manifest_sha256=frozen['manifest_sha256'],

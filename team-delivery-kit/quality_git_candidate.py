@@ -61,11 +61,12 @@ def observed_ref(repo,ref):
 
 
 @contextmanager
-def journal(private,request):
+def journal(private,request,*,family='quality-git-candidates'):
+    require(family in ('quality-git-candidates','quality-delivery-exports'))
     private=Path(private)
     require(private.is_absolute() and private.resolve()==private and private.is_dir()
         and private.stat().st_uid==os.getuid() and not private.stat().st_mode&0o077)
-    directory=private/'quality-git-candidates';require(not directory.is_symlink())
+    directory=private/family;require(not directory.is_symlink())
     directory.mkdir(mode=0o700,exist_ok=True)
     require(directory.stat().st_uid==os.getuid() and not directory.stat().st_mode&0o077)
     descriptor=os.open(directory/(request+'.lock'),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)

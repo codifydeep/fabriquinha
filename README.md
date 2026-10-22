@@ -72,7 +72,7 @@ preserva checkout, índice e `main`, não faz push nem merge. O journal privado
 mantém a mesma identidade após reinício e observa a referência original quando
 a confirmação se perde. Seus testes usam repositórios Git reais descartáveis,
 inclusive interrupção antes da publicação e corrida com referência simbólica.
-Ainda falta conectá-lo à exportação autenticada e à captura Green persistente.
+Ainda falta ligá-lo ao despacho instalado e à captura Green persistente.
 Esse caminho exige clone local completo: repositórios parciais/promisor são
 recusados para não iniciar fetch ou autenticação de rede implicitamente.
 A captura persistente pós-implementação está implementada em fonte, ainda sem
@@ -83,6 +83,16 @@ vale como término. Volume e job têm intenções persistidas antes dos efeitos,
 com reconferência após a cópia, alerta aos dez minutos e impedimento técnico
 após trinta, sem reiniciar o prazo ou repetir uma execução incerta. Seus testes
 usam autoridade sintética e terminam em `awaiting_git_binding`, nunca em Green.
+A ponte local de exportação está implementada em fonte: seu descritor é obtido
+do registro durável dessa captura, reconferindo a revisão congelada e a
+identidade do volume, sem aceitar instruções do agente como autoridade.
+Um helper agrupado, nunca iniciado e sem rede, socket ou credenciais, exporta
+o volume somente para leitura; hashes, intenção de cópia e retirada por ID
+ficam em journal privado. Confirmações perdidas são observadas, não repetidas;
+uma cópia incompleta permanece como impedimento explícito. Esse componente
+passou em Docker real com entrada sintética, sem modelo nem aprovação nativa.
+O encadeamento automático exportação → candidato Git → Green ainda não está
+instalado ou qualificado; o teste isolado não substitui esse ensaio.
 O coordenador v2 também está ligado ao watchdog em fonte, sob uma flag separada
 desligada por padrão. Ele encaminha Red → revisão dos testes → autor Green →
 captura por registros persistentes, com fila por observação mais antiga, limite

@@ -194,5 +194,23 @@ class DeliveryCaptureTests(unittest.TestCase):
         self.assertEqual(receipt['stage'],'technical_blocked')
         self.assertFalse(receipt['incident']['automatic_retry']);self.assertEqual(self.creates,0)
 
+    def test_export_descriptor_is_bound_to_durable_copy_and_actual_volume_without_native_requery(self):
+        with patch.object(capture.validation_job,'run',side_effect=self.copied):receipt=self.call()
+        with patch.object(capture.native,'task_record',side_effect=AssertionError('no live-native dependency')):
+            descriptor=capture.export_descriptor(self.b,self.request)
+        from quality_delivery_export import validate
+        validate(descriptor)
+        self.assertEqual(descriptor['manifest_sha256'],receipt['manifest_sha256'])
+        self.assertEqual(descriptor['volume_identity'],receipt['volume_identity'])
+        self.volume['CreatedAt']='2026-10-22T06:00:00Z'
+        with self.assertRaises(ValueError):capture.export_descriptor(self.b,self.request)
+
+    def test_pending_or_blocked_capture_cannot_issue_export_authority(self):
+        with patch.object(capture.native,'task_record',side_effect=TimeoutError):
+            with self.assertRaises(capture.validation_job.Pending):self.call()
+        with self.assertRaises(ValueError):capture.export_descriptor(self.b,self.request)
+        self.f.f.native['status']='failed';self.call()
+        with self.assertRaises(ValueError):capture.export_descriptor(self.b,self.request)
+
 
 if __name__=='__main__':unittest.main()
