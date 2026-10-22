@@ -59,6 +59,13 @@ retirados; a primeira tentativa, com proprietário incorreto no snapshot sintét
 continua registrada como falha. Isso não é implementação do agente nem Green.
 O observador da suíte Green está implementado em fonte e executa testes reais
 com hashes congelados, mas não atesta sozinho a origem nativa ou o commit Git.
+A cópia pós-implementação passou em Docker depois dos handlers Green, com todas
+as entradas somente leitura, hashes dos testes preservados e saída imutável;
+cinco helpers foram retirados. É um canário sem modelo, não uma entrega do agente.
+O verificador Git passou em repositórios locais reais: confere parent, escopo,
+modos e blobs de todos os arquivos contra o snapshot e os testes congelados,
+sem alterar o checkout, publicar branches ou aprovar merge. Ainda é um componente
+separado, não uma captura nativa completa.
 A captura persistente dessas evidências e a execução nativa ainda precisam ser
 integradas e qualificadas. Um pacote,
 uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.

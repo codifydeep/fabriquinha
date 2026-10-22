@@ -94,6 +94,19 @@ def fixture_dockerfile(image,green):
     return 'FROM '+image+'\nCOPY base /base\n'+('COPY --chown=10000:10000 previous /previous\n' if green else '')
 
 
+def postcopy_payload(fixture,volumes):
+    request=dict(operation='snapshot_after_implementation_v2',plan=fixture.plan,
+        base_manifest_sha256=fixture.prepared['base_manifest_sha256'],
+        reviewed_manifest_sha256=fixture.prepared['manifest_sha256'],
+        frozen_tests={**fixture.plan['baseline_tests'],**fixture.prepared['test_sha256']})
+    return dict(User='10000:10000',Cmd=['/opt/quality/quality_green_job.py'],
+        Env=['QUALITY_GREEN_JOB_JSON='+json.dumps(request,sort_keys=True)],HostConfig=dict(Mounts=[
+            dict(Type='volume',Source=volumes['base'],Target='/base',ReadOnly=True),
+            dict(Type='volume',Source=volumes['previous'],Target='/reviewed',ReadOnly=True),
+            dict(Type='volume',Source=volumes['work'],Target='/workspace',ReadOnly=True),
+            dict(Type='volume',Source=volumes['delivered'],Target='/snapshot')]))
+
+
 def observe_failure(namespace,operation):
     """Close only a proved failed probe, never an unknown/missing execution."""
     if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}',namespace)
@@ -120,11 +133,21 @@ def observe_failure(namespace,operation):
     return final
 
 
-def qualify(namespace,image,worker_image=None,phase='tests_only_v2'):
+def qualify(namespace,image,worker_image=None,phase='tests_only_v2',green_job_image=None):
     if phase not in ('tests_only_v2','implementation_v2') or (phase=='implementation_v2' and not worker_image):
         raise ValueError('exact phase and Green registry worker required')
     green=phase=='implementation_v2'
+    if green_job_image and not green:raise ValueError('postcopy qualification requires product phase')
     maintenance,idle=require_idle(namespace)
+    copier=None
+    if green_job_image:
+        if not re.fullmatch(r'delivery-kit-quality-green-job:[A-Za-z0-9_.-]{1,64}',green_job_image):
+            raise ValueError('dedicated fixed Green job image required')
+        copier=json.loads(subprocess.check_output(['docker','image','inspect',green_job_image],text=True))[0]
+        if (copier['Config'].get('Volumes') or copier['Config'].get('User')!='10000:10000'
+                or copier['Config'].get('Entrypoint')!=['python','/opt/quality/quality_green_job.py']
+                or copier['Config'].get('Labels',{}).get('delivery-kit.component')!='quality-green-job'):
+            raise ValueError('isolated fixed Green job image required')
     if not re.fullmatch(r'delivery-kit-quality-author-prep:[A-Za-z0-9_.-]{1,64}',image):raise ValueError('fixed local prep image required')
     info=json.loads(subprocess.check_output(['docker','image','inspect',image],text=True))[0]
     if (info['Config'].get('Volumes') or info['Config'].get('User')!='10000:10000'
@@ -149,8 +172,10 @@ def qualify(namespace,image,worker_image=None,phase='tests_only_v2'):
             raise ValueError('unfinished qualification; observe original recorded intents')
     operation=str(uuid.uuid4());archive=backups/('quality-author-docker-'+operation);archive.mkdir(mode=0o700)
     volumes={key:namespace+'-quality-author-'+key+'-'+operation for key in (('base','work','previous') if green else ('base','work'))}
+    if copier:volumes['delivered']=namespace+'-quality-author-delivered-'+operation
     phases=('seed','lock','probe','registry') if green else (('seed','lock','probe','registry','review') if worker else ('seed','lock','probe'))
-    save(archive/'operation.json',dict(operation=operation,volumes=volumes,image=info['Id'],worker_image=worker['Id'] if worker else None,review_canary=worker is not None and not green,phases=phases,phase=phase,maintenance=maintenance,idle=idle,
+    if copier:phases+=('postcopy',)
+    save(archive/'operation.json',dict(operation=operation,volumes=volumes,image=info['Id'],worker_image=worker['Id'] if worker else None,green_job_image=copier['Id'] if copier else None,review_canary=worker is not None and not green,phases=phases,phase=phase,maintenance=maintenance,idle=idle,
         native_qualification=False,model_calls=0,delivery_approval=False))
     sys.path.insert(0,str(ROOT/'tests'))
     from test_quality_red_observation import QualityRedObservationTests
@@ -185,7 +210,7 @@ def qualify(namespace,image,worker_image=None,phase='tests_only_v2'):
         b=SimpleNamespace(QUALITY_PREP_IMAGE=image_id,OWNER=owner)
         outcomes=[]
         for phase in phases:
-            p=payload(b,c,'seed' if phase in ('probe','registry','review') else phase)
+            p=postcopy_payload(fixture,volumes) if phase=='postcopy' else payload(b,c,'seed' if phase in ('probe','registry','review') else phase)
             if phase=='probe':p={**p,'Cmd':['-c',GREEN_PROBE if green else PROBE],'Env':[]}
             if green and phase in ('probe','registry'):
                 p={**p,'HostConfig':{**p['HostConfig'],'Mounts':[
@@ -214,7 +239,8 @@ def qualify(namespace,image,worker_image=None,phase='tests_only_v2'):
             for mount in p['HostConfig']['Mounts']:
                 args+=['--mount','type=volume,src='+mount['Source']+',dst='+mount['Target']+(',readonly' if mount.get('ReadOnly') else '')]
             for env in p['Env']:args+=['--env',env]
-            args+=['--entrypoint','python',worker['Id'] if phase in ('registry','review') else image_id,*p['Cmd']]
+            selected_image=copier['Id'] if phase=='postcopy' else worker['Id'] if phase in ('registry','review') else image_id
+            args+=['--entrypoint','python',selected_image,*p['Cmd']]
             save(archive/(phase+'-intent.json'),dict(argv=args))
             executed=command(args)
             save(archive/(phase+'-result.json'),dict(exit_code=executed.returncode,stdout=executed.stdout,stderr=executed.stderr))
@@ -244,10 +270,25 @@ def qualify(namespace,image,worker_image=None,phase='tests_only_v2'):
                         or report.get('direct_handler_denied') is not True or report.get('model_calls')!=0
                         or report.get('delivery_approval') is not False):
                     raise ValueError('real read-only registry proof missing')
+            if phase=='postcopy':
+                report=json.loads(executed.stdout)
+                from broker.quality_lifecycle_v2 import digest
+                files={**fixture.old,'tests/test_new.py':fixture.new,'app.py':b'VALUE=8\n'}
+                inventory={p:dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)) for p,raw in files.items()}
+                encoded=json.dumps(dict(files=inventory),sort_keys=True,separators=(',',':')).encode()
+                if (report.get('operation')!='post_implementation_snapshot_v2'
+                        or report.get('plan_sha256')!=digest(fixture.plan)
+                        or report.get('file_inventory')!=inventory
+                        or report.get('manifest_sha256')!=hashlib.sha256(encoded).hexdigest()
+                        or report.get('reviewed_manifest_sha256')!=fixture.prepared['manifest_sha256']
+                        or report.get('tests')!={**fixture.plan['baseline_tests'],**fixture.prepared['test_sha256']}
+                        or report.get('execution_authorized') is not False or report.get('delivery_approval') is not False):
+                    raise ValueError('post-implementation exact frozen copy proof missing')
             outcomes.append(dict(phase=phase,status='passed',container_retired=True))
             print(json.dumps(outcomes[-1]),flush=True)
         result=dict(operation='quality_author_filesystem_docker_qualification_v2',results=outcomes,
-            phase='implementation_v2' if green else 'tests_only_v2',image=image_id,worker_image=worker['Id'] if worker else None,retained_volumes=volumes,archive=str(archive),native_qualification=False,model_calls=0,delivery_approval=False)
+            phase='implementation_v2' if green else 'tests_only_v2',image=image_id,worker_image=worker['Id'] if worker else None,
+            green_job_image=copier['Id'] if copier else None,retained_volumes=volumes,archive=str(archive),native_qualification=False,model_calls=0,delivery_approval=False)
         save(archive/'result.json',result);return result
     finally:fixture.doCleanups()
 
@@ -256,9 +297,10 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--namespace',required=True);p.add_argument('--image')
     p.add_argument('--worker-image')
     p.add_argument('--phase',choices=('tests_only_v2','implementation_v2'),default='tests_only_v2')
+    p.add_argument('--green-job-image')
     p.add_argument('--observe-failure')
     a=p.parse_args()
     if a.observe_failure:result=observe_failure(a.namespace,a.observe_failure)
-    elif a.image:result=qualify(a.namespace,a.image,a.worker_image,a.phase)
+    elif a.image:result=qualify(a.namespace,a.image,a.worker_image,a.phase,a.green_job_image)
     else:p.error('--image or --observe-failure required')
     print(json.dumps(result,sort_keys=True))

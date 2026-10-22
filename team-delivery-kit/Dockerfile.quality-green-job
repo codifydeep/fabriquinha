@@ -1,0 +1,10 @@
+FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+WORKDIR /opt/quality
+COPY quality_green_job.py quality_delivery_snapshot.py quality_red_observation.py portable_contract.py test_runner_policy.py r3_snapshot_probe.py calibration_frozen_harness_probe.py generic_harness_calibration.py ./
+COPY broker/quality_lifecycle_v2.py broker/test_first_protocol.py ./
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/opt/quality
+RUN mkdir /snapshot && chown 10000:10000 /snapshot && chmod 0700 /snapshot && python -B -c "import quality_green_job"
+LABEL delivery-kit.component="quality-green-job" delivery-kit.qualification="not-native-delivery"
+USER 10000:10000
+WORKDIR /tmp
+ENTRYPOINT ["python", "/opt/quality/quality_green_job.py"]

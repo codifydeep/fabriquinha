@@ -63,5 +63,20 @@ class QualificationFailureTests(unittest.TestCase):
         self.assertIn('COPY --chown=10000:10000 previous /previous',text)
         self.assertNotIn('chmod',text)
 
+    def test_postcopy_only_mounts_inputs_readonly_and_has_no_agent_command(self):
+        import test_quality_red_observation as red
+        f=red.QualityRedObservationTests();f.setUp();self.addCleanup(f.doCleanups);f.prepare()
+        p=qualifier.postcopy_payload(f,dict(base='base',work='work',previous='old',delivered='new'))
+        self.assertEqual(p['Cmd'],['/opt/quality/quality_green_job.py'])
+        self.assertEqual(p['User'],'10000:10000')
+        self.assertEqual(p['HostConfig']['Mounts'],[
+            dict(Type='volume',Source='base',Target='/base',ReadOnly=True),
+            dict(Type='volume',Source='old',Target='/reviewed',ReadOnly=True),
+            dict(Type='volume',Source='work',Target='/workspace',ReadOnly=True),
+            dict(Type='volume',Source='new',Target='/snapshot')])
+        request=json.loads(p['Env'][0].split('=',1)[1])
+        self.assertEqual(request['frozen_tests'],{**f.plan['baseline_tests'],**f.prepared['test_sha256']})
+        self.assertEqual(request['operation'],'snapshot_after_implementation_v2')
+
 
 if __name__=='__main__':unittest.main()
