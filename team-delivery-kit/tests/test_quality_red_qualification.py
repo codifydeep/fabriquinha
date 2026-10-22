@@ -27,5 +27,16 @@ class RedQualificationTests(unittest.TestCase):
             with self.assertRaises(TimeoutError):qualification.await_retirement('delivery-kit-port2-red-probe-example')
         read.assert_called_once()
 
+    def test_env_input_is_single_fixed_metadata_field_not_an_extra_mount_or_command(self):
+        import json
+        request=dict(plan={},task_id='task',base_manifest_sha256='a'*64,snapshot_manifest_sha256='b'*64)
+        command=qualification.execution_args('delivery-kit-port2','delivery-kit-port2-red-probe-example',
+            'sha256:'+'a'*64,request)
+        self.assertEqual(command.count('--env'),1)
+        self.assertEqual(json.loads(command[command.index('--env')+1].removeprefix('QUALITY_RED_INPUT_JSON=')),request)
+        self.assertNotIn('--mount',command)
+        with self.assertRaises(ValueError):qualification.execution_args('delivery-kit-port2',
+            'delivery-kit-port2-red-probe-example','sha256:'+'a'*64,{**request,'command':['sh']})
+
 
 if __name__=='__main__':unittest.main()

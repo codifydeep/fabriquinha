@@ -38,20 +38,28 @@ def await_retirement(name):
         time.sleep(0.25)  # Read-only observation of the same removal acknowledgement.
 
 
-def execution_args(namespace,name,image_id):
+def execution_args(namespace,name,image_id,request=None):
     from docker_grouping import args as group
     if not re.fullmatch(r'sha256:[a-f0-9]{64}',image_id):raise ValueError('exact local image ID required')
     if not re.fullmatch(re.escape(namespace)+r'-red-probe-[a-z0-9-]+',name):raise ValueError('exact grouped probe name required')
-    return ['docker','run','--rm','--name',name,*group('quality-red-probe',namespace),
+    command=['docker','run','--rm','--name',name,*group('quality-red-probe',namespace),
         '--label','delivery-kit.owner='+namespace+'-quality-red-probe',
         '--network','none','--read-only','--cap-drop','ALL',
         '--security-opt','no-new-privileges','--user','10000:10000',
         '--pids-limit','64','--memory','256m','--cpus','1',
-        '--tmpfs','/tmp:rw,nosuid,nodev,size=32m,mode=1777',image_id]
+        '--tmpfs','/tmp:rw,nosuid,nodev,size=32m,mode=1777']
+    if request is not None:
+        if not isinstance(request,dict) or set(request)!={'plan','task_id','base_manifest_sha256','snapshot_manifest_sha256'}:
+            raise ValueError('fixed input fields required')
+        encoded=json.dumps(request,sort_keys=True,separators=(',',':'))
+        if len(encoded.encode())>65536:raise ValueError('bounded fixed input required')
+        command+=['--env','QUALITY_RED_INPUT_JSON='+encoded]
+    return command+[image_id]
 
 
-def qualify(namespace,image):
+def qualify(namespace,image,input_mode='file'):
     if not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}',namespace):raise ValueError('exact delivery namespace required')
+    if input_mode not in ('file','env'):raise ValueError('fixed input mode required')
     if not re.fullmatch(r'delivery-kit-quality-red-observer:[A-Za-z0-9_.-]{1,64}',image):
         raise ValueError('locally built fixed observer image required')
     from controller_maintenance_cli import arguments
@@ -82,7 +90,7 @@ def qualify(namespace,image):
     archive=backups/('quality-red-docker-'+operation)
     archive.mkdir(mode=0o700)
     save(archive/'operation.json',dict(operation=operation,namespace=namespace,observer_image_id=info['Id'],
-        native_qualification=False,model_calls=0,delivery_approval=False,maintenance=maintenance,idle=idle))
+        native_qualification=False,model_calls=0,delivery_approval=False,maintenance=maintenance,idle=idle,input_mode=input_mode))
     # Reuse the public synthetic unit fixture, never a product snapshot/session.
     sys.path.insert(0,str(ROOT/'tests'))
     from test_quality_red_observation import QualityRedObservationTests
@@ -109,7 +117,7 @@ def qualify(namespace,image):
             # gives the unprivileged observer read access on its read-only root.
             os.chmod(context/'policy/input.json',0o644)
             (context/'Dockerfile').write_text('FROM '+image+'\nCOPY base /base\n'
-                'COPY --chown=10000:10000 snapshot /snapshot\nCOPY policy /policy\n')
+                'COPY --chown=10000:10000 snapshot /snapshot\n'+('COPY policy /policy\n' if input_mode=='file' else ''))
             tag='delivery-kit-quality-red-probe:'+operation[:8]+'-'+case
             name=namespace+'-red-probe-'+operation[:8]+'-'+case.replace('_','-')
             save(context/'intent.json',dict(image_tag=tag,container_name=name,case=case))
@@ -119,7 +127,7 @@ def qualify(namespace,image):
             built_info=json.loads(subprocess.check_output(['docker','image','inspect',tag],text=True))[0]
             image_id=built_info['Id']
             if built_info['Config'].get('Volumes'):raise ValueError('probe image inherited a volume')
-            args=execution_args(namespace,name,image_id)
+            args=execution_args(namespace,name,image_id,request if input_mode=='env' else None)
             observed=command(args)
             save(context/'execution.json',dict(argv=args,image_id=image_id,exit_code=observed.returncode,
                 stdout=observed.stdout,stderr=observed.stderr))
@@ -144,7 +152,7 @@ def qualify(namespace,image):
             print(json.dumps(dict(case=case,status='passed',delivery_approval=False)),flush=True)
         finally:fixture.tmp.cleanup()
     receipt=dict(operation='synthetic_docker_quality_red_qualification_v2',cases=results,
-        observer_image_id=info['Id'],model_calls=0,native_qualification=False,delivery_approval=False,
+        observer_image_id=info['Id'],input_mode=input_mode,model_calls=0,native_qualification=False,delivery_approval=False,
         source_sha256=hashlib.sha256((ROOT/'quality_red_observation.py').read_bytes()).hexdigest(),archive=str(archive))
     save(archive/'result.json',receipt)
     return receipt
@@ -153,5 +161,6 @@ def qualify(namespace,image):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--namespace',required=True);parser.add_argument('--image',required=True)
+    parser.add_argument('--input-mode',choices=('file','env'),default='file')
     options=parser.parse_args()
-    print(json.dumps(qualify(options.namespace,options.image),sort_keys=True))
+    print(json.dumps(qualify(options.namespace,options.image,options.input_mode),sort_keys=True))

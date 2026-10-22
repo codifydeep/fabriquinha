@@ -18,8 +18,11 @@ negativos obrigatórios antes do merge. A política, o executor offline e o cada
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
 bloqueios contra uso do fluxo legado por uma issue v2. O observador de Red real
 também passou por controles sintéticos em Docker isolado, sem uma implementação
-positiva prévia. Isso ainda não autentica uma entrega dos agentes nem autoriza
-workers: instalação, integração das etapas e qualificação nativa seguem pendentes.
+positiva prévia. A ingestão persistente de Red também está implementada em fonte:
+exige fase, tarefa, cópia e job reais vinculados pelo controlador, sem aceitar
+relatos do agente como prova. Isso ainda não qualifica uma entrega dos agentes nem
+autoriza workers: admissão v2, produtor de snapshots, revisão, instalação e
+qualificação nativa seguem pendentes.
 Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de

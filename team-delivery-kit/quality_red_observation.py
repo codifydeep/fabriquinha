@@ -171,15 +171,27 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest):
         inputs(base,snapshot,plan,base_manifest,snapshot_manifest)
 
 
+def load_request():
+    # Controller-owned bounded metadata, never an agent command. File input is
+    # retained for baked synthetic probes; live fixed jobs bind Env in their
+    # immutable validation identity and mount only base/snapshot read-only.
+    raw=os.environ.get('QUALITY_RED_INPUT_JSON')
+    if raw is None:
+        path=Path('/policy/input.json')
+        if path.is_symlink() or path.stat().st_size>262144:raise ValueError('bounded fixed input required')
+        raw=path.read_bytes()
+    elif len(raw.encode())>65536:raise ValueError('bounded fixed input required')
+    request=json.loads(raw)
+    if not isinstance(request,dict) or set(request)!={'plan','task_id','base_manifest_sha256','snapshot_manifest_sha256'}:
+        raise ValueError('exact fixed input required')
+    return request
+
+
 if __name__=='__main__':
     try:
         if len(sys.argv)!=1:raise ValueError('fixed runner takes no commands')
         signal.alarm(180)
-        path=Path('/policy/input.json')
-        if path.is_symlink() or path.stat().st_size>262144:raise ValueError('bounded fixed input required')
-        request=json.loads(path.read_bytes())
-        if set(request)!={'plan','task_id','base_manifest_sha256','snapshot_manifest_sha256'}:
-            raise ValueError('exact fixed input required')
+        request=load_request()
         print(json.dumps(run('/base','/snapshot',request['plan'],request['task_id'],
             request['base_manifest_sha256'],request['snapshot_manifest_sha256']),sort_keys=True),flush=True)
     except Exception as error:

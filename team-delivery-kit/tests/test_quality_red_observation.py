@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import quality_red_observation as runner
 from broker import quality_lifecycle_v2 as quality
@@ -134,6 +135,16 @@ class QualityRedObservationTests(unittest.TestCase):
     def test_real_subtest_assertion_is_recorded_under_parent_method(self):
         self.prepare(new=b'import unittest\nimport app\nclass New(unittest.TestCase):\n def test_new(self):\n  for v in (0,1):\n   with self.subTest(v=v):self.assertEqual(app.VALUE,v)\n')
         self.assertEqual(self.call()['red']['tests_run'],2)
+
+    def test_controller_env_input_is_bounded_and_cannot_supply_commands(self):
+        self.prepare()
+        request=dict(plan=self.plan,task_id=self.task,base_manifest_sha256=self.prepared['base_manifest_sha256'],
+            snapshot_manifest_sha256=self.prepared['manifest_sha256'])
+        with patch.dict(runner.os.environ,{'QUALITY_RED_INPUT_JSON':json.dumps(request)}):
+            self.assertEqual(runner.load_request(),request)
+        for raw in (json.dumps({**request,'command':['sh']}),'x'*65537,'[]'):
+            with self.subTest(raw_length=len(raw)),patch.dict(runner.os.environ,{'QUALITY_RED_INPUT_JSON':raw}):
+                with self.assertRaises(ValueError):runner.load_request()
 
 
 if __name__=='__main__':unittest.main()

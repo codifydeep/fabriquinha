@@ -1,8 +1,8 @@
 # Quality lifecycle v2
 
 Status: owner-approved design; policy, offline sensitivity executor, persistent
-operator enrollment, legacy admission fences and standalone full-suite Red
-observer implemented in source. The Red observer also passed synthetic Docker
+operator enrollment, legacy admission fences, standalone full-suite Red observer
+and durable controller Red ingestion implemented in source. The Red observer also passed synthetic Docker
 isolation checks. The v2 chain is not installed, enrolled or enabled in the
 running controller. Historical runs retain v1.
 
@@ -100,12 +100,56 @@ cannot satisfy the check; each negative must fail for its expected category.
 Delayed Docker removal is observed by the same exact name without repeating a
 run/delete. An unsettled earlier probe blocks a new qualification invocation.
 
-These Docker checks qualify only the observer on synthetic inputs. They do not
-authenticate a completed native author task or persist a controller Red transition.
-That adapter still must bind the exact source lease, immutable copy job, qualified
-observer image and durable execution result to the enrolled issue before sending
-an independent review. No historical `test_first_red` or calibration receipt is
-upgraded by this component.
+These Docker checks qualify only the observer on synthetic inputs, not a native
+author task. Live fixed jobs can bind the same bounded metadata through the
+`QUALITY_RED_INPUT_JSON` environment field in their immutable job identity. This
+avoids an extra writable policy volume; the field cannot contain a command or
+additional input keys. The observer's pinned image must resolve to the portable
+contract's exact test image. Environment-input Docker qualification runs without
+a policy file, so a file fallback cannot accidentally satisfy that check.
+
+### Durable controller Red ingestion
+
+`broker/quality_red_capture.py` has no worker endpoint and accepts a source task
+identity, not a caller-supplied test report. It authenticates the completed native
+author against the enrolled run, workspace/runtime and independent roles. The
+source capability must be consumed, closed and the latest attempt for that task;
+its controller-owned `quality_native_scopes` record must bind `tests_only_v2`, the
+same request/task/run and plan hash. Agent prose never establishes a phase.
+
+The copy receipt must already be complete in the controller's durable copy-job
+table, with the exact fixed copy image/command, pinned base, source scope,
+destination volume, immutable mounts, prepared test hashes and output digest.
+Both `QUALITY_COPY_IMAGE` and `QUALITY_RED_IMAGE` are explicit immutable controller
+configuration, never worker input or an automatic fallback to a legacy image.
+Inherited image volumes and credential-bearing environment keys are refused;
+the configured technical escalation actor must be an enrolled planning role.
+The observer job is built from those records, not agent-selected commands. Its
+actual identity, complete result, container ID, output hash and job-contract hash
+are rechecked against the durable validation-job table before any transition.
+The new code deliberately does not reconstruct/upgrade a historical Red or
+calibration receipt.
+
+Only after those checks can the capture enter `awaiting_independent_test_review`,
+owned by the enrolled reviewer. It still grants no execution, approval or merge.
+Context/state digests protect readback against accidental corruption. The durable
+receipt can be read after mutable source records are retired, without rerunning
+the job. A newly admitted author task can produce a separate Red revision without
+overwriting an earlier capture for the same issue. This does not admit another
+task, reset a budget or authorize re-observation with changed parameters: phase
+admission and any changed-condition recovery remain separate controller decisions.
+A per-source private OS lock serializes observers across processes and
+is released on process exit. Slow native/Docker operations do not hold the global
+admission lock or SQLite writer. Pending observation retains the exact same job;
+rejected provenance or an executed invalid Red records a technical impediment for
+the configured Tech Lead, preserving evidence and refusing an identical retry.
+
+The tests for ingestion use isolated controller databases and mocked native/copy
+provenance; they are not native qualification. The installed admission adapter
+still does not mint `tests_only_v2` capabilities, the fixed copy producer is not
+wired to a new v2 coordinator, and independent review dispatch/attestation remain
+to implement and qualify. Do not populate scope/proof tables manually to bypass
+these missing stages or enable v2 based on observer/ingestion tests alone.
 
 ### Immutable enrollment and legacy fences
 
