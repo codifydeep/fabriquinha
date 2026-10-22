@@ -10,6 +10,7 @@ COPY tests/quality_phase_registry_canary.py /quality_phase_registry_canary.py
 COPY tests/quality_review_registry_canary.py /quality_review_registry_canary.py
 RUN PYTHONPATH=/opt/hermes:/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import quality_phase_tools,review_tool_policy,worker_model_config"
 LABEL delivery-kit.component="quality-author-worker" delivery-kit.qualification="not-native-delivery"
+LABEL delivery-kit.quality-phases="tests_only_v2,test_review_v2,implementation_v2"
 ENV PYTHONDONTWRITEBYTECODE=1
 USER 10000:10000
 WORKDIR /tmp

@@ -29,12 +29,13 @@ def enabled(b):
     require(getattr(b,'QUALITY_V2_ENABLED',False) is True)
 
 
-def current(b,request):
+def current(b,request,*,admission_adapter=None):
     """Native scope override only from the authenticated persistent phase."""
     enabled(b)
-    with b.db() as con:c=admission.load(con,request);require(c is not None)
+    authority=admission_adapter or admission
+    with b.db() as con:c=authority.load(con,request);require(c is not None)
     settings=json.loads((b.STATE/'native.json').read_text())
-    with b.db() as con:e=admission.enrollment.lookup(con,c['issue_id'])
+    with b.db() as con:e=authority.enrollment.lookup(con,c['issue_id'])
     require(e is not None and settings['workspace_id']==e['workspace_id']
         and settings['runtime_id']==e['runtime_id'] and settings['agents'].get(c['agent_id'])=='implementation')
     task=native.task_record(settings,c['task_id'],c['agent_id'])
@@ -45,11 +46,12 @@ def current(b,request):
         scope=c['scope'],wakeup_id=task.get('wakeup_id'),handoff_note=task.get('handoff_note'),quality_request_id=request)
 
 
-def payload(b,request):
+def payload(b,request,*,admission_adapter=None):
     """Pure fixed worker selection after a completed seed/lock receipt."""
     enabled(b)
+    authority=admission_adapter or admission
     with b.db() as con:
-        c=admission.load(con,request);require(c is not None)
+        c=authority.load(con,request);require(c is not None)
         workspace.initialize(con)
         row=con.execute('SELECT context,state,context_sha256,state_sha256 FROM quality_author_workspaces WHERE request_id=?',
             (request,)).fetchone()
@@ -57,7 +59,7 @@ def payload(b,request):
     context,state=json.loads(row[0]),json.loads(row[1])
     require(context['source']==c and admission.quality.digest(context)==row[2]
         and admission.quality.digest(state)==row[3] and state['stage']=='workspace_locked'
-        and context['selection']==admission.selection(b,request))
+        and context['selection']==authority.selection(b,request))
     volume=b.docker('GET','/volumes/'+context['volume'])
     require(volume is not None and admission.quality.digest(workspace.capture_identity(volume,context))==state['volume_identity_sha256'])
     image_id=getattr(b,'QUALITY_WORKER_IMAGE',None)
@@ -75,7 +77,7 @@ def payload(b,request):
         Cmd=['-c','import time; time.sleep(480)'],WorkingDir='/tmp',NetworkDisabled=False,
         Env=['HOME=/tmp','HERMES_HOME=/tmp/hermes','HERMES_CONTROLLER_DENIAL_MESSAGES=1'],
         Labels={'delivery-kit.owner':b.OWNER,'delivery-kit.request':request,'delivery-kit.quality-run':c['run_id'],
-            'delivery-kit.quality-phase':'tests_only_v2'},
+            'delivery-kit.quality-phase':c['phase']},
         HostConfig=dict(ReadonlyRootfs=True,NetworkMode=b.MODEL_NETWORK,CapDrop=['ALL'],
             SecurityOpt=['no-new-privileges'],Memory=268435456,NanoCpus=1000000000,PidsLimit=64,
             AutoRemove=False,Privileged=False,Binds=[],VolumesFrom=[],
