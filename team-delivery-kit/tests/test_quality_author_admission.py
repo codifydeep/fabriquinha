@@ -43,6 +43,10 @@ class AuthorAdmissionTests(unittest.TestCase):
         self.assertEqual(selected['test_commands'],[])
         for k in ('product_edits_allowed','terminal_allowed','legacy_calibration_allowed','delivery_approval'):
             self.assertFalse(selected[k])
+        from quality_phase_tools import validate
+        config=author.tool_config(self.b,grant['request_id'])
+        validate(config,grant['request_id'])
+        self.assertEqual(config['editable_paths'],selected['editable_paths'])
 
     def test_duplicate_or_lost_capability_response_cannot_mint_another_attempt(self):
         grant=self.call()

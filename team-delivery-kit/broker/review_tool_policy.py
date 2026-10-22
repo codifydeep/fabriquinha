@@ -36,6 +36,12 @@ def observe_surgical_read(name,args,result):
 
 def controlled(name, args):
     """None delegates to the original handler; all other results are terminal."""
+    if 'DELIVERY_QUALITY_PHASE_JSON' in os.environ:
+        try:
+            import quality_phase_tools
+            return quality_phase_tools.controlled(name,args,os.environ)
+        except Exception:
+            return json.dumps(dict(error='quality_phase_policy_unavailable',delivery_approval=False))
     mode = os.environ.get('DELIVERY_EXECUTION_MODE')
     if mode=='implementation' and os.environ.get('DELIVERY_AUTHOR_FEEDBACK_JSON'):
         try:

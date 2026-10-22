@@ -236,6 +236,36 @@ isolation evidence, not live Hermes tool-handler, native launch, independent
 test-review or release qualification. The current server/worker-image launch
 integration and remaining chain are still disabled pending those gates.
 
+`quality_phase_tools.py` enforces `tests_only_v2` at registry dispatch and direct
+registered handlers via `review_tool_policy`. Only exact declared reads and a
+bounded full-file write to a new test delegate to the existing file handler.
+Product/baseline writes, arbitrary patches, terminal/Python/delegation/admin
+tools, path traversal and unknown arguments are denied. The original syntax
+guard and kernel filesystem permissions still apply. Malformed or conflicting
+phase configuration never falls back to the broader implementation policy.
+
+The ACP transport accepts this configuration only for a nonpersistent
+implementation session, the exact execution UUID and identical ACP editables,
+with no legacy feedback, review-suite or command capabilities. It validates these
+conditions before Docker exec, then supplies the same controller-owned config to
+the worker handlers. `quality_author_admission.tool_config` derives it from the
+persisted plan, not a model argument. The launcher must still select and validate
+the immutable qualified worker image and connect this transport to its admission.
+
+`Dockerfile.quality-author-worker` reuses a local already-flattened Hermes runtime
+without inherited anonymous volumes or another multi-gigabyte filesystem copy.
+It is a qualification build, not a portable distribution or installed deployment.
+The workspace qualifier's optional `--worker-image` runs the real Hermes registry
+and a direct registered handler with network disabled, no credentials/socket and
+no model request. It proves legitimate reads/new-test writes and denied shell,
+Python, product/baseline writes and out-of-scope reads. An initial canary supplied
+invalid Python text and was correctly rejected by the syntax guard; its failed
+receipt remains preserved. A new image with valid synthetic test bytes passed.
+`--observe-failure` can close a qualification only from an actual nonzero process
+result and retired exact helpers; an unknown/missing result remains unresolved.
+Neither these proofs nor a successful metadata readback authorize native launch,
+test review, implementation continuation or homologation.
+
 `broker/quality_lifecycle_enrollment.py` binds a new run and previously unexecuted
 native issue to the complete portable contract, repository, registered base SHA,
 base-volume manifest, native workspace/runtime and independent author/reviewer.

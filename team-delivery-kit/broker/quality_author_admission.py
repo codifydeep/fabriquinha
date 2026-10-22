@@ -68,6 +68,12 @@ def selection(b,request_id):
         legacy_calibration_allowed=False,delivery_approval=False)
 
 
+def tool_config(b,request_id):
+    selected=selection(b,request_id)
+    return dict(version=2,phase=selected['phase'],request_id=request_id,
+        editable_paths=selected['editable_paths'],read_paths=selected['read_paths'])
+
+
 def admit(b,task_id,agent_id,*,now=None):
     for value in (task_id,agent_id):enrollment.canonical(value)
     now=time.time() if now is None else now

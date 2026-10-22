@@ -46,13 +46,46 @@ print(json.dumps(result,sort_keys=True))
 '''
 
 
-def qualify(namespace,image):
+def observe_failure(namespace,operation):
+    """Close only a proved failed probe, never an unknown/missing execution."""
+    if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}',namespace)
+            or str(uuid.UUID(operation))!=operation):raise ValueError('exact qualification identity required')
+    archive=ROOT/('.local-'+namespace.removeprefix('delivery-kit-'))/'backups'/('quality-author-docker-'+operation)
+    original=json.loads((archive/'operation.json').read_text())
+    if original['operation']!=operation:raise ValueError('original operation drift')
+    phases=('seed','lock','probe','registry') if original.get('worker_image') else ('seed','lock','probe')
+    outcomes=[];failed=None
+    for phase in phases:
+        result=json.loads((archive/(phase+'-result.json')).read_text())
+        intent=json.loads((archive/(phase+'-intent.json')).read_text())
+        expected=namespace+'-author-probe-'+operation[:8]+'-'+phase
+        if intent['argv'][intent['argv'].index('--name')+1]!=expected:raise ValueError('helper name drift')
+        await_retirement(expected)
+        outcomes.append(dict(phase=phase,exit_code=result['exit_code'],container_retired=True))
+        if type(result['exit_code']) is not int:raise ValueError('actual terminal process result required')
+        if result['exit_code']!=0:failed=phase;break
+    if failed is None:raise ValueError('no proved failed execution; never close an unknown outcome')
+    final=dict(operation='quality_author_filesystem_docker_qualification_v2',status='failed',failed_phase=failed,
+        results=outcomes,retained_volumes=original['volumes'],native_qualification=False,model_calls=0,delivery_approval=False)
+    save(archive/'result.json',final)
+    return final
+
+
+def qualify(namespace,image,worker_image=None):
     maintenance,idle=require_idle(namespace)
     if not re.fullmatch(r'delivery-kit-quality-author-prep:[A-Za-z0-9_.-]{1,64}',image):raise ValueError('fixed local prep image required')
     info=json.loads(subprocess.check_output(['docker','image','inspect',image],text=True))[0]
     if (info['Config'].get('Volumes') or info['Config'].get('User')!='10000:10000'
             or info['Config'].get('Labels',{}).get('delivery-kit.component')!='quality-author-prep'):
         raise ValueError('dedicated prep image required')
+    worker=None
+    if worker_image is not None:
+        if not re.fullmatch(r'delivery-kit-quality-author-worker:[A-Za-z0-9_.-]{1,64}',worker_image):
+            raise ValueError('fixed local worker image required')
+        worker=json.loads(subprocess.check_output(['docker','image','inspect',worker_image],text=True))[0]
+        if (worker['Config'].get('Volumes') or worker['Config'].get('User')!='10000:10000'
+                or worker['Config'].get('Labels',{}).get('delivery-kit.component')!='quality-author-worker'):
+            raise ValueError('dedicated worker with no inherited volumes required')
     owner=namespace+'-quality-author-probe'
     if subprocess.check_output(['docker','ps','-aq','--filter','label=delivery-kit.owner='+owner],text=True).strip():
         raise ValueError('observe previous exact helper before new qualification')
@@ -62,7 +95,7 @@ def qualify(namespace,image):
             raise ValueError('unfinished qualification; observe original recorded intents')
     operation=str(uuid.uuid4());archive=backups/('quality-author-docker-'+operation);archive.mkdir(mode=0o700)
     volumes={key:namespace+'-quality-author-'+key+'-'+operation for key in ('base','work')}
-    save(archive/'operation.json',dict(operation=operation,volumes=volumes,image=info['Id'],maintenance=maintenance,idle=idle,
+    save(archive/'operation.json',dict(operation=operation,volumes=volumes,image=info['Id'],worker_image=worker['Id'] if worker else None,maintenance=maintenance,idle=idle,
         native_qualification=False,model_calls=0,delivery_approval=False))
     sys.path.insert(0,str(ROOT/'tests'))
     from test_quality_red_observation import QualityRedObservationTests
@@ -97,9 +130,17 @@ def qualify(namespace,image):
                 editable_paths=['/workspace/tests/test_new.py']))
         b=SimpleNamespace(QUALITY_PREP_IMAGE=image_id,OWNER=owner)
         outcomes=[]
-        for phase in ('seed','lock','probe'):
-            p=payload(b,c,'seed' if phase=='probe' else phase)
+        phases=('seed','lock','probe','registry') if worker else ('seed','lock','probe')
+        for phase in phases:
+            p=payload(b,c,'seed' if phase in ('probe','registry') else phase)
             if phase=='probe':p={**p,'Cmd':['-c',PROBE],'Env':[]}
+            if phase=='registry':
+                from broker.acp_transport import worker_env
+                config=dict(version=2,phase='tests_only_v2',request_id=operation,
+                    editable_paths=['/workspace/tests/test_new.py'],
+                    read_paths=['/workspace/tests/test_new.py','/workspace/app.py','/workspace/tests/test_old.py'])
+                p={**p,'Cmd':['/quality_phase_registry_canary.py'],
+                    'Env':worker_env('implementation',False,execution_id=operation,quality_phase_config=config)}
             name=namespace+'-author-probe-'+operation[:8]+'-'+phase
             args=['docker','run','--rm','--name',name,*grouped('quality-author-probe',namespace),
                 '--label','delivery-kit.owner='+owner,'--network','none','--read-only','--cap-drop','ALL',
@@ -109,11 +150,13 @@ def qualify(namespace,image):
             for mount in p['HostConfig']['Mounts']:
                 args+=['--mount','type=volume,src='+mount['Source']+',dst='+mount['Target']+(',readonly' if mount.get('ReadOnly') else '')]
             for env in p['Env']:args+=['--env',env]
-            args+=['--entrypoint','python',image_id,*p['Cmd']]
+            args+=['--entrypoint','python',worker['Id'] if phase=='registry' else image_id,*p['Cmd']]
             save(archive/(phase+'-intent.json'),dict(argv=args))
             executed=command(args)
             save(archive/(phase+'-result.json'),dict(exit_code=executed.returncode,stdout=executed.stdout,stderr=executed.stderr))
-            if executed.returncode:raise ValueError('qualification failed; inspect recorded '+phase+' result')
+            if executed.returncode:
+                observe_failure(namespace,operation)
+                raise ValueError('qualification failed; inspect recorded '+phase+' result')
             await_retirement(name)
             if phase=='probe':
                 report=json.loads(executed.stdout)
@@ -122,11 +165,17 @@ def qualify(namespace,image):
             outcomes.append(dict(phase=phase,status='passed',container_retired=True))
             print(json.dumps(outcomes[-1]),flush=True)
         result=dict(operation='quality_author_filesystem_docker_qualification_v2',results=outcomes,
-            image=image_id,retained_volumes=volumes,archive=str(archive),native_qualification=False,model_calls=0,delivery_approval=False)
+            image=image_id,worker_image=worker['Id'] if worker else None,retained_volumes=volumes,archive=str(archive),native_qualification=False,model_calls=0,delivery_approval=False)
         save(archive/'result.json',result);return result
     finally:fixture.doCleanups()
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--namespace',required=True);p.add_argument('--image',required=True)
-    a=p.parse_args();print(json.dumps(qualify(a.namespace,a.image),sort_keys=True))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--namespace',required=True);p.add_argument('--image')
+    p.add_argument('--worker-image')
+    p.add_argument('--observe-failure')
+    a=p.parse_args()
+    if a.observe_failure:result=observe_failure(a.namespace,a.observe_failure)
+    elif a.image:result=qualify(a.namespace,a.image,a.worker_image)
+    else:p.error('--image or --observe-failure required')
+    print(json.dumps(result,sort_keys=True))

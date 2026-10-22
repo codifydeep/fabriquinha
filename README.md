@@ -30,6 +30,10 @@ a instalação e a qualificação nativa seguem pendentes.
 O preparo persistente do workspace (seed e lockdown) está implementado em fonte;
 o bloqueio real de arquivos já passou por qualificação sintética Docker como
 usuário sem privilégios, inclusive contra chmod, renomeação e subprocessos.
+O transporte ACP agora pode vincular a fase à execução exata; o registry e os
+handlers diretos do Hermes passaram por prova real em Docker: leitura declarada
+e escrita do teste novo funcionam, enquanto shell, Python e alterações de código
+ou testes antigos são recusados. A ligação ao lançamento nativo segue pendente.
 Não é uma dispensa dos gates existentes nem uma aprovação de ensaios bloqueados.
 
 Se um diagnóstico do CTO mantiver um incidente de transporte por falta de

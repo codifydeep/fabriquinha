@@ -87,6 +87,7 @@ COPY broker/session_resume.py /session_resume.py
 COPY docker_grouping.py /docker_grouping.py
 COPY broker/acp_probe.py /acp_probe.py
 COPY broker/acp_transport.py /acp_transport.py
+COPY quality_phase_tools.py /quality_phase_tools.py
 COPY broker/planning_review_observation.py /planning_review_observation.py
 COPY tests/acp_initialize_probe.py /acp_initialize_probe.py
 COPY broker/worker_model_config.py /worker_model_config.py

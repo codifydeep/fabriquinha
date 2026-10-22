@@ -60,7 +60,8 @@ def failure_diagnostics(stderr):
     return sorted(set(labels))
 
 
-def worker_env(mode, persistent, test_commands=(), review_suite_capability=None, execution_id=None,author_feedback_config=None):
+def worker_env(mode, persistent, test_commands=(), review_suite_capability=None, execution_id=None,author_feedback_config=None,
+               quality_phase_config=None):
     if mode not in ('review', 'implementation', 'planning'):
         raise ValueError('invalid execution mode')
     values = ['HOME=/tmp', 'HERMES_HOME=' + ('/session-state' if persistent else '/tmp/hermes'),
@@ -82,6 +83,12 @@ def worker_env(mode, persistent, test_commands=(), review_suite_capability=None,
         from literal_feedback_wire import worker_config
         worker_config(author_feedback_config,execution_id)
         values.append('DELIVERY_AUTHOR_FEEDBACK_JSON='+json.dumps(author_feedback_config,sort_keys=True))
+    if quality_phase_config is not None:
+        from quality_phase_tools import validate,KEY
+        validate(quality_phase_config,execution_id)
+        if mode!='implementation' or persistent or test_commands or review_suite_capability or author_feedback_config is not None:
+            raise ValueError('tests-only transport cannot combine legacy capabilities or sessions')
+        values.append(KEY+'='+json.dumps(quality_phase_config,sort_keys=True))
     return values
 
 
@@ -125,13 +132,20 @@ def permission_response(request, mode, editable_paths=frozenset(), test_commands
 
 class Transport:
     def __init__(self, docker, name, persistent=False, mode='review', editable_paths=(),
-                 test_commands=(), review_suite_capability=None,author_feedback_config=None):
+                 test_commands=(), review_suite_capability=None,author_feedback_config=None,quality_phase_config=None):
         if mode not in ('review', 'implementation', 'planning'):
             raise ValueError('invalid execution mode')
         self.mode = mode
         self.execution_id = name.rsplit('-job-', 1)[1]
         self.editable_paths = frozenset(editable_paths)
         self.test_commands = frozenset(test_commands)
+        if quality_phase_config is not None:
+            from quality_phase_tools import validate
+            validate(quality_phase_config,self.execution_id)
+            if self.editable_paths!=frozenset(quality_phase_config['editable_paths']):
+                raise ValueError('ACP editables must match the exact tests-only phase')
+            worker_env(mode,persistent,test_commands,review_suite_capability,self.execution_id,
+                author_feedback_config,quality_phase_config)  # Before any Docker exec.
         self.cwd = ('/workspace' if mode == 'implementation' else
                     '/delivery' if mode == 'review' else '/tmp')
         execution = docker('POST', '/containers/' + name + '/exec', {
@@ -140,7 +154,7 @@ class Transport:
             # Explicit offline marker, not a usable credential. Container network is none
             # and the ACP policy rejects every prompt. This only permits session setup.
             'Env': worker_env(mode, persistent, self.test_commands, review_suite_capability,
-                              name.rsplit('-job-', 1)[1],author_feedback_config),
+                              name.rsplit('-job-', 1)[1],author_feedback_config,quality_phase_config),
             'WorkingDir': self.cwd})
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.settimeout(25)

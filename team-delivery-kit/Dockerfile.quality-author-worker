@@ -1,0 +1,15 @@
+# Reuse the already flattened local runtime: no inherited anonymous volumes and
+# no second multi-gigabyte filesystem copy. This is a local-only base tag; the
+# expected local config ID is f85484409c92b52e7db70b8200b576b7e88da10372920f092c0508f86396c172.
+# It is not a distributable registry manifest digest. Pin/qualify output ID.
+FROM delivery-kit-generic-calibration:20261011.7
+USER root
+COPY quality_phase_tools.py broker/review_tool_policy.py /opt/hermes/
+COPY quality_phase_tools.py model_policy.py broker/worker_model_config.py /
+COPY tests/quality_phase_registry_canary.py /quality_phase_registry_canary.py
+RUN PYTHONPATH=/opt/hermes:/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import quality_phase_tools,review_tool_policy,worker_model_config"
+LABEL delivery-kit.component="quality-author-worker" delivery-kit.qualification="not-native-delivery"
+ENV PYTHONDONTWRITEBYTECODE=1
+USER 10000:10000
+WORKDIR /tmp
+ENTRYPOINT ["python"]
