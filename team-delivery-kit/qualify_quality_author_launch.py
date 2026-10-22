@@ -27,6 +27,7 @@ SOURCES={
     'broker/quality_author_admission.py':'quality_author_admission.py','broker/quality_author_worker.py':'quality_author_worker.py',
     'broker/quality_author_launch.py':'quality_author_launch.py','broker/quality_red_capture.py':'quality_red_capture.py',
     'broker/quality_red_snapshot.py':'quality_red_snapshot.py','broker/quality_progress.py':'quality_progress.py',
+    'broker/quality_test_review.py':'quality_test_review.py',
     'broker/validation_job.py':'validation_job.py',
     'broker/test_first_job.py':'test_first_job.py','broker/worker_creation_intent.py':'worker_creation_intent.py',
     'broker/acp_startup.py':'acp_startup.py','broker/acp_transport.py':'acp_transport.py',

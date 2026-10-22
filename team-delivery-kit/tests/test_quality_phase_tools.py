@@ -75,5 +75,53 @@ class QualityPhaseToolsTests(unittest.TestCase):
             c=copy.deepcopy(self.config);c['read_paths'].append(path)
             with self.subTest(path=path),self.assertRaises(ValueError):phase.validate(c,self.request)
 
+    def review(self):
+        config=dict(version=2,phase='test_review_v2',request_id=self.request,
+            editable_paths=[],read_paths=['/delivery/tests/test_new.py','/delivery/app.py'])
+        return config,{phase.KEY:json.dumps(config),'DELIVERY_EXECUTION_MODE':'review',
+            'DELIVERY_MODEL_EXECUTION_ID':self.request}
+
+    def test_test_review_only_delegates_registered_bounded_read_pages(self):
+        config,env=self.review()
+        phase.validate(config,self.request)
+        self.assertIsNone(self.control('read_file',dict(path='/delivery/app.py',offset=1,limit=100),env))
+        for name,args in [('read_file',dict(path='/delivery/app.py')),
+                ('read_file',dict(path='/delivery/app.py',offset=1,limit=101)),
+                ('read_file',dict(path='/delivery/.env',offset=1,limit=100)),
+                ('read_file',dict(path='/workspace/app.py',offset=1,limit=100)),
+                ('write_file',dict(path='/delivery/tests/test_new.py',content='weakened')),
+                ('terminal',dict(command='python -m unittest')),('patch',{}),('python',{}),('delegate_task',{})]:
+            with self.subTest(name=name,args=args):
+                self.assertIn('error',json.loads(self.control(name,args,env)))
+
+    def test_read_only_phase_direct_handlers_never_execute_writes_or_shell(self):
+        _,env=self.review()
+        with patch.dict(os.environ,env,clear=True):
+            for name in ('write_file','patch','terminal','python','github','kanban'):
+                original=Mock(side_effect=AssertionError('review handler bypass'))
+                result=handlers.fence(name,original)({'path':'/delivery/tests/test_new.py','content':'bad'})
+                self.assertIn('error',json.loads(result));original.assert_not_called()
+            async def forbidden(*args,**kwargs):raise AssertionError('async write bypass')
+            self.assertIn('error',json.loads(asyncio.run(handlers.fence('write_file',forbidden,True)({}))))
+
+    def test_review_transport_is_nonpersistent_and_cannot_import_legacy_suite_authority(self):
+        config,_=self.review()
+        values=acp.worker_env('review',False,execution_id=self.request,quality_phase_config=config)
+        self.assertIn('DELIVERY_EXECUTION_MODE=review',values)
+        self.assertFalse(any(v.startswith('HERMES_WRITE_SAFE_ROOT=') for v in values))
+        for change in (dict(mode='implementation'),dict(persistent=True),dict(test_commands=['python -m unittest']),
+                dict(review_suite_capability='a'*64),dict(author_feedback_config={})):
+            options=dict(mode='review',persistent=False,execution_id=self.request,quality_phase_config=config)
+            options.update(change)
+            with self.subTest(change=change),self.assertRaises(ValueError):acp.worker_env(**options)
+
+    def test_review_config_cannot_smuggle_editables_or_workspace_paths(self):
+        config,env=self.review()
+        for key,value in [('editable_paths',['/delivery/app.py']),('read_paths',['/workspace/app.py'])]:
+            bad=copy.deepcopy(config);bad[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):phase.validate(bad,self.request)
+        bad={**env,'DELIVERY_EXECUTION_MODE':'implementation'}
+        self.assertIn('error',json.loads(self.control('read_file',dict(path='/delivery/app.py',offset=1,limit=100),bad)))
+
 
 if __name__=='__main__':unittest.main()

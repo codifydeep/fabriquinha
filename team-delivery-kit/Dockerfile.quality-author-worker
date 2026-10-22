@@ -7,6 +7,7 @@ USER root
 COPY quality_phase_tools.py broker/review_tool_policy.py /opt/hermes/
 COPY quality_phase_tools.py model_policy.py broker/worker_model_config.py /
 COPY tests/quality_phase_registry_canary.py /quality_phase_registry_canary.py
+COPY tests/quality_review_registry_canary.py /quality_review_registry_canary.py
 RUN PYTHONPATH=/opt/hermes:/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import quality_phase_tools,review_tool_policy,worker_model_config"
 LABEL delivery-kit.component="quality-author-worker" delivery-kit.qualification="not-native-delivery"
 ENV PYTHONDONTWRITEBYTECODE=1

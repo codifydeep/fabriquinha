@@ -30,8 +30,14 @@ ACP reais com autoridade nativa sintética, sem chamada ao modelo. A reconcilia�
 persistente término do autor → snapshot → Red → pacote para revisão está ligada
 ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
 bloqueio de falhas repetidas. Continua desabilitada no controlador instalado.
-A admissão da revisão independente, Green, instalação e qualificação nativa
-integral seguem pendentes; um pacote pronto para revisão não aprova os testes.
+A atribuição, o encaminhamento nativo único e a admissão da revisão independente
+estão implementados em fonte, em modo separado e desabilitado: leitura paginada
+do snapshot, sem permissões de implementação. O lançamento do revisor, a
+atestação nativa da leitura/veredito, Green, instalação e qualificação integral
+seguem pendentes; um pacote ou uma admissão não aprova os testes.
+O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
+Docker: leitura registrada funciona; escrita, terminal e tentativa direta de
+chmod/escrita no volume somente leitura são recusados, sem chamadas ao modelo.
 O preparo persistente do workspace (seed e lockdown) está implementado em fonte;
 o bloqueio real de arquivos já passou por qualificação sintética Docker como
 usuário sem privilégios, inclusive contra chmod, renomeação e subprocessos.

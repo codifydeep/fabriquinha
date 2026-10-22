@@ -54,6 +54,7 @@ def observe_failure(namespace,operation):
     original=json.loads((archive/'operation.json').read_text())
     if original['operation']!=operation:raise ValueError('original operation drift')
     phases=('seed','lock','probe','registry') if original.get('worker_image') else ('seed','lock','probe')
+    if original.get('review_canary'):phases+=('review',)
     outcomes=[];failed=None
     for phase in phases:
         result=json.loads((archive/(phase+'-result.json')).read_text())
@@ -95,7 +96,7 @@ def qualify(namespace,image,worker_image=None):
             raise ValueError('unfinished qualification; observe original recorded intents')
     operation=str(uuid.uuid4());archive=backups/('quality-author-docker-'+operation);archive.mkdir(mode=0o700)
     volumes={key:namespace+'-quality-author-'+key+'-'+operation for key in ('base','work')}
-    save(archive/'operation.json',dict(operation=operation,volumes=volumes,image=info['Id'],worker_image=worker['Id'] if worker else None,maintenance=maintenance,idle=idle,
+    save(archive/'operation.json',dict(operation=operation,volumes=volumes,image=info['Id'],worker_image=worker['Id'] if worker else None,review_canary=worker is not None,maintenance=maintenance,idle=idle,
         native_qualification=False,model_calls=0,delivery_approval=False))
     sys.path.insert(0,str(ROOT/'tests'))
     from test_quality_red_observation import QualityRedObservationTests
@@ -130,9 +131,9 @@ def qualify(namespace,image,worker_image=None):
                 editable_paths=['/workspace/tests/test_new.py']))
         b=SimpleNamespace(QUALITY_PREP_IMAGE=image_id,OWNER=owner)
         outcomes=[]
-        phases=('seed','lock','probe','registry') if worker else ('seed','lock','probe')
+        phases=('seed','lock','probe','registry','review') if worker else ('seed','lock','probe')
         for phase in phases:
-            p=payload(b,c,'seed' if phase in ('probe','registry') else phase)
+            p=payload(b,c,'seed' if phase in ('probe','registry','review') else phase)
             if phase=='probe':p={**p,'Cmd':['-c',PROBE],'Env':[]}
             if phase=='registry':
                 from broker.acp_transport import worker_env
@@ -141,6 +142,14 @@ def qualify(namespace,image,worker_image=None):
                     read_paths=['/workspace/tests/test_new.py','/workspace/app.py','/workspace/tests/test_old.py'])
                 p={**p,'Cmd':['/quality_phase_registry_canary.py'],
                     'Env':worker_env('implementation',False,execution_id=operation,quality_phase_config=config)}
+            if phase=='review':
+                from broker.acp_transport import worker_env
+                config=dict(version=2,phase='test_review_v2',request_id=operation,editable_paths=[],
+                    read_paths=['/delivery/app.py','/delivery/tests/test_old.py','/delivery/tests/test_new.py'])
+                p={**p,'Cmd':['/quality_review_registry_canary.py'],
+                    'Env':worker_env('review',False,execution_id=operation,quality_phase_config=config),
+                    'HostConfig':{**p['HostConfig'],'Mounts':[
+                        dict(Type='volume',Source=volumes['work'],Target='/delivery',ReadOnly=True)]}}
             name=namespace+'-author-probe-'+operation[:8]+'-'+phase
             args=['docker','run','--rm','--name',name,*grouped('quality-author-probe',namespace),
                 '--label','delivery-kit.owner='+owner,'--network','none','--read-only','--cap-drop','ALL',
@@ -150,7 +159,7 @@ def qualify(namespace,image,worker_image=None):
             for mount in p['HostConfig']['Mounts']:
                 args+=['--mount','type=volume,src='+mount['Source']+',dst='+mount['Target']+(',readonly' if mount.get('ReadOnly') else '')]
             for env in p['Env']:args+=['--env',env]
-            args+=['--entrypoint','python',worker['Id'] if phase=='registry' else image_id,*p['Cmd']]
+            args+=['--entrypoint','python',worker['Id'] if phase in ('registry','review') else image_id,*p['Cmd']]
             save(archive/(phase+'-intent.json'),dict(argv=args))
             executed=command(args)
             save(archive/(phase+'-result.json'),dict(exit_code=executed.returncode,stdout=executed.stdout,stderr=executed.stderr))
@@ -162,6 +171,13 @@ def qualify(namespace,image,worker_image=None):
                 report=json.loads(executed.stdout)
                 expected={p:hashlib.sha256(fixture.old[p]).hexdigest() for p in ('app.py','tests/test_old.py')}
                 if report.get('protected_hashes')!=expected:raise ValueError('protected bytes changed')
+            if phase=='review':
+                report=json.loads(executed.stdout)
+                if (report.get('operation')!='test_review_actual_registry_qualification_v2'
+                        or report.get('snapshot_unchanged') is not True or report.get('readonly_mount') is not True
+                        or report.get('direct_handler_denied') is not True or report.get('model_calls')!=0
+                        or report.get('delivery_approval') is not False):
+                    raise ValueError('real read-only registry proof missing')
             outcomes.append(dict(phase=phase,status='passed',container_retired=True))
             print(json.dumps(outcomes[-1]),flush=True)
         result=dict(operation='quality_author_filesystem_docker_qualification_v2',results=outcomes,

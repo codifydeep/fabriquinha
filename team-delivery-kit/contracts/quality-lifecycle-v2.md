@@ -94,9 +94,49 @@ The review-ready packet binds plan, Red, snapshot manifest, author, reviewer,
 candidate test hashes and capture digests. It is produced only from authenticated
 controller capture rows, never the worker's returned report. It does **not**
 freeze/approve tests, start a reviewer, authorize Green or grant delivery. The
-independent read-only review admission/attestation adapter remains to implement
+independent read-only review launch/attestation chain remains to implement
 and qualify. This hook is not installed or enabled in the live controller; its
 database/native-fixture tests are not proof of autonomous native delivery.
+
+### Snapshot-bound independent test-review admission (source only)
+
+`broker/quality_test_review.py` prepares an immutable assignment from the exact
+review-ready packet and durable Red capture, reauthenticating the original native
+author, source phase, base and enrollment. It requires the author's persisted
+admission/context capsule, preserving the original requirements instead of
+asking a reviewer to infer intent from test counts or an acceptance ID alone.
+Changed issue text is a technical replan, not an implicit scope refresh.
+
+Dispatch uses the existing native independent-review wakeup API. A durable intent
+precedes its only possible POST. After a crash or lost response it only observes
+the same immutable marker. A maintenance-adjusted deadline bounds an unobserved
+dispatch; drift or an unconfirmed outcome produces a preserved technical hold
+for the configured CTO, not the CEO or an automatic re-post. The separate
+`QUALITY_REVIEW_ENABLED` adapter flag defaults absent/off and must remain off
+until the worker launch/attestation chain is implemented and qualified.
+
+Admission checks the exact native task, independent reviewer, wakeup ID, complete
+handoff note, workspace/runtime, sole reviewer execution and still-current author
+delivery. Grant digest, native binding, `test_review_v2` phase and hash-bound
+context commit atomically. Lost capability responses cannot mint a replacement.
+The global two-slot/per-agent one-slot rules also apply to review; a consumed
+capability without an observable lease cannot silently free capacity.
+
+The handler/ACP contract supports `test_review_v2` explicitly: empty editables,
+only registered `/delivery/` paths, explicit read pages of at most 100 lines,
+no terminal/patch/write/delegation/admin and no legacy suite capability or
+persistent session. Direct handlers and registry dispatch enforce the same fence.
+The isolated canary additionally tries raw chmod/write against a read-only mount.
+The actual Hermes registry, direct handlers and mount passed this synthetic Docker
+qualification, alongside the author seed/lock/write phases. All five helpers
+were retired with `--rm`; the tiny proof volumes and private receipts remain.
+This is handler/filesystem evidence only, not a native review verdict or
+frozen-test approval. No prompt/model request was sent.
+
+Assignment/dispatch/admission do not yet connect to a qualified v2 read-only
+worker launch or native verdict/read attestation. They have no worker endpoint
+and cannot approve tests, grant Green, merge or homologate. Installing these
+source files is not authority to turn on dispatch or bypass the legacy v2 fence.
 
 ### Actual Red observation, without a positive prerequisite
 
