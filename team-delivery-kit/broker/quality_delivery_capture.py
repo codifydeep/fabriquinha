@@ -96,6 +96,18 @@ def export_descriptor(b,request):
         image=image_id(b),volume_identity=state['volume_identity'])
 
 
+def candidate_packet(b,request):
+    """Local controller inputs, not an agent-selectable repository or plan."""
+    descriptor=export_descriptor(b,request)
+    context,state=load(b,request)
+    require(quality.digest(context)==descriptor['capture_context_sha256']
+        and quality.digest(state)==descriptor['capture_state_sha256'])
+    frozen,enrolled=admission.frozen(b,context['admission']['source_task'])
+    require(frozen==context['freeze'] and quality.digest(enrolled)==context['enrollment_sha256'])
+    return dict(descriptor=descriptor,plan=frozen['plan'],frozen_tests=frozen['frozen_tests'],
+        repository=enrolled['repository'])
+
+
 def copy_payload(b,context):
     frozen=context['freeze'];evidence=dict(operation='snapshot_after_implementation_v2',plan=frozen['plan'],
         base_manifest_sha256=context['base']['manifest_sha256'],reviewed_manifest_sha256=frozen['manifest_sha256'],

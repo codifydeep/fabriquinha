@@ -72,7 +72,8 @@ preserva checkout, índice e `main`, não faz push nem merge. O journal privado
 mantém a mesma identidade após reinício e observa a referência original quando
 a confirmação se perde. Seus testes usam repositórios Git reais descartáveis,
 inclusive interrupção antes da publicação e corrida com referência simbólica.
-Ainda falta ligá-lo ao despacho instalado e à captura Green persistente.
+A ponte local ao registro persistente está implementada em fonte, mas ainda
+falta qualificá-la com a origem nativa e ligá-la ao despacho instalado.
 Esse caminho exige clone local completo: repositórios parciais/promisor são
 recusados para não iniciar fetch ou autenticação de rede implicitamente.
 A captura persistente pós-implementação está implementada em fonte, ainda sem
@@ -93,6 +94,23 @@ uma cópia incompleta permanece como impedimento explícito. Esse componente
 passou em Docker real com entrada sintética, sem modelo nem aprovação nativa.
 O encadeamento automático exportação → candidato Git → Green ainda não está
 instalado ou qualificado; o teste isolado não substitui esse ensaio.
+A ponte local agora registra o candidato no controlador após verificar o
+repositório esperado, todos os objetos Git e a captura original novamente.
+Os journals da exportação e do candidato permitem retomar uma gravação de
+confirmação perdida sem novo helper, commit ou referência. Testes de integração
+usam Git real e autoridade de captura sintética; não há endpoint para o agente
+enviar provas, escolher repositório ou aprovar a própria entrega.
+Em fonte, esse registro libera um job Green fixo sobre o volume imutável:
+comando e suíte completa são definidos pelo controlador, com rede desligada e
+montagens somente leitura. Seu recibo deve existir no journal de validação e
+concordar com SHA, testes congelados e revisão independente. O coordenador
+observa o mesmo job após reinício e avança para `awaiting_sensitivity`, nunca
+para homologação. Esses novos encadeamentos ainda usam fixtures nativas nos
+testes; o ensaio instalado com modelo continua pendente.
+O job Green fixo também passou isoladamente em Docker real, na versão de
+Python da imagem, executando os dois testes da suíte sintética completa e
+preservando o snapshot. Essa qualificação não autentica Git ou revisão nativa;
+o helper foi retirado e nenhuma chamada ao modelo foi necessária.
 O coordenador v2 também está ligado ao watchdog em fonte, sob uma flag separada
 desligada por padrão. Ele encaminha Red → revisão dos testes → autor Green →
 captura por registros persistentes, com fila por observação mais antiga, limite
@@ -103,8 +121,8 @@ Seus testes usam identidades nativas sintéticas. Solicitações de revisão ain
 registram `test_revision_adapter_required`; falta o executor dessa correção e da
 recuperação técnica hierárquica, além dos gates posteriores. Não está habilitado
 no ambiente instalado e não qualifica autonomia completa.
-A ligação Git/Green à captura, o despacho automático e a execução nativa ainda
-precisam ser integrados e qualificados. Um pacote,
+A instalação do encadeamento Git/Green, seu despacho automático e sua execução
+nativa ainda precisam ser qualificados. Um pacote,
 uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.
 O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
 Docker: leitura registrada funciona; escrita, terminal e tentativa direta de
@@ -342,7 +360,9 @@ flowchart TB
     B --> E[Snapshots imutáveis e validação controlada]
     B -.->|Opt-in em fonte, desligado| V2[Coordenador v2: fila e handoffs duráveis]
     V2 -.->|Revisão e autor Green| MC
-    V2 -.->|Captura; ainda sem aprovação Git/Green| E
+    V2 -.->|Captura e job Green fixo; somente em fonte| E
+    E -.-> GX[Ponte local: exportação e candidato Git interno]
+    GX -.->|Registro persistente do SHA; sem push ou merge| V2
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]

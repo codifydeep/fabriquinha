@@ -202,6 +202,10 @@ class DeliveryCaptureTests(unittest.TestCase):
         validate(descriptor)
         self.assertEqual(descriptor['manifest_sha256'],receipt['manifest_sha256'])
         self.assertEqual(descriptor['volume_identity'],receipt['volume_identity'])
+        packet=capture.candidate_packet(self.b,self.request)
+        self.assertEqual(packet['descriptor'],descriptor)
+        self.assertEqual(packet['plan'],self.f.f.frozen['plan'])
+        self.assertEqual(packet['repository'],'codifydeep/descartavel2')
         self.volume['CreatedAt']='2026-10-22T06:00:00Z'
         with self.assertRaises(ValueError):capture.export_descriptor(self.b,self.request)
 

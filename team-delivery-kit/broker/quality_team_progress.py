@@ -12,21 +12,23 @@ try:
     from . import quality_progress as progress,quality_author_admission as author
     from . import quality_test_review as review,quality_review_attestation as attestation
     from . import quality_implementation_admission as implementation,quality_delivery_capture as delivery
+    from . import quality_candidate_binding as candidate,quality_green_capture as green
     from . import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 except ImportError:
     import quality_progress as progress,quality_author_admission as author
     import quality_test_review as review,quality_review_attestation as attestation
     import quality_implementation_admission as implementation,quality_delivery_capture as delivery
+    import quality_candidate_binding as candidate,quality_green_capture as green
     import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 
 quality=author.quality
 require=author.require
 IMAGES=('QUALITY_PREP_IMAGE','QUALITY_WORKER_IMAGE','QUALITY_COPY_IMAGE','QUALITY_RED_IMAGE',
     'QUALITY_REVIEW_WORKER_IMAGE','QUALITY_GREEN_JOB_IMAGE')
-TERMINAL={'technical_blocked','awaiting_git_binding'}
-STAGES=TERMINAL|{'waiting_author','waiting_red','review_ready','waiting_review_capacity','waiting_review_dispatch',
+TERMINAL={'technical_blocked','awaiting_sensitivity'}
+STAGES=TERMINAL|{'awaiting_git_binding','waiting_author','waiting_red','review_ready','waiting_review_capacity','waiting_review_dispatch',
     'awaiting_review_admission','waiting_test_review','tests_frozen','waiting_implementation_capacity',
-    'waiting_implementation_dispatch','awaiting_implementation_admission','waiting_delivery_capture'}
+    'waiting_implementation_dispatch','awaiting_implementation_admission','waiting_delivery_capture','waiting_green'}
 
 
 def initialize(con):
@@ -220,10 +222,18 @@ def advance(b,identity,phase):
     if state['stage']=='awaiting_implementation':return outcome('awaiting_implementation_admission',identity['author'],state)
     require(state['stage']=='admitted')
     phase['value']='delivery_capture'
-    result=delivery.observe(b,state['request_id']);require(delivery.load(b,state['request_id'])[1]==result)
+    captured=delivery.load(b,state['request_id'])
+    result=captured[1] if captured and captured[1]['stage'] in ('awaiting_git_binding','technical_blocked') else delivery.observe(b,state['request_id'])
+    require(delivery.load(b,state['request_id'])[1]==result)
     if result['stage']=='technical_blocked':return blocked(identity,result)
     require(result['stage']=='awaiting_git_binding' and result['green_approved'] is False)
-    return outcome('awaiting_git_binding',identity['techlead'],result)
+    if candidate.load(b,state['request_id']) is None:
+        return outcome('awaiting_git_binding',identity['techlead'],result)
+    phase['value']='green'
+    result=green.observe(b,state['request_id']);require(green.load(b,state['request_id'])[1]==result)
+    if result['stage']=='technical_blocked':return blocked(identity,result,category='green_observation_blocked')
+    require(result['stage']=='awaiting_sensitivity')
+    return outcome('awaiting_sensitivity',identity['techlead'],result)
 
 
 def save(b,source,identity,before,result):
@@ -270,8 +280,9 @@ def tick(b,*,limit=2):
             try:result=advance(b,identity,phase)
             except validation_job.Pending as pending:
                 stage={'review_dispatch':'waiting_review_dispatch','test_review':'waiting_test_review',
-                    'implementation_dispatch':'waiting_implementation_dispatch','delivery_capture':'waiting_delivery_capture'}.get(phase['value'],'waiting_red')
-                owner=identity['reviewer'] if 'review' in phase['value'] else identity['author']
+                    'implementation_dispatch':'waiting_implementation_dispatch','delivery_capture':'waiting_delivery_capture',
+                    'green':'waiting_green'}.get(phase['value'],'waiting_red')
+                owner=identity['techlead'] if phase['value']=='green' else identity['reviewer'] if 'review' in phase['value'] else identity['author']
                 result=outcome(stage,owner,getattr(pending,'progress',None))
             except (TimeoutError,OSError):
                 result=outcome(before['stage'],before['owner'])
