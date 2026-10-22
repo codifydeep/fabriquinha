@@ -36,7 +36,7 @@ def require(condition,category):
     if not condition:raise Rejected(category)
 
 
-def inputs(base,snapshot,plan,base_manifest,snapshot_manifest):
+def inputs(base,snapshot,plan,base_manifest,snapshot_manifest,*,frozen_tests=None):
     quality.validate(plan)
     require(not base.is_symlink() and base.is_dir(),'base_identity_invalid')
     probe(snapshot,snapshot_manifest)
@@ -56,14 +56,18 @@ def inputs(base,snapshot,plan,base_manifest,snapshot_manifest):
         'test_or_file_inventory_mismatch')
     require(expected['contract.json']==hashlib.sha256(_regular(base,'contract.json')).hexdigest(),
         'contract_mismatch')
+    if frozen_tests is not None:
+        require(set(plan['product_files'])==set(spec['editable_files'])-set(plan['new_tests']),
+            'product_partition_mismatch')
     for path,sha in expected.items():
         actual=hashlib.sha256(_regular(base,path)).hexdigest()
         require(actual==sha,'base_file_hash_mismatch')
-        if path!='contract.json':
+        if path!='contract.json' and not (frozen_tests is not None and path in plan['product_files']):
             require(frozen[path]['sha256']==sha and _regular(snapshot,path)==_regular(base,path),
                 'base_bytes_changed_before_red')
     tests={p:frozen[p]['sha256'] for p in spec['test_files']}
     require(all(tests[p]==h for p,h in plan['baseline_tests'].items()),'baseline_test_hash_mismatch')
+    if frozen_tests is not None:require(tests==frozen_tests,'frozen_test_hash_mismatch')
     inventory=set()
     for path in sorted(tests):
         raw=_regular(snapshot,path)
@@ -109,11 +113,20 @@ class Observations(Results):
         super().record(test,outcome,error)
 
 
-def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest):
+def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_context=None):
     if not isinstance(task_id,str) or str(uuid.UUID(task_id))!=task_id:
         raise ValueError('canonical controller-bound source task required')
     base,snapshot=Path(base),Path(snapshot)
-    spec,tests,inventory=inputs(base,snapshot,plan,base_manifest,snapshot_manifest)
+    frozen=None
+    if green_context is not None:
+        require(isinstance(green_context,dict) and set(green_context)=={'red','review','commit_sha'},
+            'invalid_green_context')
+        observed,decision=green_context['red'],green_context['review']
+        quality.red(plan,observed);quality.review(plan,observed,decision);quality.sha(green_context['commit_sha'],40)
+        require(task_id not in (observed['task_id'],decision['task_id'])
+            and snapshot_manifest!=observed['manifest_sha256'],'green_execution_identity_mismatch')
+        frozen=observed['tests']
+    spec,tests,inventory=inputs(base,snapshot,plan,base_manifest,snapshot_manifest,frozen_tests=frozen)
     root=snapshot.resolve();previous_path=list(sys.path);previous_cwd=os.getcwd()
     bytecode=sys.dont_write_bytecode;sys.dont_write_bytecode=True;output=OutputDigest()
     result=Observations(root);before_modules=set(sys.modules)
@@ -145,6 +158,18 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest):
             and not result.unexpectedSuccesses,'suite_import_or_infrastructure_failure')
         failures=[v for v in result.events if v['outcome']=='failure']
         require(result.testsRun==len(inventory),'incomplete_suite')
+        if green_context is not None:
+            require(not failures,'green_suite_failed')
+            evidence=dict(operation='observed_green_v2',run_id=plan['run_id'],issue_id=plan['issue_id'],
+                contract_sha256=plan['contract_sha256'],plan_sha256=quality.digest(plan),task_id=task_id,
+                manifest_sha256=snapshot_manifest,tests=tests,suite_complete=True,tests_run=result.testsRun,
+                skipped=0,errors=0,exit_code=0,failures=[],commit_sha=green_context['commit_sha'],
+                red_sha256=quality.digest(observed),test_review_sha256=quality.digest(decision))
+            quality.green(plan,observed,decision,evidence)
+            return dict(operation='full_suite_green_observation_v2',green=evidence,
+                base_manifest_sha256=base_manifest,captured_output_sha256=output.hash.hexdigest(),
+                captured_output_bytes=output.bytes,snapshot_unchanged=True,commit_binding_verified=False,
+                execution_authorized=False,delivery_approval=False)
         require(bool(failures),'suite_not_behavioral_red')
         require(all(v['path'] in plan['new_tests'] for v in failures),'baseline_regression')
         require(all(v['phase']=='test_body' and v['kind']=='assertion' and v['test_body_frame'] for v in failures),
@@ -168,7 +193,7 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest):
                 except ValueError:continue
                 del sys.modules[name]
         # Detect even accidental edits when used by a test outside read-only Docker.
-        inputs(base,snapshot,plan,base_manifest,snapshot_manifest)
+        inputs(base,snapshot,plan,base_manifest,snapshot_manifest,frozen_tests=frozen)
 
 
 def load_request():

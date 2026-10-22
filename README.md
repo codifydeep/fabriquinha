@@ -52,7 +52,14 @@ não repetem o acionamento nativo. O lançamento Green está ligado em fonte à
 admissão nativa, startup, sessão e handlers com edição somente de produto,
 reutilizando o journal de criação única. Seus testes de integração usam
 autoridade nativa/Docker sintética; a feature continua desligada no controlador
-instalado. A captura de evidências e a execução nativa ainda precisam ser
+instalado. O workspace Green passou pela prova técnica real em Docker: seed dos
+testes congelados, lockdown, escrita de produto e recusa de alterações dos testes
+por handlers, chmod, exclusão, renomeação e subprocesso. Os quatro helpers foram
+retirados; a primeira tentativa, com proprietário incorreto no snapshot sintético,
+continua registrada como falha. Isso não é implementação do agente nem Green.
+O observador da suíte Green está implementado em fonte e executa testes reais
+com hashes congelados, mas não atesta sozinho a origem nativa ou o commit Git.
+A captura persistente dessas evidências e a execução nativa ainda precisam ser
 integradas e qualificadas. Um pacote,
 uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.
 O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
