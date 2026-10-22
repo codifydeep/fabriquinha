@@ -122,6 +122,7 @@ def materialize(repo,snapshot,manifest_sha256,plan,frozen_tests,request,task,pri
     quality.validate(plan);quality.sha(manifest_sha256)
     repo,snapshot=Path(repo),Path(snapshot)
     require(repo.is_absolute() and repo.resolve()==repo and repo.is_dir())
+    binding.repository_policy(repo)
     context=dict(operation='local_quality_candidate_v2',repository=str(repo),base_sha=plan['base_sha'],
         manifest_sha256=manifest_sha256,plan_sha256=quality.digest(plan),frozen_sha256=quality.digest(frozen_tests),
         request_id=request,source_task=task,run_id=plan['run_id'],issue_id=plan['issue_id'],author=plan['author'],ref=ref_name(plan,task))

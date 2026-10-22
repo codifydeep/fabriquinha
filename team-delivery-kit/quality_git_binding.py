@@ -59,11 +59,25 @@ def contents(repo,item):
     return data
 
 
+def repository_policy(repo):
+    # A read from a partial clone must not silently start network/credential
+    # helpers to fetch missing objects. The controller prepares a complete
+    # local clone separately; this verifier/materializer never fetches.
+    raw=git(repo,'config','--local','--includes','--null','--list')
+    for setting in raw.split(b'\0'):
+        if not setting:continue
+        key,_,value=setting.partition(b'\n');key=key.lower()
+        require(key!=b'extensions.partialclone')
+        if key.startswith(b'remote.') and key.endswith(b'.promisor'):
+            require(value.strip().lower() in (b'false',b'no',b'off',b'0'))
+
+
 def inputs(repo,snapshot,manifest_sha256,plan,frozen_tests):
     """Preflight must succeed before a candidate producer writes Git objects."""
     quality.validate(plan);quality.sha(manifest_sha256)
     repo,snapshot=Path(repo),Path(snapshot)
     require(repo.is_absolute() and repo.is_dir() and repo.resolve()==repo)
+    repository_policy(repo)
     probe(snapshot,manifest_sha256)
     manifest=json.loads(_regular(snapshot,'manifest.json'))['files']
     require(set(manifest)==set(plan['product_files'])|set(plan['protected_files'])

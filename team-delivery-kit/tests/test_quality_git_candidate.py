@@ -97,5 +97,10 @@ class GitCandidateTests(unittest.TestCase):
         self.f.snapshot=self.f.snapshot.parent/'export-already-retired'
         self.assertEqual(self.call(),first)
 
+    def test_promisor_repository_is_rejected_before_any_object_write(self):
+        self.f.git('config','remote.origin.promisor','true')
+        with patch.object(candidate,'write_git') as write,self.assertRaises(ValueError):self.call()
+        write.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()

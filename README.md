@@ -73,6 +73,8 @@ mantém a mesma identidade após reinício e observa a referência original quan
 a confirmação se perde. Seus testes usam repositórios Git reais descartáveis,
 inclusive interrupção antes da publicação e corrida com referência simbólica.
 Ainda falta conectá-lo à exportação autenticada e à captura Green persistente.
+Esse caminho exige clone local completo: repositórios parciais/promisor são
+recusados para não iniciar fetch ou autenticação de rede implicitamente.
 A captura persistente pós-implementação está implementada em fonte, ainda sem
 despacho automático: exige admissão Green, identidade nativa, prompt ACP bem
 sucedido, lease fechado, inspeção do worker e workspace original. Se o worker
