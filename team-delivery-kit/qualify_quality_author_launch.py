@@ -28,6 +28,8 @@ SOURCES={
     'broker/quality_author_launch.py':'quality_author_launch.py','broker/quality_red_capture.py':'quality_red_capture.py',
     'broker/quality_red_snapshot.py':'quality_red_snapshot.py','broker/quality_progress.py':'quality_progress.py',
     'broker/quality_test_review.py':'quality_test_review.py',
+    'broker/quality_worker_runtime.py':'quality_worker_runtime.py',
+    'broker/quality_review_launch.py':'quality_review_launch.py','broker/quality_launch_router.py':'quality_launch_router.py',
     'broker/validation_job.py':'validation_job.py',
     'broker/test_first_job.py':'test_first_job.py','broker/worker_creation_intent.py':'worker_creation_intent.py',
     'broker/acp_startup.py':'acp_startup.py','broker/acp_transport.py':'acp_transport.py',
@@ -46,6 +48,19 @@ def validate_report(report):
     if (not isinstance(frames,list) or [f.get('method') for f in frames]!=['initialize','session/new']
             or any(f.get('status')!='passed' or not re.fullmatch('[a-f0-9]{64}',str(f.get('response_sha256'))) for f in frames)):
         raise ValueError('complete actual initialize/session-new receipts required')
+    if 'review_launch' in report:
+        review=report['review_launch']
+        if (not isinstance(review,dict) or review.get('status')!='passed'
+                or review.get('tests_approved') is not False or review.get('delivery_approval') is not False
+                or review.get('snapshot_mount')!='readonly' or review.get('source_task')!=report.get('task_id')
+                or review.get('task_id')==report.get('task_id') or review.get('request_id')==report.get('request_id')
+                or not re.fullmatch('[a-f0-9]{64}',str(review.get('manifest_sha256')))
+                or [f.get('method') for f in review.get('frames',[])]!=['initialize','session/new']
+                or any(f.get('status')!='passed' or not re.fullmatch('[a-f0-9]{64}',str(f.get('response_sha256')))
+                    for f in review.get('frames',[]))):
+            raise ValueError('actual readonly review launch required, never test approval')
+        for key in ('task_id','request_id'):
+            if str(uuid.UUID(review[key]))!=review[key]:raise ValueError('exact review execution identity required')
 
 
 def input_config(archive,metadata):
@@ -59,10 +74,17 @@ def input_config(archive,metadata):
         baseline_tests={'tests/test_old.py':base['files']['tests/test_old.py']},new_tests=['tests/test_new.py'],
         product_files=['app.py'],protected_files=['AGENTS.md','tests/test_old.py','tests/test_new.py'],
         criterion_tests={'A01':[dict(path='tests/test_new.py',method='test_new')]})
-    return dict(namespace=namespace,owner=metadata['owner'],operation=operation,task_id=ids['task'],plan=plan,contract=spec,
+    result=dict(namespace=namespace,owner=metadata['owner'],operation=operation,task_id=ids['task'],plan=plan,contract=spec,
         settings=dict(workspace_id=ids['workspace'],runtime_id=ids['runtime'],agents={ids['author']:'implementation',ids['reviewer']:'review'}),
         base=dict(issue_id=ids['issue'],base_sha=base['base_sha'],volume=metadata['base_volume'],manifest_sha256=hashlib.sha256(manifest).hexdigest()),
         **metadata['images'])
+    if metadata.get('review_chain'):
+        actors={key:str(uuid.uuid5(uuid.UUID(operation),key)) for key in ('techlead','cto','review_task','review_wakeup')}
+        result.update(review_chain=True,review_task=actors['review_task'],review_wakeup=actors['review_wakeup'],
+            QUALITY_REVIEW_WORKER_IMAGE=metadata['images']['QUALITY_WORKER_IMAGE'],
+            QUALITY_TECHLEAD=actors['techlead'],QUALITY_CTO=actors['cto'])
+        result['settings']['agents'].update({actors['techlead']:'planning',actors['cto']:'planning'})
+    return result
 
 
 def execute_probe(archive,controller,remote,config,maintenance):
@@ -198,9 +220,18 @@ def finish_retirement(namespace,operation):
     with sqlite3.connect('file:'+str(archive/'state/leases.sqlite')+'?mode=ro',uri=True) as con:
         if con.execute('PRAGMA quick_check').fetchone()[0]!='ok':raise ValueError('private state archive corrupt')
         events=con.execute('SELECT method,success FROM acp_events ORDER BY rowid').fetchall()
-        if events!=[('initialize',1),('session/new',1)]:raise ValueError('actual ACP events missing or a prompt was sent')
+        expected=[('initialize',1),('session/new',1)]*(2 if 'review_launch' in report else 1)
+        if events!=expected:raise ValueError('actual ACP events missing or a prompt was sent')
         bindings=con.execute('SELECT request_id,task_id FROM quality_author_admissions').fetchall()
         if bindings!=[(report['request_id'],report['task_id'])]:raise ValueError('admission report identity drift')
+        if 'review_launch' in report:
+            reviewed=report['review_launch']
+            rows=con.execute('SELECT request_id,task_id FROM quality_review_admissions').fetchall()
+            if rows!=[(reviewed['request_id'],reviewed['task_id'])]:raise ValueError('review admission identity drift')
+            state=json.loads(con.execute('SELECT state FROM quality_test_reviews WHERE source_task=?',(report['task_id'],)).fetchone()[0])
+            if state['stage']!='admitted' or state['tests_approved'] is not False:raise ValueError('review launch must not approve tests')
+            for row in con.execute('SELECT state FROM test_first_jobs'):
+                if json.loads(row[0])['stage']!='complete':raise ValueError('fixed copy job unsettled')
         if any(json.loads(row[0])['stage']!='complete' for row in con.execute('SELECT state FROM validation_jobs')):
             raise ValueError('fixed jobs unsettled; observe original execution')
         if any(json.loads(row[0])['stage'] not in ('start_acknowledged','start_running_observed')
@@ -216,7 +247,7 @@ def finish_retirement(namespace,operation):
     save(archive/'result.json',result);return result
 
 
-def qualify(namespace,prep_tag,worker_tag,copy_tag,observer_tag):
+def qualify(namespace,prep_tag,worker_tag,copy_tag,observer_tag,*,review_chain=False):
     maintenance,idle=require_idle(namespace)
     controller=namespace+'-execution-broker-1'
     proxy=subprocess.run(['docker','inspect',namespace+'-model-proxy-1','--format','{{.State.Running}}'],capture_output=True,text=True)
@@ -234,7 +265,7 @@ def qualify(namespace,prep_tag,worker_tag,copy_tag,observer_tag):
     base_volume=namespace+'-base-'+ids['issue']
     save(archive/'operation.json',dict(operation=operation,owner=owner,namespace=namespace,controller=controller,
         maintenance=maintenance,idle=idle,base_volume=base_volume,images={k:v['Id'] for k,v in images.items()},
-        native_api='synthetic_fixture',model_calls=0,prompts_sent=0,delivery_approval=False))
+        native_api='synthetic_fixture',review_chain=review_chain,model_calls=0,prompts_sent=0,delivery_approval=False))
     sys.path.insert(0,str(ROOT/'tests'))
     from test_quality_red_observation import QualityRedObservationTests
     fixture=QualityRedObservationTests();fixture.setUp()
@@ -283,10 +314,11 @@ if __name__=='__main__':
     for key in ('prep','worker','copy','observer'):p.add_argument('--'+key+'-image')
     p.add_argument('--resume-before-execution')
     p.add_argument('--finish-retirement')
+    p.add_argument('--review-chain',action='store_true',help='Synthetic author/Red/review launch, no model or test approval')
     a=p.parse_args()
     if a.finish_retirement:result=finish_retirement(a.namespace,a.finish_retirement)
     elif a.resume_before_execution:result=resume_before_execution(a.namespace,a.resume_before_execution)
     elif all((a.prep_image,a.worker_image,a.copy_image,a.observer_image)):
-        result=qualify(a.namespace,a.prep_image,a.worker_image,a.copy_image,a.observer_image)
+        result=qualify(a.namespace,a.prep_image,a.worker_image,a.copy_image,a.observer_image,review_chain=a.review_chain)
     else:p.error('four fixed images or --resume-before-execution required')
     print(json.dumps(result,sort_keys=True))

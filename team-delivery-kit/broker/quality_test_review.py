@@ -186,6 +186,13 @@ def admission(con, request):
         ('task_id','agent_id','scope','issue_id','mode','attempt','run_id','phase','plan_sha256')))
     require(con.execute('SELECT max(attempt) FROM grants WHERE task_id=?',
         (context['task_id'],)).fetchone()[0] == 1)
+    assignment = con.execute('SELECT context,state,context_sha256,state_sha256 FROM quality_test_reviews '
+        'WHERE source_task=?', (context['source_task'],)).fetchone()
+    require(assignment is not None)
+    registered, state = json.loads(assignment[0]), json.loads(assignment[1])
+    require(quality.digest(registered) == assignment[2] == context['assignment_sha256']
+        and quality.digest(state) == assignment[3] and state['stage'] == 'admitted'
+        and state['request_id'] == request and state['review_task'] == context['task_id'])
     return context
 
 

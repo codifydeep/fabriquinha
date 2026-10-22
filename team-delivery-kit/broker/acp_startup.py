@@ -61,8 +61,8 @@ def authority(b,token):
         row=dict(row);binding=dict(binding)
     try:import native
     except ImportError:from broker import native
-    try:import quality_author_launch as v2_launch
-    except ImportError:from broker import quality_author_launch as v2_launch
+    try:import quality_launch_router as v2_launch
+    except ImportError:from broker import quality_launch_router as v2_launch
     current=(v2_launch.current(b,row['request_id']) if v2_launch.owns(b,row['request_id']) else
         native.task_binding(json.loads((Path(b.STATE)/'native.json').read_text()),binding['task_id'],binding['agent_id']))
     if (current['scope']!=binding['scope'] or binding['task_id']!=row['task_id']

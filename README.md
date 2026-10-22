@@ -32,9 +32,13 @@ ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
 bloqueio de falhas repetidas. Continua desabilitada no controlador instalado.
 A atribuição, o encaminhamento nativo único e a admissão da revisão independente
 estão implementados em fonte, em modo separado e desabilitado: leitura paginada
-do snapshot, sem permissões de implementação. O lançamento do revisor, a
-atestação nativa da leitura/veredito, Green, instalação e qualificação integral
-seguem pendentes; um pacote ou uma admissão não aprova os testes.
+do snapshot, sem permissões de implementação. O lançamento do revisor está ligado
+em fonte à admissão, startup e sessão ACP, com snapshot somente leitura e sem
+acesso ao workspace do autor. O encadeamento técnico autor/handlers → snapshot →
+Red real → abertura do revisor passou em Docker/ACP, usando identidades nativas
+sintéticas e sem modelo; seis contêineres foram retirados. A atestação nativa da
+leitura/veredito, Green, instalação e qualificação integral seguem pendentes;
+um pacote, uma admissão ou sessão aberta não aprova os testes.
 O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
 Docker: leitura registrada funciona; escrita, terminal e tentativa direta de
 chmod/escrita no volume somente leitura são recusados, sem chamadas ao modelo.

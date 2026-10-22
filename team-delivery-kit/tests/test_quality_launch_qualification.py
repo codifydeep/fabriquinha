@@ -70,4 +70,20 @@ class LaunchQualificationTests(unittest.TestCase):
             with self.subTest(key=key),self.assertRaises(ValueError):qualification.validate_report(bad)
 
 
+    def test_readonly_review_qualification_is_not_a_test_approval(self):
+        source='80000000-0000-4000-8000-000000000001'
+        frames=[dict(method=m,status='passed',response_sha256='c'*64) for m in ('initialize','session/new')]
+        report=dict(status='passed',docker='real',acp='real',native_api='synthetic_fixture',delivery_approval=False,
+            model_calls=0,prompts_sent=0,frames=frames,task_id=source,
+            request_id='80000000-0000-4000-8000-000000000002',
+            review_launch=dict(status='passed',source_task=source,snapshot_mount='readonly',manifest_sha256='d'*64,
+                task_id='80000000-0000-4000-8000-000000000003',
+                request_id='80000000-0000-4000-8000-000000000004',frames=frames,
+                tests_approved=False,delivery_approval=False))
+        qualification.validate_report(report)
+        for key,value in [('snapshot_mount','readwrite'),('tests_approved',True),('frames',[]),('task_id',source)]:
+            bad=copy.deepcopy(report);bad['review_launch'][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):qualification.validate_report(bad)
+
+
 if __name__=='__main__':unittest.main()

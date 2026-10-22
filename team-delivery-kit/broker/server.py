@@ -53,6 +53,11 @@ QUALITY_COPY_IMAGE = os.environ.get('BROKER_QUALITY_COPY_IMAGE')
 QUALITY_RED_IMAGE = os.environ.get('BROKER_QUALITY_RED_IMAGE')
 QUALITY_TECHLEAD = os.environ.get('BROKER_QUALITY_TECHLEAD')
 # END QUALITY_V2 launch_config
+# BEGIN QUALITY_V2_REVIEW config
+QUALITY_REVIEW_ENABLED = os.environ.get('BROKER_QUALITY_REVIEW_ENABLED', '0') == '1'
+QUALITY_REVIEW_WORKER_IMAGE = os.environ.get('BROKER_QUALITY_REVIEW_WORKER_IMAGE')
+QUALITY_CTO = os.environ.get('BROKER_QUALITY_CTO')
+# END QUALITY_V2_REVIEW config
 
 
 class RequiredTestMissing(ValueError):
@@ -746,6 +751,13 @@ def native_grant(payload):
     binding = task_binding(settings, **payload)
     if not binding['issue_id']:
         raise ValueError('native task missing issue identity')
+    # BEGIN QUALITY_V2_REVIEW native_admission
+    if QUALITY_V2_ENABLED and QUALITY_REVIEW_ENABLED and binding['mode']=='review':
+        try:import quality_launch_router as v2_review
+        except ImportError:from broker import quality_launch_router as v2_review
+        with db() as con:review_issue=v2_review.admission.enrollment.lookup(con,binding['issue_id'])
+        if review_issue is not None:return v2_review.admit(handoff_context(),payload['task_id'],payload['agent_id'])
+    # END QUALITY_V2_REVIEW native_admission
     # BEGIN QUALITY_V2 native_admission
     if QUALITY_V2_ENABLED:
         try:import quality_author_admission as v2_admission
@@ -1651,6 +1663,14 @@ def change_request_reason(content):
 
 
 def execute_grant(token, payload, streaming=False, defer_transport=False):
+    # BEGIN QUALITY_V2_REVIEW execute_dispatch
+    try:import quality_review_launch as v2_review
+    except ImportError:from broker import quality_review_launch as v2_review
+    with db() as con:
+        review_row=con.execute('SELECT request_id FROM grants WHERE digest=?',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+    if review_row and v2_review.owns(handoff_context(),review_row[0]):
+        return v2_review.execute(handoff_context(),token,payload,streaming,defer_transport)
+    # END QUALITY_V2_REVIEW execute_dispatch
     # BEGIN QUALITY_V2 execute_dispatch
     try:import quality_author_launch as v2_launch
     except ImportError:from broker import quality_author_launch as v2_launch
@@ -1699,6 +1719,12 @@ def execute_grant(token, payload, streaming=False, defer_transport=False):
 
 def open_granted_transport(row,result,scope):
     """Open only after startup authorization; callers own the single-use intent."""
+    # BEGIN QUALITY_V2_REVIEW transport_dispatch
+    try:import quality_review_launch as v2_review
+    except ImportError:from broker import quality_review_launch as v2_review
+    if v2_review.owns(handoff_context(),row['request_id']):
+        return v2_review.open_transport(handoff_context(),row,result,scope)
+    # END QUALITY_V2_REVIEW transport_dispatch
     # BEGIN QUALITY_V2 transport_dispatch
     try:import quality_author_launch as v2_launch
     except ImportError:from broker import quality_author_launch as v2_launch
@@ -1777,6 +1803,14 @@ def open_granted_transport(row,result,scope):
 
 
 def assert_review_task_running(row):
+    # BEGIN QUALITY_V2_REVIEW running_identity
+    try:import quality_review_launch as v2_review
+    except ImportError:from broker import quality_review_launch as v2_review
+    if v2_review.owns(handoff_context(),dict(row).get('request_id')):
+        current=v2_review.current(handoff_context(),row['request_id'])
+        if any(current[k]!=row[k] for k in ('task_id','agent_id','scope')):raise ValueError('native v2 review scope drift')
+        return
+    # END QUALITY_V2_REVIEW running_identity
     # BEGIN QUALITY_V2 running_identity
     try:import quality_author_launch as v2_launch
     except ImportError:from broker import quality_author_launch as v2_launch
@@ -1815,6 +1849,12 @@ def session_operation(token, payload, close=False, on_notification=None):
             if v2_launch.owns(handoff_context(),binding['request_id']):
                 current = v2_launch.current(handoff_context(),binding['request_id'])
             # END QUALITY_V2 session_identity
+            # BEGIN QUALITY_V2_REVIEW session_identity
+            try:import quality_review_launch as v2_review
+            except ImportError:from broker import quality_review_launch as v2_review
+            if v2_review.owns(handoff_context(),binding['request_id']):
+                current = v2_review.current(handoff_context(),binding['request_id'])
+            # END QUALITY_V2_REVIEW session_identity
             if current['scope'] != binding['scope']:
                 raise ValueError('native scope changed')
         session = SESSIONS.get(grant['request_id'])
@@ -2039,6 +2079,12 @@ def native_task_prompt(frame, mode, issue, task, correction=None):
         raise ValueError('invalid native mode')
     if frame.get('method') != 'session/prompt':
         raise ValueError('prompt frame required')
+    # BEGIN QUALITY_V2_REVIEW prompt_dispatch
+    if task.get('quality_request_id') and mode=='review':
+        try:import quality_review_launch as v2_review
+        except ImportError:from broker import quality_review_launch as v2_review
+        return v2_review.prompt(handoff_context(),frame,issue,task,correction)
+    # END QUALITY_V2_REVIEW prompt_dispatch
     # BEGIN QUALITY_V2 prompt_dispatch
     if task.get('quality_request_id'):
         if mode!='implementation':raise ValueError('v2 tests-only mode required')

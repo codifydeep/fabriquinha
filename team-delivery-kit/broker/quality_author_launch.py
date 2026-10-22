@@ -7,14 +7,14 @@ acknowledgments through the existing creation journal, without another attempt.
 import hashlib
 import json
 import re
-import time
+import sys
 from docker_grouping import grouped_create
 try:
     from . import quality_author_admission as admission,quality_author_worker as workspace
-    from . import controller_maintenance as maintenance,native,worker_creation_intent as intents
+    from . import native
 except ImportError:
     import quality_author_admission as admission,quality_author_worker as workspace
-    import controller_maintenance as maintenance,native,worker_creation_intent as intents
+    import native
 
 require=admission.require
 
@@ -84,85 +84,30 @@ def payload(b,request):
     return grouped_create('POST','/containers/create?name='+b.PREFIX+'-job-'+request,result,b.PREFIX)
 
 
-def execute(b,token,args,streaming,defer_transport):
-    enabled(b);require(args=={} and streaming is True and defer_transport is True)
-    with b.db() as con:
-        row=con.execute('SELECT * FROM grants WHERE digest=?',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
-        require(row is not None and row['used']==0 and row['deadline']>time.time());row=dict(row)
-    request=row['request_id'];require(owns(b,request));current(b,request)
+load_admission=admission.load
+
+
+def prepare_worker(b,request):
     prepared=workspace.prepare(b,request)
     require(prepared['stage']=='workspace_locked')
-    expected=payload(b,request)
-    current(b,request)  # Recheck after slow preparation and image/volume reads.
-    name=b.PREFIX+'-job-'+request
-    with b.LOCK,b.db() as con:
-        maintenance.require_admission(con)
-        stored=con.execute('SELECT * FROM grants WHERE request_id=?',(request,)).fetchone()
-        require(stored is not None and dict(stored)==row and stored['used']==0 and stored['deadline']>time.time())
-        admission.load(con,request)
-        require(not con.execute('SELECT 1 FROM leases WHERE request_id=?',(request,)).fetchone())
-        require(con.execute("SELECT count(*) FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()[0]<2)
-        con.execute('UPDATE grants SET used=1 WHERE request_id=?',(request,))
-        con.execute('INSERT INTO leases VALUES(?,?,?,?,?)',(request,'acp-session',name,'creating',time.time()+420))
-        intents.record(con,request,expected)
-    # Only one POST create. A lost acknowledgment leaves used=1 + exact intent;
-    # ACP startup's existing observer can finish that same creation/start.
-    try:b.docker('POST','/containers/create?name='+name,expected)
-    except TimeoutError:
-        with b.db() as con:intents.uncertain(con,request)
-        raise
-    except Exception:
-        with b.db() as con:con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(request,))
-        raise
-    with b.db() as con:intents.start_intent(con,request)
-    try:b.docker('POST','/containers/'+name+'/start')
-    except TimeoutError:
-        with b.db() as con:intents.start_uncertain(con,request)
-        raise
-    except Exception:
-        with b.db() as con:con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(request,))
-        raise
-    with b.db() as con:
-        intents.started(con,request)
-        return dict(con.execute('SELECT * FROM leases WHERE request_id=?',(request,)).fetchone())
+
+
+def transport_spec(b,request):
+    selected=admission.selection(b,request)
+    return dict(mode='implementation',editable_paths=selected['editable_paths'],test_commands=[],
+        quality_phase_config=admission.tool_config(b,request))
+
+
+def execute(b,token,args,streaming,defer_transport):
+    try:from . import quality_worker_runtime as runtime
+    except ImportError:import quality_worker_runtime as runtime
+    return runtime.execute(b,token,args,streaming,defer_transport,sys.modules[__name__])
 
 
 def open_transport(b,row,result,scope):
-    enabled(b);request=row['request_id'];binding=current(b,request);require(scope==binding['scope'])
-    selected=admission.selection(b,request);expected=payload(b,request)
-    info=b.docker('GET','/containers/'+result['name']+'/json')
-    require(info is not None and not intents.policy_differences(expected,info)
-        and info.get('State',{}).get('Status')=='running')
-    with b.LOCK,b.db() as con:
-        row=con.execute('SELECT * FROM grants WHERE request_id=?',(request,)).fetchone()
-        startup=con.execute('SELECT state FROM acp_startups WHERE request_id=?',(request,)).fetchone()
-        lease=con.execute('SELECT * FROM leases WHERE request_id=?',(request,)).fetchone()
-        original=con.execute('SELECT payload FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
-        observations=con.execute('SELECT receipt_sha256,receipt FROM worker_policy_observations WHERE request_id=?',(request,)).fetchall()
-        require(row is not None and row['used']==1 and row['deadline']>time.time()
-            and startup is not None and json.loads(startup[0])['stage']=='transport_intent'
-            and lease is not None and lease['status']=='running' and lease['deadline']>time.time()
-            and lease['name']==result['name'] and original is not None and json.loads(original[0])==expected)
-        proofs=[json.loads(raw) for sha,raw in observations if hashlib.sha256(raw.encode()).hexdigest()==sha]
-        require(any(p.get('container_id')==info['Id'] and p.get('worker_image')==expected['Image']
-            and p.get('payload_sha256')==hashlib.sha256(json.dumps(expected,sort_keys=True).encode()).hexdigest()
-            and p.get('docker_status')=='running' and p.get('normalized_differences')==[] for p in proofs))
-        con.execute('CREATE TABLE IF NOT EXISTS quality_transport_intents(request_id TEXT PRIMARY KEY,state TEXT)')
-        require(not con.execute('SELECT 1 FROM quality_transport_intents WHERE request_id=?',(request,)).fetchone())
-        con.execute('INSERT INTO quality_transport_intents VALUES(?,?)',(request,'opening'))
-    try:
-        try:from acp_transport import Transport
-        except ImportError:from broker.acp_transport import Transport
-        session=Transport(b.docker,result['name'],persistent=False,mode='implementation',
-            editable_paths=selected['editable_paths'],test_commands=[],quality_phase_config=admission.tool_config(b,request))
-    except Exception:
-        with b.db() as con:
-            con.execute("UPDATE quality_transport_intents SET state='outcome_unknown' WHERE request_id=?",(request,))
-            con.execute("UPDATE leases SET status='closing' WHERE request_id=?",(request,))
-        raise
-    b.SESSIONS[request]=session
-    with b.db() as con:con.execute("UPDATE quality_transport_intents SET state='opened' WHERE request_id=?",(request,))
-    return result
+    try:from . import quality_worker_runtime as runtime
+    except ImportError:import quality_worker_runtime as runtime
+    return runtime.open_transport(b,row,result,scope,sys.modules[__name__])
 
 
 def prompt(b,frame,issue,task,correction):
