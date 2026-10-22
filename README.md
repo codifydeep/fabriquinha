@@ -66,6 +66,13 @@ O verificador Git passou em repositórios locais reais: confere parent, escopo,
 modos e blobs de todos os arquivos contra o snapshot e os testes congelados,
 sem alterar o checkout, publicar branches ou aprovar merge. Ainda é um componente
 separado, não uma captura nativa completa.
+O produtor do primeiro candidato Git local está implementado em fonte. Ele usa
+índice temporário, objetos determinísticos e referência interna por execução;
+preserva checkout, índice e `main`, não faz push nem merge. O journal privado
+mantém a mesma identidade após reinício e observa a referência original quando
+a confirmação se perde. Seus testes usam repositórios Git reais descartáveis,
+inclusive interrupção antes da publicação e corrida com referência simbólica.
+Ainda falta conectá-lo à exportação autenticada e à captura Green persistente.
 A captura persistente pós-implementação está implementada em fonte, ainda sem
 despacho automático: exige admissão Green, identidade nativa, prompt ACP bem
 sucedido, lease fechado, inspeção do worker e workspace original. Se o worker
@@ -1201,7 +1208,9 @@ flowchart TD
     CG -->|Sim| G[TDD: Red real registrado]
     G --> TR[Revisão independente e congelamento dos testes]
     TR -->|Solicita mudanças nos testes novos| F
-    TR -->|Aprova os testes exatos| GG[Implementação Green e suíte completa congelada]
+    TR -->|Aprova os testes exatos| IMPL[Implementação limitada aos arquivos do produto]
+    IMPL --> CAND[Snapshot pós-implementação e candidato Git local]
+    CAND --> GG[Green: suíte completa congelada do mesmo SHA]
     GG --> NG[Controles negativos obrigatórios no mesmo commit]
     GG -->|Suíte congelada falha| AD[Tech Lead e CTO: diagnóstico da entrega imutável]
     NG -->|Defeito não detectado| AD
@@ -1219,7 +1228,7 @@ flowchart TD
     EF -->|Defeito de produto comprovado| F
     EF -->|Evidência insuficiente| RB
     DP --> QE[Qualificar executor limitado; sem retry ou aprovação implícitos]
-    NG -->|Passa| H[Snapshot durável da entrega]
+    NG -->|Passa| H[Entrega verificada vinculada ao SHA]
     H --> I[Revisor independente: leitura e validações permitidas]
     I -->|Erro ACP sem parecer; leituras integrais| RO[Uma observação de transporte: mesma entrega somente leitura]
     RO -->|Nova execução com diagnóstico durável| I

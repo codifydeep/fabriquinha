@@ -25,12 +25,16 @@ def require(value):
     if not value:raise ValueError('exact immutable snapshot and Git object binding required')
 
 
+def environment():
+    return dict(PATH=os.defpath,LC_ALL='C',GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL='/dev/null',
+        GIT_NO_REPLACE_OBJECTS='1',GIT_OPTIONAL_LOCKS='0',GIT_TERMINAL_PROMPT='0')
+
+
 def git(repo,*args,limit=65536):
     binary=shutil.which('git');require(binary is not None)
     result=subprocess.run([binary,'--no-pager','--no-replace-objects','--literal-pathspecs',
         '-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','-C',str(repo),*args],
-        env=dict(PATH=os.defpath,LC_ALL='C',GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL='/dev/null',
-            GIT_NO_REPLACE_OBJECTS='1',GIT_OPTIONAL_LOCKS='0',GIT_TERMINAL_PROMPT='0'),
+        env=environment(),
         capture_output=True,timeout=15)
     require(result.returncode==0 and len(result.stdout)<=limit)
     return result.stdout
@@ -55,8 +59,9 @@ def contents(repo,item):
     return data
 
 
-def verify(repo,snapshot,manifest_sha256,plan,commit_sha,frozen_tests):
-    quality.validate(plan);quality.sha(commit_sha,40);quality.sha(manifest_sha256)
+def inputs(repo,snapshot,manifest_sha256,plan,frozen_tests):
+    """Preflight must succeed before a candidate producer writes Git objects."""
+    quality.validate(plan);quality.sha(manifest_sha256)
     repo,snapshot=Path(repo),Path(snapshot)
     require(repo.is_absolute() and repo.is_dir() and repo.resolve()==repo)
     probe(snapshot,manifest_sha256)
@@ -67,6 +72,25 @@ def verify(repo,snapshot,manifest_sha256,plan,commit_sha,frozen_tests):
         and all(manifest[p]['sha256']==sha for p,sha in frozen_tests.items()))
     require(git(repo,'rev-parse','--show-object-format').strip()==b'sha1')
     base=plan['base_sha'];require(git(repo,'cat-file','-t',base).strip()==b'commit')
+    changed_product=False
+    for path in sorted(manifest):
+        original=entry(repo,base,path)
+        if path in plan['new_tests']:require(original is None)
+        elif path in plan['protected_files']:
+            require(original is not None and contents(repo,original)==_regular(snapshot,path))
+        if path in plan['baseline_tests']:
+            require(original is not None and hashlib.sha256(contents(repo,original)).hexdigest()==plan['baseline_tests'][path])
+        if path in plan['product_files']:
+            changed_product |= original is None or contents(repo,original)!=_regular(snapshot,path)
+    require(changed_product)
+    return manifest
+
+
+def verify(repo,snapshot,manifest_sha256,plan,commit_sha,frozen_tests):
+    quality.sha(commit_sha,40)
+    repo,snapshot=Path(repo),Path(snapshot)
+    manifest=inputs(repo,snapshot,manifest_sha256,plan,frozen_tests)
+    base=plan['base_sha']
     raw=git(repo,'cat-file','commit',commit_sha)
     require(hashlib.sha1(b'commit '+str(len(raw)).encode()+b'\0'+raw).hexdigest()==commit_sha)
     headers=raw.split(b'\n\n',1)[0].splitlines()
