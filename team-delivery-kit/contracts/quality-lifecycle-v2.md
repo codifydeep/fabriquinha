@@ -183,6 +183,31 @@ and neither a pause nor a restart resets attempts or grants an approval.
 
 ### Immutable enrollment and legacy fences
 
+`broker/quality_author_admission.py` implements the source-only first-author
+admission adapter. It authenticates a running native task belonging to the
+enrolled author, workspace/runtime, sole first issue execution and frozen base.
+Maintenance and capacity are checked in the transaction that atomically records
+the capability digest, native binding, `tests_only_v2` phase and hash-bound
+admission context. There are at most two active/reserved slots and one per author;
+a consumed capability without an observable lease does not silently free a slot.
+The workspace scope includes this exact task, not a previous issue session.
+
+Its worker selection permits only declared new-test files, no baseline/product
+edits, test commands, generic terminal or legacy positive calibration. Tests feed
+this selection into the actual ACP permission handler and verify its denial of
+product/baseline edits and shell execution. This does not prove installed handler
+or filesystem isolation: worker-image selection, workspace seeding/lockdown,
+launch-time reauthentication and transport integration still must be wired and
+qualified together. The installed legacy launch fence is unchanged.
+
+No retry is minted for a duplicate call or a lost capability response. Only the
+capability digest is stored; metadata readback is not a new secret or launch.
+Any interrupted admission remains inspectable by request/task/run and requires
+evidence-based recovery, not another identical attempt. Transaction failure rolls
+back every authority row. These tests use synthetic native fixtures, not a live
+agent run. No admission module is exposed as a worker endpoint or enabled merely
+because its unit tests pass.
+
 `broker/quality_lifecycle_enrollment.py` binds a new run and previously unexecuted
 native issue to the complete portable contract, repository, registered base SHA,
 base-volume manifest, native workspace/runtime and independent author/reviewer.
