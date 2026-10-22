@@ -1,6 +1,7 @@
 """Remove only retired owned image tags; preserve external projects and inputs."""
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,17 @@ def owned(repository):
 
 
 def protected_tag(tag):return tag.split(':')[0].rsplit('/',1)[-1].startswith('toso-')
+
+
+def version(tag):
+    # Docker list order and image creation time do not establish tag age. Build
+    # cache/aliases can make a newly qualified tag appear older than its peers.
+    if not isinstance(tag,str) or not re.fullmatch(r'v?\d+(?:[._-]\d+)*',tag):return None
+    return tuple(int(p) for p in re.split(r'[._-]',tag.removeprefix('v')))
+
+
+def plan_digest(plan):
+    return hashlib.sha256(json.dumps(plan,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
 def containers():
@@ -44,21 +56,32 @@ def select(rows,used,refs):
     for row in rows:
         key=row['ID'];tag=row['Repository']+':'+row['Tag']
         groups.setdefault(key,[]).append(row)
-        repositories.setdefault(row['Repository'],[]).append(key)
-    # Preserve two newest immutable versions per owned family for rollback.
-    recent={i for repo,ids in repositories.items() if owned(repo) for i in list(dict.fromkeys(ids))[:2]}
+        repositories.setdefault(row['Repository'],[]).append(row)
+    recent=set()
+    for repo,family in repositories.items():
+        if not owned(repo):continue
+        ranks={}
+        for row in family:
+            rank=version(row['Tag'])
+            if rank is None:
+                recent.add(row['ID'])  # Opaque hashes/aliases have no proved age.
+            else:ranks[row['ID']]=max(ranks.get(row['ID'],rank),rank)
+        threshold=sorted(ranks.values(),reverse=True)[min(1,len(ranks)-1)] if ranks else None
+        recent.update(i for i,rank in ranks.items() if rank>=threshold)
     selected=[]
-    for key,aliases in groups.items():
+    for key,aliases in sorted(groups.items()):
         if key in used or key in refs or key in recent:continue
         if any(not owned(r['Repository']) or r['Tag']=='<none>' for r in aliases):continue
-        tags=[r['Repository']+':'+r['Tag'] for r in aliases]
+        tags=sorted(r['Repository']+':'+r['Tag'] for r in aliases)
         if any(protected_tag(t) or t in refs for t in tags):continue
         selected.append({'id':key,'tags':tags})
     return selected
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--apply',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--apply',action='store_true')
+    parser.add_argument('--expect-plan',help='Exact plan_sha256 from the reviewed preview; required to apply')
+    args=parser.parse_args()
     rows=[json.loads(line) for line in docker('image','ls','--no-trunc','--format','{{json .}}').stdout.splitlines()]
     before=containers();used={c['Image'] for c in before};refs=references()
     # Resolve Docker content/config digests independently of local image IDs.
@@ -68,9 +91,11 @@ def main():
         aliases=set(image.get('RepoTags') or [])|set(image.get('RepoDigests') or [])
         if aliases&refs or image['Id'] in refs:used.add(image['Id'])
     selected=select(rows,used,refs)
-    print(json.dumps({'image_ids':len(selected),'tags':sum(len(s['tags']) for s in selected),
+    selected_digest=plan_digest(selected)
+    print(json.dumps({'image_ids':len(selected),'tags':sum(len(s['tags']) for s in selected),'plan_sha256':selected_digest,
         'toso_preserved':True,'dangling_and_external_preserved':True,'first_tags':[s['tags'][0] for s in selected[:8]]}),flush=True)
     if not args.apply:return
+    if args.expect_plan!=selected_digest:raise ValueError('reviewed preview hash required; plan changed or not approved, nothing removed')
     archive=ROOT/'.local-port2/backups'/('image-cleanup-'+time.strftime('%Y%m%d-%H%M%S'));archive.mkdir(mode=0o700)
     def save(name,value):
         with os.fdopen(os.open(archive/name,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump(value,f)

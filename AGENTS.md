@@ -13,7 +13,9 @@
   separately qualified ownership rules, not a broader name prefix.
 - Follow container retirement with a preview from
   `team-delivery-kit/cleanup_obsolete_images.py`; apply only its verified scoped
-  plan. Preserve source references, used images, protected aliases and two recent
+  plan using `--apply --expect-plan <plan_sha256>` from the reviewed preview.
+  Docker list order is not tag age; preserve opaque tags without a separately
+  qualified retirement rule. Preserve source references, used images, protected aliases and two recent
   versions per owned family. Unknown ownership or uncertain deletion stays
   visible and is observed, never resolved by prune, force or blind repetition.
 

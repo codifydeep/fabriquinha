@@ -1339,6 +1339,12 @@ python3 team-delivery-kit/cleanup_port2_history.py --tests-only
 python3 team-delivery-kit/cleanup_obsolete_images.py
 ```
 
+Para imagens, a aplicação exige `--apply --expect-plan <plan_sha256>` com o hash
+da prévia revisada; uma seleção diferente é recusada antes de remover qualquer
+tag. A ordem de `docker image ls` não comprova idade: versões numéricas são
+ordenadas explicitamente, e tags opacas/hashes permanecem preservadas até terem
+uma regra de retirada qualificada separadamente.
+
 `--apply` executa o plano com arquivamento privado e revalidação dos IDs. A seleção
 de imagens preserva tags `toso-*` e seus aliases, imagens em uso, referências de
 fonte e duas versões recentes por família. Uma exclusão sem confirmação deve ser
