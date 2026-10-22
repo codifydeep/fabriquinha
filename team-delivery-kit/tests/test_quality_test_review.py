@@ -24,6 +24,18 @@ class QualityTestReviewTests(unittest.TestCase):
         self.b.QUALITY_REVIEW_ENABLED = True
         self.e.settings['agents'][self.b.QUALITY_CTO] = 'planning'
         (self.b.STATE/'native.json').write_text(json.dumps(self.e.settings))
+        if getattr(self,'snapshot_files',None) is not None:
+            inventory={path:dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw))
+                for path,raw in self.snapshot_files.items()}
+            self.capture.prepared.update(file_inventory=inventory,
+                manifest_sha256=hashlib.sha256(json.dumps({'files':inventory},sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+                test_sha256={'tests/test_new.py':inventory['tests/test_new.py']['sha256']})
+            # Synthetic copy fixture, before any capture/assignment is created.
+            with self.b.db() as con:
+                state=json.loads(con.execute('SELECT state FROM test_first_jobs').fetchone()[0])
+                state['result']['output']=json.dumps(self.capture.prepared)
+                state['result']['output_sha256']=hashlib.sha256(state['result']['output'].encode()).hexdigest()
+                con.execute('UPDATE test_first_jobs SET state=?',(json.dumps(state),))
         captured = f.captured()
         with patch.object(review.progress.snapshot, 'advance', return_value=captured):
             f.observe()

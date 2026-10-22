@@ -10,8 +10,10 @@ COPY broker/quality_red_snapshot.py broker/quality_author_admission.py broker/qu
 COPY broker/quality_progress.py /
 COPY broker/quality_test_review.py /
 COPY broker/quality_worker_runtime.py broker/quality_review_launch.py broker/quality_launch_router.py /
+COPY broker/quality_review_reads.py broker/quality_review_attestation.py broker/read_stream_receipts.py /
+COPY artifact_read_evidence.py /
 COPY broker/literal_author_bootstrap_recovery.py broker/review_context_recovery.py /
 COPY quality_phase_tools.py execution_context.py /
 ENV BROKER_QUALITY_V2_ENABLED=0
-RUN BROKER_WORKER_IMAGE=sha256:0000000000000000000000000000000000000000000000000000000000000000 PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import broker, quality_author_launch, quality_red_snapshot, quality_progress, quality_test_review, quality_worker_runtime, quality_review_launch, quality_launch_router; assert broker.QUALITY_V2_ENABLED is False; assert broker.QUALITY_REVIEW_ENABLED is False"
+RUN BROKER_WORKER_IMAGE=sha256:0000000000000000000000000000000000000000000000000000000000000000 PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import broker, quality_author_launch, quality_red_snapshot, quality_progress, quality_test_review, quality_worker_runtime, quality_review_launch, quality_launch_router, quality_review_reads, quality_review_attestation; assert broker.QUALITY_V2_ENABLED is False; assert broker.QUALITY_REVIEW_ENABLED is False"
 LABEL delivery-kit.component="quality-v2-controller" delivery-kit.qualification="not-native-delivery"

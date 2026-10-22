@@ -14,7 +14,7 @@ from test_quality_author_launch import UnknownDocker
 
 class QualityReviewLaunchTests(unittest.TestCase):
     def setUp(self):
-        f = fixtures.QualityTestReviewTests()
+        f = getattr(self,'review_fixture_factory',fixtures.QualityTestReviewTests)()
         f.setUp()
         self.addCleanup(f.doCleanups)
         self.f, self.b = f, f.b

@@ -33,15 +33,23 @@ def store(con,binding,notifications,mode):
     if not binding or mode not in ('planning','review'):return
     initialize(con)
     from artifact_read_evidence import coverage
+    quality=False
+    if mode=='review' and con.execute("SELECT 1 FROM sqlite_master WHERE name='quality_native_scopes'").fetchone():
+        quality=bool(con.execute("SELECT 1 FROM quality_native_scopes WHERE request_id=? AND task_id=? "
+            "AND phase='test_review_v2'",(binding['request_id'],binding['task_id'])).fetchone())
     for messages in extract(notifications):
-        if not coverage(messages):continue  # never promote a cut/malformed page
+        if quality:
+            try:from .quality_review_reads import accept_page
+            except ImportError:from quality_review_reads import accept_page
+            if not accept_page(messages):continue
+        elif not coverage(messages):continue  # never promote a cut/malformed page
         identifier=messages[0]['call_id'];encoded=json.dumps(messages,sort_keys=True)
         old=con.execute('SELECT request_id,messages FROM observed_read_stream WHERE task_id=? AND call_id=?',
                         (binding['task_id'],identifier)).fetchone()
         if old:
             if old[0]!=binding['request_id'] or old[1]!=encoded:raise ValueError('observed read identity drift')
         else:
-            if con.execute('SELECT count(*) FROM observed_read_stream WHERE task_id=?',(binding['task_id'],)).fetchone()[0]>=128:
+            if con.execute('SELECT count(*) FROM observed_read_stream WHERE task_id=?',(binding['task_id'],)).fetchone()[0]>=(512 if quality else 128):
                 raise ValueError('observed read page limit')
             con.execute('INSERT INTO observed_read_stream VALUES (?,?,?,?)',
                         (binding['task_id'],binding['request_id'],identifier,encoded))

@@ -59,7 +59,7 @@ def source(con,task):
 
 def copy_payload(b,e,task,binding):
     return dict(Image=copy_image_id(b),User='10000:10000',Entrypoint=['python'],Cmd=['/test_first_copy.py'],
-        NetworkDisabled=True,Env=['TEST_FIRST_RESUME=0'],
+        NetworkDisabled=True,Env=['TEST_FIRST_RESUME=0','TEST_FIRST_INCLUDE_INVENTORY=1'],
         Labels={'delivery-kit.owner':b.OWNER,'delivery-kit.test-first-task':task,'delivery-kit.quality-run':e['run_id']},
         HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',CapDrop=['ALL'],SecurityOpt=['no-new-privileges'],
             Memory=134217728,NanoCpus=500000000,PidsLimit=16,

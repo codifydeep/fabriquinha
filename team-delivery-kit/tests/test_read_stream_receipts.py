@@ -75,3 +75,17 @@ class ReadStreamReceiptTests(unittest.TestCase):
         self.assertEqual(con.execute('SELECT count(*) FROM observed_read_stream').fetchone()[0],0)
         receipts.store(con,binding,self.frames(page),'implementation')
         self.assertEqual(con.execute('SELECT count(*) FROM observed_read_stream').fetchone()[0],0)
+
+    def test_quality_phase_preserves_actual_empty_and_unicode_pages_without_ui_fallback(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT)')
+        con.execute('INSERT INTO native_bindings VALUES(?,?)',('request','task'))
+        con.execute('CREATE TABLE quality_native_scopes(request_id TEXT,task_id TEXT,phase TEXT)')
+        con.execute('INSERT INTO quality_native_scopes VALUES(?,?,?)',('request','task','test_review_v2'))
+        binding={'task_id':'task','request_id':'request'}
+        path='/delivery/ação.py'
+        frames=self.frames('Read '+path+' (from line 1, limit 100) — 0 total lines\n\n```\n\n```')
+        frames[0]['params']['update']['title']='read: '+path
+        receipts.store(con,binding,frames,'review')
+        self.assertEqual(len(receipts.load(con,'task')),2)
+        self.assertEqual(con.execute('SELECT count(*) FROM observed_read_stream').fetchone()[0],1)

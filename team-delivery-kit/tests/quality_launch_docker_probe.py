@@ -26,6 +26,7 @@ import quality_author_launch as launch
 import quality_author_admission as author_admission
 import quality_progress as progress
 import quality_test_review as review
+import quality_review_reads as read_verifier
 import acp_startup
 
 b.STATE=ROOT/'state';b.STATE.mkdir(mode=0o700)
@@ -125,13 +126,20 @@ def review_launch(grant):
         response=b.session_operation(admitted['capability'],dict(frame=dict(jsonrpc='2.0',id=index+1,method=method,params={})))
         if 'error' in response or 'result' not in response:raise ValueError('actual review ACP request rejected')
         receipts.append(dict(method=method,status='passed',response_sha256=hashlib.sha256(json.dumps(response,sort_keys=True).encode()).hexdigest()))
-    fixed_canary(admitted,'review','/quality_review_registry_canary.py')
+    read_canary=fixed_canary(admitted,'review','/quality_review_registry_canary.py')
+    with b.db() as con:
+        capture=json.loads(con.execute('SELECT context FROM quality_red_captures WHERE task_id=?',(task['id'],)).fetchone()[0])
+    prepared=capture['copy']['prepared']
+    byte_reads=read_verifier.observe(prepared['file_inventory'],context['packet']['manifest_sha256'],
+        context['read_paths'],read_canary['read_pairs'])
+    save('operator-read-byte-binding.json',dict(reads=byte_reads,
+        origin='fixed_operator_canary_not_native_stream',tests_approved=False,delivery_approval=False))
     b.SESSIONS[admitted['request_id']].close();b.SESSIONS.clear()
     state=review.load(b.handoff_context(),task['id'])[1]
     if state['tests_approved'] is not False:raise ValueError('launch cannot approve tests')
     return dict(status='passed',source_task=task['id'],task_id=reviewed['id'],request_id=admitted['request_id'],
         manifest_sha256=context['packet']['manifest_sha256'],snapshot_mount='readonly',frames=receipts,
-        tests_approved=False,delivery_approval=False)
+        handler_byte_binding=True,tests_approved=False,delivery_approval=False)
 
 
 try:

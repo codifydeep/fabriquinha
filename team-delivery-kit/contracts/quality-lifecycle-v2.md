@@ -94,7 +94,8 @@ The review-ready packet binds plan, Red, snapshot manifest, author, reviewer,
 candidate test hashes and capture digests. It is produced only from authenticated
 controller capture rows, never the worker's returned report. It does **not**
 freeze/approve tests, start a reviewer, authorize Green or grant delivery. The
-independent native review/read attestation remains to implement and qualify.
+independent native review/read attestation is implemented below but still needs
+real-agent qualification.
 This hook is not installed or enabled in the live controller; its
 database/native-fixture tests are not proof of autonomous native delivery.
 
@@ -168,10 +169,55 @@ inserted as a fixture report. All six helpers/workers were archived and retired;
 proof volumes remain. No candidate HTTP server, model prompt or real native
 review verdict is involved, and the installed controller stays unchanged/sealed.
 
-Assignment/dispatch/admission/launch still do not provide native verdict/read
-attestation. They cannot approve tests, grant Green, merge or homologate.
-Installing these source files is not authority to turn on dispatch or bypass
-the legacy v2 fence; agent qualification and remaining gates are still required.
+### Complete reads, native verdict and durable test freeze (source only)
+
+`test_first_protocol.prepare_red(include_inventory=True)` optionally emits every
+copied file's hash and byte size, bound to the canonical immutable manifest.
+`TEST_FIRST_INCLUDE_INVENTORY=1` is fixed controller configuration for v2 copy
+jobs. The legacy/default receipt shape is unchanged. Historical receipts without
+the inventory are not retroactively converted to full-read/freeze evidence.
+
+`quality_review_reads.py` compares actual numbered handler pages against that
+complete manifest. Every registered policy/product/test file must be covered;
+partial, clipped, contradictory, duplicated-call, missing or wrong-byte reads
+cannot become inspection. Empty files require an actual successful empty read.
+Unicode paths and LF/CRLF renderings are accepted only when the reconstructed
+byte count/hash matches the snapshot, not by normalizing away a difference.
+Unsupported representations remain a technical impediment. The v2 controller
+stream preserves these pages independently of UI truncation; there is no native
+UI/transcript fallback for missing controller reads. It keeps at most 512 pages
+for the bound v2 review; legacy phases retain their earlier 128-page limit.
+
+`quality_review_attestation.observe` accepts a source identity, not a worker's
+verdict/report. It requires the exact completed native reviewer/wakeup/realm,
+latest author, consumed review capability and closed lease. Actual opened
+transport, inspected immutable worker payload and successful prompt in the
+registered session must already exist in the controller journal. Only then can
+its durable read stream and authoritative native final output be evaluated.
+
+The verdict is exact bounded JSON. Approval has no unresolved findings and binds
+all criterion IDs, plan, Red and manifest. Change requests require actual line
+quotes and, for a named test, a line within that real method's AST span. A valid
+change request returns to the original author without granting test weakening or
+product edits. Identity/read/protocol failures and technical escalation belong
+to the CTO, never automatically to the CEO. Ending with ordinary text cannot
+approve the test phase.
+
+An approved receipt freezes every test hash, criterion witness, native execution,
+read digest and review decision. `tests_frozen` authorizes no worker execution,
+Green claim, merge or delivery by itself; the next implementation admission
+adapter must authenticate this exact receipt and preserve its tests. Terminal
+receipts survive restarts/retirement without native API reads or rerunning work.
+Unknown native/close observations use a persistent original window: alert after
+ten minutes, technical hold for the CTO after thirty. Only proved sealed operator
+downtime extends it. Restarting does not reset the deadline or execution budget.
+
+These native identity/verdict checks currently have database/Docker fixtures,
+not a real-agent approval qualification. A real Docker/ACP run additionally
+confirmed complete-copy metadata and byte-bound reads from actual Hermes
+handlers. Those reads come from a **fixed operator canary**, not a model prompt
+or native controller-stream verdict, and cannot freeze tests. The controller
+remains sealed/default-off until native qualification and subsequent gates pass.
 
 ### Actual Red observation, without a positive prerequisite
 
@@ -252,7 +298,8 @@ The tests for ingestion use isolated controller databases and mocked native/copy
 provenance; they are not native qualification. The installed admission adapter
 still does not mint `tests_only_v2` capabilities. Source now connects the fixed
 copy producer to v2 reconciliation and independent review launch, but native
-review/read attestation and subsequent gates remain to implement and qualify.
+review/read attestation still needs native qualification, and subsequent gates
+remain to implement and qualify.
 Do not populate scope/proof tables manually to bypass these missing stages or
 enable v2 based on observer/ingestion tests alone.
 

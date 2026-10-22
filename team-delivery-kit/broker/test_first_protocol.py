@@ -90,8 +90,10 @@ def validate_test_framework(name, data, command):
             {name: {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}})
 
 
-def prepare_red(base, workspace, frozen, contract, *, resume=False):
+def prepare_red(base, workspace, frozen, contract, *, resume=False, include_inventory=False):
     """Copy verified base and only new tests into a controller volume."""
+    if type(include_inventory) is not bool:
+        raise ValueError('explicit copy inventory flag required')
     base, workspace, frozen = map(Path, (base, workspace, frozen))
     contract = validate(contract)
     base_manifest = json.loads(_regular(base, 'manifest.json'))
@@ -173,7 +175,7 @@ def prepare_red(base, workspace, frozen, contract, *, resume=False):
     else:
         with os.fdopen(os.open(manifest_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o400), 'wb') as stream:
             stream.write(manifest_bytes)
-    return {'base_sha': base_manifest['base_sha'],
+    receipt = {'base_sha': base_manifest['base_sha'],
             'base_manifest_sha256': hashlib.sha256(_regular(base, 'manifest.json')).hexdigest(),
             'baseline_test_sha256': {name: expected[name] for name in contract['test_files'] if name in existing},
             'manifest_sha256': hashlib.sha256(manifest_bytes).hexdigest(),
@@ -181,6 +183,9 @@ def prepare_red(base, workspace, frozen, contract, *, resume=False):
             'command': contract['test_command'], 'test_roots': contract['test_roots'],
             'test_count_pattern': contract['test_count_pattern'],
             'test_image': contract['test_image']}
+    if include_inventory:
+        receipt['file_inventory'] = all_files
+    return receipt
 
 
 def save_red_rejection(directory, issue_id, task_id, exit_code, output, prepared, reason):

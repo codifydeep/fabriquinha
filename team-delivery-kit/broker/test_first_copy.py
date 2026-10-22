@@ -11,7 +11,8 @@ def main():
     contract = json.loads((Path('/base') / 'contract.json').read_text())
     try:
         receipt = prepare_red('/base', '/workspace', '/snapshot', contract,
-                              resume=os.environ.get('TEST_FIRST_RESUME') == '1')
+                              resume=os.environ.get('TEST_FIRST_RESUME') == '1',
+                              include_inventory=os.environ.get('TEST_FIRST_INCLUDE_INVENTORY') == '1')
     except SnapshotRejection as error:
         print(json.dumps(error.receipt,sort_keys=True),flush=True)
         sys.exit(1)

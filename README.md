@@ -36,9 +36,13 @@ do snapshot, sem permissões de implementação. O lançamento do revisor está 
 em fonte à admissão, startup e sessão ACP, com snapshot somente leitura e sem
 acesso ao workspace do autor. O encadeamento técnico autor/handlers → snapshot →
 Red real → abertura do revisor passou em Docker/ACP, usando identidades nativas
-sintéticas e sem modelo; seis contêineres foram retirados. A atestação nativa da
-leitura/veredito, Green, instalação e qualificação integral seguem pendentes;
-um pacote, uma admissão ou sessão aberta não aprova os testes.
+sintéticas e sem modelo; seis contêineres foram retirados. A atestação da revisão
+está implementada em fonte: exige tarefa nativa concluída, lease encerrado,
+inspeção do worker, leituras ACP reais byte a byte e veredito estruturado no mesmo
+snapshot. Seus controles passaram com fixtures de autoridade; as leituras dos
+handlers reais também coincidiram com o manifesto em Docker. A qualificação com
+o agente real, a continuação Green e a instalação seguem pendentes. Um pacote,
+uma admissão, sessão aberta ou canário fixo não aprova os testes do produto.
 O registry e os handlers reais do Hermes já passaram pelo canário de revisão em
 Docker: leitura registrada funciona; escrita, terminal e tentativa direta de
 chmod/escrita no volume somente leitura são recusados, sem chamadas ao modelo.

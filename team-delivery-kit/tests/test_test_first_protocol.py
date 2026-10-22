@@ -11,6 +11,15 @@ from test_portable_contract import contract
 
 
 class TestFirstProtocolTests(unittest.TestCase):
+    def test_opt_in_copy_inventory_binds_every_file_without_exposing_contents(self):
+        prepared=prepare_red(self.base,self.work,self.red,self.contract,include_inventory=True)
+        manifest=json.loads((self.red/'manifest.json').read_bytes())
+        self.assertEqual(prepared['file_inventory'],manifest['files'])
+        self.assertEqual(set(prepared['file_inventory']),set(self.contract['files']))
+        self.assertTrue(all(set(value)=={'sha256','bytes'} for value in prepared['file_inventory'].values()))
+        self.assertEqual(hashlib.sha256(json.dumps({'files':prepared['file_inventory']},
+            sort_keys=True,separators=(',',':')).encode()).hexdigest(),prepared['manifest_sha256'])
+
     def test_unittest_contract_rejects_pytest_before_snapshot_creation(self):
         for statement in (b'import pytest\n', b'import pytest as pt\n',
                           b'from pytest import mark\n', b'from _pytest import fixtures\n'):
