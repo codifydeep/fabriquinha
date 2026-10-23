@@ -5,6 +5,7 @@ import signal
 import sys
 import quality_delivery_snapshot as snapshot
 import quality_red_observation as observer
+import quality_reversion_job as reversion
 
 
 def request(raw):
@@ -12,7 +13,8 @@ def request(raw):
     value=json.loads(raw)
     common={'operation','plan','base_manifest_sha256'}
     fields={'snapshot_after_implementation_v2':{'reviewed_manifest_sha256','frozen_tests'},
-        'observe_green_v2':{'task_id','snapshot_manifest_sha256','green_context'}}
+        'observe_green_v2':{'task_id','snapshot_manifest_sha256','green_context'},
+        'observe_reversion_v2':{'task_id','candidate_manifest_sha256','reviewed_manifest_sha256','evidence'}}
     if (not isinstance(value,dict) or not isinstance(value.get('operation'),str) or value['operation'] not in fields
             or set(value)!=common|fields[value['operation']]):raise ValueError('exact fixed Green input required')
     if value['operation']=='observe_green_v2' and not isinstance(value['green_context'],dict):
@@ -25,6 +27,9 @@ def run(value):
     if value['operation']=='snapshot_after_implementation_v2':
         return snapshot.copy('/base','/reviewed','/workspace','/snapshot',value['plan'],
             value['base_manifest_sha256'],value['reviewed_manifest_sha256'],value['frozen_tests'])
+    if value['operation']=='observe_reversion_v2':
+        return reversion.run('/base','/candidate','/snapshot',value['plan'],value['task_id'],
+            value['base_manifest_sha256'],value['candidate_manifest_sha256'],value['reviewed_manifest_sha256'],value['evidence'])
     return observer.run('/base','/snapshot',value['plan'],value['task_id'],
         value['base_manifest_sha256'],value['snapshot_manifest_sha256'],green_context=value['green_context'])
 

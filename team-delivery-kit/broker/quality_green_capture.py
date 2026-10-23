@@ -86,12 +86,13 @@ def payload(b,context):
                 dict(Type='volume',Source=context['volume'],Target='/snapshot',ReadOnly=True)]))
 
 
-def observed(b,context,result):
-    p=grouped_create('POST','/containers/create?name=validation',context['payload'],b.PREFIX)
-    task=context['task_id'];key=digest(dict(task=task,kind='green',payload=p))
+def fixed_receipt(b,task,kind,payload,result):
+    require(kind in ('green','sensitivity'))
+    p=grouped_create('POST','/containers/create?name=validation',payload,b.PREFIX)
+    key=digest(dict(task=task,kind=kind,payload=p))
     expected={**p,'Labels':{**p['Labels'],'delivery-kit.owner':b.OWNER,
         'delivery-kit.source-task':task,'delivery-kit.validation-job':key}}
-    identity=dict(task=task,kind='green',name=b.PREFIX+'-validation-job-'+task+'-'+key[:12],payload=expected)
+    identity=dict(task=task,kind=kind,name=b.PREFIX+'-validation-job-'+task+'-'+key[:12],payload=expected)
     with b.db() as con:row=con.execute('SELECT identity,state FROM validation_jobs WHERE job_key=?',(key,)).fetchone()
     require(row is not None and json.loads(row[0])==identity)
     state=json.loads(row[1])
@@ -101,6 +102,12 @@ def observed(b,context,result):
         and result.get('validation_job_key')==key and result.get('validation_contract_sha256')==digest(identity)
         and isinstance(result.get('output'),str) and len(result['output'].encode())<=65536
         and result.get('output_sha256')==hashlib.sha256(result['output'].encode()).hexdigest())
+    return dict(validation_job_key=key,validation_contract_sha256=digest(identity),
+        container_id=result['container_id'],output_sha256=result['output_sha256'])
+
+
+def observed(b,context,result):
+    receipt=fixed_receipt(b,context['task_id'],'green',context['payload'],result)
     report=json.loads(result['output'])
     require(set(report)=={'operation','green','base_manifest_sha256','captured_output_sha256','captured_output_bytes',
             'snapshot_unchanged','commit_binding_verified','execution_authorized','delivery_approval'}
@@ -111,9 +118,8 @@ def observed(b,context,result):
     quality.sha(report['captured_output_sha256'])
     green=report['green'];quality.green(context['plan'],context['freeze']['red'],context['freeze']['test_review'],green)
     require(green['commit_sha']==context['commit_sha'] and green['manifest_sha256']==context['manifest_sha256']
-        and green['task_id']==task and green['tests']==context['freeze']['frozen_tests'])
-    return dict(green=green,validation_job_key=key,validation_contract_sha256=digest(identity),
-        container_id=result['container_id'],output_sha256=result['output_sha256'])
+        and green['task_id']==context['task_id'] and green['tests']==context['freeze']['frozen_tests'])
+    return dict(green=green,**receipt)
 
 
 def observe(b,request):
@@ -122,6 +128,8 @@ def observe(b,request):
         old=load(b,request)
         if old and old[1]['stage'] in ('awaiting_sensitivity','technical_blocked'):return old[1]
         delivery.admission.enabled(b)
+        with b.db() as con:
+            if maintenance.current(con):raise validation_job.Pending('maintenance preserves original Green observation')
         if old:context,state=old
         else:
             context=provenance(b,request);context['payload']=payload(b,context)
@@ -154,8 +162,10 @@ def observe(b,request):
                 pending.progress=state;raise
             phase='green_observation_deadline'
         except (TimeoutError,OSError) as error:
-            pending=validation_job.Pending('observe original Green job and exact volume; no replay');pending.progress=state
-            raise pending from error
+            if time.time()<deadline:
+                pending=validation_job.Pending('observe original Green job and exact volume; no replay');pending.progress=state
+                raise pending from error
+            phase='green_source_observation_deadline';category=type(error).__name__
         except (ValueError,KeyError,TypeError) as error:
             category=type(error).__name__
         return save(b,request,context,state,{**state,'stage':'technical_blocked','incident':dict(category=phase,

@@ -107,6 +107,18 @@ concordar com SHA, testes congelados e revisão independente. O coordenador
 observa o mesmo job após reinício e avança para `awaiting_sensitivity`, nunca
 para homologação. Esses novos encadeamentos ainda usam fixtures nativas nos
 testes; o ensaio instalado com modelo continua pendente.
+O primeiro controle negativo pós-Green agora é executável em fonte: a suíte
+congelada inteira é reexecutada contra o snapshot Red revisado, comparado à base
+e à entrega Green. Produto anterior, candidato e testes permanecem somente para
+leitura. O controlador exige um novo job e seu recibo persistente; não transforma
+o Red histórico em prova de controle executado depois do Green.
+Somente critérios com falha real de assertion no corpo do teste contam como
+cobertos. Se a reversão não cobrir todos, a evidência parcial é preservada em
+incidente do CTO para controles adicionais de QA, sem repetição idêntica ou
+aprovação fictícia. O executor desses controles adicionais ainda falta.
+Cobertura completa avança apenas para `awaiting_independent_delivery_review`;
+revisão, PR/CI e homologação continuam obrigatórios. O controle de reversão
+passou isoladamente em Docker real com entradas sintéticas, sem modelo.
 O job Green fixo também passou isoladamente em Docker real, na versão de
 Python da imagem, executando os dois testes da suíte sintética completa e
 preservando o snapshot. Essa qualificação não autentica Git ou revisão nativa;
@@ -360,7 +372,7 @@ flowchart TB
     B --> E[Snapshots imutáveis e validação controlada]
     B -.->|Opt-in em fonte, desligado| V2[Coordenador v2: fila e handoffs duráveis]
     V2 -.->|Revisão e autor Green| MC
-    V2 -.->|Captura e job Green fixo; somente em fonte| E
+    V2 -.->|Captura, Green e controle negativo; somente em fonte| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|Registro persistente do SHA; sem push ou merge| V2
     S --> GH[GitHub: PR, checks e integração]

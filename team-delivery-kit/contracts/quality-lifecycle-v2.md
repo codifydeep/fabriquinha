@@ -6,6 +6,11 @@ and durable controller Red ingestion/snapshot producer implemented in source.
 The observer and dedicated snapshot copier also passed synthetic Docker
 isolation/integrity checks. The v2 chain is not installed, enrolled or enabled in the
 running controller. Historical runs retain v1.
+The source coordinator now also reaches durable local Git binding, full-suite
+Green and the first post-Green reversion control. These paths remain disabled in
+the installed controller. Reversion passed a synthetic Docker qualification;
+native end-to-end execution, additional-control recovery and later gates remain
+unqualified.
 
 ## Required order
 
@@ -43,6 +48,10 @@ run, snapshot or contract.
   A Path fixture used to load it must be byte-identical to its Green source.
 - A negative changes only declared product-code/data paths in an isolated copy.
   It cannot change tests, the harness, discovery, mocks or CI configuration.
+  Reusing the immutable reviewed Red as that isolated product reversion is valid
+  only when its frozen tests equal Green, non-product bytes remain unchanged,
+  and the complete suite is actually reexecuted after Green. The old Red receipt
+  alone is never a post-Green negative execution.
 - Every negative reexecutes the complete frozen test inventory. The older
   single-selected-test calibration receipts are not v2 sensitivity evidence.
 - Each claimed acceptance ID must have a frozen witness test that actually
@@ -66,6 +75,19 @@ has `merge_authorized=false` and `delivery_approval=false`.
 requires a distinct `post_green_sensitivity_policy_v2` input. It does not accept,
 upgrade or emit a legacy calibration approval. It executes the complete declared
 inventory for each negative and compares the positive fixtures to Green bytes.
+
+`quality_reversion_job.py` is a separate fixed, read-only executor for real
+product reversion, including tests which import product modules rather than
+Path fixtures. The reviewed product must equal the baseline; differences from
+Green must be declared product paths. Criterion coverage is derived from actual
+behavioral assertion failures in the complete frozen inventory. Partial coverage
+is retained but never qualifies sensitivity.
+`broker/quality_sensitivity_capture.py` authenticates Green, exact Git binding,
+both volume incarnations and the new fixed validation-job receipt. Complete
+coverage reaches independent delivery review only. Missing witnesses become a
+CTO-owned incident for additional QA controls; that additional-controls executor
+is not implemented yet. Transient observations preserve the original deadline;
+expired source outages become visible incidents, not unbounded polling.
 
 These modules must not be exposed as worker authorization endpoints. A controller
 adapter must authenticate native identities, independent decisions, complete

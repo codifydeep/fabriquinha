@@ -36,6 +36,7 @@ SOURCES={
     'broker/quality_delivery_capture.py':'quality_delivery_capture.py',
     'broker/quality_candidate_binding.py':'quality_candidate_binding.py',
     'broker/quality_green_capture.py':'quality_green_capture.py',
+    'broker/quality_sensitivity_capture.py':'quality_sensitivity_capture.py',
     'broker/quality_team_progress.py':'quality_team_progress.py',
     'broker/read_stream_receipts.py':'read_stream_receipts.py','artifact_read_evidence.py':'artifact_read_evidence.py',
     'broker/validation_job.py':'validation_job.py',

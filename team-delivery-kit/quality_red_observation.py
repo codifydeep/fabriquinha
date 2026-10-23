@@ -113,11 +113,19 @@ class Observations(Results):
         super().record(test,outcome,error)
 
 
-def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_context=None):
+def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_context=None,negative_context=None):
     if not isinstance(task_id,str) or str(uuid.UUID(task_id))!=task_id:
         raise ValueError('canonical controller-bound source task required')
     base,snapshot=Path(base),Path(snapshot)
     frozen=None
+    require(green_context is None or negative_context is None,'ambiguous_observation_mode')
+    if negative_context is not None:
+        require(isinstance(negative_context,dict) and set(negative_context)=={'red','review','green'},'invalid_negative_context')
+        previous,decision,passing=(negative_context[k] for k in ('red','review','green'))
+        quality.red(plan,previous);quality.review(plan,previous,decision);quality.green(plan,previous,decision,passing)
+        require(task_id==passing['task_id'] and snapshot_manifest==previous['manifest_sha256'],
+            'negative_execution_identity_mismatch')
+        frozen=passing['tests']
     if green_context is not None:
         require(isinstance(green_context,dict) and set(green_context)=={'red','review','commit_sha'},
             'invalid_green_context')
@@ -170,6 +178,16 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_conte
                 base_manifest_sha256=base_manifest,captured_output_sha256=output.hash.hexdigest(),
                 captured_output_bytes=output.bytes,snapshot_unchanged=True,commit_binding_verified=False,
                 execution_authorized=False,delivery_approval=False)
+        if negative_context is not None:
+            require(bool(failures),'negative_control_survived')
+            require(all(v['path'] in plan['new_tests'] and v['phase']=='test_body' and v['kind']=='assertion'
+                and v['test_body_frame'] for v in failures),'negative_not_new_behavioral_assertions')
+            facts=dict(tests=tests,suite_complete=True,tests_run=result.testsRun,skipped=0,errors=0,exit_code=1,
+                failures=[{k:v[k] for k in ('path','method','phase','kind')} for v in failures])
+            quality.suite(plan,facts,passing=False,minimum=passing['tests_run'],frozen=passing['tests'])
+            return dict(operation='full_suite_negative_observation_v2',suite=facts,
+                captured_output_sha256=output.hash.hexdigest(),captured_output_bytes=output.bytes,
+                snapshot_unchanged=True,execution_authorized=False,delivery_approval=False)
         require(bool(failures),'suite_not_behavioral_red')
         require(all(v['path'] in plan['new_tests'] for v in failures),'baseline_regression')
         require(all(v['phase']=='test_body' and v['kind']=='assertion' and v['test_body_frame'] for v in failures),

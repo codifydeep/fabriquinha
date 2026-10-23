@@ -15,6 +15,7 @@ COPY broker/quality_implementation_admission.py /
 COPY broker/quality_implementation_launch.py /
 COPY broker/quality_delivery_capture.py /
 COPY broker/quality_candidate_binding.py broker/quality_green_capture.py /
+COPY broker/quality_sensitivity_capture.py /
 COPY broker/quality_team_progress.py /
 COPY artifact_read_evidence.py /
 COPY broker/literal_author_bootstrap_recovery.py broker/review_context_recovery.py /

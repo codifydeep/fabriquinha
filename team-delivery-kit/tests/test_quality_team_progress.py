@@ -200,11 +200,10 @@ class TeamDeliveryTests(unittest.TestCase):
         result=dict(stage='awaiting_sensitivity',green_approved=False,delivery_approval=False)
         with patch.object(team.candidate,'load',return_value=({},{})),\
                 patch.object(team.green,'observe',return_value=result) as observe,\
-                patch.object(team.green,'load',return_value=({},result)):
+                patch.object(team.green,'load',side_effect=[None,({},result)]):
             state=team.tick(f.b,limit=1)['observed'][0]
         observe.assert_called_once_with(f.b,f.request)
         self.assertEqual(state['stage'],'awaiting_sensitivity');self.assertFalse(state['delivery_approval'])
-        self.assertEqual(team.tick(f.b)['observed'],[])
 
     def test_pending_green_is_observed_under_techlead_not_misreported_as_red(self):
         f=deliveries.DeliveryCaptureTests();f.setUp();self.addCleanup(f.doCleanups);configured(f.b)
@@ -213,6 +212,20 @@ class TeamDeliveryTests(unittest.TestCase):
                 patch.object(team.green,'observe',side_effect=team.validation_job.Pending('original Green running')):
             result=team.tick(f.b,limit=1)['observed'][0]
         self.assertEqual(result['stage'],'waiting_green');self.assertEqual(result['owner'],f.b.QUALITY_TECHLEAD)
+
+    def test_persisted_green_triggers_negative_control_not_another_green_job(self):
+        f=deliveries.DeliveryCaptureTests();f.setUp();self.addCleanup(f.doCleanups);configured(f.b)
+        with patch.object(team.delivery.validation_job,'run',side_effect=f.copied):team.tick(f.b,limit=1)
+        result=dict(stage='awaiting_independent_delivery_review',delivery_approval=False)
+        with patch.object(team.candidate,'load',return_value=({},{})),\
+                patch.object(team.green,'load',return_value=({},dict(stage='awaiting_sensitivity'))),\
+                patch.object(team.green,'observe',side_effect=AssertionError('no replay Green')),\
+                patch.object(team.sensitivity,'observe',return_value=result) as observe,\
+                patch.object(team.sensitivity,'load',return_value=({},result)):
+            state=team.tick(f.b,limit=1)['observed'][0]
+        observe.assert_called_once_with(f.b,f.request)
+        self.assertEqual(state['stage'],'awaiting_independent_delivery_review');self.assertFalse(state['delivery_approval'])
+        self.assertEqual(team.tick(f.b)['observed'],[])
 
 
 if __name__=='__main__':unittest.main()

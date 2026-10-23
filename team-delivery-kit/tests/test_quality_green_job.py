@@ -39,5 +39,13 @@ class GreenJobTests(unittest.TestCase):
         with patch.object(job.observer,'run') as observe,self.assertRaises(ValueError):job.run(value)
         observe.assert_not_called()
 
+    def test_reversion_uses_three_fixed_readonly_snapshot_paths_not_commands(self):
+        value=dict(operation='observe_reversion_v2',plan={},task_id='task',base_manifest_sha256='a'*64,
+            candidate_manifest_sha256='b'*64,reviewed_manifest_sha256='c'*64,evidence={})
+        with patch.object(job.reversion,'run',return_value={'fixture':True}) as run:
+            self.assertEqual(job.run(value),{'fixture':True})
+        self.assertEqual(run.call_args.args[:3],('/base','/candidate','/snapshot'))
+        with self.assertRaises(ValueError):job.run({**value,'command':'shell'})
+
 
 if __name__=='__main__':unittest.main()

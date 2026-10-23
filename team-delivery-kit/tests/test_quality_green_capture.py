@@ -93,5 +93,15 @@ class GreenCaptureTests(unittest.TestCase):
         self.assertEqual(result['stage'],'technical_blocked');self.assertEqual(result['owner'],self.b.QUALITY_TECHLEAD)
         self.assertFalse(result['incident']['automatic_retry'])
 
+    def test_source_outage_expires_to_incident_without_restarting_green(self):
+        with patch.object(green.validation_job,'run',side_effect=green.validation_job.Pending('original')):
+            with self.assertRaises(green.validation_job.Pending):self.call()
+        _,state=green.load(self.b,self.request)
+        with patch.object(green.time,'time',return_value=state['deadline']+1),\
+                patch.object(green,'provenance',side_effect=OSError('source unavailable')):
+            result=self.call()
+        self.assertEqual(result['stage'],'technical_blocked')
+        self.assertEqual(result['incident']['category'],'green_source_observation_deadline')
+
 
 if __name__=='__main__':unittest.main()
