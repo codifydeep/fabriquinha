@@ -782,8 +782,10 @@ The source/unit tests and a real Docker/Hermes/ACP canary passed with a fixed
 loopback provider: premature final answer → diagnostic → actual reads → exact
 final JSON, in the same turn, with 39 iterations remaining after the first call.
 No OpenRouter/model call, native reviewer approval, product code or delivery is
-involved. Installation, chained author/Red/review qualification and a new native
-review after a qualified changed condition remain required. Historical terminal
+involved. The chained author/Red/review/correction/Red/review Docker/ACP canary
+also passed with synthetic authority and no model; twelve helpers were retired,
+without deleting volumes or changing the installed controller. Installation and
+a new native review after a qualified changed condition remain required. Historical terminal
 review attestations are not reparsed or rewritten by this candidate.
 
 Approval requires authenticated complete reads of the entire registered snapshot.

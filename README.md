@@ -85,7 +85,9 @@ Um canário passou pelo Hermes, handlers e ACP reais com respostas fixas em
 loopback: tentou aprovar cedo, recebeu feedback, leu os arquivos e retornou só
 o JSON final ao cliente. Rascunhos ficaram separados em diagnósticos sem
 autoridade. Não houve modelo, aprovação nativa nem alteração do produto. Essa
-candidata ainda precisa da qualificação encadeada, instalação e ensaio nativo;
+candidata também passou pelo encadeamento físico autor/Red/revisão/correção e
+nova revisão, com autoridade sintética e retirada de doze auxiliares. Ainda
+precisa de instalação e ensaio nativo;
 o bloqueio já encerrado não será apagado nem reinterpretado como aprovação.
 Foi reproduzida em testes uma corrida compatível com essa falha: a observação do
 watchdog avançava o estado antes do ACK de criação/start e a rotina rejeitava a
