@@ -39,6 +39,17 @@ def containers():
     return json.loads(docker('inspect',*ids).stdout) if ids else []
 
 
+def runtime_references(rows):
+    """Selectors are required even while their helpers are idle; never print Env."""
+    result=set()
+    pattern=r'(?:sha256:[a-f0-9]{64}|[a-z0-9][a-z0-9./:_-]*(?::[A-Za-z0-9_.-]+|@sha256:[a-f0-9]{64}))'
+    for row in rows:
+        for entry in row.get('Config',{}).get('Env') or []:
+            key,separator,value=entry.partition('=')
+            if separator and key.endswith('_IMAGE') and re.fullmatch(pattern,value):result.add(value)
+    return result
+
+
 def references():
     refs=set()
     paths=list(ROOT.glob('*.py'))+list(ROOT.glob('*.yaml'))+list(ROOT.glob('Dockerfile*'))
@@ -83,7 +94,7 @@ def main():
     parser.add_argument('--expect-plan',help='Exact plan_sha256 from the reviewed preview; required to apply')
     args=parser.parse_args()
     rows=[json.loads(line) for line in docker('image','ls','--no-trunc','--format','{{json .}}').stdout.splitlines()]
-    before=containers();used={c['Image'] for c in before};refs=references()
+    before=containers();used={c['Image'] for c in before};refs=references()|runtime_references(before)
     # Resolve Docker content/config digests independently of local image IDs.
     ids=list(dict.fromkeys(r['ID'] for r in rows));metadata=[]
     for start in range(0,len(ids),50):metadata.extend(json.loads(docker('image','inspect',*ids[start:start+50]).stdout))
@@ -104,7 +115,8 @@ def main():
         if any(protected_tag(t) for t in i.get('RepoTags') or [])}
     removed=[];conflicts=[]
     for start in range(0,len(selected),12):
-        current_used={c['Image'] for c in containers()};batch=[]
+        current_containers=containers();current_used={c['Image'] for c in current_containers};batch=[]
+        current_refs=references()|runtime_references(current_containers)
         targets=selected[start:start+12]
         probe=docker('image','inspect',*(t['id'] for t in targets),check=False)
         observed={image['Id']:image for image in json.loads(probe.stdout or '[]')}
@@ -112,7 +124,9 @@ def main():
             image=observed.get(target['id'])
             if image is None:continue
             tags=image.get('RepoTags') or []
-            if (image['Id'] in current_used or set(tags)!=set(target['tags']) or
+            aliases=set(tags)|set(image.get('RepoDigests') or [])
+            if (image['Id'] in current_used or image['Id'] in current_refs or aliases&current_refs
+                    or set(tags)!=set(target['tags']) or
                     any(protected_tag(t) or not owned(t.split(':')[0]) for t in tags)):
                 conflicts.append(target['id']);continue
             batch.append(target['tags'])

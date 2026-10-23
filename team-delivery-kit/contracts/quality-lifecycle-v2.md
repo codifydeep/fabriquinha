@@ -28,9 +28,24 @@ credentials. Test stdout is hashed, not accepted as a protocol record.
 isolated read-only snapshot, with fixed full Python and Node discovery. The real
 baseline passed 380 Python and 36 Node tests on Linux without skipping. Its
 receipt explicitly grants neither Red, Green, native qualification nor delivery.
-Mandatory frozen Node evidence must still be wired into every relevant native
-capture/control before enabling the mixed-language chain; old diagnostic
-receipts must not be reclassified as those approvals.
+The source integration now requires `node_baseline_tests` hashes for every
+recognized Node test path in the plan. These paths cannot be reclassified as
+editable product or omitted from the frozen map. The full Node observation is
+part of Red, Green and negative-control suite facts; each snapshot is bound,
+and Green/control preserve exact case membership, runtime version and hashes.
+Controller validation also checks the reversion observation against the reviewed
+snapshot, not the candidate. A version-1 diagnostic cannot satisfy the required
+version-2 Node facts. Pure facts still do not authenticate their own execution.
+
+A real read-only Linux Docker canary passed the source Red → Green → reversion
+functions (including fixed Green-job dispatch) with actual Node reexecution,
+source hashes and frozen inventory. Source, review and commit identities are
+synthetic: this is not an independent agent verdict or native qualification.
+The installed controller/runners have not been upgraded to these gates yet;
+their dispatcher pins must migrate without resetting any journals before a
+controlled installation and native qualification. Supported source mixed mode
+is primary Python unittest plus protected baseline Node tests, not arbitrary
+Node authoring frameworks. Native dispatch remains off until qualified.
 
 ## Required order
 

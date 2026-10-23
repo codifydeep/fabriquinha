@@ -53,6 +53,8 @@ def instruction(packet):
         'coverage and preservation, not just a failing count. Red is already observed; '
         'do not overwrite code or recreate Red. Only registered read_file pages are '
         'allowed, offset>=1 and limit<=100. No terminal, patches, writes, delegation, '
+        'Batch independent read_file calls when possible; cover every registered '
+        'page without rereading unchanged pages or claiming omitted reads. '
         'administration or claimed execution. Approval is for frozen tests and later '
         'implementation only, never merge/delivery. Request changes with concrete '
         'file/test/criterion findings when inadequate; technical review problems go '

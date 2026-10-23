@@ -86,9 +86,10 @@ def observed(b,context,result):
         and facts['manifest_sha256']==context['manifest_sha256'] and facts['commit_sha']==context['commit_sha']
         and isinstance(facts['controls'],list) and len(facts['controls'])==1)
     control=facts['controls'][0]
-    require(set(control)==quality.SUITE|{'id','criteria','changed_files'}
+    require(set(control)==quality.suite_fields(plan)|{'id','criteria','changed_files'}
         and control['id']=='revert_product_to_reviewed_red' and control['changed_files']==context['changed_product_paths'])
-    quality.suite(plan,control,passing=False,minimum=passing['tests_run'],frozen=passing['tests'])
+    quality.suite(plan,control,passing=False,minimum=passing['tests_run'],frozen=passing['tests'],
+        node_manifest=context['evidence']['red']['manifest_sha256'],frozen_node=passing.get('node_baseline'))
     witnesses={(f['path'],f['method']) for f in control['failures']}
     covered=sorted(c for c,tests in plan['criterion_tests'].items() if any((t['path'],t['method']) in witnesses for t in tests))
     missing=sorted(set(plan['criteria'])-set(covered))

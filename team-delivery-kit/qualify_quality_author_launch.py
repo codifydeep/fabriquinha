@@ -24,6 +24,7 @@ SOURCES={
     'broker/server.py':'candidate_broker.py','broker/native.py':'native.py',
     'broker/controller_maintenance.py':'controller_maintenance.py','broker/maintenance_job_clock.py':'maintenance_job_clock.py',
     'broker/quality_lifecycle_v2.py':'quality_lifecycle_v2.py','broker/quality_lifecycle_enrollment.py':'quality_lifecycle_enrollment.py',
+    'quality_node_evidence.py':'quality_node_evidence.py',
     'broker/quality_author_admission.py':'quality_author_admission.py','broker/quality_author_worker.py':'quality_author_worker.py',
     'broker/quality_author_launch.py':'quality_author_launch.py','broker/quality_red_capture.py':'quality_red_capture.py',
     'broker/quality_red_snapshot.py':'quality_red_snapshot.py','broker/quality_progress.py':'quality_progress.py',

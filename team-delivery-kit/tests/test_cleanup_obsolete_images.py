@@ -8,6 +8,16 @@ class ImageSelectionTests(unittest.TestCase):
         self.assertEqual([s['tags'] for s in select(self.rows(),set(),set())],
             [['delivery-kit-model-proxy:1'],['delivery-kit-model-proxy:2']])
         self.assertEqual(select(self.rows(),{'sha256:'+'2'*64},{'delivery-kit-model-proxy:1'}),[])
+
+    def test_runtime_selected_helpers_are_protected_even_without_a_live_job(self):
+        import cleanup_obsolete_images as cleanup
+        refs=cleanup.runtime_references([dict(Config=dict(Env=[
+            'BROKER_QUALITY_RED_IMAGE=sha256:'+'1'*64,
+            'BROKER_QUALITY_GREEN_JOB_IMAGE=delivery-kit-green:3',
+            'OPENROUTER_API_KEY=synthetic',
+            'BROKER_QUALITY_CTO=not-an-image']))])
+        self.assertEqual(refs,{'sha256:'+'1'*64,'delivery-kit-green:3'})
+        self.assertNotIn('sha256:'+'1'*64,[r['id'] for r in select(self.rows(),set(),refs)])
     def test_preserves_toso_aliases_external_and_dangling(self):
         self.assertTrue(protected_tag('registry.example/toso-old:latest'))
         for repo,tag in [('toso-old','latest'),('reforma-api','old'),('<none>','<none>')]:

@@ -9,6 +9,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import sys
@@ -56,6 +57,12 @@ def inputs(base,snapshot,plan,base_manifest,snapshot_manifest,*,frozen_tests=Non
         'test_or_file_inventory_mismatch')
     require(expected['contract.json']==hashlib.sha256(_regular(base,'contract.json')).hexdigest(),
         'contract_mismatch')
+    node_tests=plan.get('node_baseline_tests',{})
+    require(quality.node.paths(spec['files'])==set(node_tests),'node_test_inventory_mismatch')
+    for path in spec['files']:
+        if path.startswith('.github/workflows/') and path.endswith(('.yml','.yaml')):
+            require(not re.search(rb'\bnode\s+--test\b',_regular(base,path)) or bool(node_tests),
+                'node_suite_not_enrolled')
     if frozen_tests is not None:
         require(set(plan['product_files'])==set(spec['editable_files'])-set(plan['new_tests']),
             'product_partition_mismatch')
@@ -66,6 +73,8 @@ def inputs(base,snapshot,plan,base_manifest,snapshot_manifest,*,frozen_tests=Non
             require(frozen[path]['sha256']==sha and _regular(snapshot,path)==_regular(base,path),
                 'base_bytes_changed_before_red')
     tests={p:frozen[p]['sha256'] for p in spec['test_files']}
+    require(all(expected.get(p)==h and frozen[p]['sha256']==h for p,h in node_tests.items()),
+        'frozen_node_test_hash_mismatch')
     require(all(tests[p]==h for p,h in plan['baseline_tests'].items()),'baseline_test_hash_mismatch')
     if frozen_tests is not None:require(tests==frozen_tests,'frozen_test_hash_mismatch')
     inventory=set()
@@ -139,6 +148,17 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_conte
     bytecode=sys.dont_write_bytecode;sys.dont_write_bytecode=True;output=OutputDigest()
     result=Observations(root);before_modules=set(sys.modules)
     try:
+        node_fields={}
+        if plan.get('node_baseline_tests'):
+            from quality_node_baseline import run as run_node
+            try:
+                node_report=run_node(root,snapshot_manifest,plan['node_baseline_tests'])
+                frozen_node=(passing.get('node_baseline') if negative_context is not None else
+                    observed.get('node_baseline') if green_context is not None else None)
+                quality.node.validate(node_report,plan['node_baseline_tests'],manifest=snapshot_manifest,frozen=frozen_node)
+            except Exception:
+                raise Rejected('baseline_node_execution_or_evidence_failed') from None
+            node_fields=dict(node_baseline=node_report)
         # Avoid observing another delivery's cached modules as this snapshot.
         for path in spec['files']:
             if not path.endswith('.py'):continue
@@ -173,6 +193,7 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_conte
                 manifest_sha256=snapshot_manifest,tests=tests,suite_complete=True,tests_run=result.testsRun,
                 skipped=0,errors=0,exit_code=0,failures=[],commit_sha=green_context['commit_sha'],
                 red_sha256=quality.digest(observed),test_review_sha256=quality.digest(decision))
+            evidence.update(node_fields)
             quality.green(plan,observed,decision,evidence)
             return dict(operation='full_suite_green_observation_v2',green=evidence,
                 base_manifest_sha256=base_manifest,captured_output_sha256=output.hash.hexdigest(),
@@ -184,7 +205,9 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_conte
                 and v['test_body_frame'] for v in failures),'negative_not_new_behavioral_assertions')
             facts=dict(tests=tests,suite_complete=True,tests_run=result.testsRun,skipped=0,errors=0,exit_code=1,
                 failures=[{k:v[k] for k in ('path','method','phase','kind')} for v in failures])
-            quality.suite(plan,facts,passing=False,minimum=passing['tests_run'],frozen=passing['tests'])
+            facts.update(node_fields)
+            quality.suite(plan,facts,passing=False,minimum=passing['tests_run'],frozen=passing['tests'],
+                node_manifest=snapshot_manifest,frozen_node=passing.get('node_baseline'))
             return dict(operation='full_suite_negative_observation_v2',suite=facts,
                 captured_output_sha256=output.hash.hexdigest(),captured_output_bytes=output.bytes,
                 snapshot_unchanged=True,execution_authorized=False,delivery_approval=False)
@@ -197,6 +220,7 @@ def run(base,snapshot,plan,task_id,base_manifest,snapshot_manifest,*,green_conte
             manifest_sha256=snapshot_manifest,tests=tests,suite_complete=True,tests_run=result.testsRun,
             skipped=0,errors=0,exit_code=1,
             failures=[{k:v[k] for k in ('path','method','phase','kind')} for v in failures])
+        observed.update(node_fields)
         quality.red(plan,observed)
         return dict(operation='full_suite_red_observation_v2',red=observed,
             base_manifest_sha256=base_manifest,captured_output_sha256=output.hash.hexdigest(),

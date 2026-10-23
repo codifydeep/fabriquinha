@@ -1,8 +1,8 @@
 """Fixed full Node discovery on an immutable snapshot; no delivery authority.
 
-This executor is not yet wired into native v2 evidence. It exists to preserve
-the real repository's Node baseline alongside Python, never to select tests or
-reinterpret a baseline failure as a valid new-behavior Red.
+The source v2 observer uses these facts alongside Python, never to select tests
+or reinterpret a baseline failure as a valid new-behavior Red. Only the owning
+controller can authenticate fixed-job provenance; this module approves nothing.
 """
 import hashlib
 import json
@@ -43,9 +43,9 @@ def run(root,manifest,tests):
         def unique(pairs):
             require(len({k for k,_ in pairs})==len(pairs));return dict(pairs)
         report=json.loads(result.stdout,object_pairs_hook=unique)
-        require(isinstance(report,dict) and set(report)=={'operation','node_version','files','counts',
+        require(isinstance(report,dict) and set(report)=={'operation','node_version','files','counts','inventory',
             'duplicate_summary_fields','captured_output_sha256','captured_output_bytes'}
-            and report['operation']=='frozen_node_suite_report_v1'
+            and report['operation']=='frozen_node_suite_report_v2'
             and isinstance(report['node_version'],str) and re.fullmatch(r'(22|24)\.[0-9]+\.[0-9]+',report['node_version'])
             and report['duplicate_summary_fields']==[])
         counts=report['counts'];require(isinstance(counts,dict)
@@ -54,11 +54,21 @@ def run(root,manifest,tests):
             and counts['tests']>0 and counts['tests']==sum(counts[k] for k in ('pass','fail','cancelled','skipped','todo')))
         files=report['files'];require(isinstance(files,list) and len(files)==len(set(files))
             and set(files)=={str(root/p) for p in tests})
+        inventory=report['inventory'];require(isinstance(inventory,list) and len(inventory)==counts['tests'])
+        normalized=[]
+        for row in inventory:
+            require(isinstance(row,dict) and set(row)=={'file','line','column','nesting','name_sha256'}
+                and isinstance(row['file'],str) and row['file'] in files
+                and all(type(row[k]) is int and 0<=row[k]<=2**31 for k in ('line','column','nesting'))
+                and isinstance(row['name_sha256'],str) and re.fullmatch('[a-f0-9]{64}',row['name_sha256']))
+            normalized.append({**{k:v for k,v in row.items() if k!='file'},'path':Path(row['file']).relative_to(root).as_posix()})
+        normalized.sort(key=lambda row:json.dumps(row,sort_keys=True))
+        require(len({json.dumps(row,sort_keys=True) for row in normalized})==len(normalized))
         require(isinstance(report['captured_output_sha256'],str) and re.fullmatch('[a-f0-9]{64}',report['captured_output_sha256'])
             and type(report['captured_output_bytes']) is int and report['captured_output_bytes']>=0
             and result.returncode in (0,1))
         passed=result.returncode==0 and counts['pass']==counts['tests'] and all(counts[k]==0 for k in ('fail','cancelled','skipped','todo'))
-        return dict(operation='full_node_baseline_observation_v1',status='passed' if passed else 'rejected',
+        return dict(operation='full_node_baseline_observation_v2',status='passed' if passed else 'rejected',inventory=normalized,
             manifest_sha256=manifest,tests=tests,tests_run=counts['tests'],counts=counts,
             node_version=report['node_version'],exit_code=result.returncode,
             captured_output_sha256=report['captured_output_sha256'],captured_output_bytes=report['captured_output_bytes'],

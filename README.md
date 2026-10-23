@@ -43,10 +43,19 @@ testes para não aceitá-la como protocolo. `quality_baseline_probe.py` executa 
 duas suítes sobre uma cópia dos blobs Git, sem alterar o checkout.
 O diagnóstico real passou com 380 testes Python e 36 Node, sem skips, em Docker
 sem rede, credenciais, socket ou escrita no snapshot. Seu helper foi retirado.
-**Esse diagnóstico não é Red, Green ou aprovação nativa.** Ainda falta tornar
-essa verificação complementar obrigatória e vinculada aos recibos de Red,
-Green e controles negativos; o despacho v2 continua desabilitado até isso ser
-qualificado. Não se permite retirar os testes Node para contornar essa lacuna.
+**Esse diagnóstico não é Red, Green ou aprovação nativa.** A integração aos
+gates já está implementada em fonte: planos mistos exigem `node_baseline_tests`
+para todos os testes Node reconhecidos e protegidos. Red, Green e controle
+negativo devem executar a suíte Node completa e vincular seu recibo ao snapshot
+correto; Green/controle preservam hashes, versão e identidade dos casos, não
+apenas a contagem. Evidência ausente, skips, troca de casos ou recibos antigos
+de diagnóstico não são aprovação. Um canário Linux real percorreu esses
+executores com entradas/revisão/commit sintéticos, sem modelo ou entrega.
+**Essa integração ainda não está instalada no controlador.** Faltam migrar os
+pins sem perder journals, instalar as novas imagens e qualificar a execução
+nativa. O despacho v2 permanece desabilitado. O modo misto qualificado em fonte
+é unittest Python com baseline Node protegida; não é suporte genérico a Vitest,
+Jest ou autoria de novos testes em qualquer framework.
 O observador de Red real
 também passou por controles sintéticos em Docker isolado, sem uma implementação
 positiva prévia. A ingestão persistente de Red também está implementada em fonte:
@@ -1547,7 +1556,9 @@ uma regra de retirada qualificada separadamente.
 
 `--apply` executa o plano com arquivamento privado e revalidação dos IDs. A seleção
 de imagens preserva tags `toso-*` e seus aliases, imagens em uso, referências de
-fonte e duas versões recentes por família. Uma exclusão sem confirmação deve ser
+fonte, seletores de imagens configurados nos serviços (mesmo sem helper ativo)
+e duas versões recentes por família. Esses seletores e aliases são revalidados
+imediatamente antes da remoção, sem imprimir o ambiente. Uma exclusão sem confirmação deve ser
 observada, não repetida. As regras port2 não autorizam limpar outra instalação.
 
 ## Calibração genérica: limite de qualificação
