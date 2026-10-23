@@ -1,5 +1,7 @@
 # Qualification layer over the current local legacy controller. This does not
 # replace the canonical distribution build or enable v2 in a running service.
+# Retain delivery-kit-quality-v2-controller:20261023.19 as the last installed
+# native author/Red/review-launch rollback while the revision successor qualifies.
 FROM delivery-kit-execution-broker:20261021.512
 COPY broker/server.py /broker.py
 COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /
