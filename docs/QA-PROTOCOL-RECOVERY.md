@@ -35,8 +35,12 @@ boundaries was rejected by the real registry canary and corrected without
 rewriting that failure. The expanded canary passed with seven fixed local
 responses: normal ACP continuation, direct duplicate denial, stalled tool
 rounds and the budget boundary. The latter uses a one-iteration fixture loop;
-the ACP factory remains fixed at 40. No external model was called. Large-scale
-paging, forced compaction, installation and native qualification remain pending.
+the ACP factory remains fixed at 40. No external model was called. The expanded
+fixture also passed: 71 files, 563,066 bytes, 219 unique pages, 23 main local
+responses and two local summary responses. Two real compression commits removed
+197 read pairs from conversation while the journal retained full byte-bound
+coverage. The complete fixed suite used 32 local responses, no external model.
+Installation and native qualification remain pending.
 Approval still requires independent, byte-bound
 inspection of the required scope, exact verdict and native identities. No
 operator may manufacture missing reads or convert failure into approval.
@@ -46,6 +50,24 @@ multi-file/pagination fixtures and the real Hermes/handler/ACP boundary. Preserv
 the earlier failure and require a separately qualified recovery. A technical
 hold assigned to CTO is visible accountability, not proof that the team has
 autonomously diagnosed and recovered the workflow.
+
+### Failed incomplete inspection, not an inferred transport fix
+
+The candidate completion-recovery adapter can register a fresh read-only review
+after a failed native prompt with a partial but valid immutable inspection.
+It requires exactly one initialize/new/prompt lineage, closed lease, consumed
+grant, retired worker, a different qualified worker and sealed maintenance.
+No reads, full coverage, invalid bytes, duplicate prompt RPCs or the same worker
+profile cannot qualify this route. Capacity evidence cannot be mixed into it.
+
+The old failure is retained with an explicit `not_proven` causal classification;
+it is not rewritten as a completed review or a proved iteration-limit incident.
+The qualified changed worker is grounds for another bounded experiment, not
+proof of historical cause or product correctness. The same profile cannot
+rearm the same source under another qualification identifier. Registration
+creates no task/grant and closes no incident; dispatch remains with the
+coordinator after controlled activation. Fresh successor reads and its exact
+independent verdict are required to freeze tests or bind implementation.
 
 ## Bounded recovery
 

@@ -26,7 +26,7 @@ if sys.argv[1]=="observe":
  assert len(values)<=1
  value=values[0] if values else None
  if value:assert value["request"]==p
-else:value=recovery.register(b,p["source_task"],p["previous_task"],p["maintenance_operation"],qualified=p["qualification"],installation=p["installation"],transport=p.get("transport"))
+else:value=recovery.register(b,p["source_task"],p["previous_task"],p["maintenance_operation"],qualified=p["qualification"],installation=p["installation"],transport=p.get("transport"),failed_review=p.get("failed_review",False))
 keys=("operation","source_task","previous_task","previous_request","new_marker","manifest_sha256","condition_sha256","ordinal","incident_closed","tests_approved","delivery_approval","model_calls")
 print(json.dumps(dict(stage="not_observed" if value is None else "completion_recovery_registered",receipt={k:value[k] for k in keys} if value else None,delivery_approval=False),sort_keys=True))
 '''
@@ -44,6 +44,9 @@ def qualification(namespace,identity,operation):
         and value['container_retired'] is True and value['model_calls']==0 and value['tests_approved'] is False
         and value['delivery_approval'] is False and value['output_sha256']==sha(output['stdout'].encode())
         and value['command_sha256']==state['command_sha256']
+        and value.get('fixture_sha256')==state['identity'].get('fixture_sha256')
+            ==sha((ROOT/'review_execution_evidence.py').read_bytes())
+        and value['report'].get('fixture_source_sha256')==value.get('fixture_sha256')
         and value['script_sha256']==sha((ROOT/'tests/quality_review_stop_canary.py').read_bytes()))
     validate_report(value['report'],guards)
     reports=[]
@@ -55,10 +58,11 @@ def qualification(namespace,identity,operation):
     return value
 
 
-def run(namespace,image,source,previous,operation,install_operation,qualification_id,*,observe=False,proxy_install_operation=None):
+def run(namespace,image,source,previous,operation,install_operation,qualification_id,*,observe=False,proxy_install_operation=None,failed_review=False):
     # Reuse strict fixed-target syntax; this is not the zero-ACP recovery guard.
     arguments(namespace,image,source,previous,'0'*64,operation)
     canonical(install_operation)
+    require(type(failed_review) is bool and not (failed_review and proxy_install_operation is not None))
     authority=Authority(namespace,image);about=authority.about()
     archive=ROOT/('.local-'+namespace.removeprefix('delivery-kit-'))/'backups'/('quality-preview-install-'+install_operation)
     state=json.loads(read(archive/'state.json'));before=json.loads(read(archive/'before.json'))
@@ -77,6 +81,7 @@ def run(namespace,image,source,previous,operation,install_operation,qualificatio
         held,_=require_idle(namespace);require(held['operation_id']==operation and authority.identity==installation['current_container'])
     payload=dict(source_task=source,previous_task=previous,maintenance_operation=operation,
         qualification=qualified,installation=installation)
+    if failed_review:payload['failed_review']=True
     if proxy_install_operation is not None:
         canonical(proxy_install_operation)
         program='''import sys,json
@@ -117,6 +122,8 @@ if __name__=='__main__':
     for key in ('namespace','image','source','previous-task','operation','install-operation','qualification'):
         parser.add_argument('--'+key,required=True)
     parser.add_argument('--proxy-install-operation',help='Exact qualified proxy upgrade for a failed capacity-bound review')
+    parser.add_argument('--failed-inspection',action='store_true',help='Failed incomplete read review; requires a different qualified worker, never approval')
     parser.add_argument('--observe',action='store_true');args=parser.parse_args()
     print(json.dumps(run(args.namespace,args.image,args.source,args.previous_task,args.operation,
-        args.install_operation,args.qualification,observe=args.observe,proxy_install_operation=args.proxy_install_operation),sort_keys=True))
+        args.install_operation,args.qualification,observe=args.observe,proxy_install_operation=args.proxy_install_operation,
+        failed_review=args.failed_inspection),sort_keys=True))

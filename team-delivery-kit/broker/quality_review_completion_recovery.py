@@ -16,6 +16,7 @@ import quality_review_verdict as verdict
 import quality_review_paging as paging
 import install_quality_review_stop as installer
 from review_execution_evidence import validate as validate_execution_controls
+import review_execution_evidence as execution_evidence
 try:
     from . import quality_test_review as review,quality_review_attestation as attestation,quality_review_history as history
     from . import controller_maintenance as maintenance,native,read_stream_receipts
@@ -68,7 +69,7 @@ def eligible(b,source):
 
 
 def exclude_completed(b,context,state,runs):
-    """Historical name; failed runs require the separate capacity proof path."""
+    """Historical name; failed runs retain their exact failure fingerprint."""
     previous=records(b,context['source_task'])
     if not previous:return runs
     marker(b,context,state);settings=json.loads((b.STATE/'native.json').read_bytes())
@@ -78,7 +79,7 @@ def exclude_completed(b,context,state,runs):
         output=(task.get('result') or {}).get('output')
         require({k:task.get(k) for k in FIELDS}==record['previous_identity']
             and attestation.load(b,context['source_task'],request_id=record['previous_request'])==record['previous_attestation'])
-        if 'transport' in record['request']:
+        if 'transport' in record['request'] or record['request'].get('failed_review') is True:
             try:from . import quality_review_capacity_recovery as capacity
             except ImportError:import quality_review_capacity_recovery as capacity
             require(capacity.failure_sha256(task)==record['native_failure_sha256'])
@@ -129,11 +130,16 @@ def qualification(b,value,operation):
         and all(report['guard_sources'][key]==sha for key,sha in guards.items())
         and all(re.fullmatch('[a-f0-9]{64}',str(v)) for v in report['guard_sources'].values()))
     validate_execution_controls(report.get('execution_controls'))
-    require(type(report.get('total_fixed_provider_calls')) is int and report['total_fixed_provider_calls']==7)
+    execution_evidence.validate_scale(report.get('scale_controls'))
+    require(type(report.get('total_fixed_provider_calls')) is int
+        and report['total_fixed_provider_calls']==30+report['scale_controls']['summary_provider_calls']
+        and report.get('fixture_source_sha256')==hashlib.sha256(Path(execution_evidence.__file__).read_bytes()).hexdigest())
     return quality.digest(report['guard_sources'])
 
 
-def register(b,source,previous_task,operation,*,qualified,installation,transport=None):
+def register(b,source,previous_task,operation,*,qualified,installation,transport=None,failed_review=False):
+    require(type(failed_review) is bool and not (failed_review and transport is not None))
+    native_failed=failed_review or transport is not None
     for value in (source,previous_task,operation):review.capture.enrollment.canonical(value)
     condition=qualification(b,qualified,operation)
     capacity_request=None
@@ -152,6 +158,7 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
     request=dict(source_task=source,previous_task=previous_task,maintenance_operation=operation,
         qualification=qualified,installation=installation)
     if transport is not None:request['transport']=transport
+    if failed_review:request['failed_review']=True
     previous=records(b,source)
     same=[r for r in previous if r['previous_task']==previous_task]
     if same:
@@ -167,7 +174,7 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
         previous_request=state['request_id'];settings=json.loads((b.STATE/'native.json').read_bytes())
         task=native.task_record(settings,previous_task,context['reviewer'])
         require(task.get('id')==previous_task and task.get('agent_id')==context['reviewer']
-            and task.get('status')==('completed' if transport is None else 'failed')
+            and task.get('status')==('failed' if native_failed else 'completed')
             and task.get('issue_id')==context['packet']['issue_id'] and task.get('wakeup_id')==state['wakeup_id']
             and task.get('handoff_note')==review.note(b,context,state)
             and task.get('workspace_id')==settings['workspace_id'] and task.get('runtime_id')==settings['runtime_id'])
@@ -176,13 +183,16 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
         old=attestation.load(b,source)
         require(old and old['stage']=='technical_blocked' and old['request_id']==previous_request and old['tests_approved'] is False
             and old.get('incident',{}).get('category') in
-                (('native_terminal_verdict','complete_snapshot_reads') if transport is None else ('native_identity',)))
+                (('native_identity',) if native_failed else ('native_terminal_verdict','complete_snapshot_reads')))
         admission,registered,assignment=attestation.launch.context_for(b,previous_request)
         require(registered==context and assignment==state)
         output=(task.get('result') or {}).get('output')
-        if transport is None:require(isinstance(output,str))
+        if not native_failed:require(isinstance(output,str))
         else:
-            require(previous_request==capacity_request)
+            if transport is not None:require(previous_request==capacity_request)
+            else:
+                try:from . import quality_review_capacity_recovery as capacity
+                except ImportError:import quality_review_capacity_recovery as capacity
             failure_sha=capacity.failure_sha256(task)
         with b.db() as con:
             capture=json.loads(con.execute('SELECT context FROM quality_red_captures WHERE task_id=?',(source,)).fetchone()[0])
@@ -191,19 +201,30 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
             proofs=[json.loads(raw) for sha,raw in con.execute('SELECT receipt_sha256,receipt FROM worker_policy_observations WHERE request_id=?',(previous_request,))
                 if hashlib.sha256(raw.encode()).hexdigest()==sha]
             retirement=con.execute('SELECT container_id,name,state FROM worker_retirement_intents WHERE request_id=?',(previous_request,)).fetchone()
-            if transport is not None:
+            if native_failed:
                 events=con.execute('SELECT method,success FROM acp_events WHERE request_id=?',(previous_request,)).fetchall()
                 require(all(any(r[0]==method and r[1]==success for r in events)
                     for method,success in (('initialize',1),('session/new',1),('session/prompt',0))))
-        if transport is None:
+                if failed_review:
+                    require(all(len([r for r in events if r[0]==method])==1
+                        for method in ('initialize','session/new','session/prompt')))
+        if not native_failed:
             diagnostic=attestation.completion_diagnostic(output,context['packet'],capture['copy']['prepared']['file_inventory'],context['read_paths'],messages)
             require(diagnostic['verdict_format']=='invalid' or diagnostic['reads']['rejected_files'])
         else:
-            diagnostic=dict(operation='review_transport_failure_diagnostic_v1',verdict_format='absent_due_to_transport',
+            diagnostic=dict(operation='review_failed_inspection_diagnostic_v1' if failed_review else 'review_transport_failure_diagnostic_v1',
+                verdict_format='absent_due_to_native_failure' if failed_review else 'absent_due_to_transport',
                 manifest_sha256=context['packet']['manifest_sha256'],
                 reads=attestation.reads.assessment(capture['copy']['prepared']['file_inventory'],
                     context['packet']['manifest_sha256'],context['read_paths'],messages),
                 native_failure_sha256=failure_sha,execution_authorized=False,tests_approved=False,delivery_approval=False)
+            if failed_review:
+                assessment=diagnostic['reads']
+                require(0<assessment['complete_files']<assessment['required_files']
+                    and assessment['rejected_files'] and all(r['category']=='file_read_incomplete'
+                        for r in assessment['rejected_files']))
+                diagnostic['native_failure_cause']='not_proven'
+                diagnostic['changed_condition']='independently_qualified_different_worker_profile'
         payload_sha=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
         proofs=[p for p in proofs if p.get('request_id')==previous_request and p.get('payload_sha256')==payload_sha
             and p.get('worker_image')==payload['Image'] and p.get('normalized_differences')==[] and p.get('docker_status')=='running']
@@ -240,7 +261,7 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
                 manifest_sha256=context['packet']['manifest_sha256'],context_sha256=quality.digest(context),
                 condition_sha256=condition,ordinal=len(previous)+1,new_marker=new_marker,request=request,
                 incident_closed=False,model_calls=0,tests_approved=False,delivery_approval=False)
-            if transport is None:receipt['native_output_sha256']=hashlib.sha256(output.encode()).hexdigest()
+            if not native_failed:receipt['native_output_sha256']=hashlib.sha256(output.encode()).hexdigest()
             else:receipt['native_failure_sha256']=failure_sha
             con.execute('INSERT INTO quality_review_completion_recoveries VALUES(?,?,?,?,?)',
                 (source,previous_request,new_marker,json.dumps(receipt,sort_keys=True),quality.digest(receipt)))
@@ -271,5 +292,6 @@ def activation_ready(b,issue,operation):
         condition=quality.digest(dict(worker=qualification(b,record['request']['qualification'],operation),
             transport=capacity.validate(b,record['request']['transport'],operation,record['previous_request'])))
         require(condition==record['condition_sha256'])
+    else:require(qualification(b,record['request']['qualification'],operation)==record['condition_sha256'])
     require(attestation.load(b,record['source_task'],request_id=record['previous_request'])==record['previous_attestation'])
     return True

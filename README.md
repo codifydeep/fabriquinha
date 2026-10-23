@@ -34,7 +34,9 @@ A candidata de paginação contém diário limitado por execução, captura no l
 enforcement no handler e saídas estruturadas. A fila simulada percorreu 71
 arquivos/81 páginas sem repetição. O canário Hermes/ACP passou com sete respostas
 locais fixas, incluindo duplicatas negadas e limites de progresso/orçamento.
-Ainda não está instalada: faltam escala e compactação forçada no Hermes real,
+A extensão percorreu 219 páginas e 563 KB: duas compactações reais retiraram 197
+pares da conversa, sem perder cobertura no diário. Foram 32 respostas locais no
+conjunto completo. Ainda não está instalada: faltam cutover controlado,
 recuperação específica e qualificação nativa. Nenhuma chamada paga foi usada.
 
 **Resumo atualizado:** [status e estimativas de prontidão](docs/STATUS.md),
@@ -1621,8 +1623,8 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 O estado vigente em **23 de outubro de 2026** está em
 [STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente falhou sem leitura
 integral, não congelou os testes e não chegou à homologação. A suíte offline
-da candidata executou 4.362 testes: 4.354 aprovados e oito skips preexistentes,
-sem falhas. O canário pequeno Hermes/ACP passou com respostas fixas, sem modelo;
+da candidata executou 4.372 testes: 4.364 aprovados e oito skips preexistentes,
+sem falhas. O canário Hermes/ACP, incluindo escala/compactação, passou com respostas fixas, sem modelo;
 instalação e qualificação nativa ainda estão pendentes. A estimativa de prontidão
 não substitui um novo ciclo sem intervenções nem uma instalação limpa.
 

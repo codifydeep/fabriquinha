@@ -14,16 +14,18 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa mais recente | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Sem congelamento, Green ou homologação. |
 | Paginação e feedback na candidata | Diário, captura, fila e handler; fixture de 71 arquivos/81 páginas dentro de 40 iterações simuladas. Não instalada. |
-| Canário físico da candidata | Hermes/ACP normal, preflight/handler, duplicata negada e paradas estruturadas por falta de progresso/orçamento; sete respostas locais, zero chamadas externas. Escala/compactação forçada e revisão nativa ainda pendentes. |
-| Última suíte completa registrada | 4.362 executados: 4.354 aprovados, oito skips preexistentes, sem falhas. Inclui captura, enforcement, paradas e validação dos controles físicos. |
+| Canário físico da candidata | Hermes/ACP normal, preflight/handler, duplicata negada e paradas estruturadas por falta de progresso/orçamento. Extensão: 71 arquivos, 563.066 bytes, 219 páginas, duas compactações e cobertura preservada após remover 197 pares da conversa. Conjunto: 32 respostas locais, zero chamadas externas. Instalação e revisão nativa pendentes. |
+| Última suíte completa registrada | 4.372 executados: 4.364 aprovados, oito skips preexistentes, sem falhas. Inclui captura, enforcement, escala, compactação e recuperação restrita de inspeção falha. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 O bloqueio atual envolve leituras repetidas e ausência de progresso, não a
 capacidade já corrigida do proxy. O conjunto inicial de paginação, captura,
-enforcement e saída estruturada passou por 81 testes focados e um canário físico
+enforcement e saída estruturada passou por 91 testes focados e um canário físico
 com respostas fixas. O controle físico do fim do orçamento usa uma iteração;
-a configuração da fábrica ACP continua em 40. Escala, compactação forçada,
-instalação e provas nativas permanecem obrigatórias antes de outra tentativa.
+a configuração da fábrica ACP continua em 40. Escala e compactação real passaram
+no perfil fixo; instalação e provas nativas permanecem obrigatórias antes de
+outra tentativa. A recuperação restrita de inspeção falha foi testada offline,
+sem converter o erro anterior em sucesso ou reutilizar leituras como aprovação.
 Na consulta
 de referência, a manutenção está selada e o proxy parado; confirme o estado vivo
 antes de agir. Nenhum resultado histórico abaixo substitui esse diagnóstico.

@@ -51,8 +51,8 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
   integral foi comprovada para 57 dos 71 arquivos; não houve aprovação nem
   congelamento dos testes, Green ou homologação nessa linhagem.
 - A suíte offline da candidata com captura, enforcement e paradas executou
-  **4.362 testes: 4.354 aprovados e oito skips preexistentes**, sem falhas.
-  Os 81 testes focados também passaram. Isso qualifica o comportamento offline,
+  **4.372 testes: 4.364 aprovados e oito skips preexistentes**, sem falhas.
+  Os 91 testes focados também passaram. Isso qualifica o comportamento offline,
   não instalação, execução física do novo módulo ou autonomia nativa.
 
 ## Bloqueio atual
@@ -72,17 +72,25 @@ compactação seguinte. O handler admite uma única entrada por página planejad
 a checagem anterior do despacho não consome essa entrada. Chamadas diretas e
 concorrentes também são restringidas. O feedback preserva páginas capturadas,
 reconhece progresso parcial e interrompe bytes divergentes ou ações sem progresso.
-Uma fixture de 71 arquivos e 81 páginas concluiu a fila simulada dentro de 40
-iterações, sem páginas repetidas ou além do fim; não é execução de modelo real.
+Uma fixture inicial de 71 arquivos e 81 páginas validou a fila offline. A prova
+física foi ampliada para 563.066 bytes e 219 páginas, volume superior ao snapshot
+do ensaio de referência, sem publicar seu conteúdo.
 
 O canário físico da candidata passou com Hermes/ACP e respostas locais fixas:
 continuação normal, despacho seguido de handler, negação de leitura duplicada,
 saída `read_progress_stalled` e saída `iteration_budget_exhausted`. Foram sete
-respostas locais, sem modelo externo. O caso de orçamento usa um loop de uma
+respostas locais no conjunto inicial, sem modelo externo. O caso de orçamento usa um loop de uma
 iteração como controle de fronteira; a fábrica ACP continua vinculada a 40.
 Isso não comprova uma revisão nativa completa com 40 iterações.
 
-Ainda faltam paginação extensa e compactação forçada no Hermes real,
+No cenário extenso, o loop real terminou a inspeção dos 71 arquivos em 23
+chamadas principais e duas chamadas auxiliares locais. Duas compactações reais
+removeram 197 pares de leitura da conversa; o diário preservou os bytes necessários
+à cobertura integral. Não houve página repetida, leitura além do fim ou alteração
+do snapshot. O conjunto inteiro consumiu 32 respostas fixas locais e zero chamadas
+pagas; retornos de aprovação nessa fixture não são pareceres nativos de produto.
+
+Escala e compactação real estão qualificadas nesse perfil fixo. Ainda faltam
 instalação e recuperação específica seguidas de qualificação nativa. A memória
 é local à execução, não recuperação
 entre reinícios ou memória compartilhada entre perfis. Não há nova aprovação
@@ -98,7 +106,7 @@ serviços, libera manutenção ou consome chamadas ao provedor.
 1. Implementar paginação orientada por evidência: preservar leituras reais entre
    compactações, selecionar apenas páginas pendentes e reconhecer progresso
    parcial. Coleta, enforcement e saída estruturada já estão na candidata;
-   completar a qualificação de escala/compactação. Não reduzir o escopo de
+   a qualificação física de escala/compactação passou. Não reduzir o escopo de
    aprovação ou ampliar as 40 iterações.
 2. Qualificar offline e em Docker/ACP os casos de múltiplos arquivos, cache,
    fim de arquivo, contexto compactado, ausência de progresso e fim do orçamento.
@@ -111,6 +119,15 @@ serviços, libera manutenção ou consome chamadas ao provedor.
    dependentes e memória entre perfis, sem condução do operador.
 6. Qualificar instalação limpa e reutilização por terceiros antes de apresentar
    a plataforma como pronta. A fatia inicial do Truco não encerrará sua v0.1.
+
+O adaptador de recuperação de inspeção falha existe em fonte e na imagem
+candidata do controlador, ainda não instalada. Ele exige erro nativo preservado,
+RPCs sem duplicação, leituras parciais válidas, lease fechada, worker retirado,
+outro worker qualificado e manutenção selada. A causa do erro genérico permanece
+explicitamente não comprovada. O registro não despacha modelo, não herda leituras
+como aprovação e não encerra o incidente. Um parecer novo e independente continua
+obrigatório. Isso é recuperação restrita de qualificação, não diagnóstico ou
+replanejamento universalmente autônomos pelo CTO.
 
 ## Navegação
 

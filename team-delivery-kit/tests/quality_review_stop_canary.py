@@ -31,6 +31,7 @@ verdict=json.dumps(dict(action='approve_tests',reason='Fixed offline fixture onl
     **{k:packet[k] for k in ('manifest_sha256','plan_sha256','red_sha256')}))
 calls=[];auxiliary=[]
 scenario='normal'
+scale_summaries=[];scale_reads=set()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -44,8 +45,16 @@ class Handler(BaseHTTPRequestHandler):
             auxiliary.append(dict(path=self.path,keys=sorted(body)))
             self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers()
             self.wfile.write(b'{}');return
+        if scenario=='scale' and body['model']=='fixture-summary':
+            scale_summaries.append(True)
+            if len(scale_summaries)>4:
+                self.send_response(400);self.end_headers();return
+            return self.respond(body,dict(role='assistant',content=(
+                'Historical synthetic review: continue inspecting the remaining registered pages. '
+                'No tests or delivery have been approved. Follow the original operator fixture '
+                'and the controller notices for exact pending paths and offsets.')),'stop','summary')
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
-        maximum=1 if scenario=='budget' else 3
+        maximum=23 if scenario=='scale' else 1 if scenario=='budget' else 3
         if index>=maximum:
             self.send_response(400);self.end_headers();self.wfile.write(b'{"error":"fixed fixture call ceiling"}');return
         if scenario=='normal' and index==1:
@@ -69,6 +78,32 @@ class Handler(BaseHTTPRequestHandler):
             message=dict(role='assistant',content=None,tool_calls=[dict(id='control-'+str(index),type='function',
                 function=dict(name='read_file',arguments=json.dumps(args)))])
             finish='tool_calls'
+        elif scenario=='scale' and index>0:
+            notices=[m['content'] for m in body['messages'] if m.get('role')=='system'
+                and 'controller_review_continuation_v1' in str(m.get('content'))]
+            assert len(notices)==1
+            note=json.loads(notices[0][notices[0].index('{'):])
+            assert note['request_id']=='60000000-0000-4000-8000-000000000005'
+            if note['remaining_files']:
+                assert body.get('tool_choice')==dict(type='function',function=dict(name='read_file'))
+                pages=note['next_reads'];assert 1<=len(pages)<=16
+                schema=body['tools'][0]['function']['parameters']['properties']
+                assert schema['path']['enum']==[p['path'] for p in pages]
+                assert schema['offset']['enum']==[pages[0]['offset']] and schema['limit']['enum']==[100]
+                for page in pages:
+                    key=(page['path'],page['offset'],page['limit'])
+                    assert key not in scale_reads
+                    assert 1<=page['offset']<=len(scale_files_data[page['path'].removeprefix('/delivery/')].splitlines())
+                    scale_reads.add(key)
+                message=dict(role='assistant',content=None,tool_calls=[dict(id=f'scale-{index}-{n}',type='function',
+                    function=dict(name='read_file',arguments=json.dumps(page))) for n,page in enumerate(pages)])
+                finish='tool_calls'
+            else:
+                assert note['complete_files']==71
+                assert body.get('tool_choice')!=dict(type='function',function=dict(name='read_file'))
+        return self.respond(body,message,finish,index)
+
+    def respond(self,body,message,finish,index):
         stream=bool(body.get('stream'));kind='text/event-stream' if stream else 'application/json'
         self.send_response(200);self.send_header('Content-Type',kind);self.end_headers()
         common=dict(id='fixed-'+str(index),created=0,model=body['model'])
@@ -193,8 +228,85 @@ def execution_controls():
         preflight_then_dispatch=True,direct_duplicate_denied=True,snapshot_unchanged=True,model_calls=0)
 
 
+def scale_compaction_control():
+    """Real read handlers, real summarizer and real compression commit.
+
+    The fixture changes only trigger parameters and supplies a fixed local
+    summary response. It does not replace the compression algorithm or create
+    read receipts. Production code and its 40-iteration budget are unchanged.
+    """
+    global calls,scenario,verdict,scale_files_data
+    from run_agent import AIAgent
+    import quality_review_stop as stop
+    from review_execution_evidence import scale_files
+    scale_files_data=scale_files()
+    assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in scale_files_data.items())
+    inv={p:dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)) for p,raw in scale_files_data.items()}
+    packet=dict(manifest_sha256=hashlib.sha256(json.dumps({'files':inv},sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+        plan_sha256='a'*64,red_sha256='b'*64,plan=dict(criteria=['A01'],new_tests=['scale/file-000.py']))
+    case=dict(version=2,phase='test_review_v2',request_id='60000000-0000-4000-8000-000000000005',
+        editable_paths=[],read_paths=['/delivery/'+p for p in inv],review_context=dict(packet=packet,files=inv))
+    verdict=json.dumps(dict(action='approve_tests',reason='Fixed scale fixture only',criteria=['A01'],findings=[],
+        **{k:packet[k] for k in ('manifest_sha256','plan_sha256','red_sha256')}))
+    os.environ.update(DELIVERY_QUALITY_PHASE_JSON=json.dumps(case),DELIVERY_MODEL_EXECUTION_ID=case['request_id'])
+    scenario='scale';calls=[]
+    local=ThreadingHTTPServer(('127.0.0.1',0),Handler)
+    threading.Thread(target=local.serve_forever,daemon=True).start()
+    commits=[];triggered=[]
+    try:
+        # The auxiliary resolver reads task configuration independently from
+        # AIAgent's explicit base_url. Never inherit the earlier closed server.
+        import yaml
+        endpoint=f'http://127.0.0.1:{local.server_port}/v1'
+        settings=yaml.safe_load((home/'config.yaml').read_text())
+        settings.setdefault('model',{})['base_url']=endpoint
+        settings.setdefault('auxiliary',{})['compression']=dict(provider='openai',
+            model='fixture-summary',base_url=endpoint,key_env='OPENAI_API_KEY')
+        (home/'config.yaml').write_text(yaml.safe_dump(settings))
+        os.environ['OPENAI_BASE_URL']=endpoint
+        current=AIAgent(model='anthropic/claude-haiku-5.5',provider='openai',api_mode='chat_completions',
+            base_url=endpoint,api_key='offline-not-a-credential',
+            max_iterations=40,enabled_toolsets=['hermes-acp'],quiet_mode=True,max_tokens=2048,
+            checkpoints_enabled=False)
+        compressor=current.context_compressor
+        compressor.protect_first_n=1;compressor.protect_last_n=2
+        compressor.summary_model='fixture-summary'
+        current.compression_enabled=True
+        original_should=compressor.should_compress
+        original_compress=current._compress_context
+        def should_compress(prompt_tokens=None):
+            journal=getattr(current,'_quality_review_journal',None)
+            if not triggered and journal is not None and len(journal.messages())>=64:return True
+            return original_should(prompt_tokens)
+        def compress(messages,system_message,**kwargs):
+            before=len(stop.pairs(messages))
+            if not triggered:kwargs['force']=True
+            triggered.append(True)
+            updated,system=original_compress(messages,system_message,**kwargs)
+            after=len(stop.pairs(updated))
+            assert 1<=len(triggered)<=4 and after<before,(before,after)
+            assert not getattr(compressor,'_last_summary_error',None)
+            assert len(current._quality_review_journal.messages())>=before
+            commits.append((before-after)//2)
+            return updated,system
+        compressor.should_compress=should_compress
+        current._compress_context=compress
+        result=current.run_conversation('Fixed operator scale fixture. Review all registered pages; do not authorize any native delivery.')
+    finally:local.shutdown();local.server_close()
+    assert result['final_response']==verdict,result
+    assert len(calls)==23 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert len(commits)==len(scale_summaries)==compressor.compression_count and all(n>0 for n in commits),commits
+    assert current._quality_review_journal.plan()['complete_files']==71
+    assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in scale_files_data.items())
+    return dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=len(scale_reads),
+        main_provider_calls=len(calls),summary_provider_calls=len(scale_summaries),max_iterations=40,
+        complete_files=71,compactions=compressor.compression_count,dropped_read_pairs=sum(commits),
+        duplicate_reads=0,eof_reads=0,snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
+
+
 normal_calls=list(calls)
 controls=execution_controls()
+scale=scale_compaction_control()
 import quality_review_stop,quality_phase_tools,quality_review_verdict,quality_review_paging,review_tool_policy
 guard_sources={key:hashlib.sha256(Path(path).read_bytes()).hexdigest() for key,path in {
     'feedback':quality_review_stop.__file__,'phase':quality_phase_tools.__file__,
@@ -205,7 +317,9 @@ guard_sources={key:hashlib.sha256(Path(path).read_bytes()).hexdigest() for key,p
     'session':'/opt/hermes/acp_adapter/session.py'}.items()}
 print(json.dumps(dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',
     provider='fixed_loopback_not_model',model_calls=0,fixed_provider_calls=len(normal_calls),
-    total_fixed_provider_calls=len(normal_calls)+controls['stall']['provider_calls']+controls['budget']['provider_calls'],
-    execution_controls=controls,
+    total_fixed_provider_calls=len(normal_calls)+controls['stall']['provider_calls']+controls['budget']['provider_calls']
+        +scale['main_provider_calls']+scale['summary_provider_calls'],
+    execution_controls=controls,scale_controls=scale,
+    fixture_source_sha256=hashlib.sha256(Path('/review_execution_evidence.py').read_bytes()).hexdigest(),
     feedback_rounds=len(notes),same_agent=True,max_iterations=40,acp=acp_mode,
     protected_files_unchanged=True,guard_sources=guard_sources,tests_approved=False,delivery_approval=False)))

@@ -21,6 +21,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Paginação em qualificação, não instalada | `quality_review_paging.py`, integração inicial em `quality_review_stop.py` |
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
 | Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
+| Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
@@ -67,8 +68,10 @@ leituras legítimas no registry real. O canário falho permanece preservado.
 O canário ampliado passou no Hermes real com sete respostas locais, incluindo
 ACP normal, negação de duplicatas, duas rodadas sem progresso e saída no fim
 do orçamento. O controle desta última fronteira usa uma iteração sintética;
-a fábrica ACP permanece fixada em 40. Escala e compactação forçada ainda
-precisam de qualificação física; não houve instalação ou aprovação nativa.
+a fábrica ACP permanece fixada em 40. A extensão de escala percorreu 219 páginas
+de 71 arquivos (563.066 bytes), com 23 chamadas principais, duas sumarizações
+locais e duas compactações reais. Elas removeram 197 pares da conversa sem
+perder cobertura no diário. Não houve instalação ou aprovação nativa.
 No runtime atual, o revisor pode consumir o orçamento com chamadas sem progresso;
 a atestação bloqueia aprovação incompleta, mas não resolve sozinha esse impasse.
 A projeção da interface e o diário consultivo do worker não substituem os recibos
@@ -80,6 +83,15 @@ teto persistente de chamadas. Capacidade de transporte não é capacidade de
 ferramenta nem autorização para novas tentativas. Workers continuam sem
 credenciais de infraestrutura ou socket Docker. A recuperação de uma falha por
 tamanho exige prova dessa falha exata; não se aplica ao esgotamento de iterações.
+
+`quality_review_completion_recovery.py` também possui uma rota administrativa
+restrita de inspeção nativa falha: exige leituras incompletas mas válidas, nenhum
+byte divergente, encerramento real da execução e outro worker fisicamente
+qualificado. O erro original e a incerteza causal são preservados. A rota não
+reutiliza a prova de capacidade do proxy, não libera o autor e não aceita um
+parecer ausente. O coordenador despacha outra revisão só após instalação,
+registro e liberação explícita da manutenção. A sucessora precisa produzir
+seus próprios recibos antes de congelar testes ou habilitar implementação.
 
 ## Fontes de verdade e responsabilidade
 
