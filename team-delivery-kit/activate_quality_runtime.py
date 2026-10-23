@@ -63,14 +63,22 @@ def active_sources(files):
     return [*[p for p in files if p!=overlay],overlay]
 
 
-def verify(before,after):
+def same_daemon(container):
+    host=install.command(['docker','info','--format','{{.ID}}']).stdout.strip()
+    inside=install.command(['docker','exec',container,'python','-c',
+        'import sys;sys.path.insert(0,"/");import broker as b;print(b.docker("GET","/info")["ID"])']).stdout.strip()
+    require(isinstance(host,str) and 0<len(host)<=256 and host==inside)
+    return True
+
+
+def verify(before,after,*,socket_daemon_verified=False):
     original=env(before);actual=env(after)
     require(after['Name']==before['Name'] and all(after['Config']['Labels'].get(k)==before['Config']['Labels'].get(k)
         for k in ('com.docker.compose.project','com.docker.compose.service')))
     require(all(original.get(k)=='0' for k in install.FLAGS) and original.get('BROKER_QUALITY_EXCLUSIVE_ENABLED','0') in ('0','1'))
     require(actual=={**original,**{k:'1' for k in FLAGS}})
     normalized=copy.deepcopy(after);normalized['Config']['Env']=list(before['Config']['Env'])
-    install.verify_preservation(before,normalized,before['Image'])
+    return install.verify_preservation(before,normalized,before['Image'],socket_daemon_verified=socket_daemon_verified)
 
 
 def preflight(namespace,image,payload,*,maintenance_operation=None):
@@ -141,7 +149,8 @@ def activate(namespace,image,path,pin,operation,install_operation,*,maintenance_
                     operation=operation,delivery_approval=False,model_calls=0)
                 state.update(stage='technical_blocked',receipt=receipt);install.save(statefile,state);return receipt
             raise Pending('observe original activation Compose effect; never repeat up')
-        verify(before,after);maintenance,_=require_idle(namespace)
+        socket_alias_changed=verify(before,after,socket_daemon_verified=same_daemon(after['Id']))
+        maintenance,_=require_idle(namespace)
         require(maintenance['operation_id']==barrier);Service().stopped(namespace)
         about=Authority(namespace,image).about()
         require(about['v2_enabled'] is True and about['implementation_enabled'] is True and about['maintenance'] is True)
@@ -150,6 +159,7 @@ def activate(namespace,image,path,pin,operation,install_operation,*,maintenance_
         receipt=dict(stage='activated_sealed',namespace=namespace,image=image,container_id=after['Id'],
             issue_id=payload['plan']['issue_id'],exclusive_enabled=True,maintenance_released=False,
             model_calls=0,delivery_approval=False,other_containers_unchanged=True,data_mounts_preserved=True)
+        receipt.update(docker_socket_daemon_verified=True,docker_socket_origin_alias_changed=socket_alias_changed)
         state.update(stage='activated_sealed',receipt=receipt);install.save(statefile,state);return receipt
 
 

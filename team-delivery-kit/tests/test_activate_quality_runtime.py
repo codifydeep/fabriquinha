@@ -36,6 +36,25 @@ class ActivationTests(unittest.TestCase):
         self.before['Config']['Env'].append('BROKER_QUALITY_EXCLUSIVE_ENABLED=1')
         activation.verify(self.before,self.after)
 
+    def test_socket_alias_requires_same_daemon_and_never_accepts_an_unknown_path(self):
+        old=dict(Destination='/var/run/docker.sock',Source='/run/host-services/docker.proxy.sock',Type='bind',RW=True,Mode='rw')
+        self.before['Mounts'].append(old)
+        self.after['Mounts'].append({**old,'Source':'/var/run/docker.sock'})
+        self.before['HostConfig']['Binds']=['/run/host-services/docker.proxy.sock:/var/run/docker.sock:rw']
+        self.after['HostConfig']['Binds']=['/var/run/docker.sock:/var/run/docker.sock:rw']
+        with self.assertRaises(ValueError):activation.verify(self.before,self.after)
+        self.assertTrue(activation.verify(self.before,self.after,socket_daemon_verified=True))
+        self.after['Mounts'][-1]['Source']='/tmp/other.sock'
+        with self.assertRaises(ValueError):activation.verify(self.before,self.after,socket_daemon_verified=True)
+
+    def test_daemon_identity_comparison_is_readonly_and_rejects_mismatch(self):
+        with patch.object(activation.install,'command',side_effect=[SimpleNamespace(stdout='same\n'),SimpleNamespace(stdout='same\n')]) as command:
+            self.assertTrue(activation.same_daemon('container'))
+        self.assertEqual(command.call_args_list[0].args[0][:2],['docker','info'])
+        self.assertEqual(command.call_args_list[1].args[0][:2],['docker','exec'])
+        with patch.object(activation.install,'command',side_effect=[SimpleNamespace(stdout='first'),SimpleNamespace(stdout='second')]),self.assertRaises(ValueError):
+            activation.same_daemon('container')
+
     def test_reactivation_moves_the_existing_exclusive_overlay_after_disabled_preview(self):
         active=activation.ROOT/'compose.quality-v2-exclusive.yaml'
         preview=activation.ROOT/'compose.quality-v2-preview.yaml'
@@ -57,6 +76,7 @@ class ActivationTests(unittest.TestCase):
         activation.install.save(self.archive/'others.json',[])
         payload=dict(maintenance_operation=self.maintenance,plan=dict(issue_id='issue'))
         mocks=[patch.object(activation,'ROOT',root),patch.object(activation.enrollment,'load',return_value=payload),
+            patch.object(activation,'same_daemon',return_value=True),
             patch.object(activation,'preflight',return_value=self.before['Id']),
             patch.object(activation,'require_idle',return_value=(dict(operation_id=self.maintenance),{})),
             patch.object(activation,'Service',return_value=SimpleNamespace(stopped=Mock())),
