@@ -13,6 +13,7 @@ import time
 import quality_review_stop as stop
 import quality_phase_tools as phase
 import quality_review_verdict as verdict
+import quality_review_paging as paging
 import install_quality_review_stop as installer
 try:
     from . import quality_test_review as review,quality_review_attestation as attestation,quality_review_history as history
@@ -111,7 +112,7 @@ def qualification(b,value,operation):
     require(image.get('Id')==value['worker_image'] and image.get('Config',{}).get('User')=='10000:10000'
         and not image.get('Config',{}).get('Volumes')
         and image.get('Config',{}).get('Labels',{}).get('delivery-kit.component')=='quality-author-worker')
-    modules={'feedback':stop,'phase':phase,'verdict':verdict,'installer':installer}
+    modules={'feedback':stop,'phase':phase,'verdict':verdict,'installer':installer,'paging':paging}
     guards={key:hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest() for key,module in modules.items()}
     require(value.get('guards')==guards)
     report=value.get('report') or {}

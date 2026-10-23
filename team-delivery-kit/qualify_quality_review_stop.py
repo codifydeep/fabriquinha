@@ -20,7 +20,8 @@ from install_quality_preview import save as save_state
 
 ROOT=Path(__file__).resolve().parent
 GUARDS={'feedback':'quality_review_stop.py','phase':'quality_phase_tools.py',
-    'verdict':'quality_review_verdict.py','installer':'install_quality_review_stop.py'}
+    'verdict':'quality_review_verdict.py','installer':'install_quality_review_stop.py',
+    'paging':'quality_review_paging.py'}
 
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()

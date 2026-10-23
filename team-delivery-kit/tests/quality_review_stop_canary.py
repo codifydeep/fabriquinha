@@ -137,10 +137,11 @@ print(json.dumps(dict(stage='fixed_probe_observed',fixed_calls=calls,auxiliary=a
 assert len(notes)==1 and notes[0]['diagnostic']['remaining_files']==2 and not notes[0]['diagnostic']['blocked'],notes
 assert notes[0]['diagnostic']['remaining_iterations']==39,notes
 assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in FILES.items())
-import quality_review_stop,quality_phase_tools,quality_review_verdict
+import quality_review_stop,quality_phase_tools,quality_review_verdict,quality_review_paging
 guard_sources={key:hashlib.sha256(Path(path).read_bytes()).hexdigest() for key,path in {
     'feedback':quality_review_stop.__file__,'phase':quality_phase_tools.__file__,
     'verdict':quality_review_verdict.__file__,'installer':'/install_quality_review_stop.py',
+    'paging':quality_review_paging.__file__,
     'loop':'/opt/hermes/agent/conversation_loop.py','acp':'/opt/hermes/acp_adapter/server.py',
     'session':'/opt/hermes/acp_adapter/session.py'}.items()}
 print(json.dumps(dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',

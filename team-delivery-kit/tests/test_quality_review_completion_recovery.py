@@ -26,7 +26,7 @@ class QualityReviewCompletionRecoveryTests(unittest.TestCase):
         self.worker='sha256:'+'e'*64
         self.b.QUALITY_WORKER_IMAGE=self.worker;self.b.QUALITY_REVIEW_WORKER_IMAGE=self.worker
         guards={k:hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest() for k,m in
-            dict(feedback=recovery.stop,phase=recovery.phase,verdict=recovery.verdict,installer=recovery.installer).items()}
+            dict(feedback=recovery.stop,phase=recovery.phase,verdict=recovery.verdict,installer=recovery.installer,paging=recovery.paging).items()}
         report=dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',provider='fixed_loopback_not_model',
             model_calls=0,fixed_provider_calls=3,feedback_rounds=1,max_iterations=40,acp=True,same_agent=True,
             protected_files_unchanged=True,tests_approved=False,delivery_approval=False,
@@ -114,6 +114,12 @@ class QualityReviewCompletionRecoveryTests(unittest.TestCase):
         q=copy.deepcopy(self.qualified);q['worker_image']='sha256:'+'b'*64
         with self.assertRaises(ValueError):self.register(qualified=q)
         with self.assertRaises(ValueError):self.register(installation={**self.installation,'current_image':self.installation['previous_image']})
+
+    def test_new_paging_dependency_must_be_qualified_at_its_exact_installed_hash(self):
+        q=copy.deepcopy(self.qualified)
+        q['guards'].pop('paging',None)
+        q['report']['guard_sources'].pop('paging',None)
+        with self.assertRaises(ValueError):self.register(qualified=q)
 
     def test_unretired_or_running_previous_worker_cannot_free_capacity_by_declaration(self):
         with self.b.db() as con:con.execute("UPDATE worker_retirement_intents SET state='delete_outcome_unknown'")

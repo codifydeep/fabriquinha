@@ -18,6 +18,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | TDD e entrega congelada | `broker/tdd_evidence.py`, `broker/test_first_protocol.py`, `review_instruction.py`, `additive_test_policy.py` |
 | Qualidade v2 | `broker/quality_team_progress.py`, `broker/quality_review_attestation.py`, `quality_phase_tools.py`, `quality_review_stop.py` |
 | Provas de leitura | `broker/quality_review_reads.py`, `broker/read_stream_receipts.py`, `artifact_read_evidence.py` |
+| Paginação em qualificação, não instalada | `quality_review_paging.py`, integração inicial em `quality_review_stop.py` |
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
 | Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
@@ -48,10 +49,19 @@ flowchart TD
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
 v2, não uma dispensa de execução. O feedback no mesmo turno está instalado;
-o planejamento estrito de páginas pendentes e a memória de leituras resistente
-à compactação ainda não. O revisor pode consumir o orçamento com chamadas sem
-progresso; a atestação bloqueia aprovação incompleta, mas não resolve sozinha
-esse impasse. A projeção da interface não substitui os recibos ACP do controlador.
+o planejador e o diário de páginas já capturadas existem em fonte, mas ainda
+não estão instalados. O diário é limitado a 512 pares/8 MiB, vincula execução
+e manifesto, não descarta evidências para caber no limite e sugere até 16
+páginas com um offset comum. IDs diferentes não transformam os mesmos bytes
+em progresso. Divergências de conteúdo bloqueiam, não reiniciam a inspeção.
+
+Captura anterior a toda compactação, enforcement nos handlers e saída
+estruturada no limite do loop ainda precisam de implementação e qualificação.
+No runtime atual, o revisor pode consumir o orçamento com chamadas sem progresso;
+a atestação bloqueia aprovação incompleta, mas não resolve sozinha esse impasse.
+A projeção da interface e o diário consultivo do worker não substituem os recibos
+ACP do controlador. O diário não é persistência entre reinícios ou memória de
+projeto; nenhuma evidência sintética da fixture vira leitura nativa do revisor.
 
 O proxy aceita um conjunto finito de limites de corpo, até 2 MiB, separado do
 teto persistente de chamadas. Capacidade de transporte não é capacidade de

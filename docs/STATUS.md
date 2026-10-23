@@ -50,9 +50,10 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
 - A revisão nativa mais recente falhou após consumir 40 iterações. A inspeção
   integral foi comprovada para 57 dos 71 arquivos; não houve aprovação nem
   congelamento dos testes, Green ou homologação nessa linhagem.
-- A última suíte completa registrada antes do rascunho de paginação teve
-  **4.329 testes aprovados e oito skips preexistentes**. Não foi reexecutada
-  nesta atualização documental; o rascunho novo não está incluído nesse número.
+- A suíte offline no estado final da primeira correção de paginação executou
+  **4.348 testes: 4.340 aprovados e oito skips preexistentes**, sem falhas.
+  Os 55 testes focados também passaram. Isso qualifica o comportamento offline,
+  não instalação, execução física do novo módulo ou autonomia nativa.
 
 ## Bloqueio atual
 
@@ -64,10 +65,18 @@ pendentes. O erro genérico nativo não deve ser confundido com a antiga rejeiç
 por tamanho ou com uma falha funcional demonstrada do produto.
 
 O feedback antes do encerramento está instalado, mas ainda não resolve essa
-classe de esgotamento. O diário de leituras resistente à compactação, a seleção
-de páginas pendentes e a interrupção estruturada por falta de progresso estão
-**pendentes de implementação e qualificação**. Não há nova aprovação implícita
-nem autorização para repetir a mesma tentativa indefinidamente.
+classe de esgotamento. O núcleo do diário limitado e do planejador de páginas
+pendentes foi implementado **em fonte, ainda não instalado**. O feedback em fonte
+preserva páginas já capturadas fora da conversa, reconhece progresso parcial e
+interrompe bytes completos divergentes em vez de recomendar releitura infinita.
+Uma fixture de 71 arquivos e 81 páginas concluiu a fila simulada dentro de 40
+iterações, sem páginas repetidas ou além do fim; não é execução de modelo real.
+
+Ainda faltam captura antes de qualquer compactação, restrição efetiva das
+chamadas às páginas planejadas, interrupção estruturada durante o loop e
+qualificação Docker/ACP/nativa. A memória é local à execução, não recuperação
+entre reinícios ou memória compartilhada entre perfis. Não há nova aprovação
+implícita nem autorização para repetir a mesma tentativa indefinidamente.
 
 Na consulta de referência, o controlador está sob manutenção selada, sem
 execuções ativas, e o proxy do modelo está parado. Essa condição pode mudar:
@@ -78,7 +87,9 @@ serviços, libera manutenção ou consome chamadas ao provedor.
 
 1. Implementar paginação orientada por evidência: preservar leituras reais entre
    compactações, selecionar apenas páginas pendentes e reconhecer progresso
-   parcial. Não reduzir o escopo de aprovação ou ampliar as 40 iterações.
+   parcial. O núcleo e a integração inicial ao feedback já estão em fonte;
+   completar coleta e enforcement. Não reduzir o escopo de aprovação ou ampliar
+   as 40 iterações.
 2. Qualificar offline e em Docker/ACP os casos de múltiplos arquivos, cache,
    fim de arquivo, contexto compactado, ausência de progresso e fim do orçamento.
 3. Instalar sob manutenção e preparar recuperação vinculada à condição realmente

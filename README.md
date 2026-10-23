@@ -30,6 +30,10 @@ esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
 O controlador voltou à manutenção selada e o proxy está parado na consulta de
 23 de outubro. Ainda faltam paginação orientada por progresso e recuperação
 qualificada para essa nova condição; não houve aprovação da revisão ou entrega.
+O núcleo da paginação já existe em fonte, com diário limitado por execução,
+progresso por novas linhas e fila simulada de 71 arquivos/81 páginas sem
+repetição. Ainda não está instalado: faltam captura antes da compactação,
+enforcement no handler, saída estruturada do loop e qualificação Docker/ACP/nativa.
 
 **Resumo atualizado:** [status e estimativas de prontidão](docs/STATUS.md),
 [validações](docs/VALIDATION.md) e [próximos marcos](docs/ROADMAP.md).
@@ -1614,9 +1618,10 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 
 O estado vigente em **23 de outubro de 2026** está em
 [STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente falhou sem leitura
-integral, não congelou os testes e não chegou à homologação. A última suíte
-completa registrada teve 4.329 testes aprovados e oito skips preexistentes;
-não foi reexecutada nesta atualização documental. A estimativa de prontidão
+integral, não congelou os testes e não chegou à homologação. A suíte offline
+com a primeira correção de paginação executou 4.348 testes: 4.340 aprovados e
+oito skips preexistentes, sem falhas. A correção ainda não está instalada nem
+qualificada em agente real. A estimativa de prontidão
 não substitui um novo ciclo sem intervenções nem uma instalação limpa.
 
 **Resultados históricos, referência em 8 de outubro de 2026:**

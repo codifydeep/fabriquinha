@@ -110,6 +110,40 @@ class QualityReviewStopTests(unittest.TestCase):
         exhausted=stop.guard(agent,self.messages()[:-2],json.dumps(self.verdict),0,self.env)
         self.assertTrue(exhausted['blocked']);self.assertEqual(exhausted['attempt'],3)
 
+    def test_partial_line_progress_prevents_false_stall_before_file_completion(self):
+        agent=SimpleNamespace()
+        first=stop.guard(agent,self.page('tests/test_new.py','b',1,3,'1|one'),json.dumps(self.verdict),39,self.env)
+        second=stop.guard(agent,self.page('tests/test_new.py','c',2,3,'2|two'),json.dumps(self.verdict),38,self.env)
+        self.assertNotEqual(first['progress_sha256'],second['progress_sha256'])
+        self.assertEqual(second['repeated_without_progress'],1);self.assertFalse(second['blocked'])
+        self.assertEqual(second['next_reads'],[dict(path='/delivery/app.py',offset=1,limit=100)])
+
+    def test_same_review_journal_survives_dropped_context_without_granting_approval(self):
+        agent=SimpleNamespace()
+        stop.guard(agent,self.messages()[:2],json.dumps(self.verdict),39,self.env)
+        # Old app.py read is no longer in the model conversation. The journal
+        # retains its actual result; controller attestation remains independent.
+        result=stop.apply_request(agent,self.api_request(),self.messages()[2:4],38,self.env)
+        self.assertIn('"complete_files": 1',result['messages'][0]['content'])
+        self.assertIn('"offset": 3',result['messages'][0]['content'])
+        final=stop.guard(agent,self.messages()[-2:],json.dumps(self.verdict),37,self.env)
+        self.assertIsNone(final)
+        self.assertFalse(agent._quality_review_journal.plan()['tests_approved'])
+
+    def test_duplicate_content_under_new_id_is_not_progress(self):
+        agent=SimpleNamespace();one=self.page('app.py','a',1,1,'1|VALUE=0')
+        stop.guard(agent,one,json.dumps(self.verdict),39,self.env)
+        repeat=self.page('app.py','another',1,1,'1|VALUE=0')
+        second=stop.guard(agent,repeat,json.dumps(self.verdict),38,self.env)
+        self.assertTrue(second['blocked']);self.assertEqual(second['repeated_without_progress'],2)
+
+    def test_valid_rejection_cannot_hide_conflicting_other_snapshot_bytes(self):
+        choice={**self.verdict,'action':'request_changes','findings':[dict(path='tests/test_new.py')]}
+        bad=self.messages();bad[1]['content']=bad[1]['content'].replace('VALUE=0','VALUE=1')
+        result=stop.guard(SimpleNamespace(),bad,json.dumps(choice),39,self.env)
+        self.assertIsNotNone(result);self.assertTrue(result['blocked'])
+        self.assertEqual(result['inspection_error'],'snapshot_read_evidence_invalid')
+
     def test_verified_progress_has_no_four_handoff_cap_inside_the_original_budget(self):
         config=copy.deepcopy(self.config)
         inventory={f'file-{n}.py':dict(bytes=2,sha256=hashlib.sha256(b'x\n').hexdigest()) for n in range(7)}
@@ -139,7 +173,8 @@ class QualityReviewStopTests(unittest.TestCase):
     def test_no_reads_from_prose_or_wrong_bytes_or_denied_tool_calls(self):
         bad=self.messages();bad[1]['content']=bad[1]['content'].replace('VALUE=0','VALUE=1')
         result=stop.guard(SimpleNamespace(),bad,json.dumps(self.verdict),39,self.env)
-        self.assertEqual(result['remaining_files'],1);self.assertEqual(result['next_reads'][0]['path'],'/delivery/app.py')
+        self.assertEqual(result['remaining_files'],1);self.assertEqual(result['next_reads'],[])
+        self.assertTrue(result['blocked']);self.assertEqual(result['inspection_error'],'snapshot_read_evidence_invalid')
         denied=self.page('app.py','denied',1,1,'1|VALUE=0');denied[-1]['content']='{"error":"denied"}'
         self.assertEqual(stop.pairs(denied),[])
         self.assertEqual(stop.pairs([dict(role='assistant',content=json.dumps(self.messages()))]),[])

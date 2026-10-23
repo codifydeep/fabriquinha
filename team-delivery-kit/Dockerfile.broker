@@ -88,7 +88,7 @@ COPY docker_grouping.py /docker_grouping.py
 COPY broker/acp_probe.py /acp_probe.py
 COPY broker/acp_transport.py /acp_transport.py
 COPY quality_phase_tools.py /quality_phase_tools.py
-COPY quality_review_verdict.py quality_review_stop.py /
+COPY quality_review_verdict.py quality_review_stop.py quality_review_paging.py /
 COPY broker/quality_review_completion_receipts.py /
 COPY broker/quality_review_history.py /
 COPY broker/quality_review_completion_recovery.py /

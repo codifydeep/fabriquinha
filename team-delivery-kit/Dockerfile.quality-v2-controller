@@ -28,7 +28,7 @@ COPY broker/quality_review_completion_recovery.py /
 COPY broker/quality_review_capacity_recovery.py proxy_capacity_contract.py /
 COPY model_proxy.py /qualified_proxy_source.py
 COPY install_quality_review_stop.py /
-COPY quality_review_verdict.py quality_review_stop.py /
+COPY quality_review_verdict.py quality_review_stop.py quality_review_paging.py /
 COPY broker/quality_implementation_admission.py /
 COPY broker/quality_implementation_launch.py /
 COPY broker/quality_delivery_capture.py /

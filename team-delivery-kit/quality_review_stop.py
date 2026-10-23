@@ -8,8 +8,8 @@ import hashlib
 import json
 import os
 import re
-from artifact_read_evidence import coverage
 from quality_review_verdict import parse,required_reads
+from quality_review_paging import Journal
 try:import quality_review_reads as reads
 except ImportError:from broker import quality_review_reads as reads
 
@@ -79,30 +79,52 @@ def pairs(messages):
     return result
 
 
-def inspect(config,messages,output):
+def remember(agent,config,messages):
+    """Keep actual reads outside model context, scoped to this one execution.
+
+    This is worker advice only. A future controller acceptance must still use
+    its independent native stream; this journal cannot create that evidence.
+    """
+    context=validate_context(config['review_context'],config['read_paths'])
+    journal=getattr(agent,'_quality_review_journal',None)
+    if journal is None:
+        journal=Journal(config['request_id'],context['files'],context['packet']['manifest_sha256'],config['read_paths'])
+        agent._quality_review_journal=journal
+    require(journal.request_id==config['request_id']
+        and journal.manifest_sha256==context['packet']['manifest_sha256'])
+    journal.add(pairs(messages))
+    return journal
+
+
+def inspect(config,messages,output,*,journal=None):
     context=validate_context(config['review_context'],config['read_paths'])
     packet=context['packet'];required=config['read_paths'];valid=True
     try:required=required_reads(parse(output,packet),packet,required)
     except (ValueError,KeyError,TypeError,UnicodeError):valid=False
-    observed=pairs(messages)
+    if journal is None:
+        journal=Journal(config['request_id'],context['files'],packet['manifest_sha256'],config['read_paths'])
+        journal.add(pairs(messages))
+    require(journal.request_id==config['request_id'] and journal.manifest_sha256==packet['manifest_sha256'])
+    observed=journal.messages()
     assessment=reads.assessment(context['files'],packet['manifest_sha256'],config['read_paths'],observed,required_paths=required)
-    normalized=[]
-    for i in range(0,len(observed),2):normalized.extend(reads.page(observed[i:i+2])[2])
-    pages=coverage(normalized,include_content=True)
-    next_reads=[]
-    for rejected in assessment['rejected_files'][:16]:
-        path='/delivery/'+rejected['path'];page=pages.get(path,{})
-        lines=page.get('line_content',{});total=page.get('total_lines',0)
-        offset=next((n for n in range(1,total+1) if n not in lines),1)
-        next_reads.append(dict(path=path,offset=offset,limit=100))
+    inspection_error=None
+    try:
+        plan=journal.plan(required_paths=required)
+        next_reads=plan['pages'];progress_sha256=plan['progress_sha256']
+    except (ValueError,KeyError,TypeError,UnicodeError):
+        # Conflicting or wrong complete bytes cannot be repaired by rereading
+        # the immutable snapshot at offset 1. Stop with preserved diagnostics.
+        next_reads=[];inspection_error='snapshot_read_evidence_invalid'
+        progress_sha256=hashlib.sha256(json.dumps(observed,sort_keys=True).encode()).hexdigest()
     result=dict(operation='advisory_review_completion_v1',verdict_format='valid' if valid else 'invalid',
         manifest_sha256=packet['manifest_sha256'],required_files=assessment['required_files'],
         complete_files=assessment['complete_files'],remaining_files=len(assessment['rejected_files']),
         next_reads=next_reads,tests_approved=False,execution_authorized=False,delivery_approval=False)
     # A changed prose answer is not new evidence; only verified reads/format can
     # change this fingerprint. Bound to the same snapshot and execution below.
-    fingerprint=dict(verdict_format=result['verdict_format'],reads=assessment)
+    fingerprint=dict(verdict_format=result['verdict_format'],reads=assessment,coverage_sha256=progress_sha256)
     result['progress_sha256']=hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
+    if inspection_error:result['inspection_error']=inspection_error
     return result
 
 
@@ -121,7 +143,8 @@ def apply_request(agent,request,messages,remaining,environment=None):
     require(state['identity']==(config['request_id'],config['review_context']['packet']['manifest_sha256'])
         and state.get('blocked') is False and type(remaining) is int and 0<=remaining<ITERATION_LIMIT
         and isinstance(request,dict) and isinstance(request.get('messages'),list))
-    observed=inspect(config,messages,state['candidate'])
+    observed=inspect(config,messages,state['candidate'],journal=remember(agent,config,messages))
+    require('inspection_error' not in observed)
     note=dict(operation='controller_review_continuation_v1',request_id=config['request_id'],
         manifest_sha256=observed['manifest_sha256'],remaining_iterations=remaining,
         complete_files=observed['complete_files'],remaining_files=observed['remaining_files'],
@@ -161,14 +184,14 @@ def guard(agent,messages,output,remaining,environment=None):
     if not enabled(environment):return None
     require(type(remaining) is int and 0<=remaining<=ITERATION_LIMIT)
     config=json.loads(environment['DELIVERY_QUALITY_PHASE_JSON'])
-    result=inspect(config,messages,output)
-    if result['verdict_format']=='valid' and not result['remaining_files']:return None
+    result=inspect(config,messages,output,journal=remember(agent,config,messages))
+    if result['verdict_format']=='valid' and not result['remaining_files'] and 'inspection_error' not in result:return None
     identity=(config['request_id'],result['manifest_sha256'])
     old=getattr(agent,'_quality_review_completion',None)
     require(old is None or old['identity']==identity)
     attempts=1+(old['attempts'] if old else 0)
     repeated=1+(old['repeated'] if old and old['progress_sha256']==result['progress_sha256'] else 0)
-    blocked=repeated>=2 or attempts>MAX_FEEDBACK or remaining<=0
+    blocked=repeated>=2 or attempts>MAX_FEEDBACK or remaining<=0 or 'inspection_error' in result
     state=dict(identity=identity,attempts=attempts,repeated=repeated,progress_sha256=result['progress_sha256'],
         candidate=output,blocked=blocked)
     agent._quality_review_completion=state

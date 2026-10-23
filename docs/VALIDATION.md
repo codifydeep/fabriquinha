@@ -13,12 +13,16 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa mais recente | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Sem congelamento, Green ou homologação. |
-| Última suíte completa registrada | 4.329 testes aprovados, oito skips preexistentes; anterior ao rascunho de paginação, não reexecutada nesta atualização. |
+| Paginação e feedback em fonte | Diário limitado e fila pendente; fixture de 71 arquivos/81 páginas dentro de 40 iterações simuladas. Não instalado nem qualificado em agente real. |
+| Última suíte completa registrada | 4.348 executados: 4.340 aprovados, oito skips preexistentes, sem falhas. Inclui a primeira correção de paginação e a vinculação de seu hash à qualificação. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 O bloqueio atual envolve leituras repetidas e ausência de progresso, não a
-capacidade já corrigida do proxy. A solução de paginação e recuperação precisa
-ser implementada, instalada e comprovada antes de outra tentativa. Na consulta
+capacidade já corrigida do proxy. O núcleo de paginação e a integração inicial
+ao feedback passaram por 55 testes focados. Captura antes de toda compactação,
+enforcement das páginas nos handlers e saída estruturada durante o loop ainda
+precisam ser implementados; instalação e provas Docker/ACP/nativas permanecem
+obrigatórias antes de outra tentativa. Na consulta
 de referência, a manutenção está selada e o proxy parado; confirme o estado vivo
 antes de agir. Nenhum resultado histórico abaixo substitui esse diagnóstico.
 

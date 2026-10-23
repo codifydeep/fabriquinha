@@ -8,7 +8,7 @@ FROM delivery-kit-generic-calibration:20261011.7
 USER root
 COPY quality_phase_tools.py portable_contract.py test_runner_policy.py broker/review_tool_policy.py /opt/hermes/
 COPY quality_phase_tools.py portable_contract.py test_runner_policy.py model_policy.py broker/worker_model_config.py /
-COPY quality_review_stop.py quality_review_verdict.py artifact_read_evidence.py /opt/hermes/
+COPY quality_review_stop.py quality_review_paging.py quality_review_verdict.py artifact_read_evidence.py /opt/hermes/
 COPY broker/quality_review_reads.py /opt/hermes/
 COPY install_quality_review_stop.py /install_quality_review_stop.py
 RUN python /install_quality_review_stop.py

@@ -27,8 +27,11 @@ not, by itself, a product defect or a precise infrastructure diagnosis.
 Pending hardening must retain actual read evidence across context compaction,
 plan only missing pages and report stalled progress or budget exhaustion
 structurally. Partial new coverage must count as progress; repeated calls,
-prose and cache responses without content must not. This hardening is not yet
-implemented or qualified. Approval still requires independent, byte-bound
+prose and cache responses without content must not. The bounded journal and
+pending-page planner now exist in source with initial pre-stop integration and
+offline tests. They are not installed. Capture before every compaction, handler
+enforcement and loop-exhaustion handling remain pending, as do physical/native
+qualification. Approval still requires independent, byte-bound
 inspection of the required scope, exact verdict and native identities. No
 operator may manufacture missing reads or convert failure into approval.
 
