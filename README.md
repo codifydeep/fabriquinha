@@ -22,6 +22,17 @@ flags de execução desligadas e manutenção selada. A instalação preservou o
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
 após backup compactado e prova real de restauração. Isso não habilita nem
 qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalação.
+O runtime de referência também já recebeu seletores explícitos para as seis
+imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO, ainda
+com todas as flags desligadas. `quality_runtime_configuration.py` confere o modo
+dos responsáveis cadastrados e os metadados das imagens (usuário sem privilégios,
+entrypoints fixos, fases suportadas, ausência de volumes herdados e credenciais).
+O instalador aceita esses oito seletores por `--runtime-config`; não aceita
+flags de ativação, modelo, comandos, sockets ou credenciais nesse documento.
+Os seletores ficam presos à identidade da instalação e em arquivo privado.
+As imagens atuais passaram novamente pelo encadeamento Docker/ACP autor → Red →
+revisão somente leitura e pelo bloqueio de testes/cópia pós-Green. Esses probes
+usam autoridade nativa sintética e não aprovam testes, produto ou homologação.
 O observador de Red real
 também passou por controles sintéticos em Docker isolado, sem uma implementação
 positiva prévia. A ingestão persistente de Red também está implementada em fonte:

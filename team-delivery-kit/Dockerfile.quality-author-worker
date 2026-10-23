@@ -2,7 +2,7 @@
 # no second multi-gigabyte filesystem copy. This is a local-only base tag; the
 # expected local config ID is f85484409c92b52e7db70b8200b576b7e88da10372920f092c0508f86396c172.
 # It is not a distributable registry manifest digest. Pin/qualify output ID.
-# Retain delivery-kit-quality-author-worker:20261022.4 as the last full
+# Retain delivery-kit-quality-author-worker:20261022.7 as the last full
 # author/Red/review ACP canary rollback until its successor passes that chain.
 FROM delivery-kit-generic-calibration:20261011.7
 USER root

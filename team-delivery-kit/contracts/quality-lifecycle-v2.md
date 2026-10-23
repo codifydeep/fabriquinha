@@ -139,6 +139,18 @@ arbitrary socket paths or volume changes are rejected. No socket is added to a
 worker or helper. Preview installation does not release maintenance or qualify
 an autonomous delivery.
 
+The optional private `--runtime-config` allows exactly six immutable quality
+image selectors and two distinct enrolled planning-role identities (Tech Lead
+and CTO). `quality_runtime_configuration.py` checks current controller identity,
+sealed/off state, role modes, image IDs, non-root users, fixed entrypoints,
+supported phases/operations and absence of inherited volumes or credentials.
+Activation flags, model settings, commands, mounts and gate exceptions are not
+accepted inputs. The exact selectors bind to the installation operation;
+existing credentials, resources and mounts retain their preservation checks.
+These selectors are installed in the reference while execution remains off.
+Current worker/runner images passed synthetic Docker/ACP and frozen-test/copy
+probes; no native task or release was authorized by configuring them.
+
 The backup wrapper accepts a fresh `--backup-id` under the existing sealed
 operation, so a new recovery point does not open a dispatch window. The explicit
 compressed-size ceiling is checked with scratch/free-space headroom; existing

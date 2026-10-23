@@ -91,7 +91,9 @@ def interpolation(before,namespace,companions):
     return values
 
 
-def verify_preservation(before,after,image,*,socket_daemon_verified=False):
+def verify_preservation(before,after,image,*,socket_daemon_verified=False,runtime=None):
+    from quality_runtime_configuration import syntax
+    runtime=syntax(runtime) if runtime is not None else {}
     require(after['Image']==image and after['State']['Running'] is True)
     old_mounts=json.loads(json.dumps(before['Mounts']));new_mounts=json.loads(json.dumps(after['Mounts']))
     socket_sources={'/run/host-services/docker.proxy.sock','/var/run/docker.sock'}
@@ -116,12 +118,15 @@ def verify_preservation(before,after,image,*,socket_daemon_verified=False):
         return sorted(rows)
     require(binds(before)==binds(after))
     old=dict(v.split('=',1) for v in before['Config'].get('Env',[]));new=dict(v.split('=',1) for v in after['Config'].get('Env',[]))
-    require(all(new.get(k)==v for k,v in old.items() if k not in FLAGS) and all(new.get(k)=='0' for k in FLAGS)
-        and set(new)<=set(old)|set(FLAGS))
+    require(all(new.get(k)==v for k,v in old.items() if k not in FLAGS and k not in runtime)
+        and all(new.get(k)==v for k,v in runtime.items()) and all(new.get(k)=='0' for k in FLAGS)
+        and set(new)<=set(old)|set(FLAGS)|set(runtime))
     return origin_changed
 
 
-def install(namespace,image,operation):
+def install(namespace,image,operation,*,runtime=None):
+    from quality_runtime_configuration import syntax,probe
+    if runtime is not None:runtime=syntax(runtime)
     require(re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}',namespace) and re.fullmatch('sha256:[a-f0-9]{64}',image)
         and str(uuid.UUID(operation))==operation)
     private=ROOT/('.local-'+namespace.removeprefix('delivery-kit-'))/'backups'/('quality-preview-install-'+operation)
@@ -129,12 +134,14 @@ def install(namespace,image,operation):
     private.mkdir(mode=0o700,exist_ok=True);require(private.resolve()==private and not private.stat().st_mode&0o077)
     statefile=private/'state.json';name=namespace+'-execution-broker-1';env=environment()
     if statefile.exists():
-        state=json.loads(statefile.read_bytes());require(state['namespace']==namespace and state['image']==image and state['operation']==operation)
+        state=json.loads(statefile.read_bytes());require(state['namespace']==namespace and state['image']==image
+            and state['operation']==operation and state.get('runtime')==runtime)
         if state['stage']=='installed_disabled':return state['receipt']
         require(state['stage'] in ('planned','backed_up','recreate_intent'))
         before=json.loads((private/'before.json').read_bytes())
     else:
         maintenance,idle=require_idle(namespace);before=inspect(name)
+        if runtime is not None:require(probe(namespace,before['Image'],runtime)==runtime)
         info=json.loads(command(['docker','image','inspect',image]).stdout)[0]
         require(info['Id']==image and info['Config']['Labels'].get('delivery-kit.component')=='quality-v2-controller')
         argv,files=configuration(before,namespace)
@@ -146,6 +153,7 @@ def install(namespace,image,operation):
         pin=configdir/('quality-preview-'+operation+'.env')
         values=interpolation(before,namespace,{s:inspect(namespace+'-'+s+'-1') for s in ('backend','frontend','model-proxy')})
         values['DELIVERY_KIT_QUALITY_V2_CONTROLLER_IMAGE']=image
+        if runtime is not None:values.update(runtime)
         content=''.join(k+'='+v+'\n' for k,v in sorted(values.items()))
         if pin.exists():
             require(not pin.is_symlink() and not pin.stat().st_mode&0o077)
@@ -163,17 +171,23 @@ def install(namespace,image,operation):
         for path in files:argv+=['-f',str(path)]
         overlay=ROOT/'compose.quality-v2-preview.yaml'
         if overlay not in files:argv+=['-f',str(overlay)]
+        runtime_overlay=ROOT/'compose.quality-v2-runtime.yaml'
+        if runtime is not None and runtime_overlay not in files:argv+=['-f',str(runtime_overlay)]
         save(private/'before.json',before)
         resolved=json.loads(command([*argv,'config','--format','json'],env=env).stdout)
         require(resolved['services']['execution-broker']['image']==image)
         old=dict(v.split('=',1) for v in before['Config'].get('Env',[]))
         target=resolved['services']['execution-broker']['environment']
-        require(all(target.get(k)=='0' for k in FLAGS) and all(k in FLAGS or old.get(k)==v for k,v in target.items()))
+        explicit=runtime or {}
+        require(all(target.get(k)=='0' for k in FLAGS)
+            and all(target.get(k)==v for k,v in explicit.items())
+            and all(k in FLAGS or k in explicit or old.get(k)==v for k,v in target.items()))
         save(private/'resolved-private.json',resolved)
         others=[json.loads(line) for line in command(['docker','ps','-a','--no-trunc','--format','json']).stdout.splitlines() if line]
         save(private/'other-containers.json',[dict(id=c['ID'],names=c['Names'],status=c['State']) for c in others if c['Names']!=name])
         state=dict(namespace=namespace,image=image,operation=operation,stage='planned',deadline=time.time()+900,
             maintenance_operation=maintenance['operation_id'],argv=argv,previous_id=before['Id'])
+        if runtime is not None:state['runtime']=runtime
         save(statefile,state)
     if state['stage']=='planned':
         maintenance,_=require_idle(namespace)
@@ -212,7 +226,7 @@ def install(namespace,image,operation):
     inside=command(['docker','exec',after['Id'],'python','-c',
         'import sys;sys.path.insert(0,"/");import broker as b;print(b.docker("GET","/info")["ID"])']).stdout.strip()
     require(bool(host_daemon) and host_daemon==inside)
-    origin_changed=verify_preservation(before,after,image,socket_daemon_verified=True)
+    origin_changed=verify_preservation(before,after,image,socket_daemon_verified=True,runtime=runtime)
     about=Authority(namespace,image).about()
     require(about['maintenance'] is True and about['v2_enabled'] is False and about['implementation_enabled'] is False)
     maintenance,idle=require_idle(namespace);require(maintenance['operation_id']==state['maintenance_operation'])
@@ -223,10 +237,15 @@ def install(namespace,image,operation):
         previous_image=before['Image'],container_id=after['Id'],maintenance_sealed=True,native_active=0,active_leases=0,
         data_mounts_preserved=True,docker_socket_daemon_verified=True,docker_socket_origin_alias_changed=origin_changed,
         other_containers_unchanged=True,model_calls=0,delivery_approval=False)
+    if runtime is not None:receipt['runtime_configured_execution_disabled']=True
     state.update(stage='installed_disabled',receipt=receipt);save(statefile,state);return receipt
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--namespace',required=True);p.add_argument('--image',required=True)
     p.add_argument('--operation',required=True)
-    args=p.parse_args();print(json.dumps(install(args.namespace,args.image,args.operation),sort_keys=True))
+    p.add_argument('--runtime-config',help='Private exact image/role selectors; all execution flags stay off')
+    args=p.parse_args()
+    from quality_runtime_configuration import load
+    runtime=load(args.runtime_config) if args.runtime_config else None
+    print(json.dumps(install(args.namespace,args.image,args.operation,runtime=runtime),sort_keys=True))

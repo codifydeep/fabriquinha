@@ -1,0 +1,13 @@
+# Immutable runtime selectors only. The preview overlay keeps all four flags off.
+# This file adds no mounts, credentials, ports, model changes or execution rights.
+services:
+  execution-broker:
+    environment:
+      BROKER_QUALITY_PREP_IMAGE: ${BROKER_QUALITY_PREP_IMAGE:?Explicit immutable prep image required}
+      BROKER_QUALITY_WORKER_IMAGE: ${BROKER_QUALITY_WORKER_IMAGE:?Explicit immutable worker image required}
+      BROKER_QUALITY_COPY_IMAGE: ${BROKER_QUALITY_COPY_IMAGE:?Explicit immutable snapshot image required}
+      BROKER_QUALITY_RED_IMAGE: ${BROKER_QUALITY_RED_IMAGE:?Explicit immutable Red image required}
+      BROKER_QUALITY_REVIEW_WORKER_IMAGE: ${BROKER_QUALITY_REVIEW_WORKER_IMAGE:?Explicit immutable review image required}
+      BROKER_QUALITY_GREEN_JOB_IMAGE: ${BROKER_QUALITY_GREEN_JOB_IMAGE:?Explicit immutable Green image required}
+      BROKER_QUALITY_TECHLEAD: ${BROKER_QUALITY_TECHLEAD:?Explicit native planning identity required}
+      BROKER_QUALITY_CTO: ${BROKER_QUALITY_CTO:?Explicit independent native planning identity required}
