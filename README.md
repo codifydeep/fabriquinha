@@ -18,8 +18,8 @@ negativos obrigatórios antes do merge. A política, o executor offline e o cada
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
-em modo exclusivo que mantém os fluxos legados inativos. A referência retomou
-a qualificação controlada após manutenção selada, sem apagar os bloqueios antigos.
+em modo exclusivo que mantém os fluxos legados inativos. A referência está
+novamente selada para diagnosticar um bootstrap falho, sem apagar os bloqueios antigos.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
@@ -62,10 +62,13 @@ idêntica; históricos nativos só são filtrados por vínculos autenticados exa
 O canário físico autor → Red → revisão somente leitura → correção tests-only
 passou em Docker/ACP, com rejeição nativa sintética, sem prompts/modelo ou
 aprovação. Verificou o seed e as permissões reais; nove auxiliares foram retirados.
-O retorno com agentes reais ainda precisa ser qualificado. O conjunto foi instalado
-após backup/restauração conferidos. O primeiro retorno foi encaminhado pelo próprio
-coordenador, sem criar outro card ou atribuir manualmente uma tarefa ao autor.
-Isso não comprova correção, novo Red, aprovação, Green ou homologação.
+O retorno real ocorreu pelo próprio coordenador, no mesmo card e autor, sem
+atribuição manual: o agente corrigiu os testes e o novo snapshot passou pelo Red
+completo (381 Python, falhas somente no teste novo; 36 Node aprovados, sem skips).
+A revisão seguinte foi acionada e admitida, mas falhou no bootstrap antes de ACP
+ou chamada ao modelo. Permanece bloqueada, com evidência preservada; o proxy foi
+parado. A causa do bootstrap e sua recuperação ainda precisam ser qualificadas.
+Isso não comprova congelamento aprovado, Green ou homologação.
 Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
 primeiro tick interrompido somente com fila vazia, serviço descarregado e
 desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado
