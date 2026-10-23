@@ -54,6 +54,11 @@ def env(info):
     require(len(rows)==len(value));return value
 
 
+def active_sources(files):
+    overlay=ROOT/'compose.quality-v2-exclusive.yaml'
+    return [*[p for p in files if p!=overlay],overlay]
+
+
 def verify(before,after):
     original=env(before);actual=env(after)
     require(after['Name']==before['Name'] and all(after['Config']['Labels'].get(k)==before['Config']['Labels'].get(k)
@@ -106,8 +111,7 @@ def activate(namespace,image,path,pin,operation,install_operation):
             with compressed.open('rb') as stream:
                 require(hashlib.file_digest(stream,'sha256').hexdigest()==proof['archive_sha256'])
             argv,files=install.configuration(before,namespace)
-            require(ROOT/'compose.quality-v2-exclusive.yaml' not in files)
-            for file in [*files,ROOT/'compose.quality-v2-exclusive.yaml']:argv+=['-f',str(file)]
+            for file in active_sources(files):argv+=['-f',str(file)]
             resolved=json.loads(install.command([*argv,'config','--format','json'],env=install.environment()).stdout)
             require(resolved['services']['execution-broker']['image']==image)
             target=resolved['services']['execution-broker']['environment'];original=env(before)

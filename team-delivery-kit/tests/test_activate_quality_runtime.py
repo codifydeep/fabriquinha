@@ -36,6 +36,13 @@ class ActivationTests(unittest.TestCase):
         self.before['Config']['Env'].append('BROKER_QUALITY_EXCLUSIVE_ENABLED=1')
         activation.verify(self.before,self.after)
 
+    def test_reactivation_moves_the_existing_exclusive_overlay_after_disabled_preview(self):
+        active=activation.ROOT/'compose.quality-v2-exclusive.yaml'
+        preview=activation.ROOT/'compose.quality-v2-preview.yaml'
+        core=activation.ROOT/'compose.eval.yaml'
+        result=activation.active_sources([core,active,preview])
+        self.assertEqual(result,[core,preview,active]);self.assertEqual(result.count(active),1)
+
     def prepare(self):
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);root=Path(temp.name).resolve()
         root.chmod(0o700);private=root/'.local-test';private.mkdir(mode=0o700)
