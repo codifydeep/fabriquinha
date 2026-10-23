@@ -19,27 +19,30 @@ persistente e imutável de novas execuções estão implementados em fonte, incl
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
 em modo exclusivo que mantém os fluxos legados inativos. A manutenção de
-bootstrap foi concluída. O bloqueio atual é o esgotamento das 40 iterações da
-revisão com leituras repetidas e inspeção incompleta, sem apagar ou converter
-bloqueios antigos.
+bootstrap foi concluída. A revisão continua tecnicamente bloqueada; instalação,
+fim de turno e aprovação independente são estados distintos. Os bloqueios
+anteriores permanecem preservados.
 O proxy corrigido foi qualificado em HTTP real isolado e instalado sob manutenção:
 capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, sem
 credenciais nos testes. A recuperação da falha por tamanho foi registrada e o
 ensaio seguinte ultrapassou o limite antigo sem aquela rejeição, mas falhou ao
 esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
-O controlador voltou à manutenção selada e o proxy está parado na consulta de
-23 de outubro. Ainda faltam paginação orientada por progresso e recuperação
-qualificada para essa nova condição; não houve aprovação da revisão ou entrega.
-A candidata de paginação contém diário limitado por execução, captura no loop,
-enforcement no handler e saídas estruturadas. A fila simulada percorreu 71
-arquivos/81 páginas sem repetição. O canário Hermes/ACP passou com sete respostas
-locais fixas, incluindo duplicatas negadas e limites de progresso/orçamento.
-A extensão percorreu 219 páginas e 563 KB: duas compactações reais retiraram 197
-pares da conversa, sem perder cobertura no diário. Foram 32 respostas locais no
-conjunto completo. Ainda não está instalada: faltam cutover controlado,
-recuperação específica e qualificação nativa. Nenhuma chamada paga foi usada.
+O hardening de paginação já foi instalado: controlador `20261023.30` e worker
+`20261023.6`, com diário limitado, captura no loop e paradas estruturadas.
+O canário Hermes/ACP percorreu 219 páginas e 563 KB; duas compactações reais
+retiraram 197 pares da conversa sem perder cobertura no diário. Foram 32
+respostas locais fixas, sem chamadas externas nessa qualificação.
+Após recuperação restrita, o coordenador iniciou outra revisão real. Ela parou
+por falta de progresso depois de sete chamadas, com 16/71 arquivos completos
+e 33 iterações restantes. A lacuna agora identificada é que a fila, o schema
+restrito e o gate por página só são armados após uma resposta final prematura;
+o caminho só de ferramentas desde o início ainda precisa ser corrigido e
+qualificado. Não houve aprovação, congelamento dos testes ou entrega.
+Na consulta de 23 de outubro, a manutenção está selada e drenada, mas o proxy
+permanece ligado. A consulta documental não altera esse estado.
 
-**Resumo atualizado:** [status e estimativas de prontidão](docs/STATUS.md),
+**Documentação:** [índice de leitura](docs/README.md),
+[status e estimativas de prontidão](docs/STATUS.md),
 [validações](docs/VALIDATION.md) e [próximos marcos](docs/ROADMAP.md).
 As notas detalhadas a seguir preservam etapas históricas; suas referências a
 “candidata”, instalação pendente ou próximo ensaio não são inventário vivo.
@@ -1482,8 +1485,10 @@ flowchart TD
     F --> CG{Contrato de qualidade ativo validado?}
     CG -->|Sim| G[TDD: Red real registrado]
     G --> TR[Revisão independente e congelamento dos testes]
-    TR -->|Feedback instalado; instalação da paginação pendente| RS[Pre-stop: formato e páginas faltantes]
-    RS -.->|Mesmo turno e orçamento de 40 iterações| TR
+    TR -->|Após resposta final prematura| RS[Fila instalada: formato e páginas faltantes]
+    RS -->|Mesmo turno e orçamento de 40 iterações| TR
+    TR -->|Só ferramentas: orientação inicial ainda incompleta| RG[Monitor de progresso ativo; correção pendente]
+    RG -->|Falta de progresso| AD
     RS -.->|Duas tentativas sem progresso| AD
     TR -->|Solicita mudanças nos testes novos| F
     TR -->|Aprova os testes exatos| IMPL[Implementação limitada aos arquivos do produto]

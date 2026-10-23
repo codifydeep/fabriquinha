@@ -47,72 +47,82 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
 - O proxy com limite de requisição de 2 MiB foi qualificado e instalado sem
   zerar o contador de chamadas. O ensaio seguinte ultrapassou o antigo limite
   de 512 KiB sem aquela rejeição de tamanho.
-- A revisão nativa mais recente falhou após consumir 40 iterações. A inspeção
-  integral foi comprovada para 57 dos 71 arquivos; não houve aprovação nem
-  congelamento dos testes, Green ou homologação nessa linhagem.
-- A suíte offline da candidata com captura, enforcement e paradas executou
+- O diário de leituras, a captura no loop, o enforcement e as paradas
+  estruturadas foram qualificados e instalados. A troca preservou dados e
+  configurações, com backup compactado e restauração verificados. O serviço
+  host foi migrado para o novo pin, sem resetar sua fila ou seu histórico.
+- Após uma recuperação restrita, o coordenador iniciou outra revisão nativa.
+  Ela consumiu sete chamadas e terminou com diagnóstico `read_progress_stalled`:
+  16 dos 71 arquivos tiveram leitura integral comprovada. O controlador manteve
+  `technical_blocked`, sem aceitar o diagnóstico como parecer ou aprovação.
+- A última suíte offline registrada com captura, enforcement e paradas executou
   **4.372 testes: 4.364 aprovados e oito skips preexistentes**, sem falhas.
-  Os 91 testes focados também passaram. Isso qualifica o comportamento offline,
-  não instalação, execução física do novo módulo ou autonomia nativa.
+  Os 91 testes focados também passaram. Esses números não representam uma nova
+  execução por ocasião desta atualização documental nem autonomia nativa.
+
+Não houve congelamento dos testes, Green ou homologação nessa linhagem v2.
 
 ## Bloqueio atual
 
-O revisor repetiu páginas já servidas e tentou ler além do fim de um arquivo,
-sem completar o escopo obrigatório dentro do orçamento. O cache é indexado por
-arquivo, offset e limite; não foi demonstrado defeito nessa chave. A lacuna é
-permitir chamadas sem progresso e não orientar suficientemente as páginas
-pendentes. O erro genérico nativo não deve ser confundido com a antiga rejeição
-por tamanho ou com uma falha funcional demonstrada do produto.
+A fila de páginas pendentes só passa a orientar o pedido ao modelo **depois de
+uma tentativa prematura de resposta final**. No código instalado,
+`quality_review_stop.apply_request()` retorna o pedido sem essa orientação
+quando ainda não existe `_quality_review_completion`. O modelo pode, portanto,
+usar ferramentas desde o início sem receber a fila, o schema restrito e o gate
+por página. O monitor de progresso continua ativo e interrompe a execução,
+mas não supre essa lacuna de orientação inicial.
 
-O feedback antes do encerramento está instalado, mas ainda não resolve essa
-classe de esgotamento. O núcleo do diário limitado e do planejador de páginas
-pendentes foi implementado **em uma candidata, ainda não instalada**. A captura
-ocorre na entrada do loop e após os resultados das ferramentas, antes da
-compactação seguinte. O handler admite uma única entrada por página planejada;
-a checagem anterior do despacho não consome essa entrada. Chamadas diretas e
-concorrentes também são restringidas. O feedback preserva páginas capturadas,
-reconhece progresso parcial e interrompe bytes divergentes ou ações sem progresso.
-Uma fixture inicial de 71 arquivos e 81 páginas validou a fila offline. A prova
-física foi ampliada para 563.066 bytes e 219 páginas, volume superior ao snapshot
-do ensaio de referência, sem publicar seu conteúdo.
+O ensaio mais recente seguiu esse caminho e parou com 33 iterações ainda
+disponíveis. O estado nativo `completed` significa que a execução terminou,
+não que a revisão foi aprovada. O recibo do controlador registra
+`native_terminal_verdict`, formato inválido para parecer e `automatic_retry=false`.
+O diagnóstico estruturado não é uma falha funcional comprovada do produto.
 
-O canário físico da candidata passou com Hermes/ACP e respostas locais fixas:
-continuação normal, despacho seguido de handler, negação de leitura duplicada,
-saída `read_progress_stalled` e saída `iteration_budget_exhausted`. Foram sete
-respostas locais no conjunto inicial, sem modelo externo. O caso de orçamento usa um loop de uma
-iteração como controle de fronteira; a fábrica ACP continua vinculada a 40.
-Isso não comprova uma revisão nativa completa com 40 iterações.
+A tentativa anterior, com 57/71 arquivos completos e 40 iterações consumidas,
+permanece preservada como falha distinta. A rejeição histórica por corpo acima
+de 512 KiB também não é a causa comprovada do bloqueio atual. Não se deve
+reutilizar a prova de capacidade do proxy para autorizar uma repetição idêntica.
 
-No cenário extenso, o loop real terminou a inspeção dos 71 arquivos em 23
-chamadas principais e duas chamadas auxiliares locais. Duas compactações reais
-removeram 197 pares de leitura da conversa; o diário preservou os bytes necessários
-à cobertura integral. Não houve página repetida, leitura além do fim ou alteração
-do snapshot. O conjunto inteiro consumiu 32 respostas fixas locais e zero chamadas
-pagas; retornos de aprovação nessa fixture não são pareceres nativos de produto.
+## Alcance da qualificação já feita
 
-Escala e compactação real estão qualificadas nesse perfil fixo. Ainda faltam
-instalação e recuperação específica seguidas de qualificação nativa. A memória
-é local à execução, não recuperação
-entre reinícios ou memória compartilhada entre perfis. Não há nova aprovação
-implícita nem autorização para repetir a mesma tentativa indefinidamente.
+O canário Hermes/ACP passou com respostas locais fixas: continuação após uma
+resposta prematura, despacho seguido de handler, duplicata negada e paradas por
+ausência de progresso e fim do orçamento. A extensão inspecionou 71 arquivos,
+563.066 bytes e 219 páginas em 23 chamadas principais e duas sumarizações locais.
+Duas compactações reais removeram 197 pares da conversa sem perder a cobertura
+no diário. O conjunto usou 32 respostas locais, sem chamadas ao provedor.
 
-Na consulta de referência, o controlador está sob manutenção selada, sem
-execuções ativas, e o proxy do modelo está parado. Essa condição pode mudar:
-consulte o runtime antes de qualquer intervenção. Esta documentação não inicia
-serviços, libera manutenção ou consome chamadas ao provedor.
+Essa prova **não cobriu a orientação desde a primeira chamada de um modelo que
+só usa ferramentas**. Também não comprova aprovação nativa, memória entre
+reinícios ou memória compartilhada entre perfis. O controle de fronteira do
+orçamento usa uma iteração sintética; a fábrica ACP mantém 40.
+
+## Instalação de referência consultada
+
+| Item | Estado observado em 23 de outubro |
+|---|---|
+| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.30`, instalado e ativo |
+| Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.6` |
+| Manutenção | `sealed`, `drained=true` |
+| Última revisão | Nativa `completed`; atestação e equipe `technical_blocked` |
+| Proxy | Ligado, provedor não pausado; limite de corpo de 2 MiB |
+| Contador do proxy | 6.254/10.000 chamadas, 3.746 restantes; não é limite monetário |
+
+Manutenção selada não significa proxy desligado. Esta é uma fotografia, não
+monitoramento vivo: confirme serviços e leases antes de agir. Esta atualização
+documental não inicia testes, libera manutenção ou altera a infraestrutura.
 
 ## Próximos marcos, em ordem
 
-1. Implementar paginação orientada por evidência: preservar leituras reais entre
-   compactações, selecionar apenas páginas pendentes e reconhecer progresso
-   parcial. Coleta, enforcement e saída estruturada já estão na candidata;
-   a qualificação física de escala/compactação passou. Não reduzir o escopo de
-   aprovação ou ampliar as 40 iterações.
-2. Qualificar offline e em Docker/ACP os casos de múltiplos arquivos, cache,
-   fim de arquivo, contexto compactado, ausência de progresso e fim do orçamento.
-3. Instalar sob manutenção e preparar recuperação vinculada à condição realmente
-   corrigida. Preservar a falha anterior; não reutilizar prova de capacidade do
-   proxy para uma falha diferente. Só então iniciar outro ensaio nativo.
+1. Aplicar a fila e os limites de leitura desde a primeira chamada, sem depender
+   de uma resposta prematura. Preservar a possibilidade de uma solicitação de
+   mudanças fundamentada antes de ler todo o escopo de aprovação.
+2. Acrescentar provas offline e Docker/ACP com ferramentas desde a primeira
+   resposta, páginas múltiplas e compactação real. Manter a cobertura integral
+   exigida para aprovação e o orçamento de 40 iterações.
+3. Instalar a correção qualificada sob manutenção e registrar recuperação
+   vinculada à nova condição. Só então executar outra revisão nativa,
+   preservando o bloqueio atual e exigindo leituras próprias da sucessora.
 4. Comprovar revisão e congelamento, Green, controles negativos, revisão da
    entrega, PR/CI e implantação/QA/rollback no mesmo commit sob o contrato v2.
 5. Demonstrar diagnóstico e recuperação por Tech Lead/CTO, novo brief com cards
@@ -120,13 +130,14 @@ serviços, libera manutenção ou consome chamadas ao provedor.
 6. Qualificar instalação limpa e reutilização por terceiros antes de apresentar
    a plataforma como pronta. A fatia inicial do Truco não encerrará sua v0.1.
 
-O adaptador de recuperação de inspeção falha existe em fonte e na imagem
-candidata do controlador, ainda não instalada. Ele exige erro nativo preservado,
+O adaptador de recuperação de inspeção falha foi instalado e seu registro foi
+exercitado antes da última revisão. Ele exige erro nativo preservado,
 RPCs sem duplicação, leituras parciais válidas, lease fechada, worker retirado,
 outro worker qualificado e manutenção selada. A causa do erro genérico permanece
 explicitamente não comprovada. O registro não despacha modelo, não herda leituras
 como aprovação e não encerra o incidente. Um parecer novo e independente continua
-obrigatório. Isso é recuperação restrita de qualificação, não diagnóstico ou
+obrigatório. O registro e o despacho da sucessora funcionaram; a revisão voltou
+a bloquear. Isso não comprova recuperação integral nem diagnóstico ou
 replanejamento universalmente autônomos pelo CTO.
 
 ## Navegação

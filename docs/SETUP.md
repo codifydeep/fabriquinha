@@ -70,6 +70,28 @@ um por perfil. O limite instalado de corpo do proxy é 2 MiB, não um limite de
 custo nem uma permissão para elevar o teto de chamadas. Não há fallback de
 modelo automático. A qualificação específica deve anteceder um novo ensaio pago.
 
+O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
+O controlador `20261023.30` e o worker `20261023.6` já estão instalados nessa
+referência; esses identificadores não constituem imagens publicadas para download.
+A nova revisão ficou bloqueada, portanto não há autorização implícita para
+iniciar o Truco ou repetir o ensaio sem uma mudança qualificada.
+
+Manutenção, pausa do provedor e estado do contêiner do proxy são independentes.
+Na consulta de 23 de outubro, a barreira estava selada e drenada, mas o proxy
+permanecia ligado. Para conferir somente os serviços dessa instância:
+
+```bash
+docker ps -a \
+  --filter name=delivery-kit-port2-execution-broker-1 \
+  --filter name=delivery-kit-port2-model-proxy-1 \
+  --format '{{.Names}} {{.State}} {{.Image}}'
+```
+
+Confirme a identidade exata antes de uma intervenção; filtros por nome não
+autorizam parar ou remover os resultados. Não use `docker inspect` sem filtrar
+campos: o ambiente completo pode conter segredos. O contador e o teto do proxy
+devem persistir em trocas de imagem, reinícios e recuperações.
+
 ### Organização e retirada de testes
 
 Use grupos Compose `delivery-kit-<instância>` para serviços,

@@ -18,7 +18,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | TDD e entrega congelada | `broker/tdd_evidence.py`, `broker/test_first_protocol.py`, `review_instruction.py`, `additive_test_policy.py` |
 | Qualidade v2 | `broker/quality_team_progress.py`, `broker/quality_review_attestation.py`, `quality_phase_tools.py`, `quality_review_stop.py` |
 | Provas de leitura | `broker/quality_review_reads.py`, `broker/read_stream_receipts.py`, `artifact_read_evidence.py` |
-| Paginação em qualificação, não instalada | `quality_review_paging.py`, integração inicial em `quality_review_stop.py` |
+| Paginação instalada, ativação inicial incompleta | `quality_review_paging.py`, `quality_review_stop.py`, `install_quality_review_stop.py` |
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
 | Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
 | Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
@@ -37,13 +37,15 @@ flowchart TD
     C --> A[Autor: testes novos no workspace atribuído]
     A --> S[Snapshot imutável e Red real]
     S --> R[Revisor independente: leitura e decisão]
-    R --> F[Feedback no mesmo turno: formato e leituras faltantes]
-    F -->|Orçamento original de 40 iterações| R
-    F -.-> P[Candidata: fila pendente e gate por página no handler]
-    P -.-> R
+    R --> J[Diário de leituras reais antes da compactação]
+    J --> K{Houve tentativa de resposta final?}
+    K -->|Não: lacuna atual de orientação| R
+    K -->|Prematura| P[Fila pendente, schema restrito e gate no handler]
+    P -->|Mesmo turno e orçamento de 40 iterações| R
+    J -->|Duas rodadas sem progresso| B[Bloqueio técnico preservado]
     R --> E[Controlador confere bytes, identidade e parecer]
     E -->|Mudanças válidas| A
-    E -->|Prova incompleta ou falha| B[Bloqueio técnico preservado]
+    E -->|Prova incompleta ou falha| B
     B --> T[Tech Lead e CTO: recuperação ainda não qualificada integralmente]
     E -.->|Aprovação completa ainda pendente neste ensaio| G[Testes congelados e implementação]
     G -.-> D[Green, controles negativos, revisão, PR e CI]
@@ -51,12 +53,18 @@ flowchart TD
 ```
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
-v2, não uma dispensa de execução. O feedback no mesmo turno está instalado;
-o planejador e o diário existem na candidata, mas ainda não estão instalados.
-O diário é limitado a 512 pares/8 MiB, vincula execução
-e manifesto, não descarta evidências para caber no limite e sugere até 16
-páginas com um offset comum. IDs diferentes não transformam os mesmos bytes
-em progresso. Divergências de conteúdo bloqueiam, não reiniciam a inspeção.
+v2, não uma dispensa de execução. Feedback, planejador, diário e paradas estão
+instalados no controlador `20261023.30` e worker `20261023.6` da referência.
+Ainda falta ativar a orientação de paginação desde a primeira chamada:
+`apply_request()` retorna sem projetar a fila quando não existe estado de uma
+resposta final prematura. O caminho só de ferramentas pode alcançar o detector
+de falta de progresso sem receber essa orientação. A correção está pendente,
+não representada como funcionalidade já implantada.
+
+O diário é limitado a 512 pares/8 MiB, vincula execução e manifesto, não descarta
+evidências para caber no limite e sugere até 16 páginas com um offset comum
+quando a fila está armada. IDs diferentes não transformam os mesmos bytes em
+progresso. Divergências de conteúdo bloqueiam, não reiniciam a inspeção.
 
 Os hooks capturam antes da preparação da próxima chamada e depois das
 ferramentas, antes de sua compactação. A projeção do schema restringe caminho,
@@ -65,15 +73,18 @@ o handler consome atomicamente a página, inclusive em chamadas diretas/paralela
 Essa distinção foi necessária: consumir no despacho e no handler bloqueava
 leituras legítimas no registry real. O canário falho permanece preservado.
 
-O canário ampliado passou no Hermes real com sete respostas locais, incluindo
-ACP normal, negação de duplicatas, duas rodadas sem progresso e saída no fim
-do orçamento. O controle desta última fronteira usa uma iteração sintética;
+O conjunto inicial do canário que qualificou a instalação passou no Hermes
+real com sete respostas locais: ACP normal, negação de duplicatas, duas rodadas
+sem progresso e saída no fim do orçamento. O controle desta última fronteira
+usa uma iteração sintética;
 a fábrica ACP permanece fixada em 40. A extensão de escala percorreu 219 páginas
 de 71 arquivos (563.066 bytes), com 23 chamadas principais, duas sumarizações
 locais e duas compactações reais. Elas removeram 197 pares da conversa sem
-perder cobertura no diário. Não houve instalação ou aprovação nativa.
-No runtime atual, o revisor pode consumir o orçamento com chamadas sem progresso;
-a atestação bloqueia aprovação incompleta, mas não resolve sozinha esse impasse.
+perder cobertura no diário. Esse caminho começa por uma resposta prematura;
+não qualificou a orientação inicial do fluxo só de ferramentas.
+A instalação foi seguida de uma revisão nativa: sete chamadas, 16/71 arquivos
+completos e parada `read_progress_stalled` com 33 iterações restantes.
+A atestação bloqueou o diagnóstico como parecer inválido; não houve aprovação.
 A projeção da interface e o diário consultivo do worker não substituem os recibos
 ACP do controlador. O diário não é persistência entre reinícios ou memória de
 projeto; nenhuma evidência sintética da fixture vira leitura nativa do revisor.
@@ -92,6 +103,14 @@ reutiliza a prova de capacidade do proxy, não libera o autor e não aceita um
 parecer ausente. O coordenador despacha outra revisão só após instalação,
 registro e liberação explícita da manutenção. A sucessora precisa produzir
 seus próprios recibos antes de congelar testes ou habilitar implementação.
+Esse registro e o despacho ocorreram, mas a sucessora permaneceu bloqueada.
+Uma nova recuperação exige condição realmente modificada e qualificada,
+não outra identidade para repetir o mesmo perfil.
+
+O coordenador `quality_team_progress.py` termina seu acompanhamento atual em
+`awaiting_independent_delivery_review`. Esse checkpoint não é `HOMOLOGADA`;
+a continuidade da cadeia v2 até revisão da entrega, PR/CI e deploy/QA/rollback
+ainda precisa ser implementada e qualificada.
 
 ## Fontes de verdade e responsabilidade
 

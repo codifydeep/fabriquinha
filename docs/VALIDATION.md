@@ -12,23 +12,36 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Autoria e Red nativos | 381 testes Python, falhas somente no teste novo; 36 Node aprovados, sem erros/skips. Não é aprovação dos testes. |
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
-| Revisão nativa mais recente | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Sem congelamento, Green ou homologação. |
-| Paginação e feedback na candidata | Diário, captura, fila e handler; fixture de 71 arquivos/81 páginas dentro de 40 iterações simuladas. Não instalada. |
-| Canário físico da candidata | Hermes/ACP normal, preflight/handler, duplicata negada e paradas estruturadas por falta de progresso/orçamento. Extensão: 71 arquivos, 563.066 bytes, 219 páginas, duas compactações e cobertura preservada após remover 197 pares da conversa. Conjunto: 32 respostas locais, zero chamadas externas. Instalação e revisão nativa pendentes. |
+| Revisão nativa anterior | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Continua preservada, não aprovada. |
+| Instalação do hardening | Controlador `20261023.30` e worker `20261023.6`; backup/restauração verificados, pin do serviço host migrado, dados e contador preservados. |
+| Canário físico que qualificou a instalação | Hermes/ACP normal, preflight/handler, duplicata negada e paradas estruturadas por falta de progresso/orçamento. Extensão: 71 arquivos, 563.066 bytes, 219 páginas, duas compactações e cobertura preservada após remover 197 pares da conversa. Conjunto: 32 respostas locais, zero chamadas externas. O caminho começa com resposta final prematura. |
+| Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
+| Revisão nativa mais recente | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Nativa `completed`, mas recibo e equipe `technical_blocked`, sem retry automático. Sem congelamento, Green ou homologação. |
 | Última suíte completa registrada | 4.372 executados: 4.364 aprovados, oito skips preexistentes, sem falhas. Inclui captura, enforcement, escala, compactação e recuperação restrita de inspeção falha. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
-O bloqueio atual envolve leituras repetidas e ausência de progresso, não a
-capacidade já corrigida do proxy. O conjunto inicial de paginação, captura,
-enforcement e saída estruturada passou por 91 testes focados e um canário físico
-com respostas fixas. O controle físico do fim do orçamento usa uma iteração;
-a configuração da fábrica ACP continua em 40. Escala e compactação real passaram
-no perfil fixo; instalação e provas nativas permanecem obrigatórias antes de
-outra tentativa. A recuperação restrita de inspeção falha foi testada offline,
-sem converter o erro anterior em sucesso ou reutilizar leituras como aprovação.
-Na consulta
-de referência, a manutenção está selada e o proxy parado; confirme o estado vivo
-antes de agir. Nenhum resultado histórico abaixo substitui esse diagnóstico.
+O bloqueio atual expõe um caminho não coberto pelo canário: o modelo usa
+ferramentas desde o início, enquanto a fila confiável só é projetada depois de
+uma resposta final prematura. A captura e o detector de falta de progresso
+funcionaram; a orientação inicial permanece incompleta. Isso não é outra falha
+comprovada de capacidade do proxy ou defeito funcional demonstrado do produto.
+
+Os 91 testes focados e a suíte completa acima são os últimos resultados
+registrados, não testes repetidos para esta atualização documental. O controle
+físico do fim do orçamento usa uma iteração; a fábrica ACP continua em 40.
+Escala e compactação passaram no perfil de respostas fixas, não em toda
+estratégia possível do modelo. A memória desse diário é local à execução.
+
+Antes de nova tentativa, acrescentar o fluxo só de ferramentas desde a primeira
+resposta, manter os controles de aprovação integral e de rejeição fundamentada,
+qualificar a mudança e registrar recuperação específica. Nenhuma leitura ou
+aprovação será herdada da tentativa anterior.
+
+Na consulta de referência, manutenção `sealed` e `drained=true`; o proxy está
+**ligado**, não pausado no provedor, com 6.254/10.000 chamadas. São estados
+independentes: uma task `completed`, uma lease fechada e uma revisão aprovada
+não são equivalentes. Confirme o estado vivo antes de agir. Nenhum resultado
+histórico abaixo substitui esse diagnóstico.
 
 ## Evidências históricas — não representam o estado vivo
 

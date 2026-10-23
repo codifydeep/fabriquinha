@@ -4,8 +4,11 @@ Scope note, **23 October 2026**: this document describes patch adapters and
 historical qualification boundaries, not the current deployment inventory.
 The current v2 review is read-only; patch receipts cannot satisfy missing
 inspection or authorize a reviewer to edit tests or implementation. The current
-blocker is read pagination/progress, not a newly demonstrated patch persistence
-failure. See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
+blocker is missing initial pending-page guidance in a tool-only review path,
+not a newly demonstrated patch persistence failure. The latest native execution
+completed with a structured stall diagnostic, not an accepted review verdict.
+No patch adapter can supply its missing inspection or turn it into approval.
+See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
 using any historical recovery mechanism below.
 
 `broker/patch_receipt_contract.py` provides an exact-source build adapter for
@@ -23,7 +26,7 @@ restrictions, test commands, approval policy and retry budgets are unchanged.
 Malformed/non-patch responses retain the original formatter. Source drift or a
 second installation fails closed.
 
-This adapter is qualified against the currently pinned Hermes formatter in an
+The historical qualification bound this adapter to the pinned Hermes formatter in an
 offline, credential-free disposable container and activated in the port2 worker
 image by `Dockerfile.patch-receipts-420`. Activation used the maintenance barrier,
 verified backup, pinned image build and installed-code qualification. Both the

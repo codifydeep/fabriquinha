@@ -18,19 +18,20 @@ capacity-failure recovery requires the original rejection, exact failed native
 execution, closed lease, retired worker, unchanged snapshot and qualified
 installed transport. Registration does not close the incident or approve tests.
 
-The next review failed after exhausting its 40 iterations while inspection
+An earlier review failed after exhausting its 40 iterations while inspection
 remained incomplete. Repeated cached pages and an out-of-range read were
 observed. This is not another demonstrated body-size failure, and the capacity
 proof cannot authorize replay of that execution. The native generic error is
 not, by itself, a product defect or a precise infrastructure diagnosis.
 
-Pending hardening must retain actual read evidence across context compaction,
-plan only missing pages and report stalled progress or budget exhaustion
-structurally. Partial new coverage must count as progress; repeated calls,
+The installed hardening retains actual read evidence across context compaction,
+plans missing pages after a premature final answer and reports stalled progress
+or budget exhaustion structurally. Partial new coverage must count as progress; repeated calls,
 prose and cache responses without content must not. The bounded journal and
 pending-page planner, loop capture, handler enforcement and structured stops
-now exist in a candidate image. Dispatch checks without consuming; only the
-fenced handler claims the page atomically. The initial consuming check at both
+are installed in reference controller `20261023.30` and worker `20261023.6`.
+Dispatch checks without consuming; only the fenced handler claims the page
+atomically. The initial consuming check at both
 boundaries was rejected by the real registry canary and corrected without
 rewriting that failure. The expanded canary passed with seven fixed local
 responses: normal ACP continuation, direct duplicate denial, stalled tool
@@ -40,12 +41,28 @@ fixture also passed: 71 files, 563,066 bytes, 219 unique pages, 23 main local
 responses and two local summary responses. Two real compression commits removed
 197 read pairs from conversation while the journal retained full byte-bound
 coverage. The complete fixed suite used 32 local responses, no external model.
-Installation and native qualification remain pending.
+Installation, verified backup/restoration and host scheduler pin migration
+completed. These fixed-response paths begin with a premature final answer;
+they do not qualify initial guidance for a tool-only model strategy.
 Approval still requires independent, byte-bound
 inspection of the required scope, exact verdict and native identities. No
 operator may manufacture missing reads or convert failure into approval.
 
-Before another native attempt, qualify the changed condition with bounded
+After the restricted recovery registration, the coordinator dispatched a new
+native review. It stopped after seven provider calls with `read_progress_stalled`,
+16/71 files complete and 33 iterations remaining. Native `completed` did not
+mean approval: the controller preserved `technical_blocked`, classified the
+diagnostic as an invalid terminal verdict and disabled automatic retry.
+
+The current gap is specific: `apply_request()` does not project the pending-page
+queue/schema/handler gate until a premature final answer has created completion
+state. A model using tools throughout may never receive that guidance. Capture
+and stall detection remain active, but are insufficient to complete inspection.
+The fix must guide reads from the first request while retaining a substantiated
+`request_changes` path without requiring the entire approval scope first.
+Full approval must still require the registered complete inspection.
+
+Before another native attempt, qualify this changed condition with bounded
 multi-file/pagination fixtures and the real Hermes/handler/ACP boundary. Preserve
 the earlier failure and require a separately qualified recovery. A technical
 hold assigned to CTO is visible accountability, not proof that the team has
@@ -53,12 +70,13 @@ autonomously diagnosed and recovered the workflow.
 
 ### Failed incomplete inspection, not an inferred transport fix
 
-The candidate completion-recovery adapter can register a fresh read-only review
+The installed completion-recovery adapter can register a fresh read-only review
 after a failed native prompt with a partial but valid immutable inspection.
 It requires exactly one initialize/new/prompt lineage, closed lease, consumed
 grant, retired worker, a different qualified worker and sealed maintenance.
-No reads, full coverage, invalid bytes, duplicate prompt RPCs or the same worker
-profile cannot qualify this route. Capacity evidence cannot be mixed into it.
+The route rejects absence of reads, already complete coverage, invalid bytes,
+duplicate prompt RPCs or an unchanged worker profile. Capacity evidence cannot
+be mixed into it.
 
 The old failure is retained with an explicit `not_proven` causal classification;
 it is not rewritten as a completed review or a proved iteration-limit incident.
@@ -68,6 +86,17 @@ rearm the same source under another qualification identifier. Registration
 creates no task/grant and closes no incident; dispatch remains with the
 coordinator after controlled activation. Fresh successor reads and its exact
 independent verdict are required to freeze tests or bind implementation.
+
+This registration and successor dispatch were exercised; the successor remained
+blocked. Its completed structured diagnostic is distinct from the earlier failed
+native prompt. Do not reuse the failed-inspection classification or qualification
+identity to repeat an unchanged worker. A new source-qualified condition and
+the matching recovery route must be verified under sealed maintenance.
+
+The reference is currently sealed and drained, while its model proxy is running.
+Maintenance, provider pause and container stop are separate controls; consult
+live state before any operation. This document grants no maintenance release,
+model calls or delivery approval.
 
 ## Bounded recovery
 

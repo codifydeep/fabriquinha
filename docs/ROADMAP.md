@@ -6,18 +6,22 @@ Não usamos quantidade de código, workers ativos ou percentual subjetivo como c
 
 Consulte [STATUS.md](STATUS.md) para a estimativa de prontidão e
 [VALIDATION.md](VALIDATION.md) para a distinção entre provas atuais e históricas.
-As etapas abaixo permanecem abertas; não são funcionalidades já entregues.
+Os marcos abaixo permanecem abertos. Componentes já instalados são distinguidos
+da qualificação ponta a ponta ainda necessária.
 
 1. **Revisão com progresso verificável:** diário limitado de leituras reais,
    resistente à compactação do contexto; fila de páginas pendentes; bloqueio de
    repetição/EOF e diagnóstico estruturado antes de esgotar as 40 iterações.
    Progresso parcial conta; prosa, cache sem conteúdo e chamadas repetidas não.
-   Esses controles já existem na candidata e passaram pelo canário Hermes/ACP,
-   incluindo 563 KB, 219 páginas e duas compactações reais. Ainda faltam instalação
-   e prova nativa; esse resultado usa respostas locais fixas.
+   Diário, captura e paradas já estão instalados após o canário Hermes/ACP de
+   563 KB, 219 páginas e duas compactações reais. A fila ainda depende de uma
+   resposta final prematura. Corrigir sua ativação desde a primeira chamada,
+   incluindo o modelo que só usa ferramentas, sem impedir rejeição fundamentada
+   de testes antes de completar todo o escopo necessário para aprovação.
 2. **Qualificação antes de novo ensaio:** fixtures com múltiplos arquivos e
    páginas, controles negativos e Hermes/handlers/ACP reais sem provedor.
-   Instalação sob manutenção e recuperação específica da condição corrigida,
+   Acrescentar o caminho sem resposta final prematura às provas de escala e
+   compactação. Instalar sob manutenção e registrar recuperação da condição corrigida,
    sem apagar a falha ou reutilizar uma prova de capacidade para outro incidente.
 3. **Contrato v2 ponta a ponta:** congelamento independente dos testes, Green,
    controles negativos, revisão da entrega, PR/CI, deploy, QA e rollback ligados
@@ -28,9 +32,31 @@ As etapas abaixo permanecem abertas; não são funcionalidades já entregues.
 5. **Novo brief e reutilização:** cards dependentes e memória entre perfis sem
    direção do operador, seguidos de instalação limpa em outro ambiente.
 
-O limite de requisição de 2 MiB já foi instalado e exercitado. A revisão seguinte
-falhou por repetição de leituras/esgotamento do orçamento; ampliar novamente o
-corpo, trocar o modelo ou aumentar iterações não é a solução já qualificada.
+O limite de requisição de 2 MiB já foi instalado e exercitado. A tentativa
+anterior esgotou 40 iterações com 57/71 arquivos completos. Após a instalação do
+diário e das paradas, a sucessora terminou bloqueada por falta de progresso,
+com 16/71 completos e 33 iterações restantes. Nenhuma aprovou os testes.
+Ampliar o corpo, trocar o modelo ou aumentar iterações não corrige a lacuna
+comprovada de orientação desde a primeira chamada.
+
+### Critérios de saída da correção imediata
+
+- A primeira chamada já contém a fila confiável; ferramenta e handler recusam
+  páginas não planejadas, repetidas ou fora do arquivo desde esse ponto.
+- Um fluxo só de ferramentas termina a inspeção com compactação real dentro
+  do orçamento, sem fabricar recibos ou herdar leituras de outra execução.
+- Uma rejeição fundamentada continua possível com o escopo exigido para
+  `request_changes`; aprovação exige o escopo integral registrado.
+- A nova revisão nativa produz parecer independente aceito pelo controlador.
+  Parada estruturada, transporte válido ou mero estado `completed` não bastam.
+
+### Continuidade após Green
+
+`quality_team_progress.py` ainda trata `awaiting_independent_delivery_review`
+como checkpoint terminal de seu coordenador. Chegar a esse estado não é concluir
+a release. A ponte seguinte precisa ser implementada e qualificada até revisão
+independente da entrega, publicação por PR/CI e deploy/QA/rollback no mesmo SHA.
+Não apresentar esse checkpoint como entrega autônoma completa.
 
 ## Entrega
 
@@ -52,7 +78,7 @@ corpo, trocar o modelo ou aumentar iterações não é a solução já qualifica
 - Instalador único, configuração declarativa e remoção de dependências da máquina original.
 - Imagens reproduzíveis e publicáveis, matriz de plataformas e política de atualizações.
 - Novo repositório e nova instalação limpa sem copiar credenciais, sessões ou fixture identities.
-- Licença escolhida pelo proprietário, documentação de operação e testes de atualização/rollback.
+- Preservar a licença MIT já escolhida, documentar operação e qualificar atualização/rollback.
 
 Esses gates permanecem abertos até evidência específica. O ensaio atual não retoma automaticamente o Truco.
 
