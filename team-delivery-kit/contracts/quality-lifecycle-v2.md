@@ -784,8 +784,12 @@ final JSON, in the same turn, with 39 iterations remaining after the first call.
 No OpenRouter/model call, native reviewer approval, product code or delivery is
 involved. The chained author/Red/review/correction/Red/review Docker/ACP canary
 also passed with synthetic authority and no model; twelve helpers were retired,
-without deleting volumes or changing the installed controller. Installation and
-a new native review after a qualified changed condition remain required. Historical terminal
+without deleting volumes or changing the installed controller during the canary.
+The candidate was subsequently installed under sealed maintenance, with verified
+compressed backup/restoration and unchanged companion services. Its qualified
+changed-condition recovery was registered without granting approval, and the
+host coordinator pin was migrated with queue/history preserved. Native review
+qualification remains required. Historical terminal
 review attestations are not reparsed or rewritten by this candidate.
 
 `quality_review_history.py` adds append-only successor admissions, attestations
@@ -809,7 +813,7 @@ incident, mints authority, dispatches work nor inherits approval. Dispatch remai
 with the coordinator after explicit activation/release. Reusing the same code
 condition under another task, qualification ID or build tag is rejected. The
 adapter is tested with prior bootstrap recovery, a fresh independent attestation
-and transactional Green admission; installation/native qualification is pending.
+and transactional Green admission; native qualification is pending.
 The physical canary's explicitly synthetic attestation also carries the exact
 request ID in its identity. Incomplete fixture identities are rejected by the
 same transactional selector as real records; qualification never weakens that

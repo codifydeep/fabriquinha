@@ -2,6 +2,9 @@
 # replace the canonical distribution build or enable v2 in a running service.
 # Retain delivery-kit-quality-v2-controller:20261023.19 as the last installed
 # native author/Red/review-launch rollback while the revision successor qualifies.
+# Also retain delivery-kit-quality-v2-controller:20261023.25, the last installed
+# controller before the qualified review-stop successor; an uninstalled build
+# must not displace this known operational rollback during image retirement.
 FROM delivery-kit-execution-broker:20261021.512
 COPY broker/server.py /broker.py
 COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /
