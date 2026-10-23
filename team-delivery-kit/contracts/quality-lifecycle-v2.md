@@ -822,6 +822,31 @@ source only while sealed/drained, native-idle and uniformly exclusive. The targe
 installation still turns every execution flag OFF before separate activation;
 mixed flags, live leases or an unsealed source remain rejected.
 
+#### Request-bound continuation candidate — not native-qualified
+
+A native successor received pre-stop feedback but refused further inspection
+with 34 iterations still available. The controller rejected the output: only
+two of 71 registered files had complete byte-bound reads. This is not an
+approved review or a successful recovery, and the same condition is not retried.
+
+The source candidate additionally constrains the next outbound request after
+such a premature stop. It projects only the existing `read_file` schema and
+requires that tool while required reads remain, with parallel independent
+pages and the unchanged iteration budget. A trusted controller notice explains
+the next page offsets and verdict contract; repository content remains untrusted.
+No reads are executed or fabricated by this projection. Actual tool results still
+have to reach the model and the controller-owned ACP evidence stream. Once the
+required scope has been inspected, the reviewer decides independently; no verdict
+or approval is supplied by the controller. Concrete change requests retain their
+new-test/citation scope. Missing/duplicate tool schemas, execution drift and a
+blocked completion loop reject the request rather than call the provider.
+
+The real isolated Hermes/ACP canary passed: the premature answer led to a
+named-read-only request, actual tool results, and an independent exact final
+verdict in three fixed loopback calls within the original budget. It used no
+model calls and granted no test/delivery approval. Native qualification remains
+pending; historical verdicts and manifests are unchanged.
+
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after
 complete, byte-bound reads of every new test and every cited file; omissions in

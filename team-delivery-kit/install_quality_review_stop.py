@@ -51,6 +51,15 @@ SESSION_HOOK='''        # V2 workers share one fixed budget, including completio
         if _quality_limit is not None:
             kwargs["max_iterations"] = _quality_limit
 '''
+REQUEST_ANCHOR='''                # Outbound-request surrogate chokepoint (#50959): the messages
+'''
+REQUEST_HOOK='''                # A premature v2 review stop must continue with real reads.
+                from quality_review_stop import apply_request as _quality_review_request
+                api_kwargs = _quality_review_request(
+                    agent, api_kwargs, messages,
+                    min(agent.max_iterations - api_call_count, agent.iteration_budget.remaining),
+                )
+'''
 
 
 def adapt_loop(source):
@@ -71,12 +80,18 @@ def adapt_session(source):
     return source.replace(SESSION_ANCHOR,SESSION_HOOK+SESSION_ANCHOR)
 
 
+def adapt_request(source):
+    if source.count(REQUEST_ANCHOR)!=1 or '_quality_review_request' in source:
+        raise ValueError('pinned Hermes outbound request seam changed')
+    return source.replace(REQUEST_ANCHOR,REQUEST_HOOK+REQUEST_ANCHOR)
+
+
 if __name__=='__main__':
     loop=Path('/opt/hermes/agent/conversation_loop.py')
     acp=Path('/opt/hermes/acp_adapter/server.py')
     session=Path('/opt/hermes/acp_adapter/session.py')
     # Prepare/compile both before any write; no partial install on source drift.
-    changed=[(loop,adapt_loop(loop.read_text())),(acp,adapt_acp(acp.read_text())),
+    changed=[(loop,adapt_request(adapt_loop(loop.read_text()))),(acp,adapt_acp(acp.read_text())),
         (session,adapt_session(session.read_text()))]
     for path,source in changed:compile(source,str(path),'exec')
     for path,source in changed:path.write_text(source)

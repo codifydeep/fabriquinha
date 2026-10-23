@@ -45,6 +45,14 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(b'{}');return
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
         assert index<3,'unexpected extra fixture call'
+        if index==1:
+            assert body.get('tool_choice')==dict(type='function',function=dict(name='read_file')),body.get('tool_choice')
+            assert [t['function']['name'] for t in body.get('tools',[])]==['read_file']
+            assert body.get('parallel_tool_calls') is True
+            assert any(m.get('role')=='system' and 'controller_review_continuation_v1' in str(m.get('content'))
+                for m in body.get('messages',[]))
+        elif index==2:
+            assert body.get('tool_choice')!=dict(type='function',function=dict(name='read_file'))
         message=dict(role='assistant',content=('Premature approval\n'+verdict) if index==0 else verdict)
         finish='stop'
         if index==1:
