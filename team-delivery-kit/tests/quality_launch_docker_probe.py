@@ -32,6 +32,7 @@ import quality_test_review as review
 import quality_review_reads as read_verifier
 import quality_test_revision as revision
 import quality_review_attestation as attestation
+import worker_creation_intent as creation
 import acp_startup
 
 b.STATE=ROOT/'state';b.STATE.mkdir(mode=0o700)
@@ -72,7 +73,7 @@ def save(name,value):
         json.dump(value,out,sort_keys=True);out.flush();os.fsync(out.fileno())
 
 
-def fixed_canary(grant,mode,path):
+def fixed_canary(grant,mode,path,*,label=None):
     """Operator fixture code through real handlers, explicitly not model work."""
     from acp_transport import worker_env
     config=(author_admission.tool_config(b.handoff_context(),grant['request_id']) if mode=='implementation'
@@ -81,7 +82,7 @@ def fixed_canary(grant,mode,path):
     for env in worker_env(mode,False,execution_id=grant['request_id'],quality_phase_config=config):
         argv+=['--env',env]
     argv+=[b.PREFIX+'-job-'+grant['request_id'],'python',path]
-    key='author' if mode=='implementation' else 'review'
+    key=label or ('author' if mode=='implementation' else 'review')
     save(key+'-fixed-canary-intent.json',dict(argv=argv,synthetic_operator_fixture=True,model_calls=0))
     result=subprocess.run(argv,capture_output=True,text=True,timeout=45)
     save(key+'-fixed-canary-result.json',dict(exit_code=result.returncode,stdout=result.stdout,stderr=result.stderr))
@@ -234,8 +235,74 @@ def test_revision_launch(review_grant,reviewed,context):
     if result['status']!='passed' or result['seed_sha256']!=expected or result['corrected_sha256']==expected or result['protected_unchanged'] is not True:
         raise ValueError('actual correction bytes/permissions required')
     b.SESSIONS[admitted['request_id']].close();b.SESSIONS.clear()
-    return dict(status='passed',native_authority='synthetic_rejection_fixture',frames=frames,
+    followup=review_after_correction(admitted,corrected)
+    return dict(status='passed',native_authority='synthetic_rejection_fixture',frames=frames,review_after_correction=followup,
         seed_unchanged=True,protected_unchanged=True,tests_approved=False,delivery_approval=False)
+
+
+def review_after_correction(grant,corrected):
+    """Actual second Red/review launch, with observer-before-ACK interleaving."""
+    worker=b.docker('GET','/containers/'+b.PREFIX+'-job-'+grant['request_id']+'/json')
+    stopped=subprocess.run(['docker','stop','--time','10',worker['Id']],capture_output=True,text=True,timeout=30)
+    save('corrected-author-stop.json',dict(container_id=worker['Id'],exit_code=stopped.returncode,stdout=stopped.stdout,stderr=stopped.stderr))
+    if stopped.returncode or b.docker('GET','/containers/'+worker['Id']+'/json')['State']['Running']:
+        raise ValueError('observe original corrected author stop, no replay')
+    with b.db() as con:con.execute("UPDATE leases SET status='closed' WHERE request_id=?",(grant['request_id'],))
+    corrected['status']='completed';deadline=time.monotonic()+60
+    while True:
+        progress.tick(b.handoff_context());state=progress.load(b.handoff_context(),corrected['id'])
+        if state and state[1]['stage']=='review_ready':break
+        if state and state[1]['stage']=='technical_blocked':raise ValueError('new revision Red rejected')
+        if time.monotonic()>=deadline:raise ValueError('observe original revision Red; no restart')
+        time.sleep(.25)
+    context,_=review.prepare(b.handoff_context(),corrected['id'])
+    wake_id=str(uuid.uuid5(uuid.UUID(config['operation']),'revision_review_wakeup'))
+    with patch.object(native,'ensure_review_start',return_value=dict(id=wake_id,issue_id=task['issue_id'],agent_id=config['plan']['reviewer'])):
+        review.dispatch(b.handoff_context(),corrected['id'])
+    examined=dict(id=str(uuid.uuid5(uuid.UUID(config['operation']),'revision_review_task')),agent_id=config['plan']['reviewer'],
+        issue_id=task['issue_id'],workspace_id=settings['workspace_id'],runtime_id=settings['runtime_id'],status='running',
+        wakeup_id=wake_id,created_at='2026-10-22T03:00:00Z')
+    examined['handoff_note']=('Wakeup '+wake_id+' triggered. Instruction:\nDELIVERY_REVIEW_START '+context['marker']+
+        '\nSource: '+corrected['id']+'\n'+context['instruction']+
+        '\nTrigger facts (read current state before deciding what to do):\ntime.due '+
+        '{"kind":"at","planned_at":"2026-10-22T02:59:59Z"}\n')
+    records[examined['id']]=examined;runs.append(examined)
+    admitted=b.native_grant(dict(task_id=examined['id'],agent_id=examined['agent_id']))
+    original=b.docker;interleavings=[]
+    def observed_before_ack(method,path,payload=None):
+        result=original(method,path,payload) if payload is not None else original(method,path)
+        if method=='POST' and (path.startswith('/containers/create?') or path.endswith('/start')):
+            info=original('GET','/containers/'+b.PREFIX+'-job-'+admitted['request_id']+'/json')
+            with b.db() as con:
+                row=con.execute('SELECT payload,state FROM worker_creation_intents WHERE request_id=?',(admitted['request_id'],)).fetchone()
+                expected,state=json.loads(row[0]),json.loads(row[1])
+                updated,_=creation.observe(expected,state,info,'running',time.time()+100,time.time())
+                creation.record_observation(con,admitted['request_id'],expected,info)
+                changed=con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=? AND state=?',
+                    (json.dumps(updated,sort_keys=True),admitted['request_id'],row[1]))
+                if changed.rowcount!=1:raise ValueError('exact observation interleaving required')
+            interleavings.append(info['State']['Status'])
+        return result
+    with patch.object(b,'docker',side_effect=observed_before_ack):
+        startup=acp_startup.request(b.handoff_context(),admitted['capability'],{},begin=True);deadline=time.monotonic()+100
+        while startup['startup_status']=='pending' and time.monotonic()<deadline:
+            time.sleep(.25);startup=acp_startup.request(b.handoff_context(),admitted['capability'],{},begin=False)
+        save('review-after-correction-startup.json',startup)
+        if startup['startup_status']!='ready':raise ValueError('review after correction startup rejected')
+        frames=[]
+        for index,method in enumerate(('initialize','session/new')):
+            response=b.session_operation(admitted['capability'],dict(frame=dict(jsonrpc='2.0',id=index+1,method=method,params={})))
+            if 'error' in response or 'result' not in response:raise ValueError('followup review ACP rejected')
+            frames.append(dict(method=method,status='passed',response_sha256=hashlib.sha256(json.dumps(response,sort_keys=True).encode()).hexdigest()))
+    canary=fixed_canary(admitted,'review','/quality_review_registry_canary.py',label='review-after-correction')
+    with b.db() as con:
+        capture=json.loads(con.execute('SELECT context FROM quality_red_captures WHERE task_id=?',(corrected['id'],)).fetchone()[0])
+    read_verifier.observe(capture['copy']['prepared']['file_inventory'],context['packet']['manifest_sha256'],context['read_paths'],canary['read_pairs'])
+    b.SESSIONS[admitted['request_id']].close();b.SESSIONS.clear()
+    if interleavings!=['created','running']:raise ValueError('create/start observation-before-ACK not proved')
+    return dict(status='passed',source_task=corrected['id'],task_id=examined['id'],request_id=admitted['request_id'],
+        frames=frames,forced_interleaving=interleavings,snapshot_mount='readonly',handler_byte_binding=True,
+        tests_approved=False,delivery_approval=False)
 
 
 try:

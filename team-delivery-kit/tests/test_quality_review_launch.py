@@ -111,6 +111,37 @@ class QualityReviewLaunchTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.call()
         self.assertEqual((self.creates,self.starts),(1,1))
 
+    def test_observer_before_docker_ack_preserves_single_create_start_and_running_proof(self):
+        from broker import worker_creation_intent as intents
+        original=self.b.docker
+        def interleaved(method,path,payload=None):
+            result=original(method,path,payload)
+            if method=='POST' and (path.startswith('/containers/create?') or path.endswith('/start')):
+                with self.b.db() as con:
+                    raw,state=con.execute('SELECT payload,state FROM worker_creation_intents WHERE request_id=?',(self.request,)).fetchone()
+                    expected=json.loads(raw)
+                    observed,_=intents.observe(expected,json.loads(state),self.worker,'running',time.time()+100,time.time())
+                    intents.record_observation(con,self.request,expected,self.worker)
+                    con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',(json.dumps(observed),self.request))
+            return result
+        with patch.object(self.b,'docker',side_effect=interleaved):self.call()
+        row,binding=self.rows()
+        self.assertEqual(acp_startup.advance_worker(self.b,row,binding)['status'],'running')
+        with self.b.db() as con:
+            stage=json.loads(con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(self.request,)).fetchone()[0])['stage']
+        self.assertEqual(stage,'start_running_observed');self.assertEqual((self.creates,self.starts),(1,1))
+
+    def test_task_that_terminates_during_creation_is_not_started(self):
+        original=self.b.docker
+        def terminal(method,path,payload=None):
+            result=original(method,path,payload)
+            if method=='POST' and path.startswith('/containers/create?'):self.record['status']='failed'
+            return result
+        with patch.object(self.b,'docker',side_effect=terminal),self.assertRaises(ValueError):self.call()
+        self.assertEqual((self.creates,self.starts),(1,0))
+        with self.assertRaises(ValueError):self.call()
+        self.assertEqual((self.creates,self.starts),(1,0))
+
     def test_snapshot_recreation_or_manifest_drift_cannot_consume_capability(self):
         self.volume_info['CreatedAt'] = '2026-10-22T01:00:00Z'
         with self.assertRaises(ValueError):self.call()

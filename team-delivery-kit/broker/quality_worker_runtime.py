@@ -59,6 +59,7 @@ def execute(b, token, args, streaming, defer_transport, adapter):
         with b.db() as con:
             con.execute("UPDATE leases SET status='closing' WHERE request_id=?", (request,))
         raise
+    adapter.current(b,request)  # Slow creation must not start a terminal native task.
     with b.db() as con:
         intents.start_intent(con, request)
     try:

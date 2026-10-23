@@ -69,6 +69,17 @@ A revisão seguinte foi acionada e admitida, mas falhou no bootstrap antes de AC
 ou chamada ao modelo. Permanece bloqueada, com evidência preservada; o proxy foi
 parado. A causa do bootstrap e sua recuperação ainda precisam ser qualificadas.
 Isso não comprova congelamento aprovado, Green ou homologação.
+Foi reproduzida em testes uma corrida compatível com essa falha: a observação do
+watchdog avançava o estado antes do ACK de criação/start e a rotina rejeitava a
+confirmação tardia. A correção em fonte preserva a observação mais forte somente
+com recibo de política, payload, contêiner e estado nativo exatos; não repete
+comandos. O bootstrap agora também registra fase, classe e localização sanitizada
+de falhas futuras, sem texto da exceção, caminhos privados ou credenciais. O
+registro histórico não contém essa localização e não é reescrito como prova da
+causa. O canário ampliado passou em Docker/ACP até a revisão após a correção,
+forçando as duas intercalações antes do ACK, sem modelo; doze auxiliares foram
+retirados e nenhuma aprovação foi concedida. A recuperação da execução nativa já admitida
+permanece separada: não se pode reutilizar o grant nem apagar a atestação falha.
 Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
 primeiro tick interrompido somente com fila vazia, serviço descarregado e
 desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado

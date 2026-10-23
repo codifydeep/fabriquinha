@@ -8,10 +8,24 @@ import json
 from pathlib import Path
 import threading
 import time
+import traceback
 
 LOCK=threading.RLock()
 THREADS={}
 STARTUP_SECONDS=90
+
+
+def failure_evidence(error,phase):
+    """Safe location evidence, never exception text, paths, locals or tokens."""
+    qualified={'acp_startup.py','quality_worker_runtime.py','quality_review_launch.py',
+        'quality_test_review.py','quality_test_revision.py','native.py','worker_creation_intent.py',
+        'quality_launch_router.py','quality_author_launch.py','broker.py','server.py'}
+    frames=[dict(file=Path(frame.filename).name,line=frame.lineno,function=frame.name)
+        for frame in traceback.extract_tb(error.__traceback__)
+        if Path(frame.filename).name in qualified][-8:]
+    return dict(phase=phase,error_type=type(error).__name__,frames=frames,
+        message_sha256=hashlib.sha256(str(error).encode()).hexdigest(),
+        execution_authorized=False,delivery_approval=False)
 
 
 class StartupDeadline(TimeoutError):
@@ -168,13 +182,16 @@ def advance_worker(b,row,binding):
 
 
 def run(b,token,request_id,state):
+    phase='native_authority'
     try:
         while time.time()<state['deadline']:
+            phase='native_authority'
             try:row,binding=authority(b,token)
             except OSError:
                 time.sleep(0.25);continue  # observation failure is not task termination
             if row['request_id']!=request_id:raise ValueError('startup identity changed')
             if not row['used']:
+                phase='grant_execution'
                 try:b.execute_grant(token,{},streaming=True,defer_transport=True)
                 except TimeoutError as error:
                     try:import validation_job
@@ -186,15 +203,19 @@ def run(b,token,request_id,state):
                 except b.DockerOperationTimeout as error:
                     if error.operation not in ('containers_create','containers_start'):raise
                 continue
+            phase='worker_observation'
             result=advance_worker(b,row,binding)
             if result:
+                phase='native_revalidation'
                 row,binding=authority(b,token)
                 if time.time()>=state['deadline']:raise StartupDeadline('startup deadline')
                 write(b,request_id,{**state,'stage':'transport_intent',
                     'required_action':'observe_single_transport_open'})
                 with b.LOCK:
                     row,binding=authority(b,token)
+                    phase='transport_open'
                     result=b.open_granted_transport(row,result,binding['scope'])
+                phase='transport_readiness'
                 authority(b,token)  # terminal native tasks cannot become ready
                 write(b,request_id,{**state,'stage':'ready','result':result,
                     'required_action':'forward_actual_ACP_initialize'})
@@ -205,7 +226,8 @@ def run(b,token,request_id,state):
         if request_id:
             category='startup_deadline' if isinstance(error,StartupDeadline) else 'startup_'+b.failure_category(error)
             write(b,request_id,{**state,'stage':'failed','category':category,
-                'required_action':'diagnose_bootstrap_no_identical_retry','delivery_approval':False})
+                'required_action':'diagnose_bootstrap_no_identical_retry','delivery_approval':False,
+                'failure_evidence':failure_evidence(error,phase)})
             with b.db() as con:
                 con.execute('INSERT INTO broker_errors VALUES (?,?,?,?)',(request_id,'acp_startup',category,time.time()))
     finally:

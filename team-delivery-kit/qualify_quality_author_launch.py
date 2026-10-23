@@ -91,6 +91,17 @@ def validate_report(report):
                     or any(f.get('status')!='passed' or not re.fullmatch('[a-f0-9]{64}',str(f.get('response_sha256')))
                         for f in correction.get('frames',[]))):
                 raise ValueError('actual correction seed/ACP evidence required, never native approval')
+            if 'review_after_correction' in correction:
+                followup=correction['review_after_correction']
+                if (followup.get('status')!='passed' or followup.get('forced_interleaving')!=['created','running']
+                        or followup.get('snapshot_mount')!='readonly' or followup.get('handler_byte_binding') is not True
+                        or followup.get('tests_approved') is not False or followup.get('delivery_approval') is not False
+                        or [f.get('method') for f in followup.get('frames',[])]!=['initialize','session/new']
+                        or any(f.get('status')!='passed' or not re.fullmatch('[a-f0-9]{64}',str(f.get('response_sha256')))
+                            for f in followup.get('frames',[]))):
+                    raise ValueError('actual followup review/ACK interleaving evidence required')
+                for key in ('source_task','task_id','request_id'):
+                    if str(uuid.UUID(followup[key]))!=followup[key]:raise ValueError('exact followup identity required')
 
 
 def input_config(archive,metadata):
@@ -145,7 +156,10 @@ def execute_probe(archive,controller,remote,config,maintenance):
     if transferred.returncode:raise ValueError('observe original source transfer; no new operation')
     args=['docker','exec',controller,'python',remote+'/quality_launch_docker_probe.py']
     save(archive/'process-intent.json',dict(argv=args))
-    executed=command(args)
+    # Four bounded bootstraps plus two real Red/copy chains can outlive the
+    # generic 120s helper budget. The host exec remains asynchronously observed;
+    # a timeout still fences replay and never manufactures a terminal result.
+    executed=subprocess.run(args,text=True,capture_output=True,timeout=480)
     save(archive/'process-result.json',dict(exit_code=executed.returncode,stdout=executed.stdout,stderr=executed.stderr))
     exported=subprocess.run(['docker','exec',controller,'tar','-cf','-','-C',remote,'state'],capture_output=True,timeout=120)
     save(archive/'state-export-result.json',dict(exit_code=exported.returncode,stderr=exported.stderr.decode(errors='replace')))
@@ -278,14 +292,23 @@ def finish_retirement(namespace,operation):
         if con.execute('PRAGMA quick_check').fetchone()[0]!='ok':raise ValueError('private state archive corrupt')
         events=con.execute('SELECT method,success FROM acp_events ORDER BY rowid').fetchall()
         correction=report.get('review_launch',{}).get('test_revision')
-        expected=[('initialize',1),('session/new',1)]*((2 if 'review_launch' in report else 1)+(1 if correction else 0))
+        followup=correction.get('review_after_correction') if correction else None
+        expected=[('initialize',1),('session/new',1)]*((2 if 'review_launch' in report else 1)+(1 if correction else 0)+(1 if followup else 0))
         if events!=expected:raise ValueError('actual ACP events missing or a prompt was sent')
         bindings=con.execute('SELECT request_id,task_id FROM quality_author_admissions').fetchall()
         if bindings!=[(report['request_id'],report['task_id'])]:raise ValueError('admission report identity drift')
         if 'review_launch' in report:
             reviewed=report['review_launch']
             rows=con.execute('SELECT request_id,task_id FROM quality_review_admissions').fetchall()
-            if rows!=[(reviewed['request_id'],reviewed['task_id'])]:raise ValueError('review admission identity drift')
+            expected_reviews={(reviewed['request_id'],reviewed['task_id'])}
+            if followup:
+                expected_reviews.add((followup['request_id'],followup['task_id']))
+                if (followup['source_task']!=str(uuid.uuid5(uuid.UUID(operation),'revision_task'))
+                        or followup['task_id']!=str(uuid.uuid5(uuid.UUID(operation),'revision_review_task'))):
+                    raise ValueError('followup review scope drift')
+                frames=con.execute('SELECT method,success FROM acp_events WHERE request_id=? ORDER BY rowid',(followup['request_id'],)).fetchall()
+                if frames!=[('initialize',1),('session/new',1)]:raise ValueError('followup review frames drift')
+            if set(rows)!=expected_reviews or len(rows)!=len(expected_reviews):raise ValueError('review admission identity drift')
             state=json.loads(con.execute('SELECT state FROM quality_test_reviews WHERE source_task=?',(report['task_id'],)).fetchone()[0])
             if state['stage']!='admitted' or state['tests_approved'] is not False:raise ValueError('review launch must not approve tests')
             if correction:

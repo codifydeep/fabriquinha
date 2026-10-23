@@ -5,6 +5,7 @@
 FROM delivery-kit-execution-broker:20261021.512
 COPY broker/server.py /broker.py
 COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /
+COPY broker/worker_creation_intent.py /
 COPY broker/controller_maintenance.py broker/maintenance_job_clock.py /
 COPY broker/handoff_runtime.py /
 COPY broker/quality_lifecycle_v2.py broker/quality_lifecycle_enrollment.py broker/quality_red_capture.py /

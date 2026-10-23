@@ -58,27 +58,52 @@ def uncertain(con,request):
         (json.dumps(dict(stage='create_outcome_unknown',at=time.time(),required_action='observe_exact_container_no_repost',delivery_approval=False)),request))
 
 
+def qualified_fact(con,request,payload,state,status):
+    """Only an actual persisted policy observation can outrun an ACK."""
+    fact=state.get('fact',{});sha=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
+    if (fact.get('docker_status')!=status or fact.get('native_status')!='running'
+            or fact.get('payload_sha256')!=sha or not re.fullmatch('[a-f0-9]{64}',str(fact.get('container_id')))):
+        return False
+    rows=con.execute('SELECT receipt_sha256,receipt FROM worker_policy_observations WHERE request_id=?',(request,)).fetchall()
+    for digest,raw in rows:
+        if hashlib.sha256(raw.encode()).hexdigest()!=digest:continue
+        receipt=json.loads(raw)
+        if (receipt.get('operation')=='worker_policy_observation_v1' and receipt.get('request_id')==request
+                and receipt.get('container_id')==fact['container_id'] and receipt.get('payload_sha256')==sha
+                and receipt.get('worker_image')==payload['Image'] and receipt.get('docker_status')==status
+                and receipt.get('normalized_differences')==[]):return True
+    return False
+
+
 def start_intent(con,request):
     """Commit before POST start. An interrupted intention must not be replayed."""
-    row=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
-    if not row or json.loads(row[0]).get('stage')!='create_intent':
+    row=con.execute('SELECT payload,state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
+    state=json.loads(row[1]) if row else {}
+    observed=(row and state.get('stage')=='late_container_observed' and
+        qualified_fact(con,request,json.loads(row[0]),state,'created'))
+    if not row or state.get('stage')!='create_intent' and not observed:
         raise ValueError('fresh acknowledged creation required before start')
     con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',
         (json.dumps(dict(stage='start_intent',at=time.time(),required_action='observe_start_no_repost',delivery_approval=False)),request))
 
 
 def start_uncertain(con,request):
-    row=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
-    if not row or json.loads(row[0]).get('stage')!='start_intent':
+    row=con.execute('SELECT payload,state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
+    state=json.loads(row[1]) if row else {}
+    if row and state.get('stage')=='start_running_observed' and qualified_fact(con,request,json.loads(row[0]),state,'running'):
+        return  # An actual running observation is stronger than an uncertain ACK.
+    if not row or state.get('stage')!='start_intent':
         raise ValueError('durable start intent required')
-    state=json.loads(row[0])
     con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',
         (json.dumps({**state,'stage':'start_outcome_unknown'}),request))
 
 
 def started(con,request):
-    row=con.execute('SELECT state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
-    if not row or json.loads(row[0]).get('stage')!='start_intent':
+    row=con.execute('SELECT payload,state FROM worker_creation_intents WHERE request_id=?',(request,)).fetchone()
+    state=json.loads(row[1]) if row else {}
+    if row and state.get('stage')=='start_running_observed' and qualified_fact(con,request,json.loads(row[0]),state,'running'):
+        return  # Preserve the qualified observation; never downgrade it to ACK.
+    if not row or state.get('stage')!='start_intent':
         raise ValueError('durable start intent required')
     con.execute('UPDATE worker_creation_intents SET state=? WHERE request_id=?',
         (json.dumps(dict(stage='start_acknowledged',at=time.time(),delivery_approval=False)),request))

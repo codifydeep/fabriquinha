@@ -17,6 +17,16 @@ from acp_wrapper import await_startup, native_capability, startup_timeout
 
 
 class StartupTests(unittest.TestCase):
+    def test_failure_evidence_never_exports_error_text_locals_or_absolute_paths(self):
+        secret='Bearer private-example-key /Users/private/config'
+        try:raise ValueError(secret)
+        except ValueError as error:observed=startup.failure_evidence(error,'worker_observation')
+        self.assertEqual(observed['phase'],'worker_observation')
+        self.assertEqual(observed['error_type'],'ValueError')
+        self.assertEqual(observed['message_sha256'],hashlib.sha256(secret.encode()).hexdigest())
+        self.assertNotIn(secret,json.dumps(observed));self.assertNotIn('/Users/',json.dumps(observed))
+        self.assertFalse(observed['delivery_approval']);self.assertFalse(observed['execution_authorized'])
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name);(self.root/'native.json').write_text('{}')

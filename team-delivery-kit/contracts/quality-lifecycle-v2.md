@@ -720,6 +720,24 @@ and installed together before any new v2 work is enabled.
 
 ## Installation gates still required
 
+### Bootstrap observations and acknowledgments
+
+A qualified watchdog observation may arrive before the Docker create/start ACK.
+The controller must not downgrade an already observed running worker to an ACK
+or reject that stronger fact solely because of ordering. Accepting the earlier
+observation requires the exact request, payload digest, container, image, native
+running state and a persisted matching policy receipt. Missing or conflicting
+evidence, terminal tasks and unknown start outcomes remain blocked. The start
+intent is still single-use; this reconciliation never sends another command.
+Native authority is checked again after a slow creation, before starting it.
+
+Future bootstrap failures record the internal phase, exception class, source
+basename/function/line and message hash. Exception text, locals, tokens and
+absolute paths are not exported. These diagnostics cannot retroactively identify
+the cause of a historical failure or authorize a rerun. A review admitted but
+failed before ACP requires separately qualified recovery with the old execution,
+capability, snapshot and attestation preserved, not a pre-admission reset.
+
 ### Evidence for requesting changes versus approval
 
 Approval requires authenticated complete reads of the entire registered snapshot.

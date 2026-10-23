@@ -126,6 +126,40 @@ class WorkerCreationIntentTests(unittest.TestCase):
         with self.assertRaises(ValueError):intent.start_intent(con,'request')
         with self.assertRaises(ValueError):intent.started(con,'request')
 
+    def test_watchdog_create_observation_does_not_invalidate_the_single_start_intent(self):
+        payload,_,info=self.inputs();con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        intent.record(con,'request',payload)
+        observed,_=intent.observe(payload,{'stage':'create_intent'},info,'running',1000,10)
+        intent.record_observation(con,'request',payload,info)
+        con.execute('UPDATE worker_creation_intents SET state=?',(json.dumps(observed),))
+        intent.start_intent(con,'request')
+        self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0])['stage'],'start_intent')
+        with self.assertRaises(ValueError):intent.start_intent(con,'request')
+
+    def test_watchdog_running_observation_is_not_downgraded_by_a_late_start_ack(self):
+        payload,_,info=self.inputs();info['State'].update(Status='running',StartedAt='2026-10-23T19:02:51Z')
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        intent.record(con,'request',payload);intent.start_intent(con,'request')
+        observed,_=intent.observe(payload,{'stage':'start_intent'},info,'running',1000,10)
+        intent.record_observation(con,'request',payload,info)
+        con.execute('UPDATE worker_creation_intents SET state=?',(json.dumps(observed),))
+        intent.started(con,'request')
+        self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0]),observed)
+        intent.start_uncertain(con,'request')
+        self.assertEqual(json.loads(con.execute('SELECT state FROM worker_creation_intents').fetchone()[0]),observed)
+
+    def test_running_observation_without_exact_policy_receipt_cannot_accept_late_ack(self):
+        payload,_,info=self.inputs();info['State']['Status']='running'
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        intent.record(con,'request',payload);intent.start_intent(con,'request')
+        observed,_=intent.observe(payload,{'stage':'start_intent'},info,'running',1000,10)
+        con.execute('UPDATE worker_creation_intents SET state=?',(json.dumps(observed),))
+        with self.assertRaises(ValueError):intent.started(con,'request')
+        intent.record_observation(con,'request',payload,info)
+        bad=copy.deepcopy(observed);bad['fact']['payload_sha256']='0'*64
+        con.execute('UPDATE worker_creation_intents SET state=?',(json.dumps(bad),))
+        with self.assertRaises(ValueError):intent.started(con,'request')
+
     def test_interrupted_create_intent_is_observed_without_repost(self):
         payload,_,info=self.inputs()
         new,lease=intent.observe(payload,{'stage':'create_intent'},info,'running',1000,10)
