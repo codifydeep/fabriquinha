@@ -847,6 +847,22 @@ verdict in three fixed loopback calls within the original budget. It used no
 model calls and granted no test/delivery approval. Native qualification remains
 pending; historical verdicts and manifests are unchanged.
 
+The subsequent native run reached 122 observed read pages over 60 files before
+the existing proxy rejected its accumulated request at the fixed 512 KiB
+transport ceiling. The 71-file snapshot alone is 552,750 bytes, excluding JSON,
+line numbers, tools and conversation history. This failure is infrastructure
+capacity, not a valid review verdict; it does not authorize a blind retry.
+
+The proxy source now allows an explicit `MODEL_PROXY_MAX_REQUEST_BYTES` from
+the finite set 524288 (unchanged default), 1048576 or 2097152 bytes. Its runtime
+endpoint exposes the selected capacity separately from the call budget. Rejection
+logs include declared/request-limit byte counts, never payloads or credentials;
+oversized bodies are rejected before reading them or reserving a model call.
+Installing a larger qualified capacity must preserve the model, key mounts,
+durable call counter, maximum-call ceiling and every delivery gate. A failed
+native transport run still needs separately qualified recovery; changing the
+capacity alone neither reclassifies it nor grants new work or approval.
+
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after
 complete, byte-bound reads of every new test and every cited file; omissions in

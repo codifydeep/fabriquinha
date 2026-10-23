@@ -29,7 +29,18 @@ import proxy_request_rejections
 from structured_response_contract import validate as validate_structured_response, StructuredResponseRejected
 
 PLACEHOLDER = 'Bearer ' + PLACEHOLDER_KEY
-MAX_BODY = 512 * 1024
+
+
+def request_body_limit(environment=None):
+    """Explicit, finite installation capacity; independent of paid-call budget."""
+    environment=os.environ if environment is None else environment
+    value=environment.get('MODEL_PROXY_MAX_REQUEST_BYTES','524288')
+    if not isinstance(value,str) or value not in ('524288','1048576','2097152'):
+        raise ValueError('unsupported model request byte capacity')
+    return int(value)
+
+
+MAX_BODY = request_body_limit()
 MAX_RESPONSE = 4 * 1024 * 1024
 RESPONSE_DEADLINE_SECONDS = 120
 LOCK = threading.Lock()
@@ -316,6 +327,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = ({'paused': bool(provider_pause()), 'incident': provider_pause()}
                        if self.path == '/provider-status' else
                        {'response_deadline_seconds': RESPONSE_DEADLINE_SECONDS,
+                        'max_request_bytes': MAX_BODY,
                         'runtime_decision_contract': 'no-tools-json-v1'}
                        if self.path == '/runtime-status' else
                        {'calls': CALLS, 'max_calls': MAX_CALLS,
@@ -338,6 +350,7 @@ class Handler(BaseHTTPRequestHandler):
         padding_receipt = None
         stage, request_sha, local_rejection = 'admission', None, None
         route, execution_id = execution_route(self.path)
+        size = None
         started = time.monotonic()
         started_at = time.time()
         try:
@@ -558,6 +571,7 @@ class Handler(BaseHTTPRequestHandler):
                           'started_at': started_at,
                           'duration_seconds': round(time.monotonic() - started, 3),
                           'response_deadline_seconds': RESPONSE_DEADLINE_SECONDS,
+                          'request_bytes': size, 'max_request_bytes': MAX_BODY,
                           **request_metrics, **response_metrics}
         if local_rejection:
             try:

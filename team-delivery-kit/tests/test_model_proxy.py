@@ -45,7 +45,8 @@ class ModelProxyTests(unittest.TestCase):
     def test_budget_status_shape_is_unchanged_and_runtime_has_separate_endpoint(self):
         from io import BytesIO
         for path, keys in (('/status', {'calls', 'max_calls', 'remaining'}),
-                           ('/runtime-status', {'response_deadline_seconds', 'runtime_decision_contract'})):
+                           ('/runtime-status', {'response_deadline_seconds', 'runtime_decision_contract',
+                                                'max_request_bytes'})):
             handler = object.__new__(model_proxy.Handler)
             handler.path = path; handler.wfile = BytesIO()
             handler.send_response = lambda *a: None
