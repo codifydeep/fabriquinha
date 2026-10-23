@@ -44,6 +44,11 @@ sob manutenção selada e após mudança comprovada do adaptador: preserva o aut
 o snapshot e o Red, registra a execução falha e cria outro marcador de handoff.
 Não recupera uma revisão já admitida nem aprova testes. Falhas nativas anteriores
 à admissão são encaminhadas imediatamente ao CTO, sem aguardar o timeout.
+Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
+primeiro tick interrompido somente com fila vazia, serviço descarregado e
+desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado
+é preservado literalmente, não convertido em sucesso; trabalho enfileirado e
+falhas anteriores continuam bloqueando essa exceção.
 O runtime de referência também já recebeu seletores explícitos para as seis
 imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO.
 `quality_runtime_configuration.py` confere o modo

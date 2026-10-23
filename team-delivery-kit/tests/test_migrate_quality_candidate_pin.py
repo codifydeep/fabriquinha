@@ -100,6 +100,32 @@ class PinMigrationTests(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):service.run_once(self.path,self.pin)
         with self.assertRaises(ValueError):self.migrate()
 
+    def test_explicit_empty_queue_migration_preserves_interrupted_intent_verbatim(self):
+        with sqlite3.connect(self.database) as con:con.execute('DELETE FROM tasks')
+        with patch.object(dispatch,'tick',side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):service.run_once(self.path,self.pin)
+        previous=service.status(self.path,self.pin)['service']
+        result=migration.migrate(self.path,self.pin,self.image,self.operation,effects=self.fx,
+            preserve_interrupted_tick=True)
+        with patch.object(self.authority,'image',self.image):
+            self.assertEqual(service.status(result['new_config'],result['new_pin'])['service'],previous)
+            self.authority.paused=True
+            observed=service.run_once(result['new_config'],result['new_pin'])
+        self.assertEqual(observed['result']['stage'],'maintenance')
+        self.assertEqual(previous['stage'],'tick_intent')
+
+    def test_interrupted_tick_option_never_migrates_queued_work_or_erases_failures(self):
+        with patch.object(dispatch,'tick',side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):service.run_once(self.path,self.pin)
+        with self.assertRaises(ValueError):
+            migration.migrate(self.path,self.pin,self.image,self.operation,effects=self.fx,preserve_interrupted_tick=True)
+        with sqlite3.connect(self.database) as con:con.execute('DELETE FROM tasks')
+        with patch.object(dispatch,'tick',side_effect=service.Pending):service.run_once(self.path,self.pin)
+        with patch.object(dispatch,'tick',side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):service.run_once(self.path,self.pin)
+        with self.assertRaises(ValueError):
+            migration.migrate(self.path,self.pin,self.image,self.operation,effects=self.fx,preserve_interrupted_tick=True)
+
     def test_changed_child_evidence_blocks_resume(self):
         self.fx.fail_registration=True
         with self.assertRaises(RuntimeError):self.migrate()

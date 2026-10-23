@@ -113,12 +113,14 @@ def probe(fx,namespace,image):
     fx.idle(namespace);fx.stopped(namespace);fx.helpers(namespace)
 
 
-def migrate(old_path,old_pin,new_image,operation,*,effects=None):
+def migrate(old_path,old_pin,new_image,operation,*,effects=None,preserve_interrupted_tick=False):
     dispatch.canonical(operation)
     value,_,old_service=service.config(old_path,old_pin);namespace=value['namespace'];private=Path(value['private'])
     require(re.fullmatch('sha256:[a-f0-9]{64}',new_image) and new_image!=value['image'])
     archive=folder(folder(private/'backups')/('candidate-pin-migration-'+operation))
     identity=dict(operation=operation,namespace=namespace,old_config=str(Path(old_path)),old_pin=old_pin,new_image=new_image)
+    require(type(preserve_interrupted_tick) is bool)
+    if preserve_interrupted_tick:identity['preserve_interrupted_tick']=True
     intent=archive/'intent.json';completed=archive/'result.json'
     if completed.exists():
         result=json.loads(read(completed));require(result['identity']==identity);return result
@@ -140,7 +142,12 @@ def migrate(old_path,old_pin,new_image,operation,*,effects=None):
         if not intent.exists():
             require(json.loads(row[0])==old_context)
             previous=service.load(svc,old_service)
-            require(previous is None or previous['stage']!='tick_intent')
+            if previous is not None and previous['stage']=='tick_intent':
+                # Never call an interrupted effect successful. With no queued
+                # work, the sealed/idle controller and both held kernel locks
+                # permit carrying this exact intent across a pin change. The
+                # first later service tick still observes/counts interruption.
+                require(preserve_interrupted_tick and count==0 and previous['unexpected_exits']==0)
             login=fx.login(namespace);login_raw=read(login) if login.exists() else None
             if login_raw is not None:
                 registered=plistlib.loads(login_raw)
@@ -210,5 +217,8 @@ def migrate(old_path,old_pin,new_image,operation,*,effects=None):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for key in ('old-config','old-pin','image','operation'):parser.add_argument('--'+key,required=True)
+    parser.add_argument('--preserve-interrupted-tick',action='store_true',
+        help='Carry an exact first interrupted intent only with an empty queue; never mark it completed')
     args=parser.parse_args()
-    print(json.dumps(migrate(args.old_config,args.old_pin,args.image,args.operation),sort_keys=True))
+    print(json.dumps(migrate(args.old_config,args.old_pin,args.image,args.operation,
+        preserve_interrupted_tick=args.preserve_interrupted_tick),sort_keys=True))
