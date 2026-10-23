@@ -72,8 +72,11 @@ def accept_page(messages):
     except (ValueError,KeyError,TypeError,UnicodeError):return False
 
 
-def observe(files,manifest,paths,messages,*,include_content=False):
+def observe(files,manifest,paths,messages,*,include_content=False,required_paths=None):
     inventory(files,manifest,paths)
+    required=set(paths) if required_paths is None else set(required_paths)
+    require(bool(required) and required<=set(paths) and
+        (required_paths is None or isinstance(required_paths,list) and len(required)==len(required_paths)))
     require(isinstance(messages,list) and 0<len(messages)<=1024 and len(messages)%2==0)
     normalized=[];identifiers=set();empty_paths={};raw_hashes={}
     for index in range(0,len(messages),2):
@@ -89,6 +92,7 @@ def observe(files,manifest,paths,messages,*,include_content=False):
     result={}
     for name,expected in files.items():
         path='/delivery/'+name;observed=found.get(path)
+        if path not in required:continue
         if observed is None or observed['lines']!=observed['total_lines']:
             raise ReadRejected('file_read_incomplete',path,expected['sha256'])
         lines=observed['line_content']

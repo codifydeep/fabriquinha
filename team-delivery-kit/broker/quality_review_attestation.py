@@ -81,7 +81,7 @@ def load(b,source):
     return receipt
 
 
-def verdict(output,packet,observed,prepared):
+def parse_decision(output,packet):
     require(isinstance(output,str) and 0<len(output.encode())<=16384)
     text=output.strip()
     fenced=re.fullmatch(r'```(?:json)?\s*\n(.*?)\n```',text,re.I|re.S)
@@ -100,13 +100,30 @@ def verdict(output,packet,observed,prepared):
         and isinstance(value['findings'],list) and len(value['findings'])<=8)
     if value['action']=='approve_tests':require(not value['findings'])
     if value['action']=='request_changes':require(bool(value['findings']))
+    return value
+
+
+def required_reads(value,packet,paths):
+    # Rejecting a concrete defect grants no implementation permission. Require
+    # every new test and cited file in full; approval still requires ALL files.
+    if value['action']!='request_changes':return paths
+    cited=[]
+    for finding in value['findings']:
+        require(isinstance(finding,dict) and isinstance(finding.get('path'),str))
+        path='/delivery/'+finding['path'];require(path in paths);cited.append(path)
+    return sorted(set(cited)|{'/delivery/'+p for p in packet['plan']['new_tests']})
+
+
+def verdict(output,packet,observed,prepared):
+    value=parse_decision(output,packet)
     for finding in value['findings']:
         require(isinstance(finding,dict) and set(finding)=={'criterion','path','test','line','quote','expected','observed'}
             and finding['criterion'] in packet['plan']['criteria']
             and isinstance(finding['path'],str) and '/delivery/'+finding['path'] in observed
             and type(finding['line']) is int and finding['line']>=1
             and isinstance(finding['test'],str)
-            and (finding['test']=='__module__' or finding['test'] in prepared['test_methods'].get(finding['path'],[]))
+            and (finding['test']=='__module__' or finding['test'] in prepared['test_methods'].get(finding['path'],[])
+                or finding['path'] in packet['plan']['new_tests'])
             and all(isinstance(finding[key],str) and 0<len(finding[key])<=500 for key in ('quote','expected','observed')))
         line=observed['/delivery/'+finding['path']]['line_content'].get(finding['line'])
         require(isinstance(line,str) and bool(finding['quote'].strip()) and finding['quote'] in line)
@@ -169,14 +186,18 @@ def collect(b,c,context,assignment,phase):
         messages=read_stream_receipts.load(con,c['task_id'])
         capture=json.loads(con.execute('SELECT context FROM quality_red_captures WHERE task_id=?',
             (c['source_task'],)).fetchone()[0])
+    phase['value']='native_terminal_verdict'
+    output=(task.get('result') or {}).get('output')
+    packet=context['packet'];choice=parse_decision(output,packet)
+    required=required_reads(choice,packet,context['read_paths'])
     phase['value']='complete_snapshot_reads'
     prepared=capture['copy']['prepared'];files=prepared.get('file_inventory')
     require(isinstance(files,dict))
-    packet=context['packet'];plan=packet['plan']
+    plan=packet['plan']
     require(all(files.get(path,{}).get('sha256')==sha for path,sha in packet['red']['tests'].items()))
-    observed=reads.observe(files,packet['manifest_sha256'],context['read_paths'],messages,include_content=True)
+    observed=reads.observe(files,packet['manifest_sha256'],context['read_paths'],messages,
+        include_content=True,required_paths=required)
     phase['value']='native_terminal_verdict'
-    output=(task.get('result') or {}).get('output')
     decision=verdict(output,packet,observed,prepared)
     action=decision['action']
     stage={'approve_tests':'tests_frozen','request_changes':'changes_requested','escalate_cto':'technical_blocked'}[action]
@@ -187,6 +208,7 @@ def collect(b,c,context,assignment,phase):
         native_output_sha256=hashlib.sha256(output.encode()).hexdigest(),
         reads={path:{key:value for key,value in receipt.items() if key!='line_content'} for path,receipt in observed.items()},
         reads_stream_sha256=quality.digest(messages),worker_inspection_sha256=quality.digest(proof[-1]),
+        read_scope='complete_snapshot' if set(required)==set(context['read_paths']) else 'rejection_new_tests_and_citations',
         tests_approved=action=='approve_tests',execution_authorized=False,delivery_approval=False)
     if action=='approve_tests':
         frozen=dict(operation='independent_test_review_v2',run_id=plan['run_id'],issue_id=plan['issue_id'],

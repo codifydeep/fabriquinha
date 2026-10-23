@@ -44,6 +44,16 @@ sob manutenção selada e após mudança comprovada do adaptador: preserva o aut
 o snapshot e o Red, registra a execução falha e cria outro marcador de handoff.
 Não recupera uma revisão já admitida nem aprova testes. Falhas nativas anteriores
 à admissão são encaminhadas imediatamente ao CTO, sem aguardar o timeout.
+A revisão real seguinte foi admitida, leu a entrega e pediu mudanças por uma
+asserção tautológica no teste novo. Não foi aprovada: a atestação bloqueou por
+leituras incompletas. Essa execução e seu bloqueio permanecem preservados.
+A correção posterior em fonte distingue rejeição de aprovação: uma rejeição
+concreta exige leitura integral de todos os testes novos e arquivos citados;
+aprovação continua exigindo o snapshot inteiro. A citação de um helper Python
+deve corresponder à função, linha e bytes realmente lidos. Essa correção ainda
+não está instalada nem converte o veredito bloqueado em aprovação. O adaptador
+de devolução ao autor e nova revisão ainda precisa ser implementado e qualificado
+antes de outro ensaio; a referência permanece selada, sem consumo de modelo.
 Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
 primeiro tick interrompido somente com fila vazia, serviço descarregado e
 desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado

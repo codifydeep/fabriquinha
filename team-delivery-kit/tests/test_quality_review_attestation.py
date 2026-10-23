@@ -113,6 +113,46 @@ class QualityReviewAttestationTests(unittest.TestCase):
         self.update_verdict(action='request_changes',findings=[])
         self.assertEqual(self.call()['stage'],'technical_blocked')
 
+    def only_new_test_reads(self):
+        with self.b.db() as con:
+            rows=con.execute('SELECT call_id,messages FROM observed_read_stream').fetchall()
+            for identifier,raw in rows:
+                if json.loads(raw)[0]['input']['path']!='/delivery/tests/test_new.py':
+                    con.execute('DELETE FROM observed_read_stream WHERE call_id=?',(identifier,))
+
+    def test_evidenced_rejection_needs_new_tests_and_citations_not_every_unrelated_file(self):
+        self.only_new_test_reads()
+        finding=dict(criterion='A01',path='tests/test_new.py',test='test_new',line=4,
+            quote='self.assertEqual(app.VALUE, 1)',expected='Registered behavior',observed='This assertion')
+        self.update_verdict(action='request_changes',findings=[finding])
+        result=self.call()
+        self.assertEqual(result['stage'],'changes_requested')
+        self.assertEqual(result['read_scope'],'rejection_new_tests_and_citations')
+        self.assertEqual(set(result['reads']),{'/delivery/tests/test_new.py'})
+        self.assertFalse(result['tests_approved']);self.assertFalse(result['execution_authorized'])
+
+    def test_partial_snapshot_can_never_approve_or_cite_an_unread_file(self):
+        self.only_new_test_reads()
+        self.assertEqual(self.call()['stage'],'technical_blocked')
+
+    def test_unread_cited_file_blocks_rejection(self):
+        self.only_new_test_reads()
+        finding=dict(criterion='A01',path='app.py',test='__module__',line=1,
+            quote='VALUE=0',expected='Registered behavior',observed='Base code')
+        self.update_verdict(action='request_changes',findings=[finding])
+        self.assertEqual(self.call()['stage'],'technical_blocked')
+
+    def test_new_test_helper_citation_requires_real_ast_function_and_exact_line(self):
+        raw=b'import unittest\nclass New(unittest.TestCase):\n def helper(self):\n  return 1\n def test_new(self): self.assertEqual(self.helper(), 1)\n'
+        packet=launch_fixture.launch.review.load(self.b,self.source)[0]['packet']
+        observed={'/delivery/tests/test_new.py':dict(line_content=dict(enumerate(raw.decode().splitlines(),1)))}
+        value={**self.verdict,'action':'request_changes','findings':[dict(criterion='A01',path='tests/test_new.py',
+            test='helper',line=4,quote='return 1',expected='Meaningful value',observed='Constant')]}
+        prepared=dict(test_methods={'tests/test_new.py':['test_new']})
+        self.assertEqual(attest.verdict(json.dumps(value),packet,observed,prepared)['action'],'request_changes')
+        value['findings'][0]['test']='invented'
+        with self.assertRaises(ValueError):attest.verdict(json.dumps(value),packet,observed,prepared)
+
     def test_citation_outside_the_claimed_test_method_is_not_a_valid_rejection(self):
         finding=dict(criterion='A01',path='tests/test_new.py',test='test_new',line=2,
             quote='new expectation',expected='Expected behavior',observed='Comment outside method')

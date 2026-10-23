@@ -720,6 +720,22 @@ and installed together before any new v2 work is enabled.
 
 ## Installation gates still required
 
+### Evidence for requesting changes versus approval
+
+Approval requires authenticated complete reads of the entire registered snapshot.
+A concrete rejection grants no execution or approval authority. It may stop after
+complete, byte-bound reads of every new test and every cited file; omissions in
+other files are never represented as complete review. A cited Python helper in
+a new-test file must exist in the observed AST and contain the quoted line.
+Unknown functions, unread citations, incomplete new tests and stale snapshot
+identities remain rejected. Escalation does not bypass the full-read check.
+
+The source implementation reports the exact read scope. Existing blocked
+attestations remain immutable; this change does not retroactively approve or
+reclassify them. A request-changes record must still reach the original author
+through a separately qualified revision adapter, with a new immutable submission,
+new Red and new independent review before implementation can be admitted.
+
 1. Qualify and install the source enrollment and legacy fences before any
    task/grant in a fresh run. Bind repository, base, contract and role identities;
    reject reuse of a legacy blocked issue.

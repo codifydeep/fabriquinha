@@ -54,7 +54,9 @@ def instruction(packet):
         'do not overwrite code or recreate Red. Only registered read_file pages are '
         'allowed, offset>=1 and limit<=100. No terminal, patches, writes, delegation, '
         'Batch independent read_file calls when possible; cover every registered '
-        'page without rereading unchanged pages or claiming omitted reads. '
+        'page before approval, without rereading unchanged pages or claiming omitted reads. '
+        'A concrete request_changes may stop early only after fully reading every NEW test and every cited file; '
+        'it never approves tests or implementation. '
         'administration or claimed execution. Approval is for frozen tests and later '
         'implementation only, never merge/delivery. Request changes with concrete '
         'file/test/criterion findings when inadequate; technical review problems go '
@@ -62,7 +64,7 @@ def instruction(packet):
         'or escalate_cto), reason (<=1200 characters), manifest_sha256, plan_sha256, red_sha256, '
         'criteria (all registered IDs) and findings. Approval requires findings=[]. Changes require '
         'concrete findings: {criterion,path,test,line,quote,expected,observed}; path is relative, '
-        'test is an existing new-test method or __module__, line is 1-based, and quote must appear '
+        'test is an existing test/helper function in a new-test file or __module__, line is 1-based, and quote must appear '
         'on the exact observed line. No extra fields or claimed read/approval booleans.\n'
         'Plan: '+packet['plan_sha256']+'\nRed: '+packet['red_sha256']+
         '\nSnapshot: '+packet['manifest_sha256'])
