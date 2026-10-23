@@ -33,6 +33,20 @@ Os seletores ficam presos à identidade da instalação e em arquivo privado.
 As imagens atuais passaram novamente pelo encadeamento Docker/ACP autor → Red →
 revisão somente leitura e pelo bloqueio de testes/cópia pós-Green. Esses probes
 usam autoridade nativa sintética e não aprovam testes, produto ou homologação.
+O preflight da aplicação real revelou uma dependência ainda ausente nos gates
+v2 instalados: a CI do repositório de avaliação executa Python **e** Node,
+incluindo regressões de navegador em VM Node. O runtime opcional
+`Dockerfile.quality-runner-base` reúne Python/Node sem downloads ou npm na
+instalação de referência. `quality_node_baseline.py` executa descoberta Node
+completa, confere inventário/hashes, rejeita falhas/skips/todos e filtra saída de
+testes para não aceitá-la como protocolo. `quality_baseline_probe.py` executa as
+duas suítes sobre uma cópia dos blobs Git, sem alterar o checkout.
+O diagnóstico real passou com 380 testes Python e 36 Node, sem skips, em Docker
+sem rede, credenciais, socket ou escrita no snapshot. Seu helper foi retirado.
+**Esse diagnóstico não é Red, Green ou aprovação nativa.** Ainda falta tornar
+essa verificação complementar obrigatória e vinculada aos recibos de Red,
+Green e controles negativos; o despacho v2 continua desabilitado até isso ser
+qualificado. Não se permite retirar os testes Node para contornar essa lacuna.
 O observador de Red real
 também passou por controles sintéticos em Docker isolado, sem uma implementação
 positiva prévia. A ingestão persistente de Red também está implementada em fonte:

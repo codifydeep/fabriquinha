@@ -13,6 +13,25 @@ the installed controller. Reversion passed a synthetic Docker qualification;
 native end-to-end execution, additional-control recovery and later gates remain
 unqualified.
 
+## Mixed Python/Node baseline boundary
+
+The actual disposable repository runs both full Python and Node suites in CI.
+Its Python browser-VM regressions also require Node. The installed v2 runners
+currently support Python only, so native dispatch remains off rather than
+ignoring those pre-existing regressions. The optional pinned Python/Node base
+and standalone `quality_node_baseline.py` executor are not native gates yet.
+Full discovery uses a fixed reporter, verifies test files/hashes, rejects
+partial inventories, skips/todos/failures and removes inherited Node options or
+credentials. Test stdout is hashed, not accepted as a protocol record.
+
+`qualify_quality_node_baseline.py` diagnoses all tracked regular Git blobs in an
+isolated read-only snapshot, with fixed full Python and Node discovery. The real
+baseline passed 380 Python and 36 Node tests on Linux without skipping. Its
+receipt explicitly grants neither Red, Green, native qualification nor delivery.
+Mandatory frozen Node evidence must still be wired into every relevant native
+capture/control before enabling the mixed-language chain; old diagnostic
+receipts must not be reclassified as those approvals.
+
 ## Required order
 
 ```mermaid

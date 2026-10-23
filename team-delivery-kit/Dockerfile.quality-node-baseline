@@ -1,0 +1,10 @@
+# Standalone auxiliary executor; not yet a native v2 gate.
+FROM delivery-kit-quality-runner-base:20261023.1
+WORKDIR /opt/quality
+COPY quality_node_baseline.py quality_node_reporter.mjs quality_baseline_probe.py portable_contract.py test_runner_policy.py r3_snapshot_probe.py ./
+RUN python -B -c "import quality_node_baseline"
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/opt/quality
+LABEL delivery-kit.component="quality-node-baseline" delivery-kit.qualification="not-native-delivery"
+USER 10000:10000
+WORKDIR /tmp
+ENTRYPOINT ["python", "/opt/quality/quality_node_baseline.py"]
