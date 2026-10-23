@@ -126,7 +126,8 @@ def register(path,pin,*,native_paths=False,persist_login=False):
         EnvironmentVariables={'PATH':'/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'},
         RunAtLoad=True,StartInterval=15,ThrottleInterval=15,
         StandardOutPath=str(log),StandardErrorPath=str(log))
-    target=directory/(label+('.native.plist' if native_paths else '.plist'))
+    generation=quality.digest(dict(config=str(Path(path)),pin=pin))[:24]
+    target=directory/(label+'.'+generation+('.native.plist' if native_paths else '.plist'))
     write_once(target,plistlib.dumps(plist,sort_keys=True))
     login=None
     if persist_login:

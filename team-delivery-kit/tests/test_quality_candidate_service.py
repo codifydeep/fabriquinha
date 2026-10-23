@@ -90,6 +90,17 @@ class CandidateServiceTests(unittest.TestCase):
             Path(result['plist']).write_bytes(b'different registration')
             with self.assertRaises(ValueError):service.register(self.path,self.pin)
 
+    def test_new_configuration_generation_does_not_overwrite_old_registration(self):
+        with patch('quality_delivery_candidate.repository'):
+            old=service.register(self.path,self.pin)
+            before=Path(old['plist']).read_bytes()
+            self.value['image']='sha256:'+'b'*64
+            self.path.write_text(json.dumps(self.value))
+            new_pin=hashlib.sha256(self.path.read_bytes()).hexdigest()
+            new=service.register(self.path,new_pin)
+        self.assertNotEqual(old['plist'],new['plist'])
+        self.assertEqual(Path(old['plist']).read_bytes(),before)
+
     def test_configuration_pin_is_checked_on_the_bytes_actually_parsed(self):
         self.assertEqual(service.dispatch.configuration(self.path,pin=self.pin),self.value)
         with self.assertRaises(ValueError):service.dispatch.configuration(self.path,pin='0'*64)

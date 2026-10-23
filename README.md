@@ -161,6 +161,15 @@ O serviço host periódico `quality_candidate_service.py` está instalado na
 referência macOS, com passagens independentes a cada 15 segundos e registro para
 o próximo login. A configuração é fixada por hash; duas falhas/interrupções
 inesperadas bloqueiam novas passagens no journal para diagnóstico do CTO.
+Atualizações do pin usam `migrate_quality_candidate_pin.py`, somente com o
+serviço descarregado e desabilitado, controlador em manutenção e nenhuma
+execução ativa. A migração arquiva e verifica o SQLite, preserva tickets,
+prazos, bloqueios e journals dos cards, e troca apenas os vínculos de autoridade
+e de configuração. Uma interrupção retoma a mesma operação; não reinicia
+contadores nem transforma evidências antigas em aprovações. Cada configuração
+gera um plist imutável próprio; a preferência de login tem troca condicional.
+Essas garantias estão cobertas por testes isolados; não substituem a validação
+de entrega ponta a ponta com agentes reais.
 O status lê apenas registros locais, sem consultar Docker ou iniciar trabalho:
 
 ```sh
