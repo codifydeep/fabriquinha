@@ -107,22 +107,24 @@ confirmação perdida sem novo helper, commit ou referência. Testes de integra�
 usam Git real e autoridade de captura sintética; não há endpoint para o agente
 enviar provas, escolher repositório ou aprovar a própria entrega.
 A ponte do host possui transporte local fixo ao controlador instalado,
-restrito às operações `about`, `inspect` e `record`, com imagem e identidade do
+restrito às operações `about`, `pending`, `inspect` e `record`, com imagem e identidade do
 contêiner conferidas antes e depois da chamada. Não há endpoint HTTP, terminal
 genérico ou montagem privilegiada nova para os workers. A perda de confirmação
 de gravação leva à leitura do vínculo durável antes de qualquer nova cópia ou
 efeito Git. A consulta real ao controlador passou com execução desabilitada;
 o despacho persistente da ponte do host ainda precisa ser ligado e qualificado.
-Em fonte, `quality_candidate_dispatch.py` acrescenta a consulta fixa `pending`
-e uma fila privada SQLite, protegida por `flock`, com tickets que preservam a
+O adaptador de consulta fixa `pending` está instalado com execução desabilitada.
+Em fonte, `quality_candidate_dispatch.py` usa essa consulta e uma fila privada
+SQLite, protegida por `flock`, com tickets que preservam a
 alternância entre cards após reinícios. Cada passagem atende no máximo dois
 cards; manutenção não gera efeitos, falhas de consulta ficam registradas e
 capturas corrompidas não bloqueiam a descoberta das seguintes. Após o prazo,
 somente um vínculo já gravado pode ser reconhecido: não se inicia outra
 exportação ou operação Git. Os testes incluem paginação, corrupção, perda de
-resposta e Git local real com autoridade sintética. Esse despachante **não está
-instalado nem executando**, e a consulta `pending` ainda não está na imagem
-instalada; ausência do adaptador é bloqueio explícito, não fila vazia. Alterar
+resposta e Git local real com autoridade sintética. O despachante passou por
+uma sondagem única contra o controlador instalado: registrou manutenção sem
+efeitos. **Ainda não há serviço periódico instalado nem execução nativa
+qualificada**; ausência do adaptador é bloqueio explícito, não fila vazia. Alterar
 imagem ou mapa de repositórios requer uma migração operacional revisada,
 preservando os journals; trocar o diretório privado não é uma recuperação.
 Em fonte, esse registro libera um job Green fixo sobre o volume imutável:
@@ -400,7 +402,7 @@ flowchart TB
     V2 -.->|Captura, Green e controle negativo; fluxo desativado| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2
-    GD[Despachante host em fonte: tickets persistentes, até 2 cards] -.->|Ainda não instalado| GX
+    GD[Despachante host: tickets persistentes, até 2 cards] -.->|Sondagem em manutenção; sem serviço periódico| GX
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]

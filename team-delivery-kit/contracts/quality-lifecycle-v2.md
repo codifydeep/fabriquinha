@@ -101,9 +101,21 @@ before persisting a qualified transition. Caller-supplied booleans are not proof
 from `broker/quality_candidate_rpc.py`, never a worker or HTTP endpoint. The
 installed immutable image, Compose ownership and exact container identity are
 checked around every call. `about` remains available while execution is off;
-`inspect` and conditional/idempotent `record` require v2 implementation enabled
+`pending`, `inspect` and conditional/idempotent `record` require v2 implementation enabled
 and no maintenance barrier. A lost reply is not proof a process stopped: the
 host reads the durable binding before any further export or Git effect.
+
+The fixed `pending` adapter is installed but disabled with the rest of v2. It
+paginates only unbound delivery captures, verifies durable capture hashes, and
+reports corrupt rows separately rather than preventing discovery of later cards.
+`quality_candidate_dispatch.py` owns a private SQLite queue, kernel lock and
+restart-stable scheduling tickets. A pass handles at most two cards; existing
+export/Git journals own all effect identities. Expiry may observe an already
+recorded binding but cannot initiate another export or Git effect. Authority
+outages have durable health and escalation deadlines. A real installed-controller
+maintenance probe recorded zero effects; no periodic host service or native
+candidate chain has been qualified. Image/repository-map changes require a
+reviewed migration preserving those journals, not a new empty private directory.
 
 `install_quality_preview.py` installs source only, leaving all v2 flags off.
 It requires sealed/drained maintenance, a fresh compressed SQLite backup with
