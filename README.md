@@ -19,12 +19,22 @@ persistente e imutável de novas execuções estão implementados em fonte, incl
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
 em modo exclusivo que mantém os fluxos legados inativos. A manutenção de
-bootstrap foi concluída; o bloqueio atual é a recuperação de uma falha de
-transporte durante a revisão completa, sem apagar ou converter bloqueios antigos.
+bootstrap foi concluída. O bloqueio atual é o esgotamento das 40 iterações da
+revisão com leituras repetidas e inspeção incompleta, sem apagar ou converter
+bloqueios antigos.
 O proxy corrigido foi qualificado em HTTP real isolado e instalado sob manutenção:
 capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, sem
-credenciais nos testes. Ele permanece parado até a recuperação qualificada da
-execução falha. Isso ainda não comprova aprovação da revisão nem entrega autônoma.
+credenciais nos testes. A recuperação da falha por tamanho foi registrada e o
+ensaio seguinte ultrapassou o limite antigo sem aquela rejeição, mas falhou ao
+esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
+O controlador voltou à manutenção selada e o proxy está parado na consulta de
+23 de outubro. Ainda faltam paginação orientada por progresso e recuperação
+qualificada para essa nova condição; não houve aprovação da revisão ou entrega.
+
+**Resumo atualizado:** [status e estimativas de prontidão](docs/STATUS.md),
+[validações](docs/VALIDATION.md) e [próximos marcos](docs/ROADMAP.md).
+As notas detalhadas a seguir preservam etapas históricas; suas referências a
+“candidata”, instalação pendente ou próximo ensaio não são inventário vivo.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
@@ -1464,7 +1474,7 @@ flowchart TD
     F --> CG{Contrato de qualidade ativo validado?}
     CG -->|Sim| G[TDD: Red real registrado]
     G --> TR[Revisão independente e congelamento dos testes]
-    TR -.->|Candidata ainda não instalada| RS[Pre-stop: formato e páginas faltantes]
+    TR -->|Feedback instalado; paginação estrita pendente| RS[Pre-stop: formato e páginas faltantes]
     RS -.->|Mesmo turno e orçamento de 40 iterações| TR
     RS -.->|Duas tentativas sem progresso| AD
     TR -->|Solicita mudanças nos testes novos| F
@@ -1602,7 +1612,14 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 
 ## Situação das validações
 
-Referência em 8 de outubro de 2026:
+O estado vigente em **23 de outubro de 2026** está em
+[STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente falhou sem leitura
+integral, não congelou os testes e não chegou à homologação. A última suíte
+completa registrada teve 4.329 testes aprovados e oito skips preexistentes;
+não foi reexecutada nesta atualização documental. A estimativa de prontidão
+não substitui um novo ciclo sem intervenções nem uma instalação limpa.
+
+**Resultados históricos, referência em 8 de outubro de 2026:**
 
 - `BRIEFSTATUS-1` percorreu dois cards dependentes, PRs, CI e QA HTTP/browser em dois contextos; reparos anteriores do operador impedem classificá-lo como prova integral sem intervenção.
 - `BRIEFDEMO-2` concluiu os cards dependentes, PR/CI e homologação com QA no mesmo SHA. Exigiu reparos do operador: não prova uma execução integral sem intervenção.

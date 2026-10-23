@@ -4,6 +4,40 @@ Provider transport failures and product failures are different incidents. A
 transport fix does not approve the product, invalidate historical failures or
 authorize an implementer to modify an independently reviewed snapshot.
 
+## Current v2 boundary — 23 October 2026
+
+See [STATUS.md](STATUS.md) for the dated project summary. Historical mechanisms
+below apply only to their registered contracts and incident signatures. They
+must not be combined into a generic retry permission or imported as approvals
+for the current quality-v2 lineage.
+
+The installed proxy's 2 MiB request limit has passed isolated real-HTTP checks
+and a native review with requests larger than the former 512 KiB limit. Its
+installation preserved the persistent call counter and ceiling. A
+capacity-failure recovery requires the original rejection, exact failed native
+execution, closed lease, retired worker, unchanged snapshot and qualified
+installed transport. Registration does not close the incident or approve tests.
+
+The next review failed after exhausting its 40 iterations while inspection
+remained incomplete. Repeated cached pages and an out-of-range read were
+observed. This is not another demonstrated body-size failure, and the capacity
+proof cannot authorize replay of that execution. The native generic error is
+not, by itself, a product defect or a precise infrastructure diagnosis.
+
+Pending hardening must retain actual read evidence across context compaction,
+plan only missing pages and report stalled progress or budget exhaustion
+structurally. Partial new coverage must count as progress; repeated calls,
+prose and cache responses without content must not. This hardening is not yet
+implemented or qualified. Approval still requires independent, byte-bound
+inspection of the required scope, exact verdict and native identities. No
+operator may manufacture missing reads or convert failure into approval.
+
+Before another native attempt, qualify the changed condition with bounded
+multi-file/pagination fixtures and the real Hermes/handler/ACP boundary. Preserve
+the earlier failure and require a separately qualified recovery. A technical
+hold assigned to CTO is visible accountability, not proof that the team has
+autonomously diagnosed and recovered the workflow.
+
 ## Bounded recovery
 
 The supervisor may resume observation of a blocked sequence only after verifying:

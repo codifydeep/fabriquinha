@@ -1,5 +1,10 @@
 # Instalação segura e limites
 
+Estado de referência: **23 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
+antes de ativar agentes. O kit continua experimental; não há instalação completa
+e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
+sós a instalação privada de referência.
+
 ## 1. Testes offline primeiro
 
 Siga o README para criar um ambiente Python isolado e executar a suíte. Não são necessárias credenciais. Os checks públicos não executam os ensaios com modelos.
@@ -37,6 +42,48 @@ Não existe ainda um instalador genérico qualificado para toda a equipe. Antes 
 6. Valide isolamento, revisão e recuperação antes de entregar trabalho de produto.
 
 Não execute `compose.onboarding.yaml`, os overrides `port2` ou scripts de recuperação sem compreender seus efeitos. Alguns disparam chamadas cobradas, criam issues ou alteram GitHub. Relatórios e LaunchAgents da máquina original não são distribuídos; registro de serviços host exige configuração própria.
+
+### Consulta e retomada de uma instalação existente
+
+Na instalação de referência, a consulta abaixo não libera manutenção nem inicia
+modelo. Execute a partir da raiz do repositório, com acesso autorizado ao Docker:
+
+```bash
+python team-delivery-kit/controller_maintenance_cli.py \
+  --namespace delivery-kit-port2 --action status
+```
+
+O namespace é específico dessa instalação; não o copie para outra instância.
+`sealed` com `drained=true` indica uma barreira de manutenção sem trabalho ativo,
+não homologação. A disponibilidade da interface Multica também não prova que
+o despacho ou o proxy do modelo estão ativos. Verifique-os separadamente, sem
+imprimir configurações de ambiente ou credenciais.
+
+Antes de retomar, confira imagens/hashes instalados, leases, efeitos Docker
+pendentes e a condição que justificará qualquer recuperação. Uma falha antiga
+não é corrigida apenas reiniciando serviços. Preserve o contador do proxy, os
+limites aprovados e os recibos; não habilite fluxos legados junto do controlador
+v2 exclusivo. Instalação de código ou edição de documentos não libera a barreira.
+
+O perfil de referência mantém 40 iterações, dois workers simultâneos e no máximo
+um por perfil. O limite instalado de corpo do proxy é 2 MiB, não um limite de
+custo nem uma permissão para elevar o teto de chamadas. Não há fallback de
+modelo automático. A qualificação específica deve anteceder um novo ensaio pago.
+
+### Organização e retirada de testes
+
+Use grupos Compose `delivery-kit-<instância>` para serviços,
+`delivery-kit-<instância>-tests` para auxiliares e
+`delivery-kit-<instância>-homologation` para candidatos implantados. Contêineres
+criados pelo controlador devem usar `docker_grouping.py`.
+
+Em cada fronteira de ciclo, inventarie recursos próprios e só retire os
+obsoletos depois de confirmar leases ociosas e efeitos assentados. Para port2,
+comece pela prévia de `cleanup_port2_history.py --tests-only`; depois revise
+`cleanup_obsolete_images.py`. A aplicação da limpeza de imagens exige o hash do
+plano conferido. Preserve logs privados, dados, snapshots, volumes, implantação
+atual e versões de rollback. Nunca faça prune global nem altere `toso-*`,
+`reforma` ou outros projetos como parte dessa rotina.
 
 ## Desktop Multica
 

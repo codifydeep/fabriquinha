@@ -1,4 +1,33 @@
-# Estado de validação — 2026-10-07
+# Estado de validação — 2026-10-23
+
+## Referência atual
+
+O resumo vigente está em [STATUS.md](STATUS.md). O contrato atual é
+[qualidade v2](../team-delivery-kit/contracts/quality-lifecycle-v2.md): Red real
+→ revisão independente e congelamento dos testes → implementação/Green →
+controles negativos obrigatórios → revisão da entrega e gates de publicação.
+
+| Evidência | Resultado e limite |
+|---|---|
+| Autoria e Red nativos | 381 testes Python, falhas somente no teste novo; 36 Node aprovados, sem erros/skips. Não é aprovação dos testes. |
+| Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
+| Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
+| Revisão nativa mais recente | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Sem congelamento, Green ou homologação. |
+| Última suíte completa registrada | 4.329 testes aprovados, oito skips preexistentes; anterior ao rascunho de paginação, não reexecutada nesta atualização. |
+| Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
+
+O bloqueio atual envolve leituras repetidas e ausência de progresso, não a
+capacidade já corrigida do proxy. A solução de paginação e recuperação precisa
+ser implementada, instalada e comprovada antes de outra tentativa. Na consulta
+de referência, a manutenção está selada e o proxy parado; confirme o estado vivo
+antes de agir. Nenhum resultado histórico abaixo substitui esse diagnóstico.
+
+## Evidências históricas — não representam o estado vivo
+
+As seções seguintes preservam resultados e limitações de etapas anteriores,
+principalmente de 7 de outubro. Expressões como “atual” e “próximo” nessas
+seções referem-se àquela etapa, não à execução corrente. Contagens históricas
+não devem ser somadas nem apresentadas como execução da suíte de hoje.
 
 ## Inspeção do autor após edição cirúrgica
 

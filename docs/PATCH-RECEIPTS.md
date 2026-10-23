@@ -1,5 +1,13 @@
 # Patch observability boundary
 
+Scope note, **23 October 2026**: this document describes patch adapters and
+historical qualification boundaries, not the current deployment inventory.
+The current v2 review is read-only; patch receipts cannot satisfy missing
+inspection or authorize a reviewer to edit tests or implementation. The current
+blocker is read pagination/progress, not a newly demonstrated patch persistence
+failure. See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
+using any historical recovery mechanism below.
+
 `broker/patch_receipt_contract.py` provides an exact-source build adapter for
 Hermes' ACP edit formatter. It preserves a bounded JSON receipt for `patch`:
 handler success, no-op, nonempty diff hash/size, and explicit non-authorization.

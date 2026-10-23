@@ -2,6 +2,33 @@
 
 Não usamos quantidade de código, workers ativos ou percentual subjetivo como comprovação.
 
+## Prioridades atuais — 23 de outubro de 2026
+
+Consulte [STATUS.md](STATUS.md) para a estimativa de prontidão e
+[VALIDATION.md](VALIDATION.md) para a distinção entre provas atuais e históricas.
+As etapas abaixo permanecem abertas; não são funcionalidades já entregues.
+
+1. **Revisão com progresso verificável:** diário limitado de leituras reais,
+   resistente à compactação do contexto; fila de páginas pendentes; bloqueio de
+   repetição/EOF e diagnóstico estruturado antes de esgotar as 40 iterações.
+   Progresso parcial conta; prosa, cache sem conteúdo e chamadas repetidas não.
+2. **Qualificação antes de novo ensaio:** fixtures com múltiplos arquivos e
+   páginas, controles negativos e Hermes/handlers/ACP reais sem provedor.
+   Instalação sob manutenção e recuperação específica da condição corrigida,
+   sem apagar a falha ou reutilizar uma prova de capacidade para outro incidente.
+3. **Contrato v2 ponta a ponta:** congelamento independente dos testes, Green,
+   controles negativos, revisão da entrega, PR/CI, deploy, QA e rollback ligados
+   ao mesmo commit. Não importar aprovações de contratos históricos.
+4. **Recuperação pela equipe:** Tech Lead/CTO executam diagnóstico, SPIKE e
+   replanejamento com evidências. Um impedimento apenas atribuído ao CTO não
+   comprova recuperação; um limite de tentativas não cancela a release.
+5. **Novo brief e reutilização:** cards dependentes e memória entre perfis sem
+   direção do operador, seguidos de instalação limpa em outro ambiente.
+
+O limite de requisição de 2 MiB já foi instalado e exercitado. A revisão seguinte
+falhou por repetição de leituras/esgotamento do orçamento; ampliar novamente o
+corpo, trocar o modelo ou aumentar iterações não é a solução já qualificada.
+
 ## Entrega
 
 - Novo brief: refinamento, aprovação de negócio, arquitetura e decomposição pelos agentes.
@@ -26,7 +53,14 @@ Não usamos quantidade de código, workers ativos ou percentual subjetivo como c
 
 Esses gates permanecem abertos até evidência específica. O ensaio atual não retoma automaticamente o Truco.
 
-## Compatibilidade de transporte dos modelos
+## Referência técnica e histórico dos adaptadores
+
+As seções seguintes descrevem adaptações e fronteiras de etapas anteriores.
+Menções a instalação pendente ou a ensaio futuro são históricas; não constituem
+inventário vivo. A prioridade corrente é a revisão com progresso verificável,
+descrita acima. Nenhum desses adaptadores, isoladamente, comprova autonomia.
+
+### Compatibilidade de transporte dos modelos
 
 O adaptador de Haiku preserva o contrato canônico validado localmente. Para
 revisões tipadas, apenas o schema enviado ao provedor omite os combinadores

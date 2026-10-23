@@ -1,6 +1,12 @@
 # Mapa da implementação
 
-Este documento descreve o código instalado, não uma arquitetura futura com Temporal.
+Este documento mapeia o código existente e distingue a instalação de referência
+das etapas ainda não qualificadas. A presença de um módulo não comprova sua
+ativação no runtime. Não descreve uma arquitetura futura como se Temporal já
+estivesse instalado.
+
+Estado de referência: **23 de outubro de 2026**. Componentes existentes não
+significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 
 | Área | Entradas principais |
 |---|---|
@@ -10,13 +16,48 @@ Este documento descreve o código instalado, não uma arquitetura futura com Tem
 | Multica e ACP | `acp_wrapper.py`, `broker/native.py`, `broker/acp_transport.py`, `broker/acp_probe.py` |
 | Broker e handoffs | `broker/server.py`, `broker/handoffs.py`, `broker/handoff_runtime.py` |
 | TDD e entrega congelada | `broker/tdd_evidence.py`, `broker/test_first_protocol.py`, `review_instruction.py`, `additive_test_policy.py` |
+| Qualidade v2 | `broker/quality_team_progress.py`, `broker/quality_review_attestation.py`, `quality_phase_tools.py`, `quality_review_stop.py` |
+| Provas de leitura | `broker/quality_review_reads.py`, `broker/read_stream_receipts.py`, `artifact_read_evidence.py` |
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
+| Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
 | Docker e limpeza segura | `docker_grouping.py`, `cleanup_delivery_test_containers.py`, `cleanup_obsolete_images.py` |
 
 Os caminhos acima são relativos a `team-delivery-kit/`. Não são APIs estáveis ainda.
+
+## Caminho de revisão v2 e limite atual
+
+```mermaid
+flowchart TD
+    M[Multica: issues e sessões] --> C[Controlador: estado persistente e autorização]
+    C --> A[Autor: testes novos no workspace atribuído]
+    A --> S[Snapshot imutável e Red real]
+    S --> R[Revisor independente: leitura e decisão]
+    R --> F[Feedback no mesmo turno: formato e leituras faltantes]
+    F -->|Orçamento original de 40 iterações| R
+    R --> E[Controlador confere bytes, identidade e parecer]
+    E -->|Mudanças válidas| A
+    E -->|Prova incompleta ou falha| B[Bloqueio técnico preservado]
+    B --> T[Tech Lead e CTO: recuperação ainda não qualificada integralmente]
+    E -.->|Aprovação completa ainda pendente neste ensaio| G[Testes congelados e implementação]
+    G -.-> D[Green, controles negativos, revisão, PR e CI]
+    D -.-> H[Mesmo commit: deploy, QA, rollback e homologação]
+```
+
+As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
+v2, não uma dispensa de execução. O feedback no mesmo turno está instalado;
+o planejamento estrito de páginas pendentes e a memória de leituras resistente
+à compactação ainda não. O revisor pode consumir o orçamento com chamadas sem
+progresso; a atestação bloqueia aprovação incompleta, mas não resolve sozinha
+esse impasse. A projeção da interface não substitui os recibos ACP do controlador.
+
+O proxy aceita um conjunto finito de limites de corpo, até 2 MiB, separado do
+teto persistente de chamadas. Capacidade de transporte não é capacidade de
+ferramenta nem autorização para novas tentativas. Workers continuam sem
+credenciais de infraestrutura ou socket Docker. A recuperação de uma falha por
+tamanho exige prova dessa falha exata; não se aplica ao esgotamento de iterações.
 
 ## Fontes de verdade e responsabilidade
 
