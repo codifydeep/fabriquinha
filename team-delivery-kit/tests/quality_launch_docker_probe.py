@@ -189,7 +189,7 @@ def test_revision_launch(review_grant,reviewed,context):
         request_id=review_grant['request_id'],stage='changes_requested',owner=task['agent_id'],plan=packet['plan'],red=packet['red'],
         manifest_sha256=packet['manifest_sha256'],red_sha256=packet['red_sha256'],verdict=decision,
         tests_approved=False,execution_authorized=False,delivery_approval=False)
-    observed=dict(namespace=b.PREFIX,source_task=task['id'])
+    observed=dict(namespace=b.PREFIX,source_task=task['id'],request_id=review_grant['request_id'])
     with b.db() as con:
         con.execute("UPDATE leases SET status='closed' WHERE request_id=?",(review_grant['request_id'],))
         attestation.initialize(con)

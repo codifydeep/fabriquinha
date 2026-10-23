@@ -810,6 +810,13 @@ with the coordinator after explicit activation/release. Reusing the same code
 condition under another task, qualification ID or build tag is rejected. The
 adapter is tested with prior bootstrap recovery, a fresh independent attestation
 and transactional Green admission; installation/native qualification is pending.
+The physical canary's explicitly synthetic attestation also carries the exact
+request ID in its identity. Incomplete fixture identities are rejected by the
+same transactional selector as real records; qualification never weakens that
+check to accommodate a fixture. A selector upgrade may inspect an enabled v2
+source only while sealed/drained, native-idle and uniformly exclusive. The target
+installation still turns every execution flag OFF before separate activation;
+mixed flags, live leases or an unsealed source remain rejected.
 
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after

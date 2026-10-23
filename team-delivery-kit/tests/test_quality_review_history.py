@@ -68,5 +68,13 @@ class QualityReviewHistoryTests(unittest.TestCase):
     def test_unknown_history_kind_is_rejected_without_sql_interpretation(self):
         with self.b.db() as con,self.assertRaises(ValueError):history.rows(con,'unknown; DROP TABLE grants',source=self.source)
 
+    def test_incomplete_synthetic_identity_cannot_feed_transactional_gates(self):
+        with self.b.db() as con:
+            raw=con.execute('SELECT identity FROM quality_review_attestations').fetchone()[0]
+            identity=json.loads(raw);identity.pop('request_id')
+            con.execute('UPDATE quality_review_attestations SET identity=?,identity_sha256=?',
+                (json.dumps(identity),self.q.digest(identity)))
+            self.assertIsNone(attest.stored_row(con,self.source,self.original['request_id']))
+
 
 if __name__=='__main__':unittest.main()

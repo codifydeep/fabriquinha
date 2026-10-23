@@ -149,7 +149,7 @@ def install(namespace,image,operation,*,runtime=None):
         before=json.loads((private/'before.json').read_bytes())
     else:
         maintenance,idle=require_idle(namespace);before=inspect(name)
-        if runtime is not None:require(probe(namespace,before['Image'],runtime)==runtime)
+        if runtime is not None:require(probe(namespace,before['Image'],runtime,sealed_upgrade=True)==runtime)
         info=json.loads(command(['docker','image','inspect',image]).stdout)[0]
         require(info['Id']==image and info['Config']['Labels'].get('delivery-kit.component')=='quality-v2-controller')
         argv,files=configuration(before,namespace)

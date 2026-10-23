@@ -79,6 +79,25 @@ class RuntimeConfigurationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):runtime.probe('delivery-kit-test','sha256:'+'f'*64,self.value)
             read.assert_not_called()
 
+    def test_upgrade_preflight_accepts_only_sealed_idle_exclusive_uniform_flags(self):
+        authority=SimpleNamespace(identity='a'*64,about=Mock(return_value=dict(maintenance=True,
+            v2_enabled=True,implementation_enabled=True)),inspect_controller=Mock(return_value='a'*64))
+        native=dict(namespace='delivery-kit-test',agents=self.agents,flags=[True]*4,exclusive=True)
+        with patch.object(runtime,'Authority',return_value=authority),\
+                patch('qualify_quality_red_observer.require_idle') as idle,\
+                patch.object(runtime.subprocess,'check_output',side_effect=[json.dumps(native),json.dumps(list(self.metadata.values()))]):
+            self.assertEqual(runtime.probe('delivery-kit-test','sha256:'+'f'*64,self.value,sealed_upgrade=True),self.value)
+            idle.assert_called_once_with('delivery-kit-test')
+        for change in (dict(flags=[True,False,True,True]),dict(exclusive=False),dict(flags=[1]*4)):
+            with patch.object(runtime,'Authority',return_value=authority),patch('qualify_quality_red_observer.require_idle'),\
+                    patch.object(runtime.subprocess,'check_output',return_value=json.dumps({**native,**change})),\
+                    self.assertRaises(ValueError):runtime.probe('delivery-kit-test','sha256:'+'f'*64,self.value,sealed_upgrade=True)
+        with patch.object(runtime,'Authority',return_value=authority),\
+                patch('qualify_quality_red_observer.require_idle',side_effect=ValueError('active native work')),\
+                patch.object(runtime.subprocess,'check_output') as read,self.assertRaises(ValueError):
+            runtime.probe('delivery-kit-test','sha256:'+'f'*64,self.value,sealed_upgrade=True)
+        read.assert_not_called()
+
     def test_installer_accepts_only_explicit_complete_selectors_with_all_flags_off(self):
         fixture=install_fixtures.PreviewInstallTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
         after=fixture.after();after['Config']['Env'] += [k+'='+v for k,v in self.value.items()]

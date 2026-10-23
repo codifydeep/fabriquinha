@@ -26,7 +26,9 @@ ROLES={PREFIX+'TECHLEAD',PREFIX+'CTO'}
 PROGRAM='''import sys,json;sys.path.insert(0,"/")
 import broker as b
 s=json.loads((b.STATE/"native.json").read_text())
-print(json.dumps(dict(namespace=b.PREFIX,agents=s["agents"]),sort_keys=True))
+print(json.dumps(dict(namespace=b.PREFIX,agents=s["agents"],flags=[getattr(b,k,False) is True for k in
+ ("QUALITY_V2_ENABLED","QUALITY_REVIEW_ENABLED","QUALITY_IMPLEMENTATION_ENABLED","QUALITY_TEAM_ENABLED")],
+ exclusive=getattr(b,"QUALITY_EXCLUSIVE_ENABLED",False) is True),sort_keys=True))
 '''
 
 
@@ -56,13 +58,22 @@ def validate(value,metadata,agents):
     return value
 
 
-def probe(namespace,controller_image,value):
+def probe(namespace,controller_image,value,*,sealed_upgrade=False):
     value=syntax(value);authority=Authority(namespace,controller_image)
     about=authority.about()
-    require(about['maintenance'] is True and about['v2_enabled'] is False and about['implementation_enabled'] is False)
+    require(about['maintenance'] is True and (about['v2_enabled'] is False and about['implementation_enabled'] is False
+        or sealed_upgrade and about['v2_enabled'] is True and about['implementation_enabled'] is True))
+    if sealed_upgrade:
+        from qualify_quality_red_observer import require_idle
+        require_idle(namespace)  # Sealed/drained plus no native tasks or leases.
     raw=subprocess.check_output(['docker','exec',authority.identity,'python','-c',PROGRAM],text=True,timeout=30)
     require(len(raw.encode())<=65536);native=json.loads(raw)
     require(native['namespace']==namespace and authority.inspect_controller()==authority.identity)
+    if sealed_upgrade:
+        flags=native.get('flags')
+        require(flags in ([False]*4,[True]*4) and all(type(v) is bool for v in flags)
+            and flags[0] is about['v2_enabled'] and flags[2] is about['implementation_enabled']
+            and (not any(flags) or native.get('exclusive') is True))
     records=json.loads(subprocess.check_output(['docker','image','inspect',*sorted(set(value[k] for k in IMAGES))],text=True,timeout=30))
     return validate(value,{r['Id']:r for r in records},native['agents'])
 
