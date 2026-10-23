@@ -47,3 +47,18 @@ class NativeScopeNoteTests(unittest.TestCase):
         record['workspace_id']='foreign'
         with patch.object(native.urllib.request,'urlopen',return_value=io.StringIO(json.dumps([record]))),self.assertRaises(ValueError):
             native.task_record(settings,task,actor)
+
+    def test_review_start_uses_the_same_strict_envelope_decoder(self):
+        actor='00000000-0000-4000-8000-000000000001';task='00000000-0000-4000-8000-000000000002'
+        note='DELIVERY_REVIEW_START '+'a'*64+'\nSource: source\nReview only the snapshot.'
+        wrapped=self.prefix+note+self.footer+self.fact+'\n'
+        settings=dict(agents={actor:'review'},workspace_id='workspace',runtime_id='runtime',token='test-only')
+        record=dict(id=task,agent_id=actor,workspace_id='workspace',runtime_id='runtime',issue_id='issue',
+            status='running',wakeup_id='wake-id',handoff_note=wrapped)
+        with patch.object(native.urllib.request,'urlopen',side_effect=lambda *a,**k:io.StringIO(json.dumps([record]))):
+            observed=native.task_record(settings,task,actor)
+        self.assertEqual(observed['handoff_note'],note)
+        self.assertTrue(observed['scope_note_envelope_verified'])
+        record['handoff_note']=wrapped.replace('Wakeup wake-id','Wakeup foreign')
+        with patch.object(native.urllib.request,'urlopen',return_value=io.StringIO(json.dumps([record]))),self.assertRaises(ValueError):
+            native.task_record(settings,task,actor)

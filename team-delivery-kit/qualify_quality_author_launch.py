@@ -22,6 +22,7 @@ from qualify_quality_red_observer import require_idle,save,command,await_retirem
 ROOT=Path(__file__).resolve().parent
 SOURCES={
     'broker/server.py':'candidate_broker.py','broker/native.py':'native.py',
+    'broker/native_scope_note.py':'native_scope_note.py',
     'broker/controller_maintenance.py':'controller_maintenance.py','broker/maintenance_job_clock.py':'maintenance_job_clock.py',
     'broker/quality_lifecycle_v2.py':'quality_lifecycle_v2.py','broker/quality_lifecycle_enrollment.py':'quality_lifecycle_enrollment.py',
     'quality_node_evidence.py':'quality_node_evidence.py',
@@ -30,6 +31,7 @@ SOURCES={
     'broker/quality_author_launch.py':'quality_author_launch.py','broker/quality_red_capture.py':'quality_red_capture.py',
     'broker/quality_red_snapshot.py':'quality_red_snapshot.py','broker/quality_progress.py':'quality_progress.py',
     'broker/quality_test_review.py':'quality_test_review.py',
+    'broker/quality_review_recovery.py':'quality_review_recovery.py',
     'broker/quality_worker_runtime.py':'quality_worker_runtime.py',
     'broker/quality_review_launch.py':'quality_review_launch.py','broker/quality_launch_router.py':'quality_launch_router.py',
     'broker/quality_review_reads.py':'quality_review_reads.py','broker/quality_review_attestation.py':'quality_review_attestation.py',
@@ -75,6 +77,9 @@ def validate_report(report):
             if str(uuid.UUID(review[key]))!=review[key]:raise ValueError('exact review execution identity required')
         if 'handler_byte_binding' in review and review['handler_byte_binding'] is not True:
             raise ValueError('actual handler byte binding required when claimed')
+        if 'strict_native_envelope' in review and (review['strict_native_envelope'] is not True
+                or not re.fullmatch('[a-f0-9]{64}',str(review.get('native_envelope_sha256')))):
+            raise ValueError('actual strict native envelope evidence required when claimed')
 
 
 def input_config(archive,metadata):
@@ -89,7 +94,8 @@ def input_config(archive,metadata):
         product_files=['app.py'],protected_files=['AGENTS.md','tests/test_old.py','tests/test_new.py'],
         criterion_tests={'A01':[dict(path='tests/test_new.py',method='test_new')]})
     result=dict(namespace=namespace,owner=metadata['owner'],operation=operation,task_id=ids['task'],plan=plan,contract=spec,
-        settings=dict(workspace_id=ids['workspace'],runtime_id=ids['runtime'],agents={ids['author']:'implementation',ids['reviewer']:'review'}),
+        settings=dict(workspace_id=ids['workspace'],runtime_id=ids['runtime'],token='test-only',
+            agents={ids['author']:'implementation',ids['reviewer']:'review'}),
         base=dict(issue_id=ids['issue'],base_sha=base['base_sha'],volume=metadata['base_volume'],manifest_sha256=hashlib.sha256(manifest).hexdigest()),
         **metadata['images'])
     if metadata.get('review_chain'):

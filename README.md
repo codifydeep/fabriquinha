@@ -19,19 +19,31 @@ persistente e imutável de novas execuções estão implementados em fonte, incl
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
 em modo exclusivo que mantém os fluxos legados inativos. Após os bloqueios do
-ensaio, a referência está em manutenção, com fases desligadas e proxy parado.
+ensaio, a referência está em manutenção selada e com proxy parado.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
 após backup compactado e prova real de restauração. Isso não habilita nem
 qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalação.
-O ensaio ainda não comprovou Red/revisão/Green nativos: detectou um vínculo de
+O ensaio comprovou autoria nativa e Red real: 381 testes Python executados,
+com falhas de asserção somente no teste novo, e 36 testes Node aprovados,
+sem erros ou skips. A revisão independente ainda não foi concluída.
+Tentativas anteriores detectaram um vínculo de
 imagem inválido e, no sucessor, um teste vazio após leituras/escrita negadas.
 O preflight de imagem já foi corrigido e verificado no runtime; o prompt de
 caminhos absolutos foi corrigido, testado e instalado. O canário físico
 autor/Red/revisão somente leitura passou sem modelo e com autoridade sintética;
 isso ainda não comprova o fluxo nativo com agentes reais.
 Os bloqueios e arquivos originais continuam preservados, sem aprovação fictícia.
+O primeiro handoff real de revisão falhou antes de admissão: o adaptador não
+decodificava o envelope de wakeup do Multica para esse modo. A correção em fonte
+usa o mesmo parser estrito de envelopes, sem autorização por substring. Seu
+canário Docker/ACP passou com autoridade sintética, sem modelo e sem aprovação.
+`recover_quality_review.py` permite uma única recuperação desse erro pré-admissão,
+sob manutenção selada e após mudança comprovada do adaptador: preserva o autor,
+o snapshot e o Red, registra a execução falha e cria outro marcador de handoff.
+Não recupera uma revisão já admitida nem aprova testes. Falhas nativas anteriores
+à admissão são encaminhadas imediatamente ao CTO, sem aguardar o timeout.
 O runtime de referência também já recebeu seletores explícitos para as seis
 imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO.
 `quality_runtime_configuration.py` confere o modo
@@ -82,7 +94,7 @@ ACP reais com autoridade nativa sintética, sem chamada ao modelo. A reconcilia�
 persistente término do autor → snapshot → Red → pacote para revisão está ligada
 ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
 bloqueio de falhas repetidas. A ativação fica restrita à qualificação nativa;
-as fases estão desligadas durante a manutenção atual.
+nenhuma execução é autorizada durante a manutenção atual.
 A atribuição, o encaminhamento nativo único e a admissão da revisão independente
 estão implementados em fonte, em modo separado e restrito ao ensaio: leitura paginada
 do snapshot, sem permissões de implementação. O lançamento do revisor está ligado

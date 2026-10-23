@@ -81,6 +81,17 @@ class ActivationTests(unittest.TestCase):
         self.assertEqual(command.call_count,1);self.assertEqual(result['stage'],'activated_sealed')
         self.assertFalse(result['maintenance_released']);self.assertEqual(result['model_calls'],0)
 
+    def test_recovery_activation_uses_current_barrier_without_rewriting_enrollment(self):
+        self.prepare();path=self.archive/'state.json';state=json.loads(path.read_bytes())
+        state['identity']['maintenance_operation']=self.maintenance;activation.install.save(path,state)
+        old=dict(maintenance_operation='80000000-0000-4000-8000-000000000009',plan=dict(issue_id='issue'))
+        with patch.object(activation.enrollment,'load',return_value=old),patch.object(activation.install,'command'),\
+                patch.object(activation.install,'inspect',return_value=self.after):
+            result=activation.activate(self.ns,self.image,'/private/payload.json',self.pin,self.op,self.inst,
+                maintenance_operation=self.maintenance)
+        self.assertEqual(result['stage'],'activated_sealed')
+        self.assertEqual(old['maintenance_operation'],'80000000-0000-4000-8000-000000000009')
+
     def test_expired_observation_keeps_visible_block_without_retry(self):
         self.prepare()
         with patch.object(activation.install,'command') as command,patch.object(activation.install,'inspect',return_value=self.before),\

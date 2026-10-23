@@ -130,6 +130,22 @@ def save(b, source, context, before, after):
     return after
 
 
+def marker(b,context,state):
+    try:from . import quality_review_recovery as recovery
+    except ImportError:import quality_review_recovery as recovery
+    return recovery.marker(b,context,state)
+
+
+def note(b,context,state):
+    return 'DELIVERY_REVIEW_START '+marker(b,context,state)+'\nSource: '+context['source_task']+'\n'+context['instruction']
+
+
+def eligible_runs(b,context,state,runs):
+    try:from . import quality_review_recovery as recovery
+    except ImportError:import quality_review_recovery as recovery
+    return recovery.runs(b,context,state,runs)
+
+
 def dispatch(b, source):
     require(getattr(b, 'QUALITY_REVIEW_ENABLED', False) is True)
     context, _ = prepare(b, source)
@@ -155,7 +171,7 @@ def dispatch(b, source):
         # No observed wakeup means uncertainty, not permission for another POST.
         try:
             wakeup = native.ensure_review_start(settings, context['packet']['issue_id'], context['reviewer'],
-                source, context['marker'], context['instruction'], allow_create=allow_create)
+                source, marker(b,context,state), context['instruction'], allow_create=allow_create)
             if wakeup is not None:
                 capture.enrollment.canonical(wakeup['id'])
                 require(wakeup.get('issue_id') == context['packet']['issue_id']
@@ -221,12 +237,13 @@ def admit(b, source, task_id, agent_id, *, now=None):
     observed_issue = native.issue_record(settings, e['issue_id'])
     require({key: observed_issue.get(key) for key in ('id','workspace_id','title','description')} == context['requirements'])
     task = native.task_record(settings, task_id, agent_id)
-    note = 'DELIVERY_REVIEW_START '+context['marker']+'\nSource: '+source+'\n'+context['instruction']
+    expected_note = note(b,context,state)
     require(task.get('id') == task_id and task.get('agent_id') == agent_id and task.get('status') == 'running'
         and task.get('issue_id') == e['issue_id'] and task.get('wakeup_id') == state['wakeup_id']
         and task.get('workspace_id') == e['workspace_id'] and task.get('runtime_id') == e['runtime_id']
-        and task.get('handoff_note') == note)
+        and task.get('handoff_note') == expected_note)
     runs = [r for r in native.issue_task_runs(settings, e['issue_id']) if r.get('agent_id') == agent_id]
+    runs = eligible_runs(b,context,state,runs)
     require(len(runs) == 1 and runs[0].get('id') == task_id)
     capsule = validate_capsule(context['capsule'])
     now = time.time() if now is None else now

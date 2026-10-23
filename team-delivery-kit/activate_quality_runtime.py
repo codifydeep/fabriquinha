@@ -42,7 +42,10 @@ with b.db() as con:
   assert record is not None and record[1]["stage"]=="technical_blocked"
  receipt=e.lookup(con,issue)
  pending=con.execute("SELECT count(*) FROM grants g LEFT JOIN leases l USING(request_id) WHERE g.deadline>? AND (g.used=0 OR (g.used=1 AND l.request_id IS NULL))",(time.time(),)).fetchone()[0]
-assert receipt and pending==0 and not native.issue_task_runs(settings,issue)
+assert receipt and pending==0
+if native.issue_task_runs(settings,issue):
+ import quality_review_recovery as recovery
+ recovery.activation_ready(b,issue,sys.argv[2])
 assert settings["agents"].get(receipt["author"])=="implementation" and settings["agents"].get(receipt["reviewer"])=="review"
 print(json.dumps(dict(issue_id=issue,enrollment=receipt,source_sha256=hashlib.sha256(pathlib.Path(isolation.__file__).read_bytes()).hexdigest(),exclusive=b.QUALITY_EXCLUSIVE_ENABLED,
  flags=[b.QUALITY_V2_ENABLED,b.QUALITY_REVIEW_ENABLED,b.QUALITY_IMPLEMENTATION_ENABLED,b.QUALITY_TEAM_ENABLED]),sort_keys=True))
@@ -69,12 +72,13 @@ def verify(before,after):
     install.verify_preservation(before,normalized,before['Image'])
 
 
-def preflight(namespace,image,payload):
+def preflight(namespace,image,payload,*,maintenance_operation=None):
     authority=Authority(namespace,image);about=authority.about()
     require(about['maintenance'] is True and about['v2_enabled'] is False and about['implementation_enabled'] is False)
     maintenance,_=require_idle(namespace)
-    require(maintenance['operation_id']==payload['maintenance_operation']);Service().stopped(namespace)
-    result=json.loads(install.command(['docker','exec',authority.identity,'python','-c',PROGRAM,payload['plan']['issue_id']]).stdout)
+    barrier=maintenance_operation or payload['maintenance_operation']
+    require(maintenance['operation_id']==barrier);Service().stopped(namespace)
+    result=json.loads(install.command(['docker','exec',authority.identity,'python','-c',PROGRAM,payload['plan']['issue_id'],barrier]).stdout)
     require(authority.inspect_controller()==authority.identity and type(result['exclusive']) is bool
         and result['flags']==[False]*4 and all(type(v) is bool for v in result['flags'])
         and result['enrollment']['plan_sha256']==enrollment.enrollment.policy.digest(payload['plan'])
@@ -82,12 +86,14 @@ def preflight(namespace,image,payload):
     return authority.identity
 
 
-def activate(namespace,image,path,pin,operation,install_operation):
+def activate(namespace,image,path,pin,operation,install_operation,*,maintenance_operation=None):
     for value in (operation,install_operation):enrollment.enrollment.canonical(value)
     require(re.fullmatch('delivery-kit-[a-z0-9-]{1,48}',namespace) and re.fullmatch('sha256:[a-f0-9]{64}',image))
     payload=enrollment.load(path,pin);private=folder(ROOT/('.local-'+namespace.removeprefix('delivery-kit-')))
+    barrier=maintenance_operation or payload['maintenance_operation'];enrollment.enrollment.canonical(barrier)
     archive=folder(folder(private/'backups')/('quality-activation-'+operation))
     identity=dict(namespace=namespace,image=image,payload_pin=pin,operation=operation,install_operation=install_operation)
+    if maintenance_operation is not None:identity['maintenance_operation']=maintenance_operation
     token=str(uuid.uuid5(uuid.NAMESPACE_URL,'quality-activation:'+namespace))
     with journal(private,token,family='quality-candidate-dispatch'):
         statefile=archive/'state.json'
@@ -97,13 +103,13 @@ def activate(namespace,image,path,pin,operation,install_operation):
             require(state['stage'] in ('prepared','recreate_intent'))
             before=json.loads(read(archive/'before.json'))
         else:
-            current=preflight(namespace,image,payload);before=install.inspect(current)
+            current=preflight(namespace,image,payload,maintenance_operation=barrier);before=install.inspect(current)
             backup=private/'backups'/('quality-preview-install-'+install_operation)
             installed=json.loads(read(backup/'state.json'));proof=json.loads(read(backup/'backup-receipt.json'))
             require(installed['stage']=='installed_disabled' and installed['image']==image
-                and installed['receipt']['container_id']==current and installed['maintenance_operation']==payload['maintenance_operation']
+                and installed['receipt']['container_id']==current and installed['maintenance_operation']==barrier
                 and proof['restore_integrity']=='ok' and proof['backup_integrity']=='ok' and proof['backup_id']==install_operation
-                and proof['operation_id']==payload['maintenance_operation'])
+                and proof['operation_id']==barrier)
             compressed=backup/'leases.sqlite.gz';info=compressed.stat()
             require(compressed.resolve()==compressed and not compressed.is_symlink() and stat.S_ISREG(info.st_mode)
                 and info.st_uid==os.getuid() and info.st_nlink==1 and not info.st_mode&0o077
@@ -123,7 +129,7 @@ def activate(namespace,image,path,pin,operation,install_operation):
             state=dict(identity=identity,stage='prepared',previous_id=current,argv=argv,deadline=time.time()+600)
             install.save(statefile,state)
         if state['stage']=='prepared':
-            require(preflight(namespace,image,payload)==before['Id'])
+            require(preflight(namespace,image,payload,maintenance_operation=barrier)==before['Id'])
             state['stage']='recreate_intent';install.save(statefile,state)
             try:install.command([*state['argv'],'up','-d','--no-deps','--pull','never','execution-broker'],env=install.environment())
             except subprocess.SubprocessError:pass
@@ -135,7 +141,7 @@ def activate(namespace,image,path,pin,operation,install_operation):
                 state.update(stage='technical_blocked',receipt=receipt);install.save(statefile,state);return receipt
             raise Pending('observe original activation Compose effect; never repeat up')
         verify(before,after);maintenance,_=require_idle(namespace)
-        require(maintenance['operation_id']==payload['maintenance_operation']);Service().stopped(namespace)
+        require(maintenance['operation_id']==barrier);Service().stopped(namespace)
         about=Authority(namespace,image).about()
         require(about['v2_enabled'] is True and about['implementation_enabled'] is True and about['maintenance'] is True)
         for row in json.loads(read(archive/'others.json')):
@@ -149,4 +155,5 @@ def activate(namespace,image,path,pin,operation,install_operation):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('namespace','image','payload','pin','operation','install-operation'):p.add_argument('--'+key,required=True)
-    a=p.parse_args();print(json.dumps(activate(a.namespace,a.image,a.payload,a.pin,a.operation,a.install_operation),sort_keys=True))
+    p.add_argument('--maintenance-operation',help='Current sealed barrier; preserves the original enrollment maintenance identity')
+    a=p.parse_args();print(json.dumps(activate(a.namespace,a.image,a.payload,a.pin,a.operation,a.install_operation,maintenance_operation=a.maintenance_operation),sort_keys=True))

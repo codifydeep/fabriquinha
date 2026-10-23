@@ -59,11 +59,14 @@ def current(b, request):
     require(e is not None and settings['workspace_id'] == e['workspace_id']
         and settings['runtime_id'] == e['runtime_id'] and settings['agents'].get(c['agent_id']) == 'review')
     task = native.task_record(settings, c['task_id'], c['agent_id'])
-    note = 'DELIVERY_REVIEW_START '+context['marker']+'\nSource: '+c['source_task']+'\n'+context['instruction']
+    note = review.note(b,context,state)
     require(task.get('id') == c['task_id'] and task.get('agent_id') == c['agent_id']
         and task.get('issue_id') == c['issue_id'] and task.get('status') == 'running'
         and task.get('workspace_id') == e['workspace_id'] and task.get('runtime_id') == e['runtime_id']
         and task.get('wakeup_id') == state['wakeup_id'] and task.get('handoff_note') == note)
+    if 'recovery_marker' in state:
+        runs=review.eligible_runs(b,context,state,[r for r in native.issue_task_runs(settings,c['issue_id']) if r.get('agent_id')==c['agent_id']])
+        require(len(runs)==1 and runs[0].get('id')==c['task_id'])
     return dict(task_id=c['task_id'], agent_id=c['agent_id'], issue_id=c['issue_id'], mode='review',
         scope=c['scope'], wakeup_id=task['wakeup_id'], handoff_note=task['handoff_note'], quality_request_id=request)
 

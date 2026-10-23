@@ -4,6 +4,7 @@ Never starts the candidate HTTP server, touches its installed DB, sends a prompt
 or calls a model. All state lives beside this copied script in a private temp dir.
 """
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -52,6 +53,14 @@ issue=dict(id=task['issue_id'],workspace_id=settings['workspace_id'],title='Synt
 runs=[]
 records={task['id']:task}
 phase='database'
+actual_native_task_record=native.task_record
+
+
+def fixture_task_record(settings,ident,agent):
+    # Fake only HTTP authority, not the adapter's parsing/ownership checks.
+    rows=[dict(r) for r in records.values() if r['agent_id']==agent]
+    with patch.object(native.urllib.request,'urlopen',side_effect=lambda *a,**k:io.StringIO(json.dumps(rows))):
+        return actual_native_task_record(settings,ident,agent)
 
 
 def save(name,value):
@@ -115,7 +124,14 @@ def review_launch(grant):
         workspace_id=settings['workspace_id'],runtime_id=settings['runtime_id'],wakeup_id=dispatched['wakeup_id'],
         handoff_note='DELIVERY_REVIEW_START '+context['marker']+'\nSource: '+task['id']+'\n'+context['instruction'],
         created_at='2026-10-22T01:00:00Z')
+    expected_note=reviewed['handoff_note']
+    reviewed['handoff_note']=('Wakeup '+reviewed['wakeup_id']+' triggered. Instruction:\n'+expected_note+
+        '\nTrigger facts (read current state before deciding what to do):\ntime.due '+
+        '{"kind":"at","planned_at":"2026-10-22T00:59:59Z"}\n')
     records[reviewed['id']]=reviewed;runs.append(reviewed)
+    decoded=native.task_record(settings,reviewed['id'],reviewed['agent_id'])
+    if decoded.get('scope_note_envelope_verified') is not True or decoded['handoff_note']!=expected_note:
+        raise ValueError('actual strict native envelope decoding required')
     admitted=b.native_grant(dict(task_id=reviewed['id'],agent_id=reviewed['agent_id']))
     save('review-admission.json',dict(request_id=admitted['request_id'],task_id=reviewed['id'],capability_not_archived=True))
     startup=acp_startup.request(b.handoff_context(),admitted['capability'],{},begin=True)
@@ -142,6 +158,7 @@ def review_launch(grant):
     state=review.load(b.handoff_context(),task['id'])[1]
     if state['tests_approved'] is not False:raise ValueError('launch cannot approve tests')
     return dict(status='passed',source_task=task['id'],task_id=reviewed['id'],request_id=admitted['request_id'],
+        strict_native_envelope=True,native_envelope_sha256=decoded['scope_note_envelope_sha256'],
         manifest_sha256=context['packet']['manifest_sha256'],snapshot_mount='readonly',frames=receipts,
         handler_byte_binding=True,tests_approved=False,delivery_approval=False)
 
@@ -162,7 +179,7 @@ try:
     b.register_issue_base(config['base'])
     with patch.object(native,'issue_record',return_value=issue),\
             patch.object(native,'issue_task_runs',side_effect=lambda *_:list(runs)),\
-            patch.object(native,'task_record',side_effect=lambda _,ident,*args:dict(records[ident])),\
+            patch.object(native,'task_record',side_effect=fixture_task_record),\
             patch.object(maintenance,'native_active',return_value=[]):
         phase='enrollment'
         enrolled=enrollment.enroll(b.handoff_context(),dict(plan=config['plan'],contract=config['contract'],maintenance_operation=config['operation']))

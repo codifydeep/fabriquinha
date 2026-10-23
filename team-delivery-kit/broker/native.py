@@ -4,6 +4,8 @@ import re
 import uuid
 import urllib.request
 
+REVIEW_NOTE_ENVELOPE_VERSION=1
+
 
 def ensure_unit_start(settings, issue_id, target, source_task, marker, instruction, *, allow_create=True):
     return _ensure_initial_start(settings,issue_id,target,source_task,marker,instruction,
@@ -163,7 +165,8 @@ def task_record(settings, task_id, agent_id):
             or task.get('runtime_id') != settings['runtime_id']):
         raise ValueError('native task ownership or state mismatch')
     if ('DELIVERY_PRODUCT_SCOPE_V1:' in (task.get('handoff_note') or '')
-            or 'DELIVERY_SCOPE_AUTHOR_START ' in (task.get('handoff_note') or '')):
+            or 'DELIVERY_SCOPE_AUTHOR_START ' in (task.get('handoff_note') or '')
+            or 'DELIVERY_REVIEW_START ' in (task.get('handoff_note') or '')):
         try:import native_scope_note
         except ImportError:from broker import native_scope_note
         raw=task['handoff_note'];canonical=native_scope_note.canonical(raw,task.get('wakeup_id'))

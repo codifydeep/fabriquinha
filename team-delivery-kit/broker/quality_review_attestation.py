@@ -127,12 +127,13 @@ def collect(b,c,context,assignment,phase):
     task=native.task_record(settings,c['task_id'],c['agent_id'])
     if task.get('status') in ('queued','pending','running'):
         raise validation_job.Pending('observe the same native test-review task')
-    note='DELIVERY_REVIEW_START '+context['marker']+'\nSource: '+c['source_task']+'\n'+context['instruction']
+    note=review.note(b,context,assignment)
     require(task.get('id')==c['task_id'] and task.get('agent_id')==c['agent_id'] and task.get('status')=='completed'
         and task.get('issue_id')==c['issue_id'] and task.get('wakeup_id')==assignment['wakeup_id']
         and task.get('handoff_note')==note and task.get('workspace_id')==e['workspace_id']
         and task.get('runtime_id')==e['runtime_id'])
     runs=[r for r in native.issue_task_runs(settings,c['issue_id']) if r.get('agent_id')==c['agent_id']]
+    runs=review.eligible_runs(b,context,assignment,runs)
     require(len(runs)==1 and runs[0].get('id')==c['task_id'])
     issue=native.issue_record(settings,c['issue_id'])
     require({key:issue.get(key) for key in ('id','workspace_id','title','description')}==context['requirements'])

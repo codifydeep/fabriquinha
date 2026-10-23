@@ -200,7 +200,15 @@ def advance(b,identity,phase):
         return outcome('awaiting_review_admission',identity['reviewer'],result)
     state=assignment[1]
     if state['stage']=='technical_blocked':return blocked(identity,state,review_problem=True)
-    if state['stage']=='awaiting_review':return outcome('awaiting_review_admission',identity['reviewer'],state)
+    if state['stage']=='awaiting_review':
+        settings=json.loads((b.STATE/'native.json').read_bytes())
+        runs=[r for r in author.native.issue_task_runs(settings,identity['issue_id'])
+            if r.get('agent_id')==identity['reviewer'] and r.get('wakeup_id')==state['wakeup_id']]
+        require(len(runs)<=1)
+        if runs and runs[0].get('status') in ('failed','cancelled'):
+            return blocked(identity,dict(task_id=runs[0]['id'],status=runs[0]['status'],wakeup_id=state['wakeup_id']),
+                review_problem=True,category='review_pre_admission_native_failed')
+        return outcome('awaiting_review_admission',identity['reviewer'],state)
     require(state['stage']=='admitted')
     frozen=attestation.load(b,source)
     if frozen is None:

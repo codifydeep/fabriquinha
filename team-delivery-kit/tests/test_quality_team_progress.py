@@ -26,6 +26,17 @@ class TeamProgressTests(unittest.TestCase):
 
     def call(self):return team.tick(self.b,limit=1)
 
+    def test_failed_review_before_admission_escalates_immediately_without_another_wakeup(self):
+        self.f.dispatch()
+        failed=dict(id=self.f.task,issue_id=self.f.e.issue,agent_id=self.f.e.reviewer,
+            wakeup_id=self.f.wakeup['id'],status='failed')
+        with patch.object(team.author.native,'issue_task_runs',return_value=[failed]),\
+                patch.object(team.review.native,'ensure_review_start') as wake:
+            state=self.call()['observed'][0]
+            self.assertEqual(state['stage'],'technical_blocked');self.assertEqual(state['owner'],self.b.QUALITY_CTO)
+            self.assertEqual(state['incident']['category'],'review_pre_admission_native_failed')
+            self.assertEqual(self.call()['observed'],[]);wake.assert_not_called()
+
     def test_review_ready_automatically_dispatches_once_without_test_approval(self):
         with patch.object(team.review.native,'ensure_review_start',return_value=self.f.wakeup) as wake:
             state=self.call()['observed'][0]
