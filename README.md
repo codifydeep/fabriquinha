@@ -17,8 +17,9 @@ foi aprovado: Red real → revisão e congelamento dos testes → Green → cont
 negativos obrigatórios antes do merge. A política, o executor offline e o cadastro
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
 bloqueios contra uso do fluxo legado por uma issue v2.
-O controlador v2 está instalado e habilitado **somente para uma qualificação
-nativa controlada**, em modo exclusivo que mantém os fluxos legados inativos.
+O controlador v2 está instalado **somente para qualificação nativa controlada**,
+em modo exclusivo que mantém os fluxos legados inativos. Após os bloqueios do
+ensaio, a referência está em manutenção, com fases desligadas e proxy parado.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
@@ -27,7 +28,9 @@ qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalaçã
 O ensaio ainda não comprovou Red/revisão/Green nativos: detectou um vínculo de
 imagem inválido e, no sucessor, um teste vazio após leituras/escrita negadas.
 O preflight de imagem já foi corrigido e verificado no runtime; o prompt de
-caminhos absolutos tem correção/testes em fonte, ainda pendente de instalação.
+caminhos absolutos foi corrigido, testado e instalado. O canário físico
+autor/Red/revisão somente leitura passou sem modelo e com autoridade sintética;
+isso ainda não comprova o fluxo nativo com agentes reais.
 Os bloqueios e arquivos originais continuam preservados, sem aprovação fictícia.
 O runtime de referência também já recebeu seletores explícitos para as seis
 imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO.
@@ -58,7 +61,7 @@ correto; Green/controle preservam hashes, versão e identidade dos casos, não
 apenas a contagem. Evidência ausente, skips, troca de casos ou recibos antigos
 de diagnóstico não são aprovação. Um canário Linux real percorreu esses
 executores com entradas/revisão/commit sintéticos, sem modelo ou entrega.
-**Essa integração está habilitada para o ensaio nativo, ainda não qualificado.** Os novos gates e
+**Essa integração está instalada, ainda não qualificada nativamente.** Os novos gates e
 pins foram instalados após backup/restauração verificados; a migração preservou
 journals, fila, tickets, prazos e contadores de falha. O scheduler próprio foi
 registrado novamente com o pin atualizado. Falta comprovar o encadeamento
@@ -78,7 +81,8 @@ restrita aos testes novos. A integração opt-in ao lançamento passou por Docke
 ACP reais com autoridade nativa sintética, sem chamada ao modelo. A reconciliação
 persistente término do autor → snapshot → Red → pacote para revisão está ligada
 ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
-bloqueio de falhas repetidas. Está habilitada apenas para a qualificação nativa.
+bloqueio de falhas repetidas. A ativação fica restrita à qualificação nativa;
+as fases estão desligadas durante a manutenção atual.
 A atribuição, o encaminhamento nativo único e a admissão da revisão independente
 estão implementados em fonte, em modo separado e restrito ao ensaio: leitura paginada
 do snapshot, sem permissões de implementação. O lançamento do revisor está ligado
@@ -481,12 +485,12 @@ flowchart TB
     W --> P[Proxy de modelo: identidade e teto de chamadas]
     P --> M[Provedor LLM configurado]
     B --> E[Snapshots imutáveis e validação controlada]
-    B -->|Modo exclusivo: ensaio nativo, não homologação| V2[Coordenador v2: fila e handoffs duráveis]
-    V2 -->|Revisão e autor Green: habilitados, ainda não qualificados| MC
-    V2 -->|Captura, Green e controle negativo: resultados pendentes| E
+    B -->|Modo exclusivo instalado; fases em manutenção| V2[Coordenador v2: fila e handoffs duráveis]
+    V2 -.->|Revisão e autor Green: ativação controlada, ainda não qualificados| MC
+    V2 -.->|Captura, Green e controle negativo: provas nativas pendentes| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2
-    GD[Serviço host periódico: tickets persistentes, até 2 cards] -->|Ativo: aguarda candidato nativo| GX
+    GD[Serviço host periódico: tickets persistentes, até 2 cards] -->|Ativo em manutenção; sem candidato nativo| GX
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]

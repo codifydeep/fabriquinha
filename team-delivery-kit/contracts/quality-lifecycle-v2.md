@@ -98,6 +98,9 @@ forbidden. Authors must read registered product/test files, use an exact
 permitted write path and read it back; denial is not successful persistence.
 This interface correction is tested in source; existing blocked tasks are not
 reopened or treated as successful test authorship.
+The absolute-path prompt correction is now installed, with phase flags off,
+exclusive isolation retained and maintenance sealed. Native qualification has
+not been restarted after this correction yet.
 The zero-model Docker/ACP canary explicitly resets its copied broker's team,
 exclusive and implementation flags, independently of the installed process.
 Its individual author/Red/review adapter must not accidentally enter the team
