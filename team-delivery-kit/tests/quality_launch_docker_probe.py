@@ -11,6 +11,8 @@ from pathlib import Path
 import sys
 import subprocess
 import time
+import uuid
+import traceback
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parent
@@ -28,6 +30,8 @@ import quality_author_admission as author_admission
 import quality_progress as progress
 import quality_test_review as review
 import quality_review_reads as read_verifier
+import quality_test_revision as revision
+import quality_review_attestation as attestation
 import acp_startup
 
 b.STATE=ROOT/'state';b.STATE.mkdir(mode=0o700)
@@ -157,10 +161,81 @@ def review_launch(grant):
     b.SESSIONS[admitted['request_id']].close();b.SESSIONS.clear()
     state=review.load(b.handoff_context(),task['id'])[1]
     if state['tests_approved'] is not False:raise ValueError('launch cannot approve tests')
+    correction=test_revision_launch(admitted,reviewed,context)
     return dict(status='passed',source_task=task['id'],task_id=reviewed['id'],request_id=admitted['request_id'],
         strict_native_envelope=True,native_envelope_sha256=decoded['scope_note_envelope_sha256'],
         manifest_sha256=context['packet']['manifest_sha256'],snapshot_mount='readonly',frames=receipts,
-        handler_byte_binding=True,tests_approved=False,delivery_approval=False)
+        handler_byte_binding=True,test_revision=correction,tests_approved=False,delivery_approval=False)
+
+
+def test_revision_launch(review_grant,reviewed,context):
+    """Synthetic rejection authority; actual seed/lock/handler/ACP operations.
+
+    No model reviewed this fixture. Do not export its authority to native state.
+    The preceding real snapshot/Red is reused; no installed DB is accessible.
+    """
+    worker=b.docker('GET','/containers/'+b.PREFIX+'-job-'+review_grant['request_id']+'/json')
+    stop=subprocess.run(['docker','stop','--time','10',worker['Id']],capture_output=True,text=True,timeout=30)
+    save('revision-review-stop.json',dict(container_id=worker['Id'],exit_code=stop.returncode,stdout=stop.stdout,stderr=stop.stderr))
+    if stop.returncode or b.docker('GET','/containers/'+worker['Id']+'/json')['State']['Running']:
+        raise ValueError('observe original review stop, never repeat')
+    reviewed['status']='completed'
+    packet=context['packet'];decision=dict(action='request_changes',reason='Synthetic correction transport fixture only.',
+        manifest_sha256=packet['manifest_sha256'],plan_sha256=packet['plan_sha256'],red_sha256=packet['red_sha256'],
+        criteria=['A01'],findings=[dict(criterion='A01',path='tests/test_new.py',test='__module__',line=1,
+            quote='import unittest',expected='Synthetic fixture',observed='Operator fixture, not native review')])
+    receipt=dict(operation='immutable_test_review_attestation_v2',source_task=task['id'],review_task=reviewed['id'],
+        request_id=review_grant['request_id'],stage='changes_requested',owner=task['agent_id'],plan=packet['plan'],red=packet['red'],
+        manifest_sha256=packet['manifest_sha256'],red_sha256=packet['red_sha256'],verdict=decision,
+        tests_approved=False,execution_authorized=False,delivery_approval=False)
+    observed=dict(namespace=b.PREFIX,source_task=task['id'])
+    with b.db() as con:
+        con.execute("UPDATE leases SET status='closed' WHERE request_id=?",(review_grant['request_id'],))
+        attestation.initialize(con)
+        con.execute('INSERT INTO quality_review_attestations VALUES(?,?,?,?,?,?)',
+            (task['id'],review_grant['request_id'],json.dumps(observed),json.dumps(receipt),review.quality.digest(observed),review.quality.digest(receipt)))
+    # Only the reviewer authority is a fixture. Admission, lineage, real frozen
+    # volume identity, actual helper jobs and handlers are not replaced.
+    with patch.object(attestation,'collect',return_value=receipt):
+        correction,_=revision.register(b.handoff_context(),task['id'])
+    wake_id=str(uuid.uuid5(uuid.UUID(config['operation']),'revision_wakeup'))
+    with patch.object(native,'ensure_scope_author_start',return_value=dict(id=wake_id,issue_id=task['issue_id'],agent_id=task['agent_id'])):
+        revision.dispatch(b.handoff_context(),task['id'])
+    corrected=dict(id=str(uuid.uuid5(uuid.UUID(config['operation']),'revision_task')),agent_id=task['agent_id'],
+        issue_id=task['issue_id'],status='running',workspace_id=settings['workspace_id'],runtime_id=settings['runtime_id'],
+        wakeup_id=wake_id,handoff_note=revision.note(correction),created_at='2026-10-22T02:00:00Z')
+    corrected['handoff_note']=('Wakeup '+wake_id+' triggered. Instruction:\n'+corrected['handoff_note']+
+        '\nTrigger facts (read current state before deciding what to do):\ntime.due '+
+        '{"kind":"at","planned_at":"2026-10-22T01:59:59Z"}\n')
+    records[corrected['id']]=corrected;runs.append(corrected)
+    admitted=b.native_grant(dict(task_id=corrected['id'],agent_id=corrected['agent_id']))
+    startup=acp_startup.request(b.handoff_context(),admitted['capability'],{},begin=True);deadline=time.monotonic()+100
+    while startup['startup_status']=='pending' and time.monotonic()<deadline:
+        time.sleep(.25);startup=acp_startup.request(b.handoff_context(),admitted['capability'],{},begin=False)
+    save('revision-startup.json',startup)
+    if startup['startup_status']!='ready':raise ValueError('observe original revision startup, no replay')
+    frames=[]
+    for index,method in enumerate(('initialize','session/new')):
+        response=b.session_operation(admitted['capability'],dict(frame=dict(jsonrpc='2.0',id=index+1,method=method,params={})))
+        if 'error' in response or 'result' not in response:raise ValueError('actual revision ACP rejected')
+        frames.append(dict(method=method,status='passed',response_sha256=hashlib.sha256(json.dumps(response,sort_keys=True).encode()).hexdigest()))
+    from acp_transport import worker_env
+    selection=author_admission.tool_config(b.handoff_context(),admitted['request_id'])
+    argv=['docker','exec','--user','10000:10000']
+    for env in worker_env('implementation',False,execution_id=admitted['request_id'],quality_phase_config=selection):
+        argv+=['--env',env]
+    expected=correction['seed']['test_sha256']['tests/test_new.py']
+    argv+=['--env','QUALITY_REVISION_EXPECTED_SHA256='+expected,b.PREFIX+'-job-'+admitted['request_id'],
+        'python','-c',(ROOT/'quality_revision_registry_canary.py').read_text()]
+    probed=subprocess.run(argv,capture_output=True,text=True,timeout=45)
+    save('revision-handler-probe.json',dict(exit_code=probed.returncode,stdout=probed.stdout,stderr=probed.stderr))
+    if probed.returncode:raise ValueError('actual revision registry probe failed')
+    result=json.loads(probed.stdout)
+    if result['status']!='passed' or result['seed_sha256']!=expected or result['corrected_sha256']==expected or result['protected_unchanged'] is not True:
+        raise ValueError('actual correction bytes/permissions required')
+    b.SESSIONS[admitted['request_id']].close();b.SESSIONS.clear()
+    return dict(status='passed',native_authority='synthetic_rejection_fixture',frames=frames,
+        seed_unchanged=True,protected_unchanged=True,tests_approved=False,delivery_approval=False)
 
 
 try:
@@ -224,5 +299,7 @@ except Exception as error:
     result=dict(operation='quality_native_launch_docker_acp_fixture_v2',status='failed',phase=phase,
         error_class=type(error).__name__,error_sha256=hashlib.sha256(str(error).encode()).hexdigest(),
         native_api='synthetic_fixture',model_calls=0,prompts_sent=0,delivery_approval=False)
+    save('failure-location.json',dict(frames=[dict(file=Path(f.filename).name,line=f.lineno,function=f.name)
+        for f in traceback.extract_tb(error.__traceback__)]))
     save('run-result.json',result);print(json.dumps(result),flush=True)
     raise SystemExit(1)

@@ -217,6 +217,9 @@ def admit(b,source,task_id,agent_id,*,now=None):
         and task.get('workspace_id')==e['workspace_id'] and task.get('runtime_id')==e['runtime_id']
         and task.get('wakeup_id')==state['wakeup_id'] and task.get('handoff_note')==note)
     runs=[r for r in native.issue_task_runs(settings,e['issue_id']) if r.get('agent_id')==agent_id]
+    try:from . import quality_test_revision as revision
+    except ImportError:import quality_test_revision as revision
+    runs=revision.exclude_prior_authors(b,source,runs)
     require({r.get('id') for r in runs}=={source,task_id} and len(runs)==2
         and max(runs,key=lambda r:(r.get('created_at') or '',r['id']))['id']==task_id)
     issue=native.issue_record(settings,e['issue_id'])

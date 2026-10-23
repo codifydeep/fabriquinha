@@ -48,7 +48,7 @@ class QualityTestReviewTests(unittest.TestCase):
                 agent_id=self.e.author, scope='owned:tests', request_id='req', mode='implementation', attempt=1,
                 phase='tests_only_v2', run_id=self.e.run, plan_sha256=review.quality.digest(self.capture.plan),
                 enrollment_sha256=review.quality.digest(review.capture.enrollment.lookup(con,self.e.issue)),
-                issue=issue, capsule=review.freeze(review.author.issue_text(issue),'Review independently.'))
+                base=self.b.issue_base(self.e.issue),issue=issue, capsule=review.freeze(review.author.issue_text(issue),'Review independently.'))
             con.execute('INSERT INTO quality_author_admissions VALUES(?,?,?,?,?)',
                 (self.e.issue,self.source,'req',json.dumps(origin),review.quality.digest(origin)))
         self.task = '70000000-0000-4000-8000-000000000002'

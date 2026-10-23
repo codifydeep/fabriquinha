@@ -22,7 +22,7 @@ require=admission.require
 def owns(b,request):
     with b.db() as con:
         if not admission.enrollment.exists(con,'quality_author_admissions'):return False
-        return bool(con.execute('SELECT 1 FROM quality_author_admissions WHERE request_id=?',(request,)).fetchone())
+        return any(row[1]==request for row in admission.requests(con))
 
 
 def enabled(b):
@@ -126,6 +126,13 @@ def prompt(b,frame,issue,task,correction):
         read_paths=selected['read_paths'],editable_paths=selected['editable_paths'],
         criterion_tests=plan['criterion_tests'],new_tests=plan['new_tests'],baseline_tests=plan['baseline_tests'],
         product_files=plan['product_files'],title=issue.get('title',''),description=issue.get('description',''))
+    if 'revision_source' in c:
+        try:from . import quality_test_revision as revision
+        except ImportError:import quality_test_revision as revision
+        parent,state=revision.load(b,c['revision_source'])
+        require(state['stage']=='admitted' and state['request_id']==request)
+        context['revision']=dict(source_task=c['revision_source'],findings=parent['request']['verdict'],
+            instruction=parent['instruction'],previous_snapshot=parent['seed']['manifest_sha256'])
     text=('TESTS-ONLY V2. Read the declared base and write only the registered NEW tests (<=32768 UTF-8 bytes/file). '
         'Every read_file/write_file path must be an exact absolute path from read_paths/editable_paths below. '
         'Relative paths are rejected by the handler and ACP client; do not guess filenames or handler names. '

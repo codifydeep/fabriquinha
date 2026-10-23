@@ -168,6 +168,9 @@ def authorize_source(b,task):
 def prepare(b,task):
     e,plan,spec,binding,lead=authorize_source(b,task)
     with b.db() as con:copied=copy_record(b,con,e,plan,spec,task,binding)
+    try:from . import quality_test_revision as revision
+    except ImportError:import quality_test_revision as revision
+    revision.changed(b,task,copied['prepared']['test_sha256'])
     volume=b.PREFIX+'-quality-red-'+task
     snapshot=b.docker('GET','/volumes/'+volume) or {}
     labels=snapshot.get('Labels',{})

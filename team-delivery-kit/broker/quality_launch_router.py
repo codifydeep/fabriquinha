@@ -54,6 +54,10 @@ def admit(b, task_id, agent_id):
     settings = json.loads((b.STATE/'native.json').read_text())
     if settings['agents'].get(agent_id) == 'implementation':
         task=native.task_record(settings,task_id,agent_id)
+        try:from . import quality_test_revision as revision
+        except ImportError:import quality_test_revision as revision
+        revised=revision.admission_source(b,task,agent_id)
+        if revised is not None:return revision.admit(b,revised,task_id,agent_id)
         with b.db() as con:
             implementation.admission.initialize(con)
             rows=con.execute('SELECT source_task,context,state,context_sha256,state_sha256 '

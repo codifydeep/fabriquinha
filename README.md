@@ -51,9 +51,19 @@ A correção posterior em fonte distingue rejeição de aprovação: uma rejeiç
 concreta exige leitura integral de todos os testes novos e arquivos citados;
 aprovação continua exigindo o snapshot inteiro. A citação de um helper Python
 deve corresponder à função, linha e bytes realmente lidos. Essa correção ainda
-não está instalada nem converte o veredito bloqueado em aprovação. O adaptador
-de devolução ao autor e nova revisão ainda precisa ser implementado e qualificado
-antes de outro ensaio; a referência permanece selada, sem consumo de modelo.
+não converte o veredito bloqueado em aprovação. O adaptador de devolução ao autor
+está implementado em fonte, ainda em qualificação: mantém o mesmo card, autor,
+brief e plano; registra uma solicitação de correção separada e cria uma execução
+tests-only com seed verificado do snapshot rejeitado. Não apaga o bloqueio antigo,
+não permite mudar testes de baseline nem editar produto. Outra revisão e outro
+Red completo são obrigatórios. Um teste novo sem alteração é recusado antes do
+novo Red. Falhas de diagnóstico deixam um hold persistente do CTO, sem repetição
+idêntica; históricos nativos só são filtrados por vínculos autenticados exatos.
+O canário físico autor → Red → revisão somente leitura → correção tests-only
+passou em Docker/ACP, com rejeição nativa sintética, sem prompts/modelo ou
+aprovação. Verificou o seed e as permissões reais; nove auxiliares foram retirados.
+O retorno com agentes reais ainda precisa ser qualificado. A referência permanece
+selada e com proxy parado até instalar o conjunto validado.
 Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
 primeiro tick interrompido somente com fila vazia, serviço descarregado e
 desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado
@@ -514,6 +524,8 @@ flowchart TB
     B --> E[Snapshots imutáveis e validação controlada]
     B -->|Modo exclusivo instalado; fases em manutenção| V2[Coordenador v2: fila e handoffs duráveis]
     V2 -.->|Revisão e autor Green: ativação controlada, ainda não qualificados| MC
+    V2 -.->|Solicitação de mudanças: retorno tests-only em qualificação| TR[Autor original: novo workspace e snapshot]
+    TR -.->|Novo Red e nova revisão obrigatórios; sem aprovação herdada| E
     V2 -.->|Captura, Green e controle negativo: provas nativas pendentes| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2

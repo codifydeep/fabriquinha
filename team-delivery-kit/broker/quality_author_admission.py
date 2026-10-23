@@ -35,6 +35,10 @@ def load(con,request_id):
     initialize(con)
     row=con.execute('SELECT context,context_sha256 FROM quality_author_admissions WHERE request_id=?',
         (request_id,)).fetchone()
+    if enrollment.exists(con,'quality_revision_author_admissions'):
+        revised=con.execute('SELECT context,context_sha256 FROM quality_revision_author_admissions WHERE request_id=?',(request_id,)).fetchone()
+        require(not (row and revised))
+        if revised:row=revised
     if not row:return None
     context=json.loads(row[0]);require(quality.digest(context)==row[1])
     validate_capsule(context['capsule'])
@@ -43,6 +47,13 @@ def load(con,request_id):
     require(e is not None and quality.digest(e)==context['enrollment_sha256'])
     require(context['request_id']==request_id and context['phase']=='tests_only_v2'
         and context['attempt']==1 and context['mode']=='implementation')
+    if 'revision_source' in context:
+        row=con.execute('SELECT context,state,context_sha256,state_sha256 FROM quality_test_revisions WHERE source_task=?',
+            (context['revision_source'],)).fetchone();require(row is not None)
+        parent,state=json.loads(row[0]),json.loads(row[1])
+        require(quality.digest(parent)==row[2]==context['revision_context_sha256'] and quality.digest(state)==row[3]
+            and state['stage']=='admitted' and state['task_id']==context['task_id'] and state['request_id']==request_id
+            and parent['author']==context['agent_id'] and parent['issue_id']==context['issue_id'])
     binding=con.execute('SELECT n.task_id,n.agent_id,n.scope,n.issue_id,g.mode,g.attempt,'
         'q.run_id,q.phase,q.plan_sha256 FROM native_bindings n JOIN grants g USING(request_id) '
         'JOIN quality_native_scopes q ON q.request_id=n.request_id AND q.task_id=n.task_id '
@@ -64,11 +75,27 @@ def selection(b,request_id):
             (c['issue_id'],)).fetchone()
         plan,spec=enrollment.request(json.loads(row[0]))
     require(c['namespace']==b.PREFIX and c['plan_sha256']==quality.digest(plan))
-    return dict(phase='tests_only_v2',scope=c['scope'],base=c['base'],
+    result=dict(phase='tests_only_v2',scope=c['scope'],base=c['base'],
         editable_paths=['/workspace/'+p for p in sorted(plan['new_tests'])],
         read_paths=['/workspace/'+p for p in sorted(spec['files'])],
         test_commands=[],terminal_allowed=False,product_edits_allowed=False,
         legacy_calibration_allowed=False,delivery_approval=False)
+    if 'revision_source' in c:
+        with b.db() as con:
+            raw,sha=con.execute('SELECT context,context_sha256 FROM quality_test_revisions WHERE source_task=?',
+                (c['revision_source'],)).fetchone()
+        parent=json.loads(raw);require(quality.digest(parent)==sha==c['revision_context_sha256'])
+        result['revision_seed']=parent['seed']
+    return result
+
+
+def requests(con):
+    initialize(con)
+    rows=list(con.execute('SELECT task_id,request_id FROM quality_author_admissions'))
+    if enrollment.exists(con,'quality_revision_author_admissions'):
+        rows+=list(con.execute('SELECT task_id,request_id FROM quality_revision_author_admissions'))
+    require(len({r[0] for r in rows})==len(rows) and len({r[1] for r in rows})==len(rows))
+    return rows
 
 
 def tool_config(b,request_id):
@@ -92,6 +119,12 @@ def admit(b,task_id,agent_id,*,now=None):
     require(task.get('id')==task_id and task.get('agent_id')==agent_id
         and task.get('status')=='running' and settings['agents'].get(agent_id)=='implementation'
         and task.get('workspace_id')==settings['workspace_id'] and task.get('runtime_id')==settings['runtime_id'])
+    # Tests-only corrections do not require enabling product implementation.
+    # A persisted exact wakeup selects the phase; task prose never does.
+    try:from . import quality_test_revision as revision
+    except ImportError:import quality_test_revision as revision
+    revised=revision.admission_source(b,task,agent_id)
+    if revised is not None:return revision.admit(b,revised,task_id,agent_id,now=now)
     issue=task.get('issue_id');enrollment.canonical(issue)
     with b.db() as con:
         e=enrollment.lookup(con,issue);require(e is not None and e['namespace']==b.PREFIX)

@@ -14,6 +14,7 @@ try:
     from . import quality_implementation_admission as implementation,quality_delivery_capture as delivery
     from . import quality_candidate_binding as candidate,quality_green_capture as green
     from . import quality_sensitivity_capture as sensitivity
+    from . import quality_test_revision as revision
     from . import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 except ImportError:
     import quality_progress as progress,quality_author_admission as author
@@ -21,17 +22,18 @@ except ImportError:
     import quality_implementation_admission as implementation,quality_delivery_capture as delivery
     import quality_candidate_binding as candidate,quality_green_capture as green
     import quality_sensitivity_capture as sensitivity
+    import quality_test_revision as revision
     import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 
 quality=author.quality
 require=author.require
 IMAGES=('QUALITY_PREP_IMAGE','QUALITY_WORKER_IMAGE','QUALITY_COPY_IMAGE','QUALITY_RED_IMAGE',
     'QUALITY_REVIEW_WORKER_IMAGE','QUALITY_GREEN_JOB_IMAGE')
-TERMINAL={'technical_blocked','awaiting_independent_delivery_review'}
+TERMINAL={'technical_blocked','awaiting_independent_delivery_review','test_revision_handed_off'}
 STAGES=TERMINAL|{'awaiting_git_binding','waiting_author','waiting_red','review_ready','waiting_review_capacity','waiting_review_dispatch',
     'awaiting_review_admission','waiting_test_review','tests_frozen','waiting_implementation_capacity',
     'waiting_implementation_dispatch','awaiting_implementation_admission','waiting_delivery_capture','waiting_green',
-    'awaiting_sensitivity','waiting_sensitivity'}
+    'awaiting_sensitivity','waiting_sensitivity','waiting_revision_capacity','waiting_revision_dispatch','awaiting_test_revision'}
 
 
 def initialize(con):
@@ -107,7 +109,7 @@ def candidates(b):
     with b.db() as con:
         initialize(con)
         if not author.enrollment.exists(con,'quality_author_admissions'):return []
-        rows=con.execute('SELECT task_id FROM quality_author_admissions').fetchall()
+        rows=author.requests(con)
         skipped={row[0] for row in con.execute('SELECT source_task FROM quality_team_quarantine')}
         cursors={row[0]:row[1] for row in con.execute('SELECT source_task,observed_at FROM quality_team_progress')}
     result=[]
@@ -117,7 +119,8 @@ def candidates(b):
         try:
             author.enrollment.canonical(source)
             old=load(b,source)
-            if old and old[1]['stage'] in TERMINAL:continue
+            if old and old[1]['stage'] in TERMINAL:
+                if old[1]['stage']!='technical_blocked' or not revision.eligible(b,source):continue
             result.append((cursors.get(source,0),source))
         except (ValueError,KeyError,TypeError):quarantine(b,source,'team_journal_integrity_rejected')
     return [source for _,source in sorted(result)]
@@ -125,8 +128,8 @@ def candidates(b):
 
 def register(b,source):
     with b.db() as con:
-        row=con.execute('SELECT request_id FROM quality_author_admissions WHERE task_id=?',(source,)).fetchone()
-        require(row is not None);c=author.load(con,row[0]);require(c is not None)
+        rows=[r for r in author.requests(con) if r[0]==source]
+        require(len(rows)==1);c=author.load(con,rows[0][1]);require(c is not None)
         e=author.enrollment.lookup(con,c['issue_id'])
     require(e is not None and e['namespace']==b.PREFIX and c['namespace']==b.PREFIX
         and c['task_id']==source and c['agent_id']==e['author'] and c['run_id']==e['run_id'])
@@ -210,13 +213,30 @@ def advance(b,identity,phase):
                 review_problem=True,category='review_pre_admission_native_failed')
         return outcome('awaiting_review_admission',identity['reviewer'],state)
     require(state['stage']=='admitted')
+    corrected=revision.load(b,source)
+    if corrected and corrected[1]['stage']=='admitted':
+        return outcome('test_revision_handed_off',identity['author'],corrected[1])
     frozen=attestation.load(b,source)
     if frozen is None:
         phase['value']='test_review'
         frozen=attestation.observe(b,source);require(attestation.load(b,source)==frozen)
         if frozen['stage']=='tests_frozen':return outcome('tests_frozen',identity['author'],frozen)
-    if frozen['stage']=='changes_requested':
-        return blocked(identity,frozen,category='test_revision_adapter_required')
+    if frozen['stage']=='changes_requested' or frozen['stage']=='technical_blocked' and revision.eligible(b,source):
+        phase['value']='test_revision'
+        current=revision.load(b,source)
+        if current and current[1]['stage']=='admitted':return outcome('test_revision_handed_off',identity['author'],current[1])
+        if (not current or current[1]['stage']=='prepared') and not capacity(b,identity['author']):
+            return outcome('waiting_revision_capacity',identity['author'])
+        result=revision.dispatch(b,source)
+        if result['stage']=='technical_blocked':return blocked(identity,result,category='test_revision_dispatch_blocked')
+        if result['stage']=='admitted':return outcome('test_revision_handed_off',identity['author'],result)
+        require(result['stage']=='awaiting_revision')
+        settings=json.loads((b.STATE/'native.json').read_bytes())
+        runs=[r for r in author.native.issue_task_runs(settings,identity['issue_id']) if r.get('wakeup_id')==result['wakeup_id']]
+        require(len(runs)<=1)
+        if runs and runs[0].get('status') in ('failed','cancelled'):
+            return blocked(identity,runs[0],category='test_revision_pre_admission_failed')
+        return outcome('awaiting_test_revision',identity['author'],result)
     if frozen['stage']=='technical_blocked':return blocked(identity,frozen,review_problem=True)
     require(frozen['stage']=='tests_frozen' and frozen['tests_approved'] is True)
     phase['value']='implementation_dispatch'
@@ -299,16 +319,19 @@ def tick(b,*,limit=2):
             try:result=advance(b,identity,phase)
             except validation_job.Pending as pending:
                 stage={'review_dispatch':'waiting_review_dispatch','test_review':'waiting_test_review',
-                    'implementation_dispatch':'waiting_implementation_dispatch','delivery_capture':'waiting_delivery_capture',
+                    'implementation_dispatch':'waiting_implementation_dispatch','test_revision':'waiting_revision_dispatch','delivery_capture':'waiting_delivery_capture',
                     'green':'waiting_green','sensitivity':'waiting_sensitivity'}.get(phase['value'],'waiting_red')
                 owner=identity['techlead'] if phase['value'] in ('green','sensitivity') else identity['reviewer'] if 'review' in phase['value'] else identity['author']
                 result=outcome(stage,owner,getattr(pending,'progress',None))
             except (TimeoutError,OSError):
                 result=outcome(before['stage'],before['owner'])
             except (ValueError,KeyError,TypeError):
+                if phase['value']=='test_revision':revision.hold(b,source,'revision_evidence_rejected')
                 result=blocked(identity,dict(phase=phase['value']),review_problem='review' in phase['value'],
                     category='immutable_quality_team_evidence_rejected')
             if result['stage']==before['stage'] and result['stage'] not in TERMINAL and time.time()>=deadline:
                 result=blocked(identity,before,review_problem='review' in before['stage'],category='quality_phase_observation_deadline')
+            if phase['value']=='test_revision' and result['stage']=='technical_blocked':
+                revision.hold(b,source,result.get('incident',{}).get('category','revision_technical_block'))
             observed.append(save(b,source,identity,before,result))
         return finish(b,dict(stage='observed',observed=observed,delivery_approval=False))

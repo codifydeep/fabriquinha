@@ -736,6 +736,27 @@ reclassify them. A request-changes record must still reach the original author
 through a separately qualified revision adapter, with a new immutable submission,
 new Red and new independent review before implementation can be admitted.
 
+`quality_test_revision.py` implements that adapter in source. Corrections are
+separate native tests-only tasks on the same issue/run/plan and original author.
+The new workspace is seeded only with manifest/hash-verified NEW tests from the
+rejected snapshot. Baseline files and product stay locked. A supplementary
+rejection diagnosis may qualify an actual request-changes output previously
+blocked by the full-read rule, but only after all new-test/citation reads and
+native/ACP/lease provenance pass. The old attestation remains unchanged; no
+approval is inherited. A prepared diagnosis never creates a task or capability.
+
+The coordinator respects existing capacity, persists intent before dispatch,
+observes the same marker after uncertain acknowledgments and escalates failed
+admissions. A malformed diagnosis latches a CTO hold rather than looping. An
+unchanged correction cannot rerun Red. Each new snapshot requires its own Red,
+review and freeze. Old task exclusions are exact authenticated lineage records;
+unknown extra runs or late state changes fail closed. There is no global
+handoff limit or implicit conversion to implementation authority.
+
+The physical revision canary uses explicitly synthetic rejection authority,
+real Docker seed/lock and actual handlers/ACP without prompts or model calls.
+It never establishes native reviewer approval or an autonomous delivery.
+
 1. Qualify and install the source enrollment and legacy fences before any
    task/grant in a fresh run. Bind repository, base, contract and role identities;
    reject reuse of a legacy blocked issue.

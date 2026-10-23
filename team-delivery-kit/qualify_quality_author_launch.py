@@ -32,6 +32,7 @@ SOURCES={
     'broker/quality_red_snapshot.py':'quality_red_snapshot.py','broker/quality_progress.py':'quality_progress.py',
     'broker/quality_test_review.py':'quality_test_review.py',
     'broker/quality_review_recovery.py':'quality_review_recovery.py',
+    'broker/quality_test_revision.py':'quality_test_revision.py',
     'broker/quality_worker_runtime.py':'quality_worker_runtime.py',
     'broker/quality_review_launch.py':'quality_review_launch.py','broker/quality_launch_router.py':'quality_launch_router.py',
     'broker/quality_review_reads.py':'quality_review_reads.py','broker/quality_review_attestation.py':'quality_review_attestation.py',
@@ -50,7 +51,8 @@ SOURCES={
     'broker/helper_cleanup.py':'helper_cleanup.py','portable_contract.py':'portable_contract.py',
     'test_runner_policy.py':'test_runner_policy.py','docker_grouping.py':'docker_grouping.py',
     'model_policy.py':'model_policy.py','quality_phase_tools.py':'quality_phase_tools.py','execution_context.py':'execution_context.py',
-    'tests/quality_launch_docker_probe.py':'quality_launch_docker_probe.py'}
+    'tests/quality_launch_docker_probe.py':'quality_launch_docker_probe.py',
+    'tests/quality_revision_registry_canary.py':'quality_revision_registry_canary.py'}
 
 
 def validate_report(report):
@@ -80,6 +82,15 @@ def validate_report(report):
         if 'strict_native_envelope' in review and (review['strict_native_envelope'] is not True
                 or not re.fullmatch('[a-f0-9]{64}',str(review.get('native_envelope_sha256')))):
             raise ValueError('actual strict native envelope evidence required when claimed')
+        if 'test_revision' in review:
+            correction=review['test_revision']
+            if (correction.get('status')!='passed' or correction.get('native_authority')!='synthetic_rejection_fixture'
+                    or correction.get('tests_approved') is not False or correction.get('delivery_approval') is not False
+                    or correction.get('seed_unchanged') is not True or correction.get('protected_unchanged') is not True
+                    or [f.get('method') for f in correction.get('frames',[])]!=['initialize','session/new']
+                    or any(f.get('status')!='passed' or not re.fullmatch('[a-f0-9]{64}',str(f.get('response_sha256')))
+                        for f in correction.get('frames',[]))):
+                raise ValueError('actual correction seed/ACP evidence required, never native approval')
 
 
 def input_config(archive,metadata):
@@ -266,7 +277,8 @@ def finish_retirement(namespace,operation):
     with sqlite3.connect('file:'+str(archive/'state/leases.sqlite')+'?mode=ro',uri=True) as con:
         if con.execute('PRAGMA quick_check').fetchone()[0]!='ok':raise ValueError('private state archive corrupt')
         events=con.execute('SELECT method,success FROM acp_events ORDER BY rowid').fetchall()
-        expected=[('initialize',1),('session/new',1)]*(2 if 'review_launch' in report else 1)
+        correction=report.get('review_launch',{}).get('test_revision')
+        expected=[('initialize',1),('session/new',1)]*((2 if 'review_launch' in report else 1)+(1 if correction else 0))
         if events!=expected:raise ValueError('actual ACP events missing or a prompt was sent')
         bindings=con.execute('SELECT request_id,task_id FROM quality_author_admissions').fetchall()
         if bindings!=[(report['request_id'],report['task_id'])]:raise ValueError('admission report identity drift')
@@ -276,6 +288,17 @@ def finish_retirement(namespace,operation):
             if rows!=[(reviewed['request_id'],reviewed['task_id'])]:raise ValueError('review admission identity drift')
             state=json.loads(con.execute('SELECT state FROM quality_test_reviews WHERE source_task=?',(report['task_id'],)).fetchone()[0])
             if state['stage']!='admitted' or state['tests_approved'] is not False:raise ValueError('review launch must not approve tests')
+            if correction:
+                rows=con.execute('SELECT source_task,task_id,request_id,context,context_sha256 FROM quality_revision_author_admissions').fetchall()
+                if len(rows)!=1:raise ValueError('one exact revision admission required')
+                source,task_id,request_id,raw,sha=rows[0];c=json.loads(raw)
+                if (source!=report['task_id'] or task_id!=str(uuid.uuid5(uuid.UUID(operation),'revision_task'))
+                        or c['task_id']!=task_id or c['request_id']!=request_id or c['revision_source']!=source
+                        or hashlib.sha256(json.dumps(c,sort_keys=True,separators=(',',':')).encode()).hexdigest()!=sha
+                        or c['phase']!='tests_only_v2'):
+                    raise ValueError('revision admission identity drift')
+                frames=con.execute('SELECT method,success FROM acp_events WHERE request_id=? ORDER BY rowid',(request_id,)).fetchall()
+                if frames!=[('initialize',1),('session/new',1)]:raise ValueError('exact revision frames required; no prompt')
             for row in con.execute('SELECT state FROM test_first_jobs'):
                 if json.loads(row[0])['stage']!='complete':raise ValueError('fixed copy job unsettled')
         if any(json.loads(row[0])['stage']!='complete' for row in con.execute('SELECT state FROM validation_jobs')):

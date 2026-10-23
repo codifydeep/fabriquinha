@@ -50,13 +50,15 @@ def payload(b,c,phase):
             dict(Type='volume',Source=c['volume'],Target='/workspace')])
     selected=c['selection']
     require(selected['phase']==c['source']['phase'] and selected['phase'] in ('tests_only_v2','implementation_v2'))
-    if selected['phase']=='implementation_v2':
-        frozen=selected['frozen_seed']
+    if selected['phase']=='implementation_v2' or 'revision_seed' in selected:
+        frozen=selected['frozen_seed'] if selected['phase']=='implementation_v2' else selected['revision_seed']
         require(isinstance(frozen,dict) and set(frozen)=={'volume','manifest_sha256','test_sha256'}
             and re.fullmatch('[A-Za-z0-9_.-]{1,200}',str(frozen['volume']))
             and re.fullmatch('[a-f0-9]{64}',str(frozen['manifest_sha256']))
-            and isinstance(frozen['test_sha256'],dict) and bool(frozen['test_sha256'])
-            and not set(frozen['test_sha256'])&{p.removeprefix('/workspace/') for p in selected['editable_paths']})
+            and isinstance(frozen['test_sha256'],dict) and bool(frozen['test_sha256']))
+        editable={p.removeprefix('/workspace/') for p in selected['editable_paths']}
+        if selected['phase']=='implementation_v2':require(not set(frozen['test_sha256'])&editable)
+        else:require('revision_source' in c['source'] and set(frozen['test_sha256'])==editable)
         if not root:
             env+=['REVISION_SEED_JSON='+json.dumps({k:v for k,v in frozen.items() if k!='volume'})]
             host['Mounts'].append(dict(Type='volume',Source=frozen['volume'],Target='/previous',ReadOnly=True))

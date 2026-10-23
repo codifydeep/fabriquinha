@@ -143,8 +143,9 @@ def note(b,context,state):
 
 
 def eligible_runs(b,context,state,runs):
-    try:from . import quality_review_recovery as recovery
-    except ImportError:import quality_review_recovery as recovery
+    try:from . import quality_review_recovery as recovery,quality_test_revision as revision
+    except ImportError:import quality_review_recovery as recovery,quality_test_revision as revision
+    runs=revision.exclude_prior_reviews(b,context['source_task'],runs)
     return recovery.runs(b,context,state,runs)
 
 
