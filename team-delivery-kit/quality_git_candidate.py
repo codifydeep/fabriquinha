@@ -62,7 +62,7 @@ def observed_ref(repo,ref):
 
 @contextmanager
 def journal(private,request,*,family='quality-git-candidates'):
-    require(family in ('quality-git-candidates','quality-delivery-exports'))
+    require(family in ('quality-git-candidates','quality-delivery-exports','quality-candidate-dispatch'))
     private=Path(private)
     require(private.is_absolute() and private.resolve()==private and private.is_dir()
         and private.stat().st_uid==os.getuid() and not private.stat().st_mode&0o077)

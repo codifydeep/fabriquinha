@@ -17,7 +17,8 @@ PATTERNS = {
         rb'''(?im)^\s*["']?(?:OPENROUTER_API_KEY|GH_TOKEN|GITHUB_TOKEN|TELEGRAM_BOT_TOKEN|EVAL_JWT_SECRET)["']?\s*[:=]\s*["']?([A-Za-z0-9_-]{32,})'''),
 }
 PRIVATE_COMPONENTS = {'node_modules', '__pycache__', '.venv', '.git',
-                      'backups', 'snapshots', 'sessions', 'artifacts', 'quality-git-candidates', 'quality-delivery-exports'}
+                      'backups', 'snapshots', 'sessions', 'artifacts', 'quality-git-candidates', 'quality-delivery-exports',
+                      'quality-candidate-dispatch'}
 
 
 def findings(path, content, *, mode='100644'):
@@ -51,6 +52,7 @@ class PublicationTests(unittest.TestCase):
     def test_private_candidate_journal_is_never_public_source(self):
         self.assertTrue(findings('team-delivery-kit/quality-git-candidates/request.json',b'{}'))
         self.assertTrue(findings('team-delivery-kit/quality-delivery-exports/request.json',b'{}'))
+        self.assertTrue(findings('team-delivery-kit/quality-candidate-dispatch/queue.sqlite',b'private'))
 
     def test_private_state_and_nested_git_are_rejected(self):
         for path in ['team-delivery-kit/.local-port2/operator.json', 'x/.env', 'x/keys.pem']:

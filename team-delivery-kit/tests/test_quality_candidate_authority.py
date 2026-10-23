@@ -2,9 +2,11 @@
 import copy
 import json
 import unittest
+import uuid
 from unittest.mock import patch
 import quality_candidate_authority as authority
 import quality_delivery_candidate as bridge
+import quality_candidate_dispatch as dispatch
 from broker import quality_candidate_rpc as rpc
 import test_quality_delivery_candidate as fixtures
 
@@ -83,6 +85,44 @@ class CandidateAuthorityTests(unittest.TestCase):
         self.assertFalse(self.a.about()['v2_enabled'])
         with self.assertRaises(ValueError):self.call()
         self.assertEqual(self.f.fx.creates,0)
+
+    def test_pending_queue_pages_validate_capture_hashes_and_isolate_corruption(self):
+        requests=[str(uuid.uuid4()) for _ in range(130)]
+        with self.b.db() as con:
+            con.execute('DELETE FROM quality_delivery_captures')
+            for request in requests:
+                context=copy.deepcopy(self.f.context);context['admission']['request_id']=request
+                state=copy.deepcopy(self.f.state)
+                con.execute('INSERT INTO quality_delivery_captures VALUES(?,?,?,?,?)',(request,
+                    json.dumps(context),json.dumps(state),rpc.binding.quality.digest(context),rpc.binding.quality.digest(state)))
+            con.execute('UPDATE quality_delivery_captures SET state=? WHERE request_id=?',('{',requests[0]))
+        first=self.a.pending()
+        self.assertEqual(first['requests'],requests[1:128]);self.assertEqual(len(first['rejected_rowids']),1)
+        self.assertGreater(first['next_after'],0)
+        second=self.a.pending(first['next_after'])
+        self.assertEqual(second['requests'],requests[128:]);self.assertEqual(second['next_after'],0)
+        self.assertEqual(self.f.fx.creates,0)
+
+    def test_pending_queue_excludes_already_bound_deliveries_and_rejects_bad_cursor(self):
+        self.assertEqual(self.a.pending()['requests'],[self.f.f.request])
+        self.call()
+        self.assertEqual(self.a.pending()['requests'],[])
+        for cursor in (-1,True,'0',2**63):
+            with self.subTest(cursor=cursor),self.assertRaises(ValueError):self.a.pending(cursor)
+
+    def test_dispatcher_resumes_real_git_after_lost_record_ack_without_new_effects(self):
+        self.fx.lost_record=True
+        repositories={'codifydeep/descartavel2':str(self.f.f.f.repo)}
+        before=self.f.f.f.git('rev-parse','HEAD')
+        first=dispatch.tick(self.a,repositories,self.f.f.private,effects=self.f.fx)
+        self.assertEqual(first['observed'][0]['stage'],'pending')
+        with patch.object(bridge.exporter,'export',side_effect=AssertionError('no replay export')),\
+                patch.object(bridge.candidate,'materialize',side_effect=AssertionError('no replay Git')):
+            last=dispatch.tick(self.a,repositories,self.f.f.private,effects=self.f.fx)
+        self.assertEqual(last['observed'][0]['stage'],'bound')
+        self.assertEqual((self.f.fx.creates,self.f.fx.copies,self.f.fx.removes),(1,1,1))
+        self.assertEqual(self.f.f.f.git('rev-parse','HEAD'),before)
+        self.assertEqual(sum(v['operation']=='record' for v in self.fx.calls),1)
 
 
 if __name__=='__main__':unittest.main()

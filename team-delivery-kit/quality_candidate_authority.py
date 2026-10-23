@@ -45,20 +45,21 @@ class Authority:
         self.identity=info['Id'];return self.identity
 
     def call(self,action,**kwargs):
-        require(action in ('about','inspect','record'))
-        if action!='about':canonical(kwargs.get('request_id'))
+        require(action in ('about','pending','inspect','record'))
+        if action in ('inspect','record'):canonical(kwargs.get('request_id'))
         value=dict(operation=action,namespace=self.namespace,**kwargs)
         try:
             identity=self.inspect_controller();result=self.fx.execute(identity,value)
             require(self.inspect_controller()==identity and isinstance(result,dict)
                 and result.get('operation')=='quality_candidate_local_rpc_v2' and result.get('namespace')==self.namespace
-                and result.get('delivery_approval') is False and result.get('stage') in ('available','maintenance','pending','bound'))
+                and result.get('delivery_approval') is False and result.get('stage') in ('available','maintenance','pending','bound','queued'))
             if result['stage']=='maintenance':raise Pending('controller maintenance preserves candidate; no local effects')
             return result
         except (TimeoutError,subprocess.TimeoutExpired,subprocess.CalledProcessError) as error:
             raise Pending('controller reply unavailable; inspect durable binding, never replace a worker') from error
 
     def about(self):return self.call('about')
+    def pending(self,after=0):return self.call('pending',after=after)
     def inspect(self,request):return self.call('inspect',request_id=request)
     def record(self,request,packet,repository,candidate):
         result=self.call('record',request_id=request,packet=packet,repository=repository,candidate=candidate)
