@@ -1,4 +1,4 @@
-"""Changed-condition successor of a completed, rejected-format/read review.
+"""Changed-condition successor of a rejected or transport-failed review.
 
 Controller/operator only. Preserves every old admission, task, attestation and
 capability; issues no capability and starts no work. Coordinator dispatches a
@@ -66,6 +66,7 @@ def eligible(b,source):
 
 
 def exclude_completed(b,context,state,runs):
+    """Historical name; failed runs require the separate capacity proof path."""
     previous=records(b,context['source_task'])
     if not previous:return runs
     marker(b,context,state);settings=json.loads((b.STATE/'native.json').read_bytes())
@@ -73,11 +74,17 @@ def exclude_completed(b,context,state,runs):
     for record in previous:
         task=native.task_record(settings,record['previous_task'],context['reviewer'])
         output=(task.get('result') or {}).get('output')
-        require({k:task.get(k) for k in FIELDS}==record['previous_identity'] and task['status']=='completed'
-            and isinstance(output,str) and hashlib.sha256(output.encode()).hexdigest()==record['native_output_sha256']
+        require({k:task.get(k) for k in FIELDS}==record['previous_identity']
             and attestation.load(b,context['source_task'],request_id=record['previous_request'])==record['previous_attestation'])
+        if 'transport' in record['request']:
+            try:from . import quality_review_capacity_recovery as capacity
+            except ImportError:import quality_review_capacity_recovery as capacity
+            require(capacity.failure_sha256(task)==record['native_failure_sha256'])
+        else:
+            require(task['status']=='completed' and isinstance(output,str)
+                and hashlib.sha256(output.encode()).hexdigest()==record['native_output_sha256'])
         matching=[r for r in result if r.get('id')==record['previous_task']]
-        require(len(matching)==1 and matching[0].get('status')=='completed'
+        require(len(matching)==1 and matching[0].get('status')==task['status']
             and matching[0].get('wakeup_id')==task['wakeup_id'])
         result=[r for r in result if r.get('id')!=record['previous_task']]
     return result
@@ -121,9 +128,16 @@ def qualification(b,value,operation):
     return quality.digest(report['guard_sources'])
 
 
-def register(b,source,previous_task,operation,*,qualified,installation):
+def register(b,source,previous_task,operation,*,qualified,installation,transport=None):
     for value in (source,previous_task,operation):review.capture.enrollment.canonical(value)
     condition=qualification(b,qualified,operation)
+    capacity_request=None
+    if transport is not None:
+        try:from . import quality_review_capacity_recovery as capacity
+        except ImportError:import quality_review_capacity_recovery as capacity
+        require(isinstance(transport,dict) and isinstance(transport.get('rejection'),dict))
+        capacity_request=transport['rejection'].get('execution_id');review.capture.enrollment.canonical(capacity_request)
+        condition=quality.digest(dict(worker=condition,transport=capacity.validate(b,transport,operation,capacity_request)))
     require(isinstance(installation,dict) and set(installation)=={'install_operation','previous_image','current_image','previous_container','current_container'}
         and installation['previous_image']!=installation['current_image']
         and all(re.fullmatch('sha256:[a-f0-9]{64}',str(installation[k])) for k in ('previous_image','current_image'))
@@ -132,6 +146,7 @@ def register(b,source,previous_task,operation,*,qualified,installation):
     review.capture.enrollment.canonical(installation['install_operation'])
     request=dict(source_task=source,previous_task=previous_task,maintenance_operation=operation,
         qualification=qualified,installation=installation)
+    if transport is not None:request['transport']=transport
     previous=records(b,source)
     same=[r for r in previous if r['previous_task']==previous_task]
     if same:
@@ -146,7 +161,8 @@ def register(b,source,previous_task,operation,*,qualified,installation):
         require(state['stage']=='admitted' and state['review_task']==previous_task)
         previous_request=state['request_id'];settings=json.loads((b.STATE/'native.json').read_bytes())
         task=native.task_record(settings,previous_task,context['reviewer'])
-        require(task.get('id')==previous_task and task.get('agent_id')==context['reviewer'] and task.get('status')=='completed'
+        require(task.get('id')==previous_task and task.get('agent_id')==context['reviewer']
+            and task.get('status')==('completed' if transport is None else 'failed')
             and task.get('issue_id')==context['packet']['issue_id'] and task.get('wakeup_id')==state['wakeup_id']
             and task.get('handoff_note')==review.note(b,context,state)
             and task.get('workspace_id')==settings['workspace_id'] and task.get('runtime_id')==settings['runtime_id'])
@@ -154,10 +170,15 @@ def register(b,source,previous_task,operation,*,qualified,installation):
         require(len(runs)==1 and runs[0].get('id')==previous_task and not maintenance.native_active(b))
         old=attestation.load(b,source)
         require(old and old['stage']=='technical_blocked' and old['request_id']==previous_request and old['tests_approved'] is False
-            and old.get('incident',{}).get('category') in ('native_terminal_verdict','complete_snapshot_reads'))
+            and old.get('incident',{}).get('category') in
+                (('native_terminal_verdict','complete_snapshot_reads') if transport is None else ('native_identity',)))
         admission,registered,assignment=attestation.launch.context_for(b,previous_request)
         require(registered==context and assignment==state)
-        output=(task.get('result') or {}).get('output');require(isinstance(output,str))
+        output=(task.get('result') or {}).get('output')
+        if transport is None:require(isinstance(output,str))
+        else:
+            require(previous_request==capacity_request)
+            failure_sha=capacity.failure_sha256(task)
         with b.db() as con:
             capture=json.loads(con.execute('SELECT context FROM quality_red_captures WHERE task_id=?',(source,)).fetchone()[0])
             messages=read_stream_receipts.load(con,previous_task)
@@ -165,15 +186,27 @@ def register(b,source,previous_task,operation,*,qualified,installation):
             proofs=[json.loads(raw) for sha,raw in con.execute('SELECT receipt_sha256,receipt FROM worker_policy_observations WHERE request_id=?',(previous_request,))
                 if hashlib.sha256(raw.encode()).hexdigest()==sha]
             retirement=con.execute('SELECT container_id,name,state FROM worker_retirement_intents WHERE request_id=?',(previous_request,)).fetchone()
-        diagnostic=attestation.completion_diagnostic(output,context['packet'],capture['copy']['prepared']['file_inventory'],context['read_paths'],messages)
-        require(diagnostic['verdict_format']=='invalid' or diagnostic['reads']['rejected_files'])
+            if transport is not None:
+                events=con.execute('SELECT method,success FROM acp_events WHERE request_id=?',(previous_request,)).fetchall()
+                require(all(any(r[0]==method and r[1]==success for r in events)
+                    for method,success in (('initialize',1),('session/new',1),('session/prompt',0))))
+        if transport is None:
+            diagnostic=attestation.completion_diagnostic(output,context['packet'],capture['copy']['prepared']['file_inventory'],context['read_paths'],messages)
+            require(diagnostic['verdict_format']=='invalid' or diagnostic['reads']['rejected_files'])
+        else:
+            diagnostic=dict(operation='review_transport_failure_diagnostic_v1',verdict_format='absent_due_to_transport',
+                manifest_sha256=context['packet']['manifest_sha256'],
+                reads=attestation.reads.assessment(capture['copy']['prepared']['file_inventory'],
+                    context['packet']['manifest_sha256'],context['read_paths'],messages),
+                native_failure_sha256=failure_sha,execution_authorized=False,tests_approved=False,delivery_approval=False)
         payload_sha=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
         proofs=[p for p in proofs if p.get('request_id')==previous_request and p.get('payload_sha256')==payload_sha
             and p.get('worker_image')==payload['Image'] and p.get('normalized_differences')==[] and p.get('docker_status')=='running']
         require(proofs and len({p['container_id'] for p in proofs})==1 and retirement is not None)
         cid=proofs[-1]['container_id']
         require(tuple(retirement)==(cid,b.PREFIX+'-job-'+previous_request,'gone')
-            and payload['Image']!=qualified['worker_image']
+            and ((payload['Image']!=qualified['worker_image']) if transport is None else
+                (payload['Image']==qualified['worker_image']))
             and b.docker('GET','/containers/'+cid+'/json') is None
             and b.docker('GET','/containers/'+b.PREFIX+'-job-'+previous_request+'/json') is None)
         with b.LOCK,b.db() as con:
@@ -197,11 +230,13 @@ def register(b,source,previous_task,operation,*,qualified,installation):
                 issue_id=context['packet']['issue_id'],previous_task=previous_task,previous_request=previous_request,
                 previous_identity={k:task.get(k) for k in FIELDS},previous_assignment=state,previous_attestation=old,
                 previous_admission_sha256=quality.digest(admission),previous_team=json.loads(team[0]),
-                native_output_sha256=hashlib.sha256(output.encode()).hexdigest(),diagnostic=diagnostic,
+                diagnostic=diagnostic,
                 retirement=dict(container_id=cid,state='gone',proof_sha256=quality.digest(proofs[-1]),source='controller_retirement_intent'),
                 manifest_sha256=context['packet']['manifest_sha256'],context_sha256=quality.digest(context),
                 condition_sha256=condition,ordinal=len(previous)+1,new_marker=new_marker,request=request,
                 incident_closed=False,model_calls=0,tests_approved=False,delivery_approval=False)
+            if transport is None:receipt['native_output_sha256']=hashlib.sha256(output.encode()).hexdigest()
+            else:receipt['native_failure_sha256']=failure_sha
             con.execute('INSERT INTO quality_review_completion_recoveries VALUES(?,?,?,?,?)',
                 (source,previous_request,new_marker,json.dumps(receipt,sort_keys=True),quality.digest(receipt)))
             after={**state,'stage':'prepared','completion_marker':new_marker}
@@ -225,5 +260,11 @@ def activation_ready(b,issue,operation):
     require(len(matching)==1);record=matching[0];context,state=review.load(b,record['source_task'])
     require(state['stage']=='prepared' and record['request']['maintenance_operation']==operation)
     marker(b,context,state);qualification(b,record['request']['qualification'],operation)
+    if 'transport' in record['request']:
+        try:from . import quality_review_capacity_recovery as capacity
+        except ImportError:import quality_review_capacity_recovery as capacity
+        condition=quality.digest(dict(worker=qualification(b,record['request']['qualification'],operation),
+            transport=capacity.validate(b,record['request']['transport'],operation,record['previous_request'])))
+        require(condition==record['condition_sha256'])
     require(attestation.load(b,record['source_task'],request_id=record['previous_request'])==record['previous_attestation'])
     return True

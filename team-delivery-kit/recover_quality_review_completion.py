@@ -26,7 +26,7 @@ if sys.argv[1]=="observe":
  assert len(values)<=1
  value=values[0] if values else None
  if value:assert value["request"]==p
-else:value=recovery.register(b,p["source_task"],p["previous_task"],p["maintenance_operation"],qualified=p["qualification"],installation=p["installation"])
+else:value=recovery.register(b,p["source_task"],p["previous_task"],p["maintenance_operation"],qualified=p["qualification"],installation=p["installation"],transport=p.get("transport"))
 keys=("operation","source_task","previous_task","previous_request","new_marker","manifest_sha256","condition_sha256","ordinal","incident_closed","tests_approved","delivery_approval","model_calls")
 print(json.dumps(dict(stage="not_observed" if value is None else "completion_recovery_registered",receipt={k:value[k] for k in keys} if value else None,delivery_approval=False),sort_keys=True))
 '''
@@ -55,7 +55,7 @@ def qualification(namespace,identity,operation):
     return value
 
 
-def run(namespace,image,source,previous,operation,install_operation,qualification_id,*,observe=False):
+def run(namespace,image,source,previous,operation,install_operation,qualification_id,*,observe=False,proxy_install_operation=None):
     # Reuse strict fixed-target syntax; this is not the zero-ACP recovery guard.
     arguments(namespace,image,source,previous,'0'*64,operation)
     canonical(install_operation)
@@ -77,6 +77,25 @@ def run(namespace,image,source,previous,operation,install_operation,qualificatio
         held,_=require_idle(namespace);require(held['operation_id']==operation and authority.identity==installation['current_container'])
     payload=dict(source_task=source,previous_task=previous,maintenance_operation=operation,
         qualification=qualified,installation=installation)
+    if proxy_install_operation is not None:
+        canonical(proxy_install_operation)
+        program='''import sys,json
+sys.path.insert(0,"/")
+import broker as b,quality_test_review as review,quality_review_completion_recovery as recovery
+source,previous=sys.argv[1:]
+_,state=review.load(b,source)
+if state.get("review_task")==previous:request=state["request_id"]
+else:
+ records=[r for r in recovery.records(b,source) if r["previous_task"]==previous]
+ assert len(records)==1
+ request=records[0]["previous_request"]
+print(json.dumps(dict(request_id=request)))'''
+        found=subprocess.run(['docker','exec',authority.identity,'python','-c',program,source,previous],
+            capture_output=True,text=True,timeout=20)
+        require(found.returncode==0 and len(found.stdout)<=4096 and authority.inspect_controller()==authority.identity)
+        request=json.loads(found.stdout)['request_id'];canonical(request)
+        from review_capacity_evidence import load
+        payload['transport']=load(namespace,proxy_install_operation,operation,request)
     raw=json.dumps(payload);require(len(raw.encode())<=65536)
     try:
         result=subprocess.run(['docker','exec','-i','-w','/',authority.identity,'python','-c',PROGRAM,
@@ -97,6 +116,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for key in ('namespace','image','source','previous-task','operation','install-operation','qualification'):
         parser.add_argument('--'+key,required=True)
+    parser.add_argument('--proxy-install-operation',help='Exact qualified proxy upgrade for a failed capacity-bound review')
     parser.add_argument('--observe',action='store_true');args=parser.parse_args()
     print(json.dumps(run(args.namespace,args.image,args.source,args.previous_task,args.operation,
-        args.install_operation,args.qualification,observe=args.observe),sort_keys=True))
+        args.install_operation,args.qualification,observe=args.observe,proxy_install_operation=args.proxy_install_operation),sort_keys=True))

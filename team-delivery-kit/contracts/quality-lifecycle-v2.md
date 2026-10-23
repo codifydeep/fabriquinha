@@ -881,6 +881,33 @@ select the old image. Auxiliary broker probe images remain pinned unchanged.
 The failed reviewer still needs a separately qualified transport recovery: this
 installation creates no task/grant and inherits no favorable verdict or reads.
 
+#### Capacity-failed native review successor — source candidate
+
+The same append-only completion lineage has a separate, operator-only transport
+path. It accepts a failed native prompt only with its original admission, exact
+identity/error digest, unsuccessful ACP prompt receipt, closed single-use lease,
+policy-bound worker retirement and unchanged snapshot. A generic provider error,
+agent claim or arbitrary HTTP 400 is insufficient: the host reader must match
+one exact request-size rejection in the archived old proxy logs, authenticate
+the old 512 KiB source constant and counter, and verify the completed qualified
+2 MiB installation. The controller rechecks the stopped proxy incarnation,
+source hash, finite capacity profile, mounts and unchanged call ceiling.
+
+This exception permits the same qualified reviewer image because the changed
+condition is transport capacity, not worker code. It cannot be used without that
+specific transport proof. The fingerprint excludes installation/qualification
+UUIDs and tags; changing an identifier cannot renew a retry. Earlier completed
+and failed records remain immutable. The new review must reacquire its own read
+evidence; no successful verdict, old partial read or freeze is inherited.
+
+The host registers only a new marker after a backed-up controller installation;
+the coordinator still owns dispatch after activation and maintenance release.
+The incident remains open. Source tests cover rejection of unrelated executions,
+changed counters/source/logs, ambiguous rejections, later success, stale errors,
+same-condition repeats and premature approval. A synthetic successor froze tests
+only after fresh complete reads and an independent valid verdict, then bound
+implementation to that exact freeze. Native qualification remains pending.
+
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after
 complete, byte-bound reads of every new test and every cited file; omissions in
