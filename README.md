@@ -18,8 +18,8 @@ negativos obrigatórios antes do merge. A política, o executor offline e o cada
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
-em modo exclusivo que mantém os fluxos legados inativos. Após os bloqueios do
-ensaio, a referência está em manutenção selada e com proxy parado.
+em modo exclusivo que mantém os fluxos legados inativos. A referência retomou
+a qualificação controlada após manutenção selada, sem apagar os bloqueios antigos.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
@@ -27,7 +27,7 @@ após backup compactado e prova real de restauração. Isso não habilita nem
 qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalação.
 O ensaio comprovou autoria nativa e Red real: 381 testes Python executados,
 com falhas de asserção somente no teste novo, e 36 testes Node aprovados,
-sem erros ou skips. A revisão independente ainda não foi concluída.
+sem erros ou skips. Ainda não há congelamento de testes aprovado pelo revisor real.
 Tentativas anteriores detectaram um vínculo de
 imagem inválido e, no sucessor, um teste vazio após leituras/escrita negadas.
 O preflight de imagem já foi corrigido e verificado no runtime; o prompt de
@@ -47,12 +47,12 @@ Não recupera uma revisão já admitida nem aprova testes. Falhas nativas anteri
 A revisão real seguinte foi admitida, leu a entrega e pediu mudanças por uma
 asserção tautológica no teste novo. Não foi aprovada: a atestação bloqueou por
 leituras incompletas. Essa execução e seu bloqueio permanecem preservados.
-A correção posterior em fonte distingue rejeição de aprovação: uma rejeição
+A correção instalada distingue rejeição de aprovação: uma rejeição
 concreta exige leitura integral de todos os testes novos e arquivos citados;
 aprovação continua exigindo o snapshot inteiro. A citação de um helper Python
 deve corresponder à função, linha e bytes realmente lidos. Essa correção ainda
 não converte o veredito bloqueado em aprovação. O adaptador de devolução ao autor
-está implementado em fonte, ainda em qualificação: mantém o mesmo card, autor,
+está instalado, ainda em qualificação nativa: mantém o mesmo card, autor,
 brief e plano; registra uma solicitação de correção separada e cria uma execução
 tests-only com seed verificado do snapshot rejeitado. Não apaga o bloqueio antigo,
 não permite mudar testes de baseline nem editar produto. Outra revisão e outro
@@ -62,8 +62,10 @@ idêntica; históricos nativos só são filtrados por vínculos autenticados exa
 O canário físico autor → Red → revisão somente leitura → correção tests-only
 passou em Docker/ACP, com rejeição nativa sintética, sem prompts/modelo ou
 aprovação. Verificou o seed e as permissões reais; nove auxiliares foram retirados.
-O retorno com agentes reais ainda precisa ser qualificado. A referência permanece
-selada e com proxy parado até instalar o conjunto validado.
+O retorno com agentes reais ainda precisa ser qualificado. O conjunto foi instalado
+após backup/restauração conferidos. O primeiro retorno foi encaminhado pelo próprio
+coordenador, sem criar outro card ou atribuir manualmente uma tarefa ao autor.
+Isso não comprova correção, novo Red, aprovação, Green ou homologação.
 Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
 primeiro tick interrompido somente com fila vazia, serviço descarregado e
 desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado
@@ -119,7 +121,7 @@ ACP reais com autoridade nativa sintética, sem chamada ao modelo. A reconcilia�
 persistente término do autor → snapshot → Red → pacote para revisão está ligada
 ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
 bloqueio de falhas repetidas. A ativação fica restrita à qualificação nativa;
-nenhuma execução é autorizada durante a manutenção atual.
+manutenções seladas continuam impedindo novas execuções.
 A atribuição, o encaminhamento nativo único e a admissão da revisão independente
 estão implementados em fonte, em modo separado e restrito ao ensaio: leitura paginada
 do snapshot, sem permissões de implementação. O lançamento do revisor está ligado
@@ -522,14 +524,14 @@ flowchart TB
     W --> P[Proxy de modelo: identidade e teto de chamadas]
     P --> M[Provedor LLM configurado]
     B --> E[Snapshots imutáveis e validação controlada]
-    B -->|Modo exclusivo instalado; fases em manutenção| V2[Coordenador v2: fila e handoffs duráveis]
+    B -->|Modo exclusivo instalado; qualificação controlada| V2[Coordenador v2: fila e handoffs duráveis]
     V2 -.->|Revisão e autor Green: ativação controlada, ainda não qualificados| MC
-    V2 -.->|Solicitação de mudanças: retorno tests-only em qualificação| TR[Autor original: novo workspace e snapshot]
+    V2 -.->|Retorno tests-only instalado; qualificação nativa em andamento| TR[Autor original: novo workspace e snapshot]
     TR -.->|Novo Red e nova revisão obrigatórios; sem aprovação herdada| E
     V2 -.->|Captura, Green e controle negativo: provas nativas pendentes| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2
-    GD[Serviço host periódico: tickets persistentes, até 2 cards] -->|Ativo em manutenção; sem candidato nativo| GX
+    GD[Serviço host periódico: tickets persistentes, até 2 cards] -->|Aguarda candidatos Green| GX
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]
