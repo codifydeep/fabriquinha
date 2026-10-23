@@ -32,7 +32,8 @@ def enabled(b):
 
 
 def context_for(b, request):
-    enabled(b)
+    # Pure evidence inspection also runs under a sealed, execution-disabled
+    # installation. Every effect entrypoint retains its enabled() check.
     with b.db() as con:
         c = review.admission(con, request)
         require(c is not None and c['namespace'] == b.PREFIX)
@@ -52,6 +53,7 @@ def context_for(b, request):
 
 
 def current(b, request):
+    enabled(b)
     c, context, state = context_for(b, request)
     settings = json.loads((b.STATE/'native.json').read_text())
     with b.db() as con:
@@ -73,10 +75,16 @@ def current(b, request):
 
 def prepare_worker(b, request):
     # Unlike implementation there is nothing to seed or make writable.
-    context_for(b, request)
+    enabled(b);context_for(b, request)
 
 
 def payload(b, request):
+    enabled(b)
+    return evidence_payload(b,request)
+
+
+def evidence_payload(b, request):
+    """Read-only expected worker policy, never a Docker execution operation."""
     c, context, _ = context_for(b, request)
     with b.db() as con:
         row = con.execute('SELECT identity,state,identity_sha256,state_sha256 FROM quality_snapshot_intents '

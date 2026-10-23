@@ -13,6 +13,14 @@ from test_quality_author_launch import UnknownDocker
 
 
 class QualityReviewLaunchTests(unittest.TestCase):
+    def test_disabled_execution_allows_only_pure_context_and_policy_inspection(self):
+        self.b.QUALITY_V2_ENABLED=False;self.b.QUALITY_REVIEW_ENABLED=False
+        self.assertEqual(launch.context_for(self.b,self.request)[0]['request_id'],self.request)
+        expected=launch.evidence_payload(self.b,self.request)
+        self.assertEqual(expected['HostConfig']['Mounts'][0]['ReadOnly'],True)
+        for operation in (launch.payload,launch.current,launch.prepare_worker):
+            with self.assertRaises(ValueError):operation(self.b,self.request)
+
     def setUp(self):
         f = getattr(self,'review_fixture_factory',fixtures.QualityTestReviewTests)()
         f.setUp()

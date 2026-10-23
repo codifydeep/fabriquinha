@@ -135,6 +135,7 @@ class TestRevisionTests(unittest.TestCase):
 
     def test_operator_maintenance_allows_preparation_only_with_exact_sealed_operation(self):
         self.f.call();operation='80000000-0000-4000-8000-000000000003'
+        self.b.QUALITY_V2_ENABLED=False;self.b.QUALITY_REVIEW_ENABLED=False
         with self.b.db() as con:
             state=dict(stage='sealed',drained=True,operation_id=operation)
             con.execute('INSERT INTO controller_maintenance VALUES(?,?,?)',(operation,'sealed',json.dumps(state)))

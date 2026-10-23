@@ -163,7 +163,7 @@ def collect(b,c,context,assignment,phase):
         require(lease[0]=='closed' and lease[1]==b.PREFIX+'-job-'+c['request_id'])
         grant=con.execute('SELECT used FROM grants WHERE request_id=?',(c['request_id'],)).fetchone()
         require(grant is not None and type(grant[0]) is int and grant[0]==1)
-    expected=launch.payload(b,c['request_id'])
+    expected=launch.evidence_payload(b,c['request_id'])
     with b.db() as con:
         creation=con.execute('SELECT payload FROM worker_creation_intents WHERE request_id=?',(c['request_id'],)).fetchone()
         require(creation is not None and json.loads(creation[0])==expected)
