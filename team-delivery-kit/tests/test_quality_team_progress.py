@@ -160,7 +160,7 @@ class TeamProgressTests(unittest.TestCase):
             if len(calls)==10:raise StopWatchdog()
         barrier=SimpleNamespace(begin_cycle=Mock(return_value=True),end_cycle=Mock())
         namespace=dict(tick=Mock(),handoff_context=lambda:self.b,controller_maintenance=barrier,
-            QUALITY_TEAM_ENABLED=True,QUALITY_V2_ENABLED=True,time=SimpleNamespace(sleep=sleep),json=json,
+            QUALITY_EXCLUSIVE_ENABLED=False,QUALITY_TEAM_ENABLED=True,QUALITY_V2_ENABLED=True,time=SimpleNamespace(sleep=sleep),json=json,
             reconcile_review_outcomes=Mock(),reconcile_review_retries=Mock(),reconcile_change_requests=Mock(),
             handoff_runtime=SimpleNamespace(tick=Mock()))
         imports={n.name:Mock() for node in ast.walk(watchdog) if isinstance(node,ast.Import) for n in node.names}

@@ -181,6 +181,17 @@ O status lê apenas registros locais, sem consultar Docker ou iniciar trabalho:
   --pin <sha256-da-configuracao> --status
 ```
 
+Para um cadastro v2 novo, `prepare_quality_enrollment.py` gera contrato/plano a
+partir da árvore Git inteira da main verificada e de uma seleção privada fixada
+por hash. `enroll_quality_lifecycle.py` confere controlador e manutenção e faz
+somente o cadastro imutável; `--observe` lê o mesmo pedido após perda de resposta.
+O primeiro card nativo de qualificação já está cadastrado, mas não foi atribuído
+nem executado. Os artefatos operacionais permanecem fora do Git público.
+O novo modo de isolamento `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` está implementado
+e testado em fonte: exclui coordenadores legados e rejeita grants antigos ou
+issues não cadastradas. Ainda precisa ser instalado antes de sair da manutenção;
+as quatro flags de execução continuam desligadas na referência atual.
+
 O gerador `--register --persist-login` cria somente o registro próprio do
 usuário; o bootstrap do launchd é uma operação separada. No macOS, os logs usam
 `~/Library/Logs/DeliveryKit/<instancia>`, com arquivos privados, em vez de exigir

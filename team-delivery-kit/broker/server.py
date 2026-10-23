@@ -47,6 +47,9 @@ TOKEN = ''
 SESSIONS = {}
 # BEGIN QUALITY_V2 launch_config
 QUALITY_V2_ENABLED = os.environ.get('BROKER_QUALITY_V2_ENABLED', '0') == '1'
+# BEGIN QUALITY_V2_EXCLUSIVE config
+QUALITY_EXCLUSIVE_ENABLED = os.environ.get('BROKER_QUALITY_EXCLUSIVE_ENABLED', '0') == '1'
+# END QUALITY_V2_EXCLUSIVE config
 QUALITY_PREP_IMAGE = os.environ.get('BROKER_QUALITY_PREP_IMAGE')
 QUALITY_WORKER_IMAGE = os.environ.get('BROKER_QUALITY_WORKER_IMAGE')
 QUALITY_COPY_IMAGE = os.environ.get('BROKER_QUALITY_COPY_IMAGE')
@@ -725,6 +728,10 @@ def submit(payload, trusted_acp=False):
 
 
 def issue_grant(payload):
+    # BEGIN QUALITY_V2_EXCLUSIVE legacy_grant
+    if QUALITY_EXCLUSIVE_ENABLED:
+        raise ValueError('legacy grants disabled in exclusive quality-v2 mode')
+    # END QUALITY_V2_EXCLUSIVE legacy_grant
     if not isinstance(payload, dict) or set(payload) != {'task_id', 'attempt', 'mode'}:
         raise ValueError('invalid grant fields')
     if str(uuid.UUID(payload['task_id'])) != payload['task_id']:
@@ -758,6 +765,12 @@ def native_grant(payload):
     binding = task_binding(settings, **payload)
     if not binding['issue_id']:
         raise ValueError('native task missing issue identity')
+    # BEGIN QUALITY_V2_EXCLUSIVE native_admission
+    if QUALITY_EXCLUSIVE_ENABLED:
+        try:import quality_execution_isolation
+        except ImportError:from broker import quality_execution_isolation
+        quality_execution_isolation.require_enrolled(handoff_context(),binding['issue_id'])
+    # END QUALITY_V2_EXCLUSIVE native_admission
     # BEGIN QUALITY_V2_REVIEW native_admission
     if QUALITY_V2_ENABLED and QUALITY_REVIEW_ENABLED and binding['mode']=='review':
         try:import quality_launch_router as v2_review
@@ -1701,6 +1714,10 @@ def execute_grant(token, payload, streaming=False, defer_transport=False):
     if v2_row and v2_launch.owns(handoff_context(),v2_row[0]):
         return v2_launch.execute(handoff_context(),token,payload,streaming,defer_transport)
     # END QUALITY_V2 execute_dispatch
+    # BEGIN QUALITY_V2_EXCLUSIVE execute_dispatch
+    if QUALITY_EXCLUSIVE_ENABLED:
+        raise ValueError('legacy capabilities disabled in exclusive quality-v2 mode')
+    # END QUALITY_V2_EXCLUSIVE execute_dispatch
     if payload != {}:
         raise ValueError('execution parameters are controller-owned')
     with LOCK, db() as con:
@@ -2739,7 +2756,12 @@ def main():
                 cycle += 1
                 if cycle % 10 == 0:
                     context = handoff_context()
-                    if controller_maintenance.begin_cycle(context):
+                    # BEGIN QUALITY_V2_EXCLUSIVE coordination
+                    if QUALITY_EXCLUSIVE_ENABLED:
+                        import quality_execution_isolation
+                        quality_execution_isolation.tick(context)
+                    # END QUALITY_V2_EXCLUSIVE coordination
+                    elif controller_maintenance.begin_cycle(context):
                         try:
                             # BEGIN QUALITY_V2_TEAM coordination
                             if QUALITY_TEAM_ENABLED:

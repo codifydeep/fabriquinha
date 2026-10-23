@@ -266,10 +266,33 @@ class QualityEnrollmentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'legacy grants forbidden'):handoff_runtime.register(self.b,route)
         with self.b.db() as con:self.assertEqual(con.execute('SELECT count(*) FROM delivery_routes').fetchone()[0],0)
 
+    def test_exclusive_execute_rejects_old_capability_before_legacy_use(self):
+        import hashlib,time
+        server=self.server();server.QUALITY_EXCLUSIVE_ENABLED=True
+        with self.b.db() as con:
+            con.execute('DROP TABLE grants')
+            con.execute('CREATE TABLE grants(digest TEXT,task_id TEXT,attempt INTEGER,mode TEXT,request_id TEXT,deadline REAL,used INTEGER)')
+            con.execute('INSERT INTO grants VALUES(?,?,?,?,?,?,?)',
+                (hashlib.sha256(b'old-capability').hexdigest(),self.run,1,'implementation','req',time.time()+100,0))
+        with patch.object(server,'submit') as submit:
+            with self.assertRaisesRegex(ValueError,'legacy capabilities disabled'):
+                server.execute_grant('old-capability',{})
+            submit.assert_not_called()
+        with self.b.db() as con:self.assertEqual(con.execute('SELECT used FROM grants').fetchone()[0],0)
+
     def test_legacy_source_pins_admit_only_exact_additive_fences_without_other_changes(self):
         import hashlib,re
         from broker import literal_author_bootstrap_recovery as author,review_context_recovery as review
         source=(Path(__file__).resolve().parents[1]/'broker/server.py').read_bytes()
+        self.assertEqual(hashlib.sha256(source).hexdigest(),author.V2_EXCLUSIVE_ROOT_SHA)
+        self.assertEqual(author.V2_EXCLUSIVE_ROOT_SHA,review.V2_EXCLUSIVE_SERVER_SHA)
+        exclusive_hooks=rb'(?ms)^([ ]*)# BEGIN QUALITY_V2_EXCLUSIVE ([a-z_]+)\n.*?^\1# END QUALITY_V2_EXCLUSIVE \2\n'
+        self.assertEqual([kind.decode() for _,kind in re.findall(exclusive_hooks,source)],
+            ['config','legacy_grant','native_admission','execute_dispatch','coordination'])
+        source=re.sub(exclusive_hooks,b'',source)
+        exclusive_branch=b'                    elif controller_maintenance.begin_cycle(context):'
+        self.assertEqual(source.count(exclusive_branch),1)
+        source=source.replace(exclusive_branch,b'                    if controller_maintenance.begin_cycle(context):')
         self.assertEqual(hashlib.sha256(source).hexdigest(),author.V2_TEAM_COORDINATION_ROOT_SHA)
         self.assertEqual(author.V2_TEAM_COORDINATION_ROOT_SHA,review.V2_TEAM_COORDINATION_SERVER_SHA)
         team_hooks=rb'(?ms)^([ ]*)# BEGIN QUALITY_V2_TEAM ([a-z_]+)\n.*?^\1# END QUALITY_V2_TEAM \2\n'

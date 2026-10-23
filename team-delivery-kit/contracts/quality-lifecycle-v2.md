@@ -5,8 +5,9 @@ operator enrollment, legacy admission fences, standalone full-suite Red observer
 and durable controller Red ingestion/snapshot producer implemented in source.
 The observer and dedicated snapshot copier also passed synthetic Docker
 isolation/integrity checks. The v2 controller source is installed in preview
-with all four execution flags off and maintenance sealed. No v2 chain has been
-enrolled, enabled or qualified natively. Historical runs retain v1.
+with all four execution flags off and maintenance sealed. One fresh native
+qualification issue is enrolled immutably, but no v2 chain has been enabled or
+qualified natively. Historical runs retain v1.
 The source coordinator now also reaches durable local Git binding, full-suite
 Green and the first post-Green reversion control. These paths remain disabled in
 the installed controller. Reversion passed a synthetic Docker qualification;
@@ -16,10 +17,11 @@ unqualified.
 ## Mixed Python/Node baseline boundary
 
 The actual disposable repository runs both full Python and Node suites in CI.
-Its Python browser-VM regressions also require Node. The installed v2 runners
-currently support Python only, so native dispatch remains off rather than
-ignoring those pre-existing regressions. The optional pinned Python/Node base
-and standalone `quality_node_baseline.py` executor are not native gates yet.
+Its Python browser-VM regressions also require Node. The Python/Node runners and
+controller validators are now installed in disabled preview. Native dispatch
+remains off until the enrolled qualification is deliberately activated; no
+pre-existing regression is omitted. The standalone `quality_node_baseline.py`
+diagnostic alone still does not count as native gate evidence.
 Full discovery uses a fixed reporter, verifies test files/hashes, rejects
 partial inventories, skips/todos/failures and removes inherited Node options or
 credentials. Test stdout is hashed, not accepted as a protocol record.
@@ -41,11 +43,29 @@ A real read-only Linux Docker canary passed the source Red → Green → reversi
 functions (including fixed Green-job dispatch) with actual Node reexecution,
 source hashes and frozen inventory. Source, review and commit identities are
 synthetic: this is not an independent agent verdict or native qualification.
-The installed controller/runners have not been upgraded to these gates yet;
-their dispatcher pins must migrate without resetting any journals before a
-controlled installation and native qualification. Supported source mixed mode
+The installed controller/runners have been upgraded to these gates, including
+dispatcher pin migration without journal/counter resets. Supported mixed mode
 is primary Python unittest plus protected baseline Node tests, not arbitrary
 Node authoring frameworks. Native dispatch remains off until qualified.
+
+## Operator enrollment and execution isolation
+
+`prepare_quality_enrollment.py` builds the portable contract and v2 plan from
+every tracked regular blob of verified GitHub main with green CI. It freezes
+all existing Python and recognized Node tests; new tests are authored only by
+the assigned agent. The operator selection binds issue/run, roles, criteria,
+allowed product paths and expected test-method witnesses, not implementation.
+`enroll_quality_lifecycle.py` checks the private payload hash, pinned controller
+incarnation and exact sealed maintenance identity before the fixed enrollment
+operation. `--observe` only reads back that same immutable request; a timeout is
+not successful enrollment or permission for a replacement issue.
+
+The new source isolation mode `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` prevents
+legacy grants, rejects unenrolled native issues and chooses only the v2
+coordinators. All four v2 phase flags are separately required. Legacy journals
+remain preserved, not completed or reset. The isolation mode is tested in source
+but has not yet been installed or activated in the reference runtime. Leaving
+maintenance in a mixed legacy/v2 coordinator mode is not the qualification path.
 
 ## Required order
 

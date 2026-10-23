@@ -33,6 +33,7 @@ V2_PROGRESS_ROOT_SHA='57f50daabc0e767af8f772b3ffd488b9976c4b0a158a6d5be6c1364579
 V2_REVIEW_LAUNCH_ROOT_SHA='c4444b9c8c11ad6df8b877602110cc393f0ebbff00fdd4318fa7ddc511f9df98'
 V2_GREEN_LAUNCH_ROOT_SHA='bc1fd7da145fca0c9d4527db07e7092ce4f8ca378dc8465b387ff2efbd192ef1'
 V2_TEAM_COORDINATION_ROOT_SHA='b08b1eeadfb1bd830f222953ca073816c0e75cd8cda6ed9d89d2e24e55f72b98'
+V2_EXCLUSIVE_ROOT_SHA='b5f61a64b8087b445d2f909b6496da5f6cf983cd581e10289151847675925aee'
 CONTEXT_SHA='7b182c770b2d0db0880571d4c254d1a158e852752801b69dca494db9c35f16ec'
 
 
@@ -68,7 +69,7 @@ def probe(b,cfg,s,task,old_route,new_route,trial,paths,issue):
     """
     from execution_context import __file__ as context_file
     root_sha=hashlib.sha256(Path(b.__file__).read_bytes()).hexdigest()
-    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA,AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA,AUTHOR_FEEDBACK_STRATEGY_ROOT_SHA,V2_ENROLLMENT_FENCE_ROOT_SHA,V2_AUTHOR_LAUNCH_ROOT_SHA,V2_PROGRESS_ROOT_SHA,V2_REVIEW_LAUNCH_ROOT_SHA,V2_GREEN_LAUNCH_ROOT_SHA,V2_TEAM_COORDINATION_ROOT_SHA)
+    require(root_sha in (ROOT_SHA,AUTHOR_FEEDBACK_ROOT_SHA,AUTHOR_FEEDBACK_ADMISSION_ROOT_SHA,AUTHOR_FEEDBACK_STRATEGY_ROOT_SHA,V2_ENROLLMENT_FENCE_ROOT_SHA,V2_AUTHOR_LAUNCH_ROOT_SHA,V2_PROGRESS_ROOT_SHA,V2_REVIEW_LAUNCH_ROOT_SHA,V2_GREEN_LAUNCH_ROOT_SHA,V2_TEAM_COORDINATION_ROOT_SHA,V2_EXCLUSIVE_ROOT_SHA)
         and hashlib.sha256(Path(context_file).read_bytes()).hexdigest()==CONTEXT_SHA)
     spec=importlib.util.spec_from_file_location('isolated_literal_author_prompt',b.__file__)
     isolated=importlib.util.module_from_spec(spec);spec.loader.exec_module(isolated)
