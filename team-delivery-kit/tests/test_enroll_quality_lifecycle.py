@@ -38,7 +38,10 @@ class EnrollmentCLITests(unittest.TestCase):
         self.authority=SimpleNamespace(identity='d'*64,about=lambda:dict(namespace=self.ns,maintenance=True,
             v2_enabled=self.enabled,implementation_enabled=False),
             inspect_controller=lambda:'e'*64 if self.replace else 'd'*64)
-        self.fx=SimpleNamespace(authority=lambda *a:self.authority,
+        self.runtime=dict(flags=[False]*4,exclusive=False,red_image='sha256:'+'f'*64,actual_image='sha256:'+'f'*64,
+            component='quality-red-observer',entrypoint=['python','/opt/quality/quality_red_observation.py'],
+            user='10000:10000',volumes=None,credential_environment=False)
+        self.fx=SimpleNamespace(authority=lambda *a:self.authority,runtime=lambda *a:self.runtime,
             idle=lambda *a:(dict(operation_id=self.maintenance),{}),invoke=self.invoke)
 
     def invoke(self,identity,payload,observe):
@@ -75,6 +78,21 @@ class EnrollmentCLITests(unittest.TestCase):
         self.enabled=True
         with self.assertRaises(ValueError):self.run_cli()
         self.assertEqual(self.calls,[])
+
+    def test_runner_base_cannot_be_enrolled_as_red_observer(self):
+        self.runtime['component']='quality-runner-base'
+        with self.assertRaises(ValueError):self.run_cli()
+        self.assertEqual(self.calls,[])
+
+    def test_wrong_image_or_mixed_legacy_mode_is_rejected_before_registration(self):
+        self.runtime['actual_image']='sha256:'+'0'*64
+        with self.assertRaises(ValueError):self.run_cli()
+        self.runtime['actual_image']=self.runtime['red_image'];self.runtime['flags']=[True]*4
+        self.authority.about=lambda:dict(namespace=self.ns,maintenance=True,v2_enabled=True,implementation_enabled=True)
+        with self.assertRaises(ValueError):self.run_cli()
+        self.runtime['exclusive']=True
+        self.assertEqual(self.run_cli()['stage'],'enrolled')
+        self.assertEqual(len(self.calls),1)
 
     def test_observation_does_not_require_or_enter_maintenance_after_activation(self):
         self.enabled=True

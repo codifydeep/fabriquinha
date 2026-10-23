@@ -34,6 +34,29 @@ else:
 print(json.dumps(dict(stage="not_observed" if result is None else "enrolled",receipt=result,delivery_approval=False),sort_keys=True))
 '''
 
+RUNTIME_PROGRAM='''import sys,json,re
+sys.path.insert(0,"/")
+import broker as b
+value=json.loads(sys.stdin.read(65537));image=b.docker("GET","/images/"+value["contract"]["test_image"]+"/json") or {}
+cfg=image.get("Config",{});flags=[b.QUALITY_V2_ENABLED,b.QUALITY_REVIEW_ENABLED,b.QUALITY_IMPLEMENTATION_ENABLED,b.QUALITY_TEAM_ENABLED]
+print(json.dumps(dict(flags=flags,exclusive=b.QUALITY_EXCLUSIVE_ENABLED,red_image=b.QUALITY_RED_IMAGE,
+ actual_image=image.get("Id"),component=cfg.get("Labels",{}).get("delivery-kit.component"),
+ entrypoint=cfg.get("Entrypoint"),user=cfg.get("User"),volumes=cfg.get("Volumes"),
+ credential_environment=any(re.search(r"token|secret|password|api.?key|credential|^aws_",str(v).split("=",1)[0],re.I) for v in cfg.get("Env",[]))),sort_keys=True))
+'''
+
+
+def validate_runtime(value,about):
+    require(isinstance(value,dict) and set(value)=={'flags','exclusive','red_image','actual_image','component',
+        'entrypoint','user','volumes','credential_environment'})
+    flags=value['flags'];require(isinstance(flags,list) and len(flags)==4 and all(type(f) is bool for f in flags)
+        and type(value['exclusive']) is bool and (not any(flags) or (all(flags) and value['exclusive'] is True))
+        and flags[0]==about['v2_enabled'] and flags[2]==about['implementation_enabled'])
+    require(isinstance(value['red_image'],str) and re.fullmatch('sha256:[a-f0-9]{64}',value['red_image'])
+        and value['actual_image']==value['red_image'] and value['component']=='quality-red-observer'
+        and value['entrypoint']==['python','/opt/quality/quality_red_observation.py']
+        and value['user']=='10000:10000' and not value['volumes'] and value['credential_environment'] is False)
+
 
 def load(path,pin):
     path=Path(path)
@@ -54,6 +77,11 @@ def load(path,pin):
 class Effects:
     def authority(self,namespace,image):return Authority(namespace,image)
     def idle(self,namespace):return require_idle(namespace)
+    def runtime(self,identity,payload):
+        result=subprocess.run(['docker','exec','-i','-w','/',identity,'python','-c',RUNTIME_PROGRAM],
+            input=json.dumps(payload),capture_output=True,text=True,timeout=30)
+        require(result.returncode==0 and len(result.stdout.encode())<=65536)
+        return json.loads(result.stdout)
     def invoke(self,identity,payload,observe):
         return subprocess.run(['docker','exec','-i','-w','/',identity,'python','-c',PROGRAM,
             'observe' if observe else 'enroll'],input=json.dumps(payload),capture_output=True,
@@ -69,9 +97,11 @@ def run(namespace,image,path,pin,*,observe=False,effects=None):
     fx=effects or Effects();authority=fx.authority(namespace,image);about=authority.about()
     require(about['namespace']==namespace)
     if not observe:
-        require(about['maintenance'] is True and about['v2_enabled'] is False and about['implementation_enabled'] is False)
+        require(about['maintenance'] is True)
         maintenance,_=fx.idle(namespace)
         require(maintenance['operation_id']==payload['maintenance_operation'])
+        validate_runtime(fx.runtime(authority.identity,payload),about)
+        require(authority.inspect_controller()==authority.identity)
     try:result=fx.invoke(authority.identity,payload,observe)
     except subprocess.TimeoutExpired:
         return dict(stage='observation_timeout',issue_id=plan['issue_id'],run_id=plan['run_id'],

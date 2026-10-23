@@ -59,6 +59,15 @@ allowed product paths and expected test-method witnesses, not implementation.
 incarnation and exact sealed maintenance identity before the fixed enrollment
 operation. `--observe` only reads back that same immutable request; a timeout is
 not successful enrollment or permission for a replacement issue.
+The enrollment preflight also resolves the contract's `test_image` inside the
+pinned controller and requires that exact configured `QUALITY_RED_IMAGE`, its
+observer entrypoint, unprivileged user and safe metadata. A bare Python/Node
+base is not the Red observer, even if it can execute the test suite. This check
+must happen before any native author run. New enrollments are allowed under
+sealed maintenance in either disabled mode or fully enabled exclusive mode;
+partially enabled or mixed legacy/v2 mode is rejected. Historical blocked
+enrollments remain immutable: correcting their contract requires a fresh run,
+not editing their receipt or replaying their author capability.
 
 The new source isolation mode `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` prevents
 legacy grants, rejects unenrolled native issues and chooses only the v2
