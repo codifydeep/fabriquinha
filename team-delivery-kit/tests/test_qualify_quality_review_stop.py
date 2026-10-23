@@ -7,12 +7,14 @@ import unittest
 from unittest.mock import patch
 import qualify_quality_review_stop as driver
 from qualify_quality_review_stop import validate_report
+from test_review_execution_evidence import evidence
 
 
 class QualityReviewStopQualificationTests(unittest.TestCase):
     def report(self):
         return dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',provider='fixed_loopback_not_model',
-            model_calls=0,fixed_provider_calls=3,feedback_rounds=1,same_agent=True,max_iterations=40,
+            model_calls=0,fixed_provider_calls=3,total_fixed_provider_calls=7,execution_controls=evidence(),
+            feedback_rounds=1,same_agent=True,max_iterations=40,
             acp=True,protected_files_unchanged=True,tests_approved=False,delivery_approval=False,
             guard_sources=dict(feedback='a'*64,phase='b'*64,verdict='c'*64,installer='d'*64))
 
@@ -31,6 +33,7 @@ class QualityReviewStopQualificationTests(unittest.TestCase):
             (root/'tests/quality_review_stop_canary.py').write_bytes(script)
             guards={}
             for key,name in driver.GUARDS.items():
+                (root/name).parent.mkdir(parents=True,exist_ok=True)
                 (root/name).write_bytes(key.encode());guards[key]=driver.sha(key.encode())
             report={**self.report(),'guard_sources':guards}
             identity=dict(namespace='delivery-kit-test',image='sha256:'+'e'*64,operation='a0000000-0000-4000-8000-000000000001',

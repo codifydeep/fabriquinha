@@ -38,6 +38,8 @@ flowchart TD
     S --> R[Revisor independente: leitura e decisão]
     R --> F[Feedback no mesmo turno: formato e leituras faltantes]
     F -->|Orçamento original de 40 iterações| R
+    F -.-> P[Candidata: fila pendente e gate por página no handler]
+    P -.-> R
     R --> E[Controlador confere bytes, identidade e parecer]
     E -->|Mudanças válidas| A
     E -->|Prova incompleta ou falha| B[Bloqueio técnico preservado]
@@ -49,14 +51,24 @@ flowchart TD
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
 v2, não uma dispensa de execução. O feedback no mesmo turno está instalado;
-o planejador e o diário de páginas já capturadas existem em fonte, mas ainda
-não estão instalados. O diário é limitado a 512 pares/8 MiB, vincula execução
+o planejador e o diário existem na candidata, mas ainda não estão instalados.
+O diário é limitado a 512 pares/8 MiB, vincula execução
 e manifesto, não descarta evidências para caber no limite e sugere até 16
 páginas com um offset comum. IDs diferentes não transformam os mesmos bytes
 em progresso. Divergências de conteúdo bloqueiam, não reiniciam a inspeção.
 
-Captura anterior a toda compactação, enforcement nos handlers e saída
-estruturada no limite do loop ainda precisam de implementação e qualificação.
+Os hooks capturam antes da preparação da próxima chamada e depois das
+ferramentas, antes de sua compactação. A projeção do schema restringe caminho,
+offset e limite sem remover restrições anteriores. O despacho apenas verifica;
+o handler consome atomicamente a página, inclusive em chamadas diretas/paralelas.
+Essa distinção foi necessária: consumir no despacho e no handler bloqueava
+leituras legítimas no registry real. O canário falho permanece preservado.
+
+O canário ampliado passou no Hermes real com sete respostas locais, incluindo
+ACP normal, negação de duplicatas, duas rodadas sem progresso e saída no fim
+do orçamento. O controle desta última fronteira usa uma iteração sintética;
+a fábrica ACP permanece fixada em 40. Escala e compactação forçada ainda
+precisam de qualificação física; não houve instalação ou aprovação nativa.
 No runtime atual, o revisor pode consumir o orçamento com chamadas sem progresso;
 a atestação bloqueia aprovação incompleta, mas não resolve sozinha esse impasse.
 A projeção da interface e o diário consultivo do worker não substituem os recibos

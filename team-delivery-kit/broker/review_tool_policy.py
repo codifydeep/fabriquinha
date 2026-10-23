@@ -34,12 +34,12 @@ def observe_surgical_read(name,args,result):
     except (ValueError,TypeError,KeyError):return
 
 
-def controlled(name, args):
+def controlled(name, args, *, handler_entry=False):
     """None delegates to the original handler; all other results are terminal."""
     if 'DELIVERY_QUALITY_PHASE_JSON' in os.environ:
         try:
             import quality_phase_tools
-            return quality_phase_tools.controlled(name,args,os.environ)
+            return quality_phase_tools.controlled(name,args,os.environ,handler_entry=handler_entry)
         except Exception:
             return json.dumps(dict(error='quality_phase_policy_unavailable',delivery_approval=False))
     mode = os.environ.get('DELIVERY_EXECUTION_MODE')
@@ -193,7 +193,7 @@ def fence(name, handler, is_async=False):
         handler=feedback.wrap(name,handler,is_async)
     if is_async:
         async def guarded(args, **kwargs):
-            result = controlled(name, args)
+            result = controlled(name, args, handler_entry=True)
             if result is not None:return result
             result=await handler(args, **kwargs)
             observe_surgical_read(name,args,result)
@@ -202,7 +202,7 @@ def fence(name, handler, is_async=False):
             return result
     else:
         def guarded(args, **kwargs):
-            result = controlled(name, args)
+            result = controlled(name, args, handler_entry=True)
             if result is not None:return result
             result=handler(args, **kwargs)
             observe_surgical_read(name,args,result)

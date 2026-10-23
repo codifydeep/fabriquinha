@@ -8,6 +8,8 @@ import copy
 import hashlib
 import json
 import uuid
+import threading
+import weakref
 from artifact_read_evidence import coverage
 try:import quality_review_reads as reads
 except ImportError:from broker import quality_review_reads as reads
@@ -15,6 +17,8 @@ except ImportError:from broker import quality_review_reads as reads
 MAX_PAIRS=512
 MAX_BYTES=8*1024*1024
 MAX_BATCH=16
+_GATES=weakref.WeakValueDictionary()
+_GATE_LOCK=threading.RLock()
 
 
 def require(value):
@@ -23,6 +27,70 @@ def require(value):
 
 def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+
+
+class PageGate:
+    """An execution-local restriction, not a capability or an evidence receipt."""
+    def __init__(self,journal,plan):
+        self.request_id=journal.request_id
+        self.manifest_sha256=journal.manifest_sha256
+        self.pending={(p['path'],p['offset'],p['limit']) for p in plan['pages']}
+
+
+def arm(agent,journal,*,required_paths=None):
+    plan=journal.plan(required_paths=required_paths)
+    with _GATE_LOCK:
+        old=_GATES.get(journal.request_id)
+        require(old is None or old is getattr(agent,'_quality_review_page_gate',None))
+        gate=PageGate(journal,plan)
+        agent._quality_review_page_gate=gate
+        _GATES[journal.request_id]=gate
+    return plan
+
+
+def allowed(config,args,*,consume=False):
+    """Check a planned tuple; consume atomically only at actual handler entry.
+
+    Before continuation is armed, the registered read-only phase remains in
+    force. After arming, even direct/parallel handler calls cannot repeat a
+    consumed page or substitute an offset. Dispatch preflight never consumes a
+    page, because Hermes checks again in the fenced handler. No tool is run here.
+    """
+    with _GATE_LOCK:
+        gate=_GATES.get(config['request_id'])
+        if gate is None:return True
+        if gate.manifest_sha256!=config['review_context']['packet']['manifest_sha256']:return False
+        key=(args['path'],args['offset'],args['limit'])
+        if key not in gate.pending:return False
+        if consume:gate.pending.remove(key)
+        return True
+
+
+def revoke(agent):
+    with _GATE_LOCK:
+        gate=getattr(agent,'_quality_review_page_gate',None)
+        if gate is not None:gate.pending.clear()
+
+
+def project(parameters,plan):
+    """Narrow the existing schema, retaining its constraints and descriptions."""
+    require(isinstance(parameters,dict) and parameters.get('type')=='object' and plan['pages'])
+    result=copy.deepcopy(parameters)
+    original=result.get('properties',{})
+    require(isinstance(original,dict) and set(result.get('required',[]))<={'path','offset','limit'})
+    choices=dict(path=[p['path'] for p in plan['pages']],offset=[plan['pages'][0]['offset']],limit=[100])
+    properties={}
+    for key,values in choices.items():
+        prop=copy.deepcopy(original.get(key,{}));expected='string' if key=='path' else 'integer'
+        require(isinstance(prop,dict) and prop.get('type',expected)==expected
+            and ('enum' not in prop or set(values)<=set(prop['enum']))
+            and ('const' not in prop or set(values)=={prop['const']}))
+        if expected=='integer':
+            require(all(('minimum' not in prop or n>=prop['minimum'])
+                and ('maximum' not in prop or n<=prop['maximum']) for n in values))
+        properties[key]={**prop,'type':expected,'enum':values}
+    result.update(properties=properties,required=['path','offset','limit'],additionalProperties=False)
+    return result
 
 
 class Journal:

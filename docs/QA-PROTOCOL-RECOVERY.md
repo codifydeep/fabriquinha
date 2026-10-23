@@ -28,10 +28,16 @@ Pending hardening must retain actual read evidence across context compaction,
 plan only missing pages and report stalled progress or budget exhaustion
 structurally. Partial new coverage must count as progress; repeated calls,
 prose and cache responses without content must not. The bounded journal and
-pending-page planner now exist in source with initial pre-stop integration and
-offline tests. They are not installed. Capture before every compaction, handler
-enforcement and loop-exhaustion handling remain pending, as do physical/native
-qualification. Approval still requires independent, byte-bound
+pending-page planner, loop capture, handler enforcement and structured stops
+now exist in a candidate image. Dispatch checks without consuming; only the
+fenced handler claims the page atomically. The initial consuming check at both
+boundaries was rejected by the real registry canary and corrected without
+rewriting that failure. The expanded canary passed with seven fixed local
+responses: normal ACP continuation, direct duplicate denial, stalled tool
+rounds and the budget boundary. The latter uses a one-iteration fixture loop;
+the ACP factory remains fixed at 40. No external model was called. Large-scale
+paging, forced compaction, installation and native qualification remain pending.
+Approval still requires independent, byte-bound
 inspection of the required scope, exact verdict and native identities. No
 operator may manufacture missing reads or convert failure into approval.
 

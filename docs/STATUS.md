@@ -50,9 +50,9 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
 - A revisão nativa mais recente falhou após consumir 40 iterações. A inspeção
   integral foi comprovada para 57 dos 71 arquivos; não houve aprovação nem
   congelamento dos testes, Green ou homologação nessa linhagem.
-- A suíte offline no estado final da primeira correção de paginação executou
-  **4.348 testes: 4.340 aprovados e oito skips preexistentes**, sem falhas.
-  Os 55 testes focados também passaram. Isso qualifica o comportamento offline,
+- A suíte offline da candidata com captura, enforcement e paradas executou
+  **4.362 testes: 4.354 aprovados e oito skips preexistentes**, sem falhas.
+  Os 81 testes focados também passaram. Isso qualifica o comportamento offline,
   não instalação, execução física do novo módulo ou autonomia nativa.
 
 ## Bloqueio atual
@@ -66,15 +66,25 @@ por tamanho ou com uma falha funcional demonstrada do produto.
 
 O feedback antes do encerramento está instalado, mas ainda não resolve essa
 classe de esgotamento. O núcleo do diário limitado e do planejador de páginas
-pendentes foi implementado **em fonte, ainda não instalado**. O feedback em fonte
-preserva páginas já capturadas fora da conversa, reconhece progresso parcial e
-interrompe bytes completos divergentes em vez de recomendar releitura infinita.
+pendentes foi implementado **em uma candidata, ainda não instalada**. A captura
+ocorre na entrada do loop e após os resultados das ferramentas, antes da
+compactação seguinte. O handler admite uma única entrada por página planejada;
+a checagem anterior do despacho não consome essa entrada. Chamadas diretas e
+concorrentes também são restringidas. O feedback preserva páginas capturadas,
+reconhece progresso parcial e interrompe bytes divergentes ou ações sem progresso.
 Uma fixture de 71 arquivos e 81 páginas concluiu a fila simulada dentro de 40
 iterações, sem páginas repetidas ou além do fim; não é execução de modelo real.
 
-Ainda faltam captura antes de qualquer compactação, restrição efetiva das
-chamadas às páginas planejadas, interrupção estruturada durante o loop e
-qualificação Docker/ACP/nativa. A memória é local à execução, não recuperação
+O canário físico da candidata passou com Hermes/ACP e respostas locais fixas:
+continuação normal, despacho seguido de handler, negação de leitura duplicada,
+saída `read_progress_stalled` e saída `iteration_budget_exhausted`. Foram sete
+respostas locais, sem modelo externo. O caso de orçamento usa um loop de uma
+iteração como controle de fronteira; a fábrica ACP continua vinculada a 40.
+Isso não comprova uma revisão nativa completa com 40 iterações.
+
+Ainda faltam paginação extensa e compactação forçada no Hermes real,
+instalação e recuperação específica seguidas de qualificação nativa. A memória
+é local à execução, não recuperação
 entre reinícios ou memória compartilhada entre perfis. Não há nova aprovação
 implícita nem autorização para repetir a mesma tentativa indefinidamente.
 
@@ -87,9 +97,9 @@ serviços, libera manutenção ou consome chamadas ao provedor.
 
 1. Implementar paginação orientada por evidência: preservar leituras reais entre
    compactações, selecionar apenas páginas pendentes e reconhecer progresso
-   parcial. O núcleo e a integração inicial ao feedback já estão em fonte;
-   completar coleta e enforcement. Não reduzir o escopo de aprovação ou ampliar
-   as 40 iterações.
+   parcial. Coleta, enforcement e saída estruturada já estão na candidata;
+   completar a qualificação de escala/compactação. Não reduzir o escopo de
+   aprovação ou ampliar as 40 iterações.
 2. Qualificar offline e em Docker/ACP os casos de múltiplos arquivos, cache,
    fim de arquivo, contexto compactado, ausência de progresso e fim do orçamento.
 3. Instalar sob manutenção e preparar recuperação vinculada à condição realmente

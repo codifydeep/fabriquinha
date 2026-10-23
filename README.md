@@ -30,10 +30,12 @@ esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
 O controlador voltou à manutenção selada e o proxy está parado na consulta de
 23 de outubro. Ainda faltam paginação orientada por progresso e recuperação
 qualificada para essa nova condição; não houve aprovação da revisão ou entrega.
-O núcleo da paginação já existe em fonte, com diário limitado por execução,
-progresso por novas linhas e fila simulada de 71 arquivos/81 páginas sem
-repetição. Ainda não está instalado: faltam captura antes da compactação,
-enforcement no handler, saída estruturada do loop e qualificação Docker/ACP/nativa.
+A candidata de paginação contém diário limitado por execução, captura no loop,
+enforcement no handler e saídas estruturadas. A fila simulada percorreu 71
+arquivos/81 páginas sem repetição. O canário Hermes/ACP passou com sete respostas
+locais fixas, incluindo duplicatas negadas e limites de progresso/orçamento.
+Ainda não está instalada: faltam escala e compactação forçada no Hermes real,
+recuperação específica e qualificação nativa. Nenhuma chamada paga foi usada.
 
 **Resumo atualizado:** [status e estimativas de prontidão](docs/STATUS.md),
 [validações](docs/VALIDATION.md) e [próximos marcos](docs/ROADMAP.md).
@@ -1478,7 +1480,7 @@ flowchart TD
     F --> CG{Contrato de qualidade ativo validado?}
     CG -->|Sim| G[TDD: Red real registrado]
     G --> TR[Revisão independente e congelamento dos testes]
-    TR -->|Feedback instalado; paginação estrita pendente| RS[Pre-stop: formato e páginas faltantes]
+    TR -->|Feedback instalado; instalação da paginação pendente| RS[Pre-stop: formato e páginas faltantes]
     RS -.->|Mesmo turno e orçamento de 40 iterações| TR
     RS -.->|Duas tentativas sem progresso| AD
     TR -->|Solicita mudanças nos testes novos| F
@@ -1619,9 +1621,9 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 O estado vigente em **23 de outubro de 2026** está em
 [STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente falhou sem leitura
 integral, não congelou os testes e não chegou à homologação. A suíte offline
-com a primeira correção de paginação executou 4.348 testes: 4.340 aprovados e
-oito skips preexistentes, sem falhas. A correção ainda não está instalada nem
-qualificada em agente real. A estimativa de prontidão
+da candidata executou 4.362 testes: 4.354 aprovados e oito skips preexistentes,
+sem falhas. O canário pequeno Hermes/ACP passou com respostas fixas, sem modelo;
+instalação e qualificação nativa ainda estão pendentes. A estimativa de prontidão
 não substitui um novo ciclo sem intervenções nem uma instalação limpa.
 
 **Resultados históricos, referência em 8 de outubro de 2026:**

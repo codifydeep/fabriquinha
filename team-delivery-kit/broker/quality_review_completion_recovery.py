@@ -15,6 +15,7 @@ import quality_phase_tools as phase
 import quality_review_verdict as verdict
 import quality_review_paging as paging
 import install_quality_review_stop as installer
+from review_execution_evidence import validate as validate_execution_controls
 try:
     from . import quality_test_review as review,quality_review_attestation as attestation,quality_review_history as history
     from . import controller_maintenance as maintenance,native,read_stream_receipts
@@ -114,6 +115,7 @@ def qualification(b,value,operation):
         and image.get('Config',{}).get('Labels',{}).get('delivery-kit.component')=='quality-author-worker')
     modules={'feedback':stop,'phase':phase,'verdict':verdict,'installer':installer,'paging':paging}
     guards={key:hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest() for key,module in modules.items()}
+    guards['handler']=hashlib.sha256(Path(__file__).with_name('review_tool_policy.py').read_bytes()).hexdigest()
     require(value.get('guards')==guards)
     report=value.get('report') or {}
     require(report.get('operation')=='real_hermes_review_stop_loop_canary_v1' and report.get('status')=='passed'
@@ -126,6 +128,8 @@ def qualification(b,value,operation):
         and set(report['guard_sources'])==set(guards)|{'loop','acp','session'}
         and all(report['guard_sources'][key]==sha for key,sha in guards.items())
         and all(re.fullmatch('[a-f0-9]{64}',str(v)) for v in report['guard_sources'].values()))
+    validate_execution_controls(report.get('execution_controls'))
+    require(type(report.get('total_fixed_provider_calls')) is int and report['total_fixed_provider_calls']==7)
     return quality.digest(report['guard_sources'])
 
 

@@ -60,6 +60,39 @@ REQUEST_HOOK='''                # A premature v2 review stop must continue with 
                     min(agent.max_iterations - api_call_count, agent.iteration_budget.remaining),
                 )
 '''
+CAPTURE_ANCHOR='''    while (api_call_count < agent.max_iterations and agent.iteration_budget.remaining > 0) or agent._budget_grace_call:
+'''
+POST_TOOL_ANCHOR='''                # Reset per-turn retry counters after successful tool
+'''
+
+
+def checkpoint_hook(indent,*,after_tools=False):
+    lines='''from quality_review_stop import checkpoint as _quality_review_checkpoint
+_quality_review_note = _quality_review_checkpoint(
+    agent, messages,
+    min(agent.max_iterations - api_call_count, agent.iteration_budget.remaining),
+    after_tools=AFTER_TOOLS,
+)
+if _quality_review_note is not None:
+    final_response = json.dumps(_quality_review_note, sort_keys=True)
+    append_message(messages, {"role": "assistant", "content": final_response})
+    agent._session_messages = messages
+    _turn_exit_reason = "quality_review_execution_blocked"
+    break
+'''.replace('AFTER_TOOLS',str(after_tools))
+    return ''.join(indent+line+'\n' for line in lines.splitlines())
+
+
+def adapt_capture(source):
+    if source.count(CAPTURE_ANCHOR)!=1 or 'after_tools=False,' in source:
+        raise ValueError('pinned Hermes iteration capture seam changed')
+    return source.replace(CAPTURE_ANCHOR,CAPTURE_ANCHOR+checkpoint_hook('        '))
+
+
+def adapt_post_tools(source):
+    if source.count(POST_TOOL_ANCHOR)!=1 or 'after_tools=True,' in source:
+        raise ValueError('pinned Hermes post-tool capture seam changed')
+    return source.replace(POST_TOOL_ANCHOR,checkpoint_hook('                ',after_tools=True)+POST_TOOL_ANCHOR)
 
 
 def adapt_loop(source):
@@ -91,7 +124,7 @@ if __name__=='__main__':
     acp=Path('/opt/hermes/acp_adapter/server.py')
     session=Path('/opt/hermes/acp_adapter/session.py')
     # Prepare/compile both before any write; no partial install on source drift.
-    changed=[(loop,adapt_request(adapt_loop(loop.read_text()))),(acp,adapt_acp(acp.read_text())),
+    changed=[(loop,adapt_post_tools(adapt_capture(adapt_request(adapt_loop(loop.read_text()))))),(acp,adapt_acp(acp.read_text())),
         (session,adapt_session(session.read_text()))]
     for path,source in changed:compile(source,str(path),'exec')
     for path,source in changed:path.write_text(source)

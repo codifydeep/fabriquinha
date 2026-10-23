@@ -12,6 +12,8 @@ As etapas abaixo permanecem abertas; não são funcionalidades já entregues.
    resistente à compactação do contexto; fila de páginas pendentes; bloqueio de
    repetição/EOF e diagnóstico estruturado antes de esgotar as 40 iterações.
    Progresso parcial conta; prosa, cache sem conteúdo e chamadas repetidas não.
+   Esses controles já existem na candidata e passaram pelo canário pequeno
+   Hermes/ACP. Ainda faltam escala, compactação forçada, instalação e prova nativa.
 2. **Qualificação antes de novo ensaio:** fixtures com múltiplos arquivos e
    páginas, controles negativos e Hermes/handlers/ACP reais sem provedor.
    Instalação sob manutenção e recuperação específica da condição corrigida,

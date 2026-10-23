@@ -9,6 +9,7 @@ from broker import quality_review_completion_recovery as recovery,quality_team_p
 from broker import quality_test_review as review,quality_review_attestation as attest,quality_review_launch as launch
 import test_quality_review_attestation as fixtures
 import test_quality_team_progress as team_fixtures
+from test_review_execution_evidence import evidence as execution_evidence
 
 
 class QualityReviewCompletionRecoveryTests(unittest.TestCase):
@@ -27,7 +28,9 @@ class QualityReviewCompletionRecoveryTests(unittest.TestCase):
         self.b.QUALITY_WORKER_IMAGE=self.worker;self.b.QUALITY_REVIEW_WORKER_IMAGE=self.worker
         guards={k:hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest() for k,m in
             dict(feedback=recovery.stop,phase=recovery.phase,verdict=recovery.verdict,installer=recovery.installer,paging=recovery.paging).items()}
+        guards['handler']=hashlib.sha256(Path(recovery.__file__).with_name('review_tool_policy.py').read_bytes()).hexdigest()
         report=dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',provider='fixed_loopback_not_model',
+            total_fixed_provider_calls=7,execution_controls=execution_evidence(),
             model_calls=0,fixed_provider_calls=3,feedback_rounds=1,max_iterations=40,acp=True,same_agent=True,
             protected_files_unchanged=True,tests_approved=False,delivery_approval=False,
             guard_sources={**guards,'loop':'1'*64,'acp':'2'*64,'session':'3'*64})

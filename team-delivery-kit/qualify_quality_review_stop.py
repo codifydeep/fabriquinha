@@ -17,11 +17,12 @@ from quality_git_candidate import require,Pending
 from qualify_quality_red_observer import require_idle,save,await_retirement
 from migrate_quality_candidate_pin import read
 from install_quality_preview import save as save_state
+from review_execution_evidence import validate as validate_execution_controls
 
 ROOT=Path(__file__).resolve().parent
 GUARDS={'feedback':'quality_review_stop.py','phase':'quality_phase_tools.py',
     'verdict':'quality_review_verdict.py','installer':'install_quality_review_stop.py',
-    'paging':'quality_review_paging.py'}
+    'paging':'quality_review_paging.py','handler':'broker/review_tool_policy.py'}
 
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
@@ -37,6 +38,8 @@ def validate_report(report,guards):
         and report.get('tests_approved') is False and report.get('delivery_approval') is False
         and isinstance(report.get('guard_sources'),dict)
         and all(report['guard_sources'].get(key)==value for key,value in guards.items()))
+    validate_execution_controls(report.get('execution_controls'))
+    require(type(report.get('total_fixed_provider_calls')) is int and report['total_fixed_provider_calls']==7)
     return report
 
 

@@ -30,6 +30,7 @@ home=Path('/tmp/hermes');home.mkdir(exist_ok=True)
 verdict=json.dumps(dict(action='approve_tests',reason='Fixed offline fixture only',criteria=['A01'],findings=[],
     **{k:packet[k] for k in ('manifest_sha256','plan_sha256','red_sha256')}))
 calls=[];auxiliary=[]
+scenario='normal'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -44,21 +45,29 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers()
             self.wfile.write(b'{}');return
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
-        assert index<3,'unexpected extra fixture call'
-        if index==1:
+        maximum=1 if scenario=='budget' else 3
+        if index>=maximum:
+            self.send_response(400);self.end_headers();self.wfile.write(b'{"error":"fixed fixture call ceiling"}');return
+        if scenario=='normal' and index==1:
             assert body.get('tool_choice')==dict(type='function',function=dict(name='read_file')),body.get('tool_choice')
             assert [t['function']['name'] for t in body.get('tools',[])]==['read_file']
             assert body.get('parallel_tool_calls') is True
             assert any(m.get('role')=='system' and 'controller_review_continuation_v1' in str(m.get('content'))
                 for m in body.get('messages',[]))
-        elif index==2:
+        elif scenario=='normal' and index==2:
             assert body.get('tool_choice')!=dict(type='function',function=dict(name='read_file'))
         message=dict(role='assistant',content=('Premature approval\n'+verdict) if index==0 else verdict)
         finish='stop'
-        if index==1:
+        if scenario=='normal' and index==1:
             message=dict(role='assistant',content=None,tool_calls=[dict(id='read-'+str(i),type='function',
                 function=dict(name='read_file',arguments=json.dumps(dict(path='/delivery/'+p,offset=1,limit=100))))
                 for i,p in enumerate(FILES)])
+            finish='tool_calls'
+        elif (scenario=='stall' and index>0) or scenario=='budget':
+            args=(dict(path='/delivery/app.py',offset=401,limit=100) if scenario=='stall' else
+                dict(path='/delivery/tests/test_new.py',offset=1,limit=1))
+            message=dict(role='assistant',content=None,tool_calls=[dict(id='control-'+str(index),type='function',
+                function=dict(name='read_file',arguments=json.dumps(args)))])
             finish='tool_calls'
         stream=bool(body.get('stream'));kind='text/event-stream' if stream else 'application/json'
         self.send_response(200);self.send_header('Content-Type',kind);self.end_headers()
@@ -137,14 +146,66 @@ print(json.dumps(dict(stage='fixed_probe_observed',fixed_calls=calls,auxiliary=a
 assert len(notes)==1 and notes[0]['diagnostic']['remaining_files']==2 and not notes[0]['diagnostic']['blocked'],notes
 assert notes[0]['diagnostic']['remaining_iterations']==39,notes
 assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in FILES.items())
-import quality_review_stop,quality_phase_tools,quality_review_verdict,quality_review_paging
+
+
+def execution_controls():
+    """Actual Hermes registry/loop, fixed local responses, never model calls."""
+    global calls,scenario
+    from types import SimpleNamespace
+    import quality_review_stop as stop
+    from tools.registry import registry,discover_builtin_tools
+    from run_agent import AIAgent
+    discover_builtin_tools()
+    probe_config={**config,'request_id':'60000000-0000-4000-8000-000000000004'}
+    os.environ.update(DELIVERY_QUALITY_PHASE_JSON=json.dumps(probe_config),DELIVERY_MODEL_EXECUTION_ID=probe_config['request_id'])
+    probe_agent=SimpleNamespace()
+    stop.guard(probe_agent,[],verdict,39)
+    request=dict(messages=[],tools=[dict(type='function',function=dict(name='read_file',parameters=dict(type='object')))])
+    stop.apply_request(probe_agent,request,[],38)
+    args=dict(path='/delivery/app.py',offset=1,limit=100)
+    read=json.loads(registry.dispatch('read_file',args))
+    assert not read.get('error') and read.get('content_returned') is not False,read
+    repeated=json.loads(registry.get_entry('read_file').handler(args))
+    assert repeated.get('error')=='operation_forbidden_in_test_review_v2',repeated
+    results={}
+    for mode,request_id,iterations in [('stall','60000000-0000-4000-8000-000000000002',40),
+            ('budget','60000000-0000-4000-8000-000000000003',1)]:
+        scenario=mode;calls=[]
+        case={**config,'request_id':request_id}
+        os.environ.update(DELIVERY_QUALITY_PHASE_JSON=json.dumps(case),DELIVERY_MODEL_EXECUTION_ID=request_id)
+        local=ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        threading.Thread(target=local.serve_forever,daemon=True).start()
+        try:
+            current=AIAgent(model='anthropic/claude-haiku-5.5',provider='openai',api_mode='chat_completions',
+                base_url=f'http://127.0.0.1:{local.server_port}/v1',api_key='offline-not-a-credential',
+                max_iterations=iterations,enabled_toolsets=['hermes-acp'],quiet_mode=True,max_tokens=2048,
+                checkpoints_enabled=False)
+            result=current.run_conversation('Fixed operator execution-stop control, not a native task or approval.')
+        finally:local.shutdown();local.server_close()
+        observed=json.loads(result['final_response'])
+        expected='read_progress_stalled' if mode=='stall' else 'iteration_budget_exhausted'
+        assert observed['operation']=='advisory_review_execution_v1' and observed['category']==expected,observed
+        assert observed['blocked'] and observed['tests_approved'] is False and observed['delivery_approval'] is False
+        assert len(calls)==(3 if mode=='stall' else 1),calls
+        results[mode]=dict(provider_calls=len(calls),category=expected,fixture_iterations=iterations)
+    assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in FILES.items())
+    return dict(operation='real_hermes_review_execution_controls_v1',**results,
+        preflight_then_dispatch=True,direct_duplicate_denied=True,snapshot_unchanged=True,model_calls=0)
+
+
+normal_calls=list(calls)
+controls=execution_controls()
+import quality_review_stop,quality_phase_tools,quality_review_verdict,quality_review_paging,review_tool_policy
 guard_sources={key:hashlib.sha256(Path(path).read_bytes()).hexdigest() for key,path in {
     'feedback':quality_review_stop.__file__,'phase':quality_phase_tools.__file__,
     'verdict':quality_review_verdict.__file__,'installer':'/install_quality_review_stop.py',
     'paging':quality_review_paging.__file__,
+    'handler':review_tool_policy.__file__,
     'loop':'/opt/hermes/agent/conversation_loop.py','acp':'/opt/hermes/acp_adapter/server.py',
     'session':'/opt/hermes/acp_adapter/session.py'}.items()}
 print(json.dumps(dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',
-    provider='fixed_loopback_not_model',model_calls=0,fixed_provider_calls=len(calls),
+    provider='fixed_loopback_not_model',model_calls=0,fixed_provider_calls=len(normal_calls),
+    total_fixed_provider_calls=len(normal_calls)+controls['stall']['provider_calls']+controls['budget']['provider_calls'],
+    execution_controls=controls,
     feedback_rounds=len(notes),same_agent=True,max_iterations=40,acp=acp_mode,
     protected_files_unchanged=True,guard_sources=guard_sources,tests_approved=False,delivery_approval=False)))

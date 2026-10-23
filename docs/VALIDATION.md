@@ -13,16 +13,18 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa mais recente | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Sem congelamento, Green ou homologação. |
-| Paginação e feedback em fonte | Diário limitado e fila pendente; fixture de 71 arquivos/81 páginas dentro de 40 iterações simuladas. Não instalado nem qualificado em agente real. |
-| Última suíte completa registrada | 4.348 executados: 4.340 aprovados, oito skips preexistentes, sem falhas. Inclui a primeira correção de paginação e a vinculação de seu hash à qualificação. |
+| Paginação e feedback na candidata | Diário, captura, fila e handler; fixture de 71 arquivos/81 páginas dentro de 40 iterações simuladas. Não instalada. |
+| Canário físico da candidata | Hermes/ACP normal, preflight/handler, duplicata negada e paradas estruturadas por falta de progresso/orçamento; sete respostas locais, zero chamadas externas. Escala/compactação forçada e revisão nativa ainda pendentes. |
+| Última suíte completa registrada | 4.362 executados: 4.354 aprovados, oito skips preexistentes, sem falhas. Inclui captura, enforcement, paradas e validação dos controles físicos. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 O bloqueio atual envolve leituras repetidas e ausência de progresso, não a
-capacidade já corrigida do proxy. O núcleo de paginação e a integração inicial
-ao feedback passaram por 55 testes focados. Captura antes de toda compactação,
-enforcement das páginas nos handlers e saída estruturada durante o loop ainda
-precisam ser implementados; instalação e provas Docker/ACP/nativas permanecem
-obrigatórias antes de outra tentativa. Na consulta
+capacidade já corrigida do proxy. O conjunto inicial de paginação, captura,
+enforcement e saída estruturada passou por 81 testes focados e um canário físico
+com respostas fixas. O controle físico do fim do orçamento usa uma iteração;
+a configuração da fábrica ACP continua em 40. Escala, compactação forçada,
+instalação e provas nativas permanecem obrigatórias antes de outra tentativa.
+Na consulta
 de referência, a manutenção está selada e o proxy parado; confirme o estado vivo
 antes de agir. Nenhum resultado histórico abaixo substitui esse diagnóstico.
 
