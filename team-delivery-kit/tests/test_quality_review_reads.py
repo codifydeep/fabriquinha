@@ -59,5 +59,30 @@ class QualityReviewReadTests(unittest.TestCase):
         self.assertEqual(reads.observe(inventory,manifest,['/delivery/empty.py'],pair)['/delivery/empty.py']['bytes'],0)
         with self.assertRaises(ValueError):reads.observe(inventory,manifest,['/delivery/empty.py'],[])
 
+    def test_assessment_lists_all_missing_files_without_authorizing_anything(self):
+        paths=['/delivery/'+p for p in self.files]
+        result=reads.assessment(self.inventory,self.manifest,paths,[])
+        self.assertEqual(result['required_files'],2);self.assertEqual(result['complete_files'],0)
+        self.assertEqual({r['path'] for r in result['rejected_files']},set(self.files))
+        self.assertFalse(result['execution_authorized']);self.assertFalse(result['delivery_approval'])
+        with self.assertRaises(ValueError):self.call([])
+
+    def test_assessment_does_not_promote_partial_or_conflicting_pages(self):
+        paths=['/delivery/'+p for p in self.files]
+        for messages in (self.messages()[:-2],self.messages()+self.pair('tests/test_new.py','d',3,3,'3|wrong')):
+            result=reads.assessment(self.inventory,self.manifest,paths,messages)
+            self.assertEqual(result['complete_paths'],['app.py'])
+            self.assertEqual(result['rejected_files'][0]['path'],'tests/test_new.py')
+        result=reads.assessment(self.inventory,self.manifest,paths,self.messages())
+        self.assertEqual(result['complete_files'],2);self.assertEqual(result['rejected_files'],[])
+        self.assertFalse(result['delivery_approval'])
+
+    def test_invalid_stream_or_manifest_cannot_claim_coverage(self):
+        paths=['/delivery/'+p for p in self.files]
+        result=reads.assessment(self.inventory,self.manifest,paths,self.messages()+self.messages()[:2])
+        self.assertEqual(result['complete_files'],0)
+        self.assertTrue(all(r['category']=='read_stream_invalid' for r in result['rejected_files']))
+        with self.assertRaises(ValueError):reads.assessment(self.inventory,'0'*64,paths,[])
+
 
 if __name__=='__main__':unittest.main()

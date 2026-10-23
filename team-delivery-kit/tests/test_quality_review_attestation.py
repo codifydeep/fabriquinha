@@ -169,6 +169,42 @@ class QualityReviewAttestationTests(unittest.TestCase):
         self.f.record['result']['output']='Everything looks good; implementation may proceed.'
         result=self.call();self.assertEqual(result['stage'],'technical_blocked')
 
+    def test_prose_before_json_diagnoses_both_format_and_missing_reads_without_reinterpretation(self):
+        self.only_new_test_reads()
+        self.f.record['result']['output']='I approve after inspection.\n```json\n'+json.dumps(self.verdict)+'\n```'
+        result=self.call();self.assertEqual(result['stage'],'technical_blocked')
+        diagnostic=result['incident']['completion_diagnostic']
+        self.assertEqual(diagnostic['verdict_format'],'invalid')
+        self.assertEqual(diagnostic['reads']['required_files'],4)
+        self.assertEqual(diagnostic['reads']['complete_files'],1)
+        self.assertEqual({r['path'] for r in diagnostic['reads']['rejected_files']},
+            {'AGENTS.md','app.py','tests/test_old.py'})
+        self.assertFalse(diagnostic['tests_approved']);self.assertFalse(result['tests_approved'])
+        self.assertNotIn('I approve',json.dumps(diagnostic))
+        self.assertEqual(self.call(),result)
+
+    def test_valid_json_still_reports_every_missing_approval_read(self):
+        self.only_new_test_reads()
+        result=self.call();self.assertEqual(result['stage'],'technical_blocked')
+        diagnostic=result['incident']['completion_diagnostic']
+        self.assertEqual(diagnostic['verdict_format'],'valid')
+        self.assertEqual(diagnostic['reads']['complete_files'],1)
+        self.assertEqual(len(diagnostic['reads']['rejected_files']),3)
+
+    def test_concrete_rejection_diagnostic_does_not_require_unrelated_approval_reads(self):
+        self.only_new_test_reads()
+        self.update_verdict(action='request_changes',findings=[dict(criterion='A01',path='tests/test_new.py',
+            test='test_new',line=4,quote='self.assertEqual(app.VALUE, 1)',expected='An assertion',observed='This assertion')])
+        with self.b.db() as con:
+            messages=read_stream_receipts.load(con,self.f.record['id'])
+        context=launch_fixture.launch.review.load(self.b,self.source)[0]
+        files={p:dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)) for p,raw in self.files.items()}
+        diagnostic=attest.completion_diagnostic(self.f.record['result']['output'],context['packet'],
+            files,context['read_paths'],messages)
+        self.assertEqual(diagnostic['reads']['required_files'],1)
+        self.assertEqual(diagnostic['reads']['complete_files'],1)
+        self.assertFalse(diagnostic['tests_approved'])
+
     def test_incomplete_or_wrong_file_bytes_do_not_become_complete_reads(self):
         with self.b.db() as con:
             row=con.execute('SELECT messages FROM observed_read_stream LIMIT 1').fetchone()

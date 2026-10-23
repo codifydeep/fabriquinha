@@ -18,8 +18,9 @@ negativos obrigatórios antes do merge. A política, o executor offline e o cada
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
-em modo exclusivo que mantém os fluxos legados inativos. A referência está
-novamente selada para diagnosticar um bootstrap falho, sem apagar os bloqueios antigos.
+em modo exclusivo que mantém os fluxos legados inativos. A manutenção de
+bootstrap foi concluída; o bloqueio atual é uma revisão incompleta, sem apagar
+ou converter os bloqueios antigos.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
@@ -66,9 +67,15 @@ O retorno real ocorreu pelo próprio coordenador, no mesmo card e autor, sem
 atribuição manual: o agente corrigiu os testes e o novo snapshot passou pelo Red
 completo (381 Python, falhas somente no teste novo; 36 Node aprovados, sem skips).
 A revisão seguinte foi acionada e admitida, mas falhou no bootstrap antes de ACP
-ou chamada ao modelo. Permanece bloqueada, com evidência preservada; o proxy foi
-parado. A causa do bootstrap e sua recuperação ainda precisam ser qualificadas.
-Isso não comprova congelamento aprovado, Green ou homologação.
+ou chamada ao modelo. Essa tentativa permanece preservada. Após instalação e
+recuperação versionada sob manutenção, o coordenador acionou outra revisão
+automaticamente, no mesmo card e snapshot: ACP e modelo funcionaram. O agente
+emitiu parecer favorável com prosa antes do JSON e não leu todos os arquivos
+obrigatórios. O controlador rejeitou a conclusão; não há congelamento aprovado,
+Green ou homologação. Apenas tolerar o formato não resolveria a leitura incompleta.
+O diagnóstico em fonte agora relata separadamente o formato e a cobertura de
+todos os arquivos, sem converter o parecer rejeitado em aprovação. Essa melhoria
+diagnóstica não implementa, por si só, a recuperação autônoma dessa falha.
 Foi reproduzida em testes uma corrida compatível com essa falha: a observação do
 watchdog avançava o estado antes do ACK de criação/start e a rotina rejeitava a
 confirmação tardia. A correção em fonte preserva a observação mais forte somente

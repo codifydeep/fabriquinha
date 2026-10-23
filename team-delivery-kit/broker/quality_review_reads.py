@@ -112,3 +112,28 @@ def observe(files,manifest,paths,messages,*,include_content=False,required_paths
         if include_content:receipt['line_content']=lines
         result[path]=receipt
     return result
+
+
+def assessment(files,manifest,paths,messages,*,required_paths=None):
+    """Read-only diagnostic, never an attestation or a replacement for observe().
+
+    Report every missing/invalid file so a malformed verdict does not hide an
+    incomplete inspection. No content or assistant claims enter this report.
+    """
+    inventory(files,manifest,paths)
+    required=paths if required_paths is None else required_paths
+    require(isinstance(required,list) and bool(required) and len(required)==len(set(required))
+        and set(required)<=set(paths) and isinstance(messages,list))
+    complete=[];rejected=[]
+    for path in sorted(required):
+        try:
+            if not messages:raise ReadRejected('file_read_incomplete',path,files[path.removeprefix('/delivery/')]['sha256'])
+            observe(files,manifest,paths,messages,required_paths=[path])
+            complete.append(path.removeprefix('/delivery/'))
+        except ReadRejected as error:
+            rejected.append(error.diagnostic)
+        except (ValueError,KeyError,TypeError,UnicodeError):
+            rejected.append(dict(category='read_stream_invalid',path=path.removeprefix('/delivery/'),
+                expected_sha256=files[path.removeprefix('/delivery/')]['sha256'],observed_sha256=[]))
+    return dict(required_files=len(required),complete_files=len(complete),complete_paths=complete,
+        rejected_files=rejected,execution_authorized=False,delivery_approval=False)

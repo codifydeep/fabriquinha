@@ -176,6 +176,22 @@ def required_reads(value,packet,paths):
     return sorted(set(cited)|{'/delivery/'+p for p in packet['plan']['new_tests']})
 
 
+def completion_diagnostic(output,packet,files,paths,messages):
+    """Pure repair evidence; cannot parse around prose or approve a past run."""
+    verdict_state='valid';required=paths
+    try:
+        choice=parse_decision(output,packet)
+        required=required_reads(choice,packet,paths)
+    except (ValueError,KeyError,TypeError,UnicodeError):
+        verdict_state='invalid'
+    return dict(operation='immutable_review_completion_diagnostic_v1',
+        verdict_format=verdict_state,expected_format='one_exact_json_object',
+        manifest_sha256=packet['manifest_sha256'],
+        output_sha256=hashlib.sha256(output.encode()).hexdigest() if isinstance(output,str) else None,
+        reads=reads.assessment(files,packet['manifest_sha256'],paths,messages,required_paths=required),
+        tests_approved=False,execution_authorized=False,delivery_approval=False)
+
+
 def verdict(output,packet,observed,prepared):
     value=parse_decision(output,packet)
     for finding in value['findings']:
@@ -250,15 +266,24 @@ def collect(b,c,context,assignment,phase):
             (c['source_task'],)).fetchone()[0])
     phase['value']='native_terminal_verdict'
     output=(task.get('result') or {}).get('output')
-    packet=context['packet'];choice=parse_decision(output,packet)
+    packet=context['packet']
+    files=capture['copy']['prepared'].get('file_inventory')
+    try:choice=parse_decision(output,packet)
+    except (ValueError,KeyError,TypeError) as error:
+        error.review_diagnostic=completion_diagnostic(output,packet,files,context['read_paths'],messages)
+        raise
     required=required_reads(choice,packet,context['read_paths'])
     phase['value']='complete_snapshot_reads'
     prepared=capture['copy']['prepared'];files=prepared.get('file_inventory')
     require(isinstance(files,dict))
     plan=packet['plan']
     require(all(files.get(path,{}).get('sha256')==sha for path,sha in packet['red']['tests'].items()))
-    observed=reads.observe(files,packet['manifest_sha256'],context['read_paths'],messages,
-        include_content=True,required_paths=required)
+    try:
+        observed=reads.observe(files,packet['manifest_sha256'],context['read_paths'],messages,
+            include_content=True,required_paths=required)
+    except (ValueError,KeyError,TypeError) as error:
+        error.review_diagnostic=completion_diagnostic(output,packet,files,context['read_paths'],messages)
+        raise
     phase['value']='native_terminal_verdict'
     decision=verdict(output,packet,observed,prepared)
     action=decision['action']
@@ -320,6 +345,7 @@ def observe(b,source):
                     next_action='CTO inspect bound snapshot, native identity, reads and verdict; no identical retry'),
                 tests_approved=False,execution_authorized=False,delivery_approval=False)
             if isinstance(error,reads.ReadRejected):receipt['incident']['file_diagnostic']=error.diagnostic
+            if hasattr(error,'review_diagnostic'):receipt['incident']['completion_diagnostic']=error.review_diagnostic
         with b.LOCK,b.db() as con:
             maintenance.transaction(con)
             if maintenance.current(con):raise validation_job.Pending('maintenance preserves original review evidence')
