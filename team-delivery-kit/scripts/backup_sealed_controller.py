@@ -6,39 +6,47 @@ from pathlib import Path
 import subprocess
 import sys
 import shutil
+import uuid
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from controller_maintenance_cli import arguments
 
 COMPRESSED_RUNNER='''
-import sys
+import sys,uuid
 sys.path.insert(0,"/")
 import broker as b,controller_maintenance as maintenance
 operation=sys.argv[1]
+backup_id=sys.argv[3] if len(sys.argv)>3 else operation
+if len(sys.argv)>3: require(str(uuid.UUID(backup_id))==backup_id)
+limit=int(sys.argv[4]) if len(sys.argv)>4 else 67108864
+require(limit in (67108864,134217728,268435456))
 with b.LOCK,b.db() as con:
  state=maintenance.current(con)
  require(state and state["operation_id"]==operation and state["stage"]=="sealed")
  require(not maintenance.native_active(b))
  require(not con.execute("SELECT count(*) FROM leases WHERE status IN ('creating','starting','running','closing')").fetchone()[0])
- path=b.STATE/("sealed-backup-"+operation+".sqlite.gz")
- scratch=b.STATE/("sealed-compressed-proof-"+operation+".sqlite")
- ack=b.STATE/("sealed-backup-"+operation+".gzip.receipt.json")
+ path=b.STATE/("sealed-backup-"+backup_id+".sqlite.gz")
+ scratch=b.STATE/("sealed-compressed-proof-"+backup_id+".sqlite")
+ ack=b.STATE/("sealed-backup-"+backup_id+".gzip.receipt.json")
  require(not any(p.is_symlink() for p in (path,scratch,ack)))
  if ack.is_file():
   receipt=json.loads(ack.read_text())
   require(receipt.get("operation_id")==operation and receipt.get("path")==str(path))
+  require(receipt.get("backup_id",operation)==backup_id)
   require(receipt.get("operation")=="sealed_gzip_backup_restore_v1" and receipt.get("encoding")=="gzip")
   require(receipt.get("backup_integrity")=="ok" and receipt.get("restore_integrity")=="ok")
   require(receipt.get("delivery_approval") is False and receipt.get("source_reset") is False)
   require(receipt.get("native_active")==0 and receipt.get("active_leases")==0 and not scratch.exists())
   require(file_sha(path)==receipt.get("archive_sha256") and file_sha(path,True)==receipt.get("sha256"))
+  require(path.stat().st_size<=limit)
  elif path.exists() or scratch.exists():
   receipt=dict(operation_id=operation,stage="observe_existing_backup",path=str(path),backup_repeated=False,delivery_approval=False)
  else:
   size=con.execute("PRAGMA page_count").fetchone()[0]*con.execute("PRAGMA page_size").fetchone()[0]
-  require(int(sys.argv[2])>=size+67108864+1610612736)
-  receipt=backup(con,path,scratch,state)
+  require(int(sys.argv[2])>=size+limit+1610612736)
+  receipt=backup(con,path,scratch,state,max_archive_bytes=limit)
   receipt["operation_id"]=operation
+  if len(sys.argv)>3: receipt["backup_id"]=backup_id
   fd=os.open(ack,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
   with os.fdopen(fd,"w") as output:
    json.dump(receipt,output);output.flush();os.fsync(output.fileno())
@@ -115,7 +123,12 @@ with b.LOCK,b.db() as con:
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--namespace',required=True);parser.add_argument('--operation',required=True)
     parser.add_argument('--compressed',action='store_true',help='One scratch allocation with verified gzip restoration')
+    parser.add_argument('--backup-id',help='Fresh backup UUID without releasing the existing maintenance barrier')
+    parser.add_argument('--max-archive-mib',type=int,choices=(64,128,256),default=64)
     options=parser.parse_args()
+    if options.backup_id and (not options.compressed or str(uuid.UUID(options.backup_id))!=options.backup_id):
+        parser.error('canonical --backup-id requires --compressed')
+    if not options.compressed and options.max_archive_mib!=64:parser.error('--max-archive-mib requires --compressed')
     owned=arguments(options.namespace,'seal',options.operation)[4]
     labels=json.loads(subprocess.check_output(['docker','inspect','--format','{{json .Config.Labels}}',owned],text=True))
     if labels.get('com.docker.compose.project')!=options.namespace or labels.get('com.docker.compose.service')!='execution-broker':
@@ -123,6 +136,8 @@ def main():
     program=compressed_program() if options.compressed else PROGRAM
     command=['docker','exec','-w','/',owned,'python','-c',program,options.operation,
         str(shutil.disk_usage(Path(__file__).resolve()).free)]
+    if options.backup_id or options.max_archive_mib!=64:
+        command.extend([options.backup_id or options.operation,str(options.max_archive_mib*1048576)])
     try:result=subprocess.check_output(command,text=True,timeout=45)
     except subprocess.TimeoutExpired:
         print(json.dumps(dict(operation_id=options.operation,stage='observation_timeout',

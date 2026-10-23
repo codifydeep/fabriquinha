@@ -16,7 +16,13 @@ O [contrato de qualidade v2](team-delivery-kit/contracts/quality-lifecycle-v2.md
 foi aprovado: Red real → revisão e congelamento dos testes → Green → controles
 negativos obrigatórios antes do merge. A política, o executor offline e o cadastro
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
-bloqueios contra uso do fluxo legado por uma issue v2. O observador de Red real
+bloqueios contra uso do fluxo legado por uma issue v2.
+O código do controlador v2 já está instalado em modo de prévia, com as quatro
+flags de execução desligadas e manutenção selada. A instalação preservou os
+volumes de dados, a configuração de workers/modelos e os outros contêineres,
+após backup compactado e prova real de restauração. Isso não habilita nem
+qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalação.
+O observador de Red real
 também passou por controles sintéticos em Docker isolado, sem uma implementação
 positiva prévia. A ingestão persistente de Red também está implementada em fonte:
 exige fase, tarefa, cópia e job reais vinculados pelo controlador, sem aceitar
@@ -93,13 +99,20 @@ ficam em journal privado. Confirmações perdidas são observadas, não repetida
 uma cópia incompleta permanece como impedimento explícito. Esse componente
 passou em Docker real com entrada sintética, sem modelo nem aprovação nativa.
 O encadeamento automático exportação → candidato Git → Green ainda não está
-instalado ou qualificado; o teste isolado não substitui esse ensaio.
+ativado ou qualificado; o teste isolado não substitui esse ensaio.
 A ponte local agora registra o candidato no controlador após verificar o
 repositório esperado, todos os objetos Git e a captura original novamente.
 Os journals da exportação e do candidato permitem retomar uma gravação de
 confirmação perdida sem novo helper, commit ou referência. Testes de integração
 usam Git real e autoridade de captura sintética; não há endpoint para o agente
 enviar provas, escolher repositório ou aprovar a própria entrega.
+A ponte do host possui transporte local fixo ao controlador instalado,
+restrito às operações `about`, `inspect` e `record`, com imagem e identidade do
+contêiner conferidas antes e depois da chamada. Não há endpoint HTTP, terminal
+genérico ou montagem privilegiada nova para os workers. A perda de confirmação
+de gravação leva à leitura do vínculo durável antes de qualquer nova cópia ou
+efeito Git. A consulta real ao controlador passou com execução desabilitada;
+o despacho persistente da ponte do host ainda precisa ser ligado e qualificado.
 Em fonte, esse registro libera um job Green fixo sobre o volume imutável:
 comando e suíte completa são definidos pelo controlador, com rede desligada e
 montagens somente leitura. Seu recibo deve existir no journal de validação e
@@ -370,11 +383,11 @@ flowchart TB
     W --> P[Proxy de modelo: identidade e teto de chamadas]
     P --> M[Provedor LLM configurado]
     B --> E[Snapshots imutáveis e validação controlada]
-    B -.->|Opt-in em fonte, desligado| V2[Coordenador v2: fila e handoffs duráveis]
+    B -.->|Instalado; flags desligadas| V2[Coordenador v2: fila e handoffs duráveis]
     V2 -.->|Revisão e autor Green| MC
-    V2 -.->|Captura, Green e controle negativo; somente em fonte| E
+    V2 -.->|Captura, Green e controle negativo; fluxo desativado| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
-    GX -.->|Registro persistente do SHA; sem push ou merge| V2
+    GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]

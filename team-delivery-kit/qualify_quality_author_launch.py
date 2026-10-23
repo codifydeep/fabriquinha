@@ -35,6 +35,7 @@ SOURCES={
     'broker/quality_implementation_launch.py':'quality_implementation_launch.py',
     'broker/quality_delivery_capture.py':'quality_delivery_capture.py',
     'broker/quality_candidate_binding.py':'quality_candidate_binding.py',
+    'broker/quality_candidate_rpc.py':'quality_candidate_rpc.py',
     'broker/quality_green_capture.py':'quality_green_capture.py',
     'broker/quality_sensitivity_capture.py':'quality_sensitivity_capture.py',
     'broker/quality_team_progress.py':'quality_team_progress.py',

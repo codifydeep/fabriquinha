@@ -23,9 +23,10 @@ class SealedCompressedTests(unittest.TestCase):
         con.execute('CREATE TABLE leases(status)');con.commit()
         return SimpleNamespace(STATE=root,LOCK=threading.Lock(),db=lambda:con),SimpleNamespace(current=lambda c:state,native_active=lambda b:active)
 
-    def run_program(self,b,m,free=10**12):
+    def run_program(self,b,m,free=10**12,backup_id=None):
         output=io.StringIO()
-        with patch.dict(sys.modules,{'broker':b,'controller_maintenance':m}),patch.object(sys,'argv',['backup','test-operation',str(free)]),redirect_stdout(output):
+        argv=['backup','test-operation',str(free)]+([backup_id] if backup_id else [])
+        with patch.dict(sys.modules,{'broker':b,'controller_maintenance':m}),patch.object(sys,'argv',argv),redirect_stdout(output):
             exec(compile(wrapper.compressed_program(),'<trusted-backup>','exec'),{})
         return json.loads(output.getvalue())
 
@@ -58,3 +59,15 @@ class SealedCompressedTests(unittest.TestCase):
             root=Path(d);b,m=self.setup_state(root,con)
             first=self.run_program(b,m);Path(first['path']).write_bytes(b'corrupt')
             with self.assertRaises(ValueError):self.run_program(b,m)
+
+    def test_fresh_backup_does_not_require_releasing_or_overwriting_the_old_seal(self):
+        with tempfile.TemporaryDirectory() as d,closing(sqlite3.connect(':memory:')) as con:
+            root=Path(d);b,m=self.setup_state(root,con)
+            first=self.run_program(b,m);original=Path(first['path']).read_bytes()
+            con.execute('CREATE TABLE progress(value)');con.execute('INSERT INTO progress VALUES(1)');con.commit()
+            key='c0000000-0000-4000-8000-000000000001'
+            second=self.run_program(b,m,backup_id=key)
+            self.assertEqual(first['operation_id'],second['operation_id']);self.assertEqual(second['backup_id'],key)
+            self.assertNotEqual(first['sha256'],second['sha256']);self.assertEqual(Path(first['path']).read_bytes(),original)
+            self.assertEqual(self.run_program(b,m,backup_id=key),second)
+            self.assertEqual(m.current(con)['stage'],'sealed')

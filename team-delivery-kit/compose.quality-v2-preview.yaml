@@ -1,0 +1,10 @@
+# Install the controller source only. This does not authorize v2 enrollment,
+# dispatch, models, Git publication or a release. Existing mounts stay unchanged.
+services:
+  execution-broker:
+    image: ${DELIVERY_KIT_QUALITY_V2_CONTROLLER_IMAGE:?Immutable qualified controller image ID required}
+    environment:
+      BROKER_QUALITY_V2_ENABLED: "0"
+      BROKER_QUALITY_REVIEW_ENABLED: "0"
+      BROKER_QUALITY_IMPLEMENTATION_ENABLED: "0"
+      BROKER_QUALITY_TEAM_ENABLED: "0"

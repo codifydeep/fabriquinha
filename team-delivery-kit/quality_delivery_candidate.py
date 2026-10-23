@@ -40,3 +40,25 @@ def advance(b,request,repo,private,*,effects=None):
     proof=candidate.materialize(repo,Path(exported['directory']),d['manifest_sha256'],packet['plan'],
         packet['frozen_tests'],request,d['task_id'],private)
     return binding.record(b,request,packet,str(repo),proof)
+
+
+def advance_remote(authority,request,repo,private,*,effects=None):
+    """Operator-configured local authority; never a model-provided RPC target."""
+    observed=authority.inspect(request)
+    if observed['stage']=='bound':
+        identity,receipt=observed['identity'],observed['receipt'];binding.validate(identity,receipt)
+        require(str(Path(repo))==identity['repository'] and identity['request_id']==request
+            and identity['namespace']==authority.namespace)
+        return receipt
+    require(observed['stage']=='pending');packet=observed['packet'];d=packet['descriptor']
+    require(d['request_id']==request and d['namespace']==authority.namespace)
+    repo=repository(repo,packet['repository'])
+    exported=exporter.export(d,private,effects=effects)
+    require(exported['descriptor_sha256']==binding.quality.digest(d) and exported['stage']=='exported')
+    proof=candidate.materialize(repo,Path(exported['directory']),d['manifest_sha256'],packet['plan'],
+        packet['frozen_tests'],request,d['task_id'],private)
+    result=authority.record(request,packet,str(repo),proof)
+    identity,receipt=result['identity'],result['receipt'];binding.validate(identity,receipt)
+    require(identity['packet']==packet and identity['repository']==str(repo) and receipt['candidate']==proof
+        and identity['namespace']==authority.namespace)
+    return receipt

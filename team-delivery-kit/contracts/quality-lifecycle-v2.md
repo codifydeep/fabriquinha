@@ -4,8 +4,9 @@ Status: owner-approved design; policy, offline sensitivity executor, persistent
 operator enrollment, legacy admission fences, standalone full-suite Red observer
 and durable controller Red ingestion/snapshot producer implemented in source.
 The observer and dedicated snapshot copier also passed synthetic Docker
-isolation/integrity checks. The v2 chain is not installed, enrolled or enabled in the
-running controller. Historical runs retain v1.
+isolation/integrity checks. The v2 controller source is installed in preview
+with all four execution flags off and maintenance sealed. No v2 chain has been
+enrolled, enabled or qualified natively. Historical runs retain v1.
 The source coordinator now also reaches durable local Git binding, full-suite
 Green and the first post-Green reversion control. These paths remain disabled in
 the installed controller. Reversion passed a synthetic Docker qualification;
@@ -94,7 +95,36 @@ adapter must authenticate native identities, independent decisions, complete
 reads, fixed-job isolation, immutable manifests and actual execution receipts
 before persisting a qualified transition. Caller-supplied booleans are not proof.
 
-### Persistent source-to-review reconciliation (source only)
+### Local candidate authority and preview installation
+
+`quality_candidate_authority.py` uses fixed operator-local Docker-exec verbs
+from `broker/quality_candidate_rpc.py`, never a worker or HTTP endpoint. The
+installed immutable image, Compose ownership and exact container identity are
+checked around every call. `about` remains available while execution is off;
+`inspect` and conditional/idempotent `record` require v2 implementation enabled
+and no maintenance barrier. A lost reply is not proof a process stopped: the
+host reads the durable binding before any further export or Git effect.
+
+`install_quality_preview.py` installs source only, leaving all v2 flags off.
+It requires sealed/drained maintenance, a fresh compressed SQLite backup with
+zeroed-scratch restoration proof, private configuration recovery and an intent
+before a single scoped Compose replacement. Unknown replacement results are
+observed, never replayed. Startup namespace, loopback ports, worker image and
+model call ceiling are preserved from installed services, not guessed from
+Compose defaults. Live pin files stay outside backup-retirement directories.
+Data volumes, models and unrelated containers must remain unchanged. The only
+allowed socket source alias is the existing Docker Desktop proxy/native pair,
+with unchanged destination/access and a same-daemon check inside the controller;
+arbitrary socket paths or volume changes are rejected. No socket is added to a
+worker or helper. Preview installation does not release maintenance or qualify
+an autonomous delivery.
+
+The backup wrapper accepts a fresh `--backup-id` under the existing sealed
+operation, so a new recovery point does not open a dispatch window. The explicit
+compressed-size ceiling is checked with scratch/free-space headroom; existing
+archives are never overwritten.
+
+### Persistent source-to-review reconciliation (installed, execution disabled)
 
 `broker/quality_progress.py` is wired into the opt-in watchdog before legacy
 reconciliation. It discovers only consumed, closed `tests_only_v2` bindings;
@@ -118,10 +148,10 @@ controller capture rows, never the worker's returned report. It does **not**
 freeze/approve tests, start a reviewer, authorize Green or grant delivery. The
 independent native review/read attestation is implemented below but still needs
 real-agent qualification.
-This hook is not installed or enabled in the live controller; its
+This hook is installed but not enabled in the live controller; its
 database/native-fixture tests are not proof of autonomous native delivery.
 
-### Snapshot-bound independent test-review admission (source only)
+### Snapshot-bound independent test-review admission (execution disabled)
 
 `broker/quality_test_review.py` prepares an immutable assignment from the exact
 review-ready packet and durable Red capture, reauthenticating the original native
@@ -156,7 +186,7 @@ were retired with `--rm`; the tiny proof volumes and private receipts remain.
 This is handler/filesystem evidence only, not a native review verdict or
 frozen-test approval. No prompt/model request was sent.
 
-### Read-only review worker and shared durable startup (source only)
+### Read-only review worker and shared durable startup (execution disabled)
 
 `broker/quality_review_launch.py` connects review admission to the existing
 asynchronous worker/startup/session entrypoints. Its only mount is the exact
@@ -191,7 +221,7 @@ inserted as a fixture report. All six helpers/workers were archived and retired;
 proof volumes remain. No candidate HTTP server, model prompt or real native
 review verdict is involved, and the installed controller stays unchanged/sealed.
 
-### Complete reads, native verdict and durable test freeze (source only)
+### Complete reads, native verdict and durable test freeze (execution disabled)
 
 `test_first_protocol.prepare_red(include_inventory=True)` optionally emits every
 copied file's hash and byte size, bound to the canonical immutable manifest.
@@ -440,7 +470,7 @@ result and retired exact helpers; an unknown/missing result remains unresolved.
 Neither these proofs nor a successful metadata readback authorize native launch,
 test review, implementation continuation or homologation.
 
-### Opt-in native launch integration (source only)
+### Opt-in native launch integration (installed, execution disabled)
 
 `broker/quality_author_launch.py` is wired into native admission, asynchronous
 startup, exact task-scope checks, transport opening and controller prompt
