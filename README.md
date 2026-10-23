@@ -122,9 +122,26 @@ capturas corrompidas não bloqueiam a descoberta das seguintes. Após o prazo,
 somente um vínculo já gravado pode ser reconhecido: não se inicia outra
 exportação ou operação Git. Os testes incluem paginação, corrupção, perda de
 resposta e Git local real com autoridade sintética. O despachante passou por
-uma sondagem única contra o controlador instalado: registrou manutenção sem
-efeitos. **Ainda não há serviço periódico instalado nem execução nativa
-qualificada**; ausência do adaptador é bloqueio explícito, não fila vazia. Alterar
+uma sondagem contra o controlador instalado: registrou manutenção sem efeitos.
+O serviço host periódico `quality_candidate_service.py` está instalado na
+referência macOS, com passagens independentes a cada 15 segundos e registro para
+o próximo login. A configuração é fixada por hash; duas falhas/interrupções
+inesperadas bloqueiam novas passagens no journal para diagnóstico do CTO.
+O status lê apenas registros locais, sem consultar Docker ou iniciar trabalho:
+
+```sh
+.venv/bin/python team-delivery-kit/quality_candidate_service.py \
+  --config /caminho/privado/quality-candidate-dispatch.config.json \
+  --pin <sha256-da-configuracao> --status
+```
+
+O gerador `--register --persist-login` cria somente o registro próprio do
+usuário; o bootstrap do launchd é uma operação separada. No macOS, os logs usam
+`~/Library/Logs/DeliveryKit/<instancia>`, com arquivos privados, em vez de exigir
+que o launchd abra logs em Documents. O serviço já executou passagens reais em
+manutenção e terminou com saída zero. **Ainda não há execução nativa de cards
+qualificada nem prova de recuperação de um card real pendente**; ausência do
+adaptador é bloqueio explícito, não fila vazia. Alterar
 imagem ou mapa de repositórios requer uma migração operacional revisada,
 preservando os journals; trocar o diretório privado não é uma recuperação.
 Em fonte, esse registro libera um job Green fixo sobre o volume imutável:
@@ -402,7 +419,7 @@ flowchart TB
     V2 -.->|Captura, Green e controle negativo; fluxo desativado| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2
-    GD[Despachante host: tickets persistentes, até 2 cards] -.->|Sondagem em manutenção; sem serviço periódico| GX
+    GD[Serviço host periódico: tickets persistentes, até 2 cards] -.->|Instalado e ocioso em manutenção; sem ensaio nativo| GX
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]

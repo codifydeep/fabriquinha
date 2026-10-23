@@ -113,8 +113,16 @@ restart-stable scheduling tickets. A pass handles at most two cards; existing
 export/Git journals own all effect identities. Expiry may observe an already
 recorded binding but cannot initiate another export or Git effect. Authority
 outages have durable health and escalation deadlines. A real installed-controller
-maintenance probe recorded zero effects; no periodic host service or native
-candidate chain has been qualified. Image/repository-map changes require a
+maintenance probe recorded zero effects. The macOS one-shot host service is
+installed and scheduled every 15 seconds; independent process runs completed
+with exit zero under maintenance. A private hash-pinned configuration and
+intent-before-tick journal survive restarts. Two interrupted/unexpected ticks
+latch a CTO hold that process reappearance cannot clear. Read-only `--status`
+does not probe Docker or run a tick. Registration is separate from launchd
+bootstrap and can persist an exact user login plist without replacing different
+contents. Logs use the standard private per-user Library/Logs location.
+This idle qualification is not recovery of a real pending native card; the native
+candidate chain remains unqualified. Image/repository-map changes require a
 reviewed migration preserving those journals, not a new empty private directory.
 
 `install_quality_preview.py` installs source only, leaving all v2 flags off.

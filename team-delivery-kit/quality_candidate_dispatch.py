@@ -5,6 +5,7 @@ flock serializes ticks; files/PIDs alone never imply a live or dead worker.
 Ticket ordering survives restarts and cannot be monopolized by a pending card.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -143,16 +144,44 @@ def tick(authority,repositories,private,*,limit=2,effects=None):
         finally:con.close()
 
 
-def configuration(path):
+def configuration(path,*,pin=None):
     path=Path(path);require(path.is_absolute() and path.resolve()==path and path.is_file())
     info=path.stat();require(info.st_uid==os.getuid() and info.st_nlink==1 and not info.st_mode&0o077
         and 0<info.st_size<=65536)
     def unique(pairs):
         require(len({key for key,_ in pairs})==len(pairs));return dict(pairs)
     def invalid(_):raise ValueError('nonfinite dispatcher configuration')
-    value=json.loads(path.read_bytes(),object_pairs_hook=unique,parse_constant=invalid)
+    raw=path.read_bytes()
+    if pin is not None:require(isinstance(pin,str) and re.fullmatch('[a-f0-9]{64}',pin)
+        and hashlib.sha256(raw).hexdigest()==pin)
+    value=json.loads(raw,object_pairs_hook=unique,parse_constant=invalid)
     require(isinstance(value,dict) and set(value)=={'namespace','image','private','repositories'})
     return value
+
+
+def status(authority,repositories,private):
+    """Read existing queue only: no Docker probes, migrations, locks or effects."""
+    identity=context(authority,repositories);private=Path(private)
+    require(private.is_absolute() and private.resolve()==private and private.is_dir()
+        and private.stat().st_uid==os.getuid() and not private.stat().st_mode&0o077)
+    token=str(uuid.uuid5(uuid.NAMESPACE_URL,'quality-candidate-dispatch:'+authority.namespace))
+    directory=private/'quality-candidate-dispatch';require(not directory.is_symlink())
+    path=directory/(token+'.sqlite');require(not path.is_symlink())
+    if not path.exists():return dict(stage='unobserved',tasks=[],delivery_approval=False)
+    info=path.stat();require(stat.S_ISREG(info.st_mode) and info.st_uid==os.getuid() and info.st_nlink==1
+        and not info.st_mode&0o077 and directory.stat().st_uid==os.getuid() and not directory.stat().st_mode&0o077)
+    con=sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=5)
+    try:
+        con.execute('BEGIN')
+        row=con.execute('SELECT context,sha256,health FROM meta WHERE id=1').fetchone()
+        require(row is not None and json.loads(row[0])==identity and row[1]==quality.digest(identity))
+        tasks=[]
+        for request, in con.execute('SELECT request_id FROM tasks ORDER BY ticket,request_id').fetchall():
+            try:tasks.append(state(con,request))
+            except (ValueError,KeyError,TypeError):
+                tasks.append(dict(request_id=request,stage='integrity_rejected',owner='cto',delivery_approval=False))
+        return dict(stage='available',health=json.loads(row[2]) if row[2] else None,tasks=tasks,delivery_approval=False)
+    finally:con.close()
 
 
 def main():
