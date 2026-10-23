@@ -1,0 +1,10 @@
+# Operator activation only, after immutable enrollment and verified backup.
+# Does not release maintenance, start a model, or authorize merge/deployment.
+services:
+  execution-broker:
+    environment:
+      BROKER_QUALITY_EXCLUSIVE_ENABLED: "1"
+      BROKER_QUALITY_V2_ENABLED: "1"
+      BROKER_QUALITY_REVIEW_ENABLED: "1"
+      BROKER_QUALITY_IMPLEMENTATION_ENABLED: "1"
+      BROKER_QUALITY_TEAM_ENABLED: "1"

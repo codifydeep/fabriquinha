@@ -5,12 +5,13 @@ operator enrollment, legacy admission fences, standalone full-suite Red observer
 and durable controller Red ingestion/snapshot producer implemented in source.
 The observer and dedicated snapshot copier also passed synthetic Docker
 isolation/integrity checks. The v2 controller source is installed in preview
-with all four execution flags off and maintenance sealed. One fresh native
-qualification issue is enrolled immutably, but no v2 chain has been enabled or
-qualified natively. Historical runs retain v1.
+in exclusive qualification mode. Activation was checked while sealed, then the
+barrier was released and one fresh issue assigned. A real native author task
+and worker were observed running; the v2 chain is not yet qualified end to end.
+Historical runs retain v1 and their coordinators remain inactive in this mode.
 The source coordinator now also reaches durable local Git binding, full-suite
-Green and the first post-Green reversion control. These paths remain disabled in
-the installed controller. Reversion passed a synthetic Docker qualification;
+Green and the first post-Green reversion control. These paths are enabled only
+for the controlled qualification. Reversion passed a synthetic Docker qualification;
 native end-to-end execution, additional-control recovery and later gates remain
 unqualified.
 
@@ -18,8 +19,7 @@ unqualified.
 
 The actual disposable repository runs both full Python and Node suites in CI.
 Its Python browser-VM regressions also require Node. The Python/Node runners and
-controller validators are now installed in disabled preview. Native dispatch
-remains off until the enrolled qualification is deliberately activated; no
+controller validators are installed and enabled for the enrolled qualification; no
 pre-existing regression is omitted. The standalone `quality_node_baseline.py`
 diagnostic alone still does not count as native gate evidence.
 Full discovery uses a fixed reporter, verifies test files/hashes, rejects
@@ -46,7 +46,7 @@ synthetic: this is not an independent agent verdict or native qualification.
 The installed controller/runners have been upgraded to these gates, including
 dispatcher pin migration without journal/counter resets. Supported mixed mode
 is primary Python unittest plus protected baseline Node tests, not arbitrary
-Node authoring frameworks. Native dispatch remains off until qualified.
+Node authoring frameworks. Qualification dispatch is not general release approval.
 
 ## Operator enrollment and execution isolation
 
@@ -64,8 +64,18 @@ The new source isolation mode `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` prevents
 legacy grants, rejects unenrolled native issues and chooses only the v2
 coordinators. All four v2 phase flags are separately required. Legacy journals
 remain preserved, not completed or reset. The isolation code is tested and
-installed in disabled preview, but has not been activated in the reference runtime. Leaving
+installed and activated for the controlled native qualification. Leaving
 maintenance in a mixed legacy/v2 coordinator mode is not the qualification path.
+
+`activate_quality_runtime.py` performs a separate operator transition using
+`compose.quality-v2-exclusive.yaml`. It requires the same installed image, a
+verified restore backup, one unexecuted enrollment, no active leases and the
+host scheduler disabled/unloaded. Only the four phase flags and exclusive-mode
+flag change. Credentials, image selectors, volumes, resources and other
+containers remain exact. The durable effect intent prevents repeating `up`
+after a lost response; expiry remains a visible DevOps block. Activation keeps
+maintenance sealed and neither starts the model proxy nor assigns the issue.
+Maintenance release and the first native assignment are distinct operations.
 
 ## Required order
 

@@ -17,14 +17,16 @@ foi aprovado: Red real → revisão e congelamento dos testes → Green → cont
 negativos obrigatórios antes do merge. A política, o executor offline e o cadastro
 persistente e imutável de novas execuções estão implementados em fonte, incluindo
 bloqueios contra uso do fluxo legado por uma issue v2.
-O código do controlador v2 já está instalado em modo de prévia, com as quatro
-flags de execução desligadas e manutenção selada. A instalação preservou os
+O controlador v2 está instalado e habilitado **somente para uma qualificação
+nativa controlada**, em modo exclusivo que mantém os fluxos legados inativos.
+A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
+um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
 após backup compactado e prova real de restauração. Isso não habilita nem
 qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalação.
 O runtime de referência também já recebeu seletores explícitos para as seis
-imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO, ainda
-com todas as flags desligadas. `quality_runtime_configuration.py` confere o modo
+imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO.
+`quality_runtime_configuration.py` confere o modo
 dos responsáveis cadastrados e os metadados das imagens (usuário sem privilégios,
 entrypoints fixos, fases suportadas, ausência de volumes herdados e credenciais).
 O instalador aceita esses oito seletores por `--runtime-config`; não aceita
@@ -51,12 +53,11 @@ correto; Green/controle preservam hashes, versão e identidade dos casos, não
 apenas a contagem. Evidência ausente, skips, troca de casos ou recibos antigos
 de diagnóstico não são aprovação. Um canário Linux real percorreu esses
 executores com entradas/revisão/commit sintéticos, sem modelo ou entrega.
-**Essa integração está instalada em prévia desabilitada.** Os novos gates e
+**Essa integração está habilitada para o ensaio nativo, ainda não qualificado.** Os novos gates e
 pins foram instalados após backup/restauração verificados; a migração preservou
 journals, fila, tickets, prazos e contadores de falha. O scheduler próprio foi
-registrado novamente com o pin atualizado, sem liberar execução. Falta
-qualificar a execução nativa com agentes reais. O despacho v2 permanece
-desabilitado. O modo misto qualificado em fonte
+registrado novamente com o pin atualizado. Falta comprovar o encadeamento
+nativo completo; um worker ativo não é evidência de conclusão. O modo misto qualificado em fonte
 é unittest Python com baseline Node protegida; não é suporte genérico a Vitest,
 Jest ou autoria de novos testes em qualquer framework.
 O observador de Red real
@@ -72,9 +73,9 @@ restrita aos testes novos. A integração opt-in ao lançamento passou por Docke
 ACP reais com autoridade nativa sintética, sem chamada ao modelo. A reconciliação
 persistente término do autor → snapshot → Red → pacote para revisão está ligada
 ao watchdog em fonte, com atendimento alternado entre cards, manutenção e
-bloqueio de falhas repetidas. Continua desabilitada no controlador instalado.
+bloqueio de falhas repetidas. Está habilitada apenas para a qualificação nativa.
 A atribuição, o encaminhamento nativo único e a admissão da revisão independente
-estão implementados em fonte, em modo separado e desabilitado: leitura paginada
+estão implementados em fonte, em modo separado e restrito ao ensaio: leitura paginada
 do snapshot, sem permissões de implementação. O lançamento do revisor está ligado
 em fonte à admissão, startup e sessão ACP, com snapshot somente leitura e sem
 acesso ao workspace do autor. O encadeamento técnico autor/handlers → snapshot →
@@ -185,14 +186,16 @@ Para um cadastro v2 novo, `prepare_quality_enrollment.py` gera contrato/plano a
 partir da árvore Git inteira da main verificada e de uma seleção privada fixada
 por hash. `enroll_quality_lifecycle.py` confere controlador e manutenção e faz
 somente o cadastro imutável; `--observe` lê o mesmo pedido após perda de resposta.
-O primeiro card nativo de qualificação já está cadastrado, mas não foi atribuído
-nem executado. Os artefatos operacionais permanecem fora do Git público.
+O primeiro card nativo de qualificação está cadastrado e foi atribuído: o
+primeiro task e worker reais foram observados em execução, sem afirmar Red,
+revisão ou entrega concluídos. Os artefatos operacionais permanecem fora do Git público.
 O novo modo de isolamento `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` está implementado
 e testado em fonte: exclui coordenadores legados e rejeita grants antigos ou
 issues não cadastradas. O código já foi instalado em prévia, após backup e
-restauração verificados. O modo exclusivo e as quatro flags de execução ainda
-estão desligados: a ativação selada e a partida do card são etapas explícitas,
-não consequências do cadastro ou da atualização da imagem.
+restauração verificados. O modo exclusivo e as quatro flags de execução foram
+habilitados por `activate_quality_runtime.py`, ainda sob manutenção. Só depois
+o proxy foi ligado, o orçamento conferido, a manutenção liberada e o card
+atribuído. Nenhuma dessas etapas autoriza merge ou homologação.
 
 O gerador `--register --persist-login` cria somente o registro próprio do
 usuário; o bootstrap do launchd é uma operação separada. No macOS, os logs usam
@@ -466,19 +469,19 @@ flowchart TB
     UI <--> MC[Multica: issues, agentes e sessões]
     MC <--> RT[Runtime Multica + wrapper ACP]
     RT <--> B[Execution broker: autorização e isolamento]
-    S[Controladores persistentes de brief e sequência] <--> MC
+    S[Controladores legados de brief e sequência: inativos no ensaio v2] <--> MC
     S <--> B
     S <--> L[Ledgers privados, incidentes e recibos]
     B --> W[Workers Hermes isolados: até 2]
     W --> P[Proxy de modelo: identidade e teto de chamadas]
     P --> M[Provedor LLM configurado]
     B --> E[Snapshots imutáveis e validação controlada]
-    B -.->|Instalado; flags desligadas| V2[Coordenador v2: fila e handoffs duráveis]
-    V2 -.->|Revisão e autor Green| MC
-    V2 -.->|Captura, Green e controle negativo; fluxo desativado| E
+    B -->|Modo exclusivo: ensaio nativo, não homologação| V2[Coordenador v2: fila e handoffs duráveis]
+    V2 -->|Revisão e autor Green: habilitados, ainda não qualificados| MC
+    V2 -->|Captura, Green e controle negativo: resultados pendentes| E
     E -.-> GX[Ponte local: exportação e candidato Git interno]
     GX -.->|RPC local fixa: registro do SHA, sem push ou merge| V2
-    GD[Serviço host periódico: tickets persistentes, até 2 cards] -.->|Instalado e ocioso em manutenção; sem ensaio nativo| GX
+    GD[Serviço host periódico: tickets persistentes, até 2 cards] -->|Ativo: aguarda candidato nativo| GX
     S --> GH[GitHub: PR, checks e integração]
     S --> QA[Docker local: candidato e QA do mesmo SHA]
     QA --> R[Recibo de homologação]
