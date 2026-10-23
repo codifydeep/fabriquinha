@@ -18,6 +18,9 @@ COPY broker/quality_review_bootstrap_recovery.py /
 COPY broker/quality_worker_runtime.py broker/quality_review_launch.py broker/quality_launch_router.py /
 COPY broker/quality_review_reads.py broker/quality_review_attestation.py broker/read_stream_receipts.py /
 COPY broker/quality_review_completion_receipts.py /
+COPY broker/quality_review_history.py /
+COPY broker/quality_review_completion_recovery.py /
+COPY install_quality_review_stop.py /
 COPY quality_review_verdict.py quality_review_stop.py /
 COPY broker/quality_implementation_admission.py /
 COPY broker/quality_implementation_launch.py /
@@ -32,5 +35,5 @@ COPY broker/quality_execution_isolation.py /
 COPY broker/literal_author_bootstrap_recovery.py broker/review_context_recovery.py /
 COPY quality_phase_tools.py execution_context.py /
 ENV BROKER_QUALITY_V2_ENABLED=0 BROKER_QUALITY_REVIEW_ENABLED=0 BROKER_QUALITY_IMPLEMENTATION_ENABLED=0 BROKER_QUALITY_TEAM_ENABLED=0
-RUN BROKER_WORKER_IMAGE=sha256:0000000000000000000000000000000000000000000000000000000000000000 PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import broker, quality_author_launch, quality_red_snapshot, quality_progress, quality_test_review, quality_worker_runtime, quality_review_launch, quality_launch_router, quality_review_reads, quality_review_attestation, quality_implementation_admission, quality_delivery_capture, quality_candidate_binding, quality_green_capture, quality_team_progress; assert broker.QUALITY_V2_ENABLED is False; assert broker.QUALITY_REVIEW_ENABLED is False; assert broker.QUALITY_IMPLEMENTATION_ENABLED is False; assert broker.QUALITY_TEAM_ENABLED is False"
+RUN BROKER_WORKER_IMAGE=sha256:0000000000000000000000000000000000000000000000000000000000000000 PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -B -c "import broker, quality_author_launch, quality_red_snapshot, quality_progress, quality_test_review, quality_worker_runtime, quality_review_launch, quality_launch_router, quality_review_reads, quality_review_attestation, quality_review_history, quality_review_completion_recovery, quality_implementation_admission, quality_delivery_capture, quality_candidate_binding, quality_green_capture, quality_team_progress; assert broker.QUALITY_V2_ENABLED is False; assert broker.QUALITY_REVIEW_ENABLED is False; assert broker.QUALITY_IMPLEMENTATION_ENABLED is False; assert broker.QUALITY_TEAM_ENABLED is False"
 LABEL delivery-kit.component="quality-v2-controller" delivery-kit.qualification="not-native-delivery"

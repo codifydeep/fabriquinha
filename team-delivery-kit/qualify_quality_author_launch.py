@@ -54,6 +54,9 @@ SOURCES={
     'model_policy.py':'model_policy.py','quality_phase_tools.py':'quality_phase_tools.py','execution_context.py':'execution_context.py',
     'quality_review_verdict.py':'quality_review_verdict.py','quality_review_stop.py':'quality_review_stop.py',
     'broker/quality_review_completion_receipts.py':'quality_review_completion_receipts.py',
+    'broker/quality_review_history.py':'quality_review_history.py',
+    'broker/quality_review_completion_recovery.py':'quality_review_completion_recovery.py',
+    'install_quality_review_stop.py':'install_quality_review_stop.py',
     'tests/quality_launch_docker_probe.py':'quality_launch_docker_probe.py',
     'tests/quality_revision_registry_canary.py':'quality_revision_registry_canary.py'}
 

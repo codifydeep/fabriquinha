@@ -89,6 +89,16 @@ candidata também passou pelo encadeamento físico autor/Red/revisão/correção
 nova revisão, com autoridade sintética e retirada de doze auxiliares. Ainda
 precisa de instalação e ensaio nativo;
 o bloqueio já encerrado não será apagado nem reinterpretado como aprovação.
+O adaptador de recuperação de conclusão está implementado em fonte: mantém
+admissões, pareceres e relógios das sucessoras em registros separados, sem
+migrar tabelas históricas durante leitura. Uma nova revisão exige instalação
+verificada, worker anterior aposentado e qualificação Docker/ACP vinculada à
+imagem e aos hashes reais do código. A mesma condição não pode ser reaplicada
+com outro nome de imagem, task ou qualificação. O registro não fecha o incidente,
+não emite grant e não aprova testes; o coordenador continua responsável pelo
+despacho após liberar a manutenção. A integração foi testada também após uma
+recuperação anterior de bootstrap, preservando ambos os pareceres antigos e
+exigindo novo congelamento antes do Green. Instalação e prova nativa pendentes.
 Foi reproduzida em testes uma corrida compatível com essa falha: a observação do
 watchdog avançava o estado antes do ACK de criação/start e a rotina rejeitava a
 confirmação tardia. A correção em fonte preserva a observação mais forte somente

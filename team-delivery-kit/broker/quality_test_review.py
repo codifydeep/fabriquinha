@@ -133,6 +133,10 @@ def save(b, source, context, before, after):
 
 
 def marker(b,context,state):
+    try:from . import quality_review_completion_recovery as completion
+    except ImportError:import quality_review_completion_recovery as completion
+    renewed=completion.marker(b,context,state)
+    if renewed is not None:return renewed
     try:from . import quality_review_bootstrap_recovery as bootstrap
     except ImportError:import quality_review_bootstrap_recovery as bootstrap
     renewed=bootstrap.marker(b,context,state)
@@ -153,6 +157,9 @@ def eligible_runs(b,context,state,runs):
     try:from . import quality_review_bootstrap_recovery as bootstrap
     except ImportError:import quality_review_bootstrap_recovery as bootstrap
     runs=bootstrap.exclude_failed(b,context,state,runs)
+    try:from . import quality_review_completion_recovery as completion
+    except ImportError:import quality_review_completion_recovery as completion
+    runs=completion.exclude_completed(b,context,state,runs)
     return recovery.runs(b,context,state,runs)
 
 
@@ -203,14 +210,13 @@ def dispatch(b, source):
 
 def admission(con, request):
     initialize(con)
-    row = con.execute('SELECT context,context_sha256 FROM quality_review_admissions '
-        'WHERE request_id=?', (request,)).fetchone()
-    if capture.enrollment.exists(con,'quality_review_attempts'):
-        renewed=con.execute('SELECT context,context_sha256 FROM quality_review_attempts WHERE request_id=?',(request,)).fetchone()
-        require(not (row and renewed))
-        if renewed:row=renewed
-    if not row:
+    try:from . import quality_review_history as history
+    except ImportError:import quality_review_history as history
+    rows=history.rows(con,'admission',request=request)
+    require(len(rows)<=1)
+    if not rows:
         return None
+    row=rows[0]
     context = json.loads(row[0])
     require(quality.digest(context) == row[1] and context['request_id'] == request
         and context['phase'] == 'test_review_v2' and context['mode'] == 'review')
@@ -271,7 +277,9 @@ def admit(b, source, task_id, agent_id, *, now=None):
             and json.loads((b.STATE/'native.json').read_text()) == settings)
         try:from . import quality_review_bootstrap_recovery as bootstrap
         except ImportError:import quality_review_bootstrap_recovery as bootstrap
-        table=bootstrap.admission_table(b,con,source,context,state,task_id)
+        try:from . import quality_review_completion_recovery as completion
+        except ImportError:import quality_review_completion_recovery as completion
+        table=completion.admission_table(b,con,source,context,state,task_id) or bootstrap.admission_table(b,con,source,context,state,task_id)
         if table=='quality_review_admissions':
             require(not con.execute('SELECT 1 FROM quality_review_admissions WHERE source_task=? OR task_id=?',
                 (source, task_id)).fetchone())
@@ -301,7 +309,7 @@ def admit(b, source, task_id, agent_id, *, now=None):
             (request, task_id, agent_id, admitted['scope'], e['issue_id']))
         con.execute('INSERT INTO quality_native_scopes VALUES(?,?,?,?,?)',
             (request, task_id, e['run_id'], 'test_review_v2', e['plan_sha256']))
-        require(table in ('quality_review_admissions','quality_review_attempts'))
+        require(table in ('quality_review_admissions','quality_review_attempts','quality_review_successor_admissions'))
         con.execute('INSERT INTO '+table+' VALUES(?,?,?,?,?)',
             (source, task_id, request, json.dumps(admitted, sort_keys=True), quality.digest(admitted)))
         after = {**state, 'stage': 'admitted', 'review_task': task_id, 'request_id': request}

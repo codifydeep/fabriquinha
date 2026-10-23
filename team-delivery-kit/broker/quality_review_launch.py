@@ -20,14 +20,12 @@ load_admission = review.admission
 
 
 def owns(b, request):
+    try:from . import quality_review_history as history
+    except ImportError:import quality_review_history as history
     with b.db() as con:
-        if not review.capture.enrollment.exists(con, 'quality_review_admissions'):
-            return False
-        found=bool(con.execute('SELECT 1 FROM quality_review_admissions WHERE request_id=?', (request,)).fetchone())
-        if review.capture.enrollment.exists(con,'quality_review_attempts'):
-            renewed=bool(con.execute('SELECT 1 FROM quality_review_attempts WHERE request_id=?',(request,)).fetchone())
-            require(not (found and renewed));found=found or renewed
-        return found
+        rows=history.rows(con,'admission',request=request)
+        require(len(rows)<=1)
+        return bool(rows)
 
 
 def enabled(b):
@@ -70,7 +68,7 @@ def current(b, request):
         and task.get('issue_id') == c['issue_id'] and task.get('status') == 'running'
         and task.get('workspace_id') == e['workspace_id'] and task.get('runtime_id') == e['runtime_id']
         and task.get('wakeup_id') == state['wakeup_id'] and task.get('handoff_note') == note)
-    if 'recovery_marker' in state or 'bootstrap_marker' in state:
+    if any(k in state for k in ('recovery_marker','bootstrap_marker','completion_marker')):
         runs=review.eligible_runs(b,context,state,[r for r in native.issue_task_runs(settings,c['issue_id']) if r.get('agent_id')==c['agent_id']])
         require(len(runs)==1 and runs[0].get('id')==c['task_id'])
     return dict(task_id=c['task_id'], agent_id=c['agent_id'], issue_id=c['issue_id'], mode='review',

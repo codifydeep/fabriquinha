@@ -122,7 +122,9 @@ def candidates(b):
             author.enrollment.canonical(source)
             old=load(b,source)
             if old and old[1]['stage'] in TERMINAL:
-                if old[1]['stage']!='technical_blocked' or not (revision.eligible(b,source) or bootstrap.eligible(b,source)):continue
+                try:from . import quality_review_completion_recovery as completion
+                except ImportError:import quality_review_completion_recovery as completion
+                if old[1]['stage']!='technical_blocked' or not (revision.eligible(b,source) or completion.eligible(b,source) or bootstrap.eligible(b,source)):continue
             result.append((cursors.get(source,0),source))
         except (ValueError,KeyError,TypeError):quarantine(b,source,'team_journal_integrity_rejected')
     return [source for _,source in sorted(result)]

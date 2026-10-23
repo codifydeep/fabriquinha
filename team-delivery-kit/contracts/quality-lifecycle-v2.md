@@ -788,6 +788,29 @@ without deleting volumes or changing the installed controller. Installation and
 a new native review after a qualified changed condition remain required. Historical terminal
 review attestations are not reparsed or rewritten by this candidate.
 
+`quality_review_history.py` adds append-only successor admissions, attestations
+and per-request clocks without rewriting either legacy review table. Pure reads
+of archived databases never perform schema migration. A corrupted inactive
+receipt also blocks active/transactional consumers; Green must select the exact
+new freeze, not an older favorable or failed verdict.
+
+`quality_review_completion_recovery.py` is a controller/operator-only changed-
+condition adapter, not a worker RPC. A closed, completed review with rejected
+format/read evidence may get a distinct successor only after a verified source
+installation, exact retirement/absence proof, unchanged snapshot and a qualified
+replacement worker. `qualify_quality_review_stop.py` records the actual image,
+runtime source hashes, same-turn ACP behavior and original 40-iteration budget
+using a fixed loopback provider. Unknown effects are observed, never replayed;
+an interrupted final receipt can resume from its preserved successful output.
+
+Registration preserves the old native identity/output hash, admission, capability,
+attestation and incident. It only prepares a new marker; it neither closes the
+incident, mints authority, dispatches work nor inherits approval. Dispatch remains
+with the coordinator after explicit activation/release. Reusing the same code
+condition under another task, qualification ID or build tag is rejected. The
+adapter is tested with prior bootstrap recovery, a fresh independent attestation
+and transactional Green admission; installation/native qualification is pending.
+
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after
 complete, byte-bound reads of every new test and every cited file; omissions in
