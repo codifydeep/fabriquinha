@@ -177,7 +177,7 @@ def image(tag,component):
     return info
 
 
-def observe_retirement(archive,owner,namespace):
+def observe_retirement(archive,owner,namespace,*,require_stopped=False):
     """Only after the isolated process and all actual jobs have settled."""
     ids=subprocess.check_output(['docker','ps','-aq','--no-trunc','--filter','label=delivery-kit.owner='+owner],text=True).split()
     for ident in ids:
@@ -199,6 +199,7 @@ def observe_retirement(archive,owner,namespace):
         if (current['Id']!=ident or current['Image']!=info['Image']
                 or current['Config'].get('Labels',{}).get('delivery-kit.owner')!=owner):raise ValueError('retirement identity changed')
         if current['State']['Running']:
+            if require_stopped:raise ValueError('failed qualification still has an active helper; preserve and diagnose')
             if (archive/(ident+'-stop-intent.json')).exists():raise ValueError('observe previous stop; never repeat it')
             save(archive/(ident+'-stop-intent.json'),dict(container_id=ident))
             stopped=command(['docker','stop','--time','10',ident])
@@ -214,6 +215,31 @@ def observe_retirement(archive,owner,namespace):
         if removed.returncode:raise ValueError('removal outcome requires observation, never replay')
         await_retirement(info['Name'].lstrip('/'))
     return len(ids)
+
+
+def retire_failed(namespace,operation):
+    """Archive a terminal failed experiment without relabeling it successful."""
+    if str(uuid.UUID(operation))!=operation:raise ValueError('exact failed qualification identity required')
+    maintenance,_=require_idle(namespace)
+    archive=ROOT/('.local-'+namespace.removeprefix('delivery-kit-'))/'backups'/('quality-launch-docker-'+operation)
+    metadata=json.loads((archive/'operation.json').read_bytes())
+    process=json.loads((archive/'process-result.json').read_bytes())
+    report=json.loads((archive/'state/run-result.json').read_bytes())
+    if (metadata['operation']!=operation or metadata['namespace']!=namespace or metadata['maintenance']!=maintenance
+            or metadata['owner']!=namespace+'-quality-launch-'+operation[:8]
+            or type(process['exit_code']) is not int or process['exit_code']==0
+            or report['status']!='failed' or report['native_api']!='synthetic_fixture'
+            or report['model_calls']!=0 or report['prompts_sent']!=0 or report['delivery_approval'] is not False):
+        raise ValueError('terminal zero-model failed report required; no live-process inference')
+    completed=archive/'result.json'
+    if completed.exists():
+        result=json.loads(completed.read_bytes())
+        if result.get('status')!='failed' or result.get('failed_experiment_preserved') is not True:
+            raise ValueError('existing result differs; no overwrite')
+        return result
+    count=observe_retirement(archive,metadata['owner'],namespace,require_stopped=True)
+    result=dict(report,containers_retired=count,volumes_deleted=0,archive=str(archive),failed_experiment_preserved=True)
+    save(completed,result);return result
 
 
 def finish_retirement(namespace,operation):
@@ -328,9 +354,11 @@ if __name__=='__main__':
     for key in ('prep','worker','copy','observer'):p.add_argument('--'+key+'-image')
     p.add_argument('--resume-before-execution')
     p.add_argument('--finish-retirement')
+    p.add_argument('--retire-failed',help='Retire only stopped helpers of a proved terminal failed experiment; preserve failure')
     p.add_argument('--review-chain',action='store_true',help='Synthetic author/Red/review launch, no model or test approval')
     a=p.parse_args()
-    if a.finish_retirement:result=finish_retirement(a.namespace,a.finish_retirement)
+    if a.retire_failed:result=retire_failed(a.namespace,a.retire_failed)
+    elif a.finish_retirement:result=finish_retirement(a.namespace,a.finish_retirement)
     elif a.resume_before_execution:result=resume_before_execution(a.namespace,a.resume_before_execution)
     elif all((a.prep_image,a.worker_image,a.copy_image,a.observer_image)):
         result=qualify(a.namespace,a.prep_image,a.worker_image,a.copy_image,a.observer_image,review_chain=a.review_chain)

@@ -98,6 +98,15 @@ forbidden. Authors must read registered product/test files, use an exact
 permitted write path and read it back; denial is not successful persistence.
 This interface correction is tested in source; existing blocked tasks are not
 reopened or treated as successful test authorship.
+The zero-model Docker/ACP canary explicitly resets its copied broker's team,
+exclusive and implementation flags, independently of the installed process.
+Its individual author/Red/review adapter must not accidentally enter the team
+coordinator. `qualify_quality_author_launch.py --retire-failed <operation>`
+requires a terminal failed receipt and retires only stopped owned helpers after
+archiving logs/metadata. The experiment stays failed; this cannot approve a
+test, replay a model task or delete its volumes. A fresh canary after the flag
+isolation fix passed real author/Red/readonly-review transport without prompts
+or model calls; its native API authority remains explicitly synthetic.
 
 ## Required order
 

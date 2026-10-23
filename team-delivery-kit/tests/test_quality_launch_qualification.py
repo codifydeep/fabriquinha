@@ -44,6 +44,26 @@ class LaunchQualificationTests(unittest.TestCase):
                 qualification.observe_retirement(self.archive,self.owner,self.namespace)
         self.assertFalse(any(c.args[0][1]=='rm' for c in command.call_args_list))
 
+    def test_failed_retirement_never_stops_a_still_running_helper(self):
+        self.info['State'].update(Running=True,Status='running')
+        with patch.object(qualification.subprocess,'check_output',side_effect=self.inspect),\
+                patch.object(qualification,'command',return_value=self.result) as command:
+            with self.assertRaisesRegex(ValueError,'active helper'):
+                qualification.observe_retirement(self.archive,self.owner,self.namespace,require_stopped=True)
+        self.assertFalse(any(c.args[0][1] in ('stop','rm') for c in command.call_args_list))
+
+    def test_adapter_fixture_does_not_inherit_installed_team_coordination_flags(self):
+        import ast
+        tree=ast.parse((Path(__file__).parent/'quality_launch_docker_probe.py').read_bytes())
+        values={}
+        for node in tree.body:
+            if isinstance(node,ast.Assign):
+                for target in node.targets:
+                    if isinstance(target,ast.Attribute) and isinstance(target.value,ast.Name) and target.value.id=='b':
+                        values[target.attr]=ast.unparse(node.value)
+        for name in ('QUALITY_TEAM_ENABLED','QUALITY_EXCLUSIVE_ENABLED','QUALITY_IMPLEMENTATION_ENABLED'):
+            self.assertEqual(values[name],'False')
+
     def test_unknown_stop_ack_is_observed_without_another_stop_or_removal(self):
         self.info['State'].update(Running=True,Status='running')
         (self.archive/(self.ident+'-stop-intent.json')).write_text('{}')

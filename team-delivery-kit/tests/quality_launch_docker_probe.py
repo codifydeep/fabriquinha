@@ -31,6 +31,10 @@ import acp_startup
 
 b.STATE=ROOT/'state';b.STATE.mkdir(mode=0o700)
 b.PREFIX=config['namespace'];b.OWNER=config['owner'];b.QUALITY_V2_ENABLED=True
+# The installed process may have active v2 flags. This subprocess exercises
+# the isolated author/Red/review adapter, not the installed team coordinator.
+b.QUALITY_TEAM_ENABLED=False;b.QUALITY_EXCLUSIVE_ENABLED=False
+b.QUALITY_IMPLEMENTATION_ENABLED=False;b.QUALITY_REVIEW_ENABLED=bool(config.get('review_chain'))
 b.MODEL_NETWORK=b.PREFIX+'_model'
 for key in ('QUALITY_WORKER_IMAGE','QUALITY_PREP_IMAGE','QUALITY_RED_IMAGE','QUALITY_COPY_IMAGE'):
     setattr(b,key,config[key])
