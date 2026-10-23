@@ -63,8 +63,8 @@ not successful enrollment or permission for a replacement issue.
 The new source isolation mode `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` prevents
 legacy grants, rejects unenrolled native issues and chooses only the v2
 coordinators. All four v2 phase flags are separately required. Legacy journals
-remain preserved, not completed or reset. The isolation mode is tested in source
-but has not yet been installed or activated in the reference runtime. Leaving
+remain preserved, not completed or reset. The isolation code is tested and
+installed in disabled preview, but has not been activated in the reference runtime. Leaving
 maintenance in a mixed legacy/v2 coordinator mode is not the qualification path.
 
 ## Required order

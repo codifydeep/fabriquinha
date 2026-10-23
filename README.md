@@ -189,8 +189,10 @@ O primeiro card nativo de qualificação já está cadastrado, mas não foi atri
 nem executado. Os artefatos operacionais permanecem fora do Git público.
 O novo modo de isolamento `BROKER_QUALITY_EXCLUSIVE_ENABLED=1` está implementado
 e testado em fonte: exclui coordenadores legados e rejeita grants antigos ou
-issues não cadastradas. Ainda precisa ser instalado antes de sair da manutenção;
-as quatro flags de execução continuam desligadas na referência atual.
+issues não cadastradas. O código já foi instalado em prévia, após backup e
+restauração verificados. O modo exclusivo e as quatro flags de execução ainda
+estão desligados: a ativação selada e a partida do card são etapas explícitas,
+não consequências do cadastro ou da atualização da imagem.
 
 O gerador `--register --persist-login` cria somente o registro próprio do
 usuário; o bootstrap do launchd é uma operação separada. No macOS, os logs usam
