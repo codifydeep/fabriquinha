@@ -33,8 +33,8 @@ Os seletores ficam presos à identidade da instalação e em arquivo privado.
 As imagens atuais passaram novamente pelo encadeamento Docker/ACP autor → Red →
 revisão somente leitura e pelo bloqueio de testes/cópia pós-Green. Esses probes
 usam autoridade nativa sintética e não aprovam testes, produto ou homologação.
-O preflight da aplicação real revelou uma dependência ainda ausente nos gates
-v2 instalados: a CI do repositório de avaliação executa Python **e** Node,
+O preflight da aplicação real revelou uma dependência inicialmente ausente nos
+gates v2: a CI do repositório de avaliação executa Python **e** Node,
 incluindo regressões de navegador em VM Node. O runtime opcional
 `Dockerfile.quality-runner-base` reúne Python/Node sem downloads ou npm na
 instalação de referência. `quality_node_baseline.py` executa descoberta Node
@@ -51,9 +51,12 @@ correto; Green/controle preservam hashes, versão e identidade dos casos, não
 apenas a contagem. Evidência ausente, skips, troca de casos ou recibos antigos
 de diagnóstico não são aprovação. Um canário Linux real percorreu esses
 executores com entradas/revisão/commit sintéticos, sem modelo ou entrega.
-**Essa integração ainda não está instalada no controlador.** Faltam migrar os
-pins sem perder journals, instalar as novas imagens e qualificar a execução
-nativa. O despacho v2 permanece desabilitado. O modo misto qualificado em fonte
+**Essa integração está instalada em prévia desabilitada.** Os novos gates e
+pins foram instalados após backup/restauração verificados; a migração preservou
+journals, fila, tickets, prazos e contadores de falha. O scheduler próprio foi
+registrado novamente com o pin atualizado, sem liberar execução. Falta
+qualificar a execução nativa com agentes reais. O despacho v2 permanece
+desabilitado. O modo misto qualificado em fonte
 é unittest Python com baseline Node protegida; não é suporte genérico a Vitest,
 Jest ou autoria de novos testes em qualquer framework.
 O observador de Red real

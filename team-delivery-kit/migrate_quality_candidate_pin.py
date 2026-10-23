@@ -37,7 +37,7 @@ class Effects:
         result=subprocess.run(['launchctl','print',domain+'/'+name],capture_output=True,text=True,timeout=10)
         require(result.returncode==113)
         disabled=subprocess.check_output(['launchctl','print-disabled',domain],text=True,timeout=10)
-        require(re.search(r'"'+re.escape(name)+r'"\s*=>\s*true',disabled) is not None)
+        require(re.search(r'^\s*"'+re.escape(name)+r'"\s*=>\s*(?:true|disabled)\s*$',disabled,re.M) is not None)
     def helpers(self,namespace):
         result=subprocess.check_output(['docker','ps','-aq','--filter',
             'label=com.docker.compose.project='+namespace+'-tests'],text=True,timeout=15)

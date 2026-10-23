@@ -5,6 +5,7 @@ import plistlib
 import sqlite3
 import unittest
 import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 import migrate_quality_candidate_pin as migration
 import quality_candidate_dispatch as dispatch
@@ -113,6 +114,16 @@ class PinMigrationTests(unittest.TestCase):
         with sqlite3.connect(backup) as con:con.execute('UPDATE meta SET ticket=ticket+1')
         self.fx.fail_registration=False
         with self.assertRaises(ValueError):self.migrate()
+
+    def test_native_launchd_disabled_formats_are_exact_and_enabled_is_rejected(self):
+        name=migration.label(self.authority.namespace)
+        for flag in ('true','disabled','false','enabled','disabled-other'):
+            with self.subTest(flag=flag),patch.object(migration.os.sys,'platform','darwin'),\
+                    patch.object(migration.subprocess,'run',return_value=SimpleNamespace(returncode=113)),\
+                    patch.object(migration.subprocess,'check_output',return_value=' "'+name+'" => '+flag+'\n'):
+                if flag in ('true','disabled'):migration.Effects().stopped(self.authority.namespace)
+                else:
+                    with self.assertRaises(ValueError):migration.Effects().stopped(self.authority.namespace)
 
 
 if __name__=='__main__':unittest.main()
