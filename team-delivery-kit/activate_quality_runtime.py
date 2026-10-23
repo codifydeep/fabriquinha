@@ -28,16 +28,24 @@ ROOT=Path(__file__).resolve().parent
 FLAGS=(*install.FLAGS,'BROKER_QUALITY_EXCLUSIVE_ENABLED')
 PROGRAM='''import sys,json,hashlib,pathlib,time
 sys.path.insert(0,"/")
-import broker as b,native,quality_lifecycle_enrollment as e,quality_execution_isolation as isolation
+import broker as b,native,quality_lifecycle_enrollment as e,quality_execution_isolation as isolation,quality_team_progress as team
 settings=json.loads((b.STATE/"native.json").read_bytes());issue=sys.argv[1]
 with b.db() as con:
  rows=con.execute("SELECT issue_id FROM quality_lifecycle_enrollments").fetchall()
- assert len(rows)==1 and rows[0][0]==issue
+ assert any(row[0]==issue for row in rows)
+ for row in rows:
+  if row[0]==issue:continue
+  assert e.lookup(con,row[0]) is not None
+  previous=con.execute("SELECT task_id FROM quality_author_admissions WHERE issue_id=?",(row[0],)).fetchall()
+  assert len(previous)==1
+  record=team.load(b,previous[0][0])
+  assert record is not None and record[1]["stage"]=="technical_blocked"
  receipt=e.lookup(con,issue)
  pending=con.execute("SELECT count(*) FROM grants g LEFT JOIN leases l USING(request_id) WHERE g.deadline>? AND (g.used=0 OR (g.used=1 AND l.request_id IS NULL))",(time.time(),)).fetchone()[0]
 assert receipt and pending==0 and not native.issue_task_runs(settings,issue)
 assert settings["agents"].get(receipt["author"])=="implementation" and settings["agents"].get(receipt["reviewer"])=="review"
-print(json.dumps(dict(issue_id=issue,enrollment=receipt,source_sha256=hashlib.sha256(pathlib.Path(isolation.__file__).read_bytes()).hexdigest(),exclusive=b.QUALITY_EXCLUSIVE_ENABLED),sort_keys=True))
+print(json.dumps(dict(issue_id=issue,enrollment=receipt,source_sha256=hashlib.sha256(pathlib.Path(isolation.__file__).read_bytes()).hexdigest(),exclusive=b.QUALITY_EXCLUSIVE_ENABLED,
+ flags=[b.QUALITY_V2_ENABLED,b.QUALITY_REVIEW_ENABLED,b.QUALITY_IMPLEMENTATION_ENABLED,b.QUALITY_TEAM_ENABLED]),sort_keys=True))
 '''
 
 
@@ -50,7 +58,7 @@ def verify(before,after):
     original=env(before);actual=env(after)
     require(after['Name']==before['Name'] and all(after['Config']['Labels'].get(k)==before['Config']['Labels'].get(k)
         for k in ('com.docker.compose.project','com.docker.compose.service')))
-    require(all(original.get(k,'0')=='0' for k in FLAGS))
+    require(all(original.get(k)=='0' for k in install.FLAGS) and original.get('BROKER_QUALITY_EXCLUSIVE_ENABLED','0') in ('0','1'))
     require(actual=={**original,**{k:'1' for k in FLAGS}})
     normalized=copy.deepcopy(after);normalized['Config']['Env']=list(before['Config']['Env'])
     install.verify_preservation(before,normalized,before['Image'])
@@ -62,7 +70,8 @@ def preflight(namespace,image,payload):
     maintenance,_=require_idle(namespace)
     require(maintenance['operation_id']==payload['maintenance_operation']);Service().stopped(namespace)
     result=json.loads(install.command(['docker','exec',authority.identity,'python','-c',PROGRAM,payload['plan']['issue_id']]).stdout)
-    require(authority.inspect_controller()==authority.identity and result['exclusive'] is False
+    require(authority.inspect_controller()==authority.identity and type(result['exclusive']) is bool
+        and result['flags']==[False]*4 and all(type(v) is bool for v in result['flags'])
         and result['enrollment']['plan_sha256']==enrollment.enrollment.policy.digest(payload['plan'])
         and result['source_sha256']==hashlib.sha256((ROOT/'broker/quality_execution_isolation.py').read_bytes()).hexdigest())
     return authority.identity

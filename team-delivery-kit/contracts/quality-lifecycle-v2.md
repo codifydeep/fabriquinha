@@ -85,6 +85,19 @@ containers remain exact. The durable effect intent prevents repeating `up`
 after a lost response; expiry remains a visible DevOps block. Activation keeps
 maintenance sealed and neither starts the model proxy nor assigns the issue.
 Maintenance release and the first native assignment are distinct operations.
+Historical enrollments may coexist with a fresh activation target only when
+their authenticated team records remain technically blocked; activation never
+clears those incidents. A sealed source upgrade reapplies the OFF overlay last,
+even if an earlier exclusive overlay is present, while preserving an existing
+exclusive fence. Phase flags are reenabled only by the separate activator.
+
+Tests-only prompts must publish the exact absolute `read_paths` and
+`editable_paths` supplied to handlers and ACP permissions. Repository-relative
+criterion identifiers are not tool addresses. Relative tool paths remain
+forbidden. Authors must read registered product/test files, use an exact
+permitted write path and read it back; denial is not successful persistence.
+This interface correction is tested in source; existing blocked tasks are not
+reopened or treated as successful test authorship.
 
 ## Required order
 

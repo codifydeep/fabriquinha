@@ -24,6 +24,11 @@ um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
 após backup compactado e prova real de restauração. Isso não habilita nem
 qualifica a cadeia nativa de entrega; nenhum modelo é acionado pela instalação.
+O ensaio ainda não comprovou Red/revisão/Green nativos: detectou um vínculo de
+imagem inválido e, no sucessor, um teste vazio após leituras/escrita negadas.
+O preflight de imagem já foi corrigido e verificado no runtime; o prompt de
+caminhos absolutos tem correção/testes em fonte, ainda pendente de instalação.
+Os bloqueios e arquivos originais continuam preservados, sem aprovação fictícia.
 O runtime de referência também já recebeu seletores explícitos para as seis
 imagens imutáveis de qualidade e os responsáveis nativos Tech Lead/CTO.
 `quality_runtime_configuration.py` confere o modo

@@ -58,6 +58,14 @@ def environment():
     return {k:v for k,v in os.environ.items() if k in allowed}
 
 
+def disabled_sources(files,*,runtime=False):
+    """Explicit OFF overlay must win even after a previous exclusive activation."""
+    preview=ROOT/'compose.quality-v2-preview.yaml';values=[p for p in files if p!=preview]
+    selectors=ROOT/'compose.quality-v2-runtime.yaml'
+    if runtime and selectors not in values:values.append(selectors)
+    return [*values,preview]
+
+
 def configuration(before,namespace):
     labels=before.get('Config',{}).get('Labels',{})
     require(labels.get('com.docker.compose.project')==namespace and labels.get('com.docker.compose.service')=='execution-broker'
@@ -168,11 +176,7 @@ def install(namespace,image,operation,*,runtime=None):
             try:os.fsync(descriptor)
             finally:os.close(descriptor)
         argv+=['--env-file',str(pin)]
-        for path in files:argv+=['-f',str(path)]
-        overlay=ROOT/'compose.quality-v2-preview.yaml'
-        if overlay not in files:argv+=['-f',str(overlay)]
-        runtime_overlay=ROOT/'compose.quality-v2-runtime.yaml'
-        if runtime is not None and runtime_overlay not in files:argv+=['-f',str(runtime_overlay)]
+        for path in disabled_sources(files,runtime=runtime is not None):argv+=['-f',str(path)]
         save(private/'before.json',before)
         resolved=json.loads(command([*argv,'config','--format','json'],env=env).stdout)
         require(resolved['services']['execution-broker']['image']==image)

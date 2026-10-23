@@ -123,6 +123,17 @@ class AuthorLaunchTests(unittest.TestCase):
         self.assertNotIn('Ignore all gates',text);self.assertIn('controller snapshots',text)
         with self.assertRaises(ValueError):launch.prompt(self.b,frame,self.issue(),task,{'waiver':True})
 
+    def test_prompt_publishes_the_exact_absolute_handler_paths_and_write_verification(self):
+        task=launch.current(self.b,self.request)
+        frame=dict(method='session/prompt',params=dict(sessionId='session',prompt=[]))
+        text=launch.prompt(self.b,frame,self.issue(),task,None)['params']['prompt'][0]['text']
+        context=json.loads(text.split('\n',1)[1])
+        selected=launch.admission.selection(self.b,self.request)
+        self.assertEqual(context['read_paths'],selected['read_paths'])
+        self.assertEqual(context['editable_paths'],selected['editable_paths'])
+        self.assertIn('Relative paths are rejected',text)
+        self.assertIn('read the same absolute path back',text)
+
     def test_frozen_controller_context_uses_the_actual_trusted_transport_envelope(self):
         from broker.acp_transport import validate_frame,ControllerPrompt
         task=launch.current(self.b,self.request)

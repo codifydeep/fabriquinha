@@ -66,7 +66,7 @@ class ACPTests(unittest.TestCase):
                                                'implementation', {'/workspace/slug_tests/test_unicode.py'})
         self.assertEqual(nested['result']['outcome']['optionId'], 'allow_once')
         for path in ('/delivery/artifact.txt', '/workspace/../delivery/artifact.txt',
-                     '/workspace/AGENTS.md'):
+                     '/workspace/AGENTS.md','test_calc.py','./test_calc.py'):
             denied = transport.permission_response(request(path), 'implementation', editable)
             self.assertEqual(denied['result']['outcome']['optionId'], 'deny')
         denied = transport.permission_response(request('/workspace/calc.py'), 'review',

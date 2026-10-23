@@ -121,10 +121,16 @@ def prompt(b,frame,issue,task,correction):
         plan,spec=admission.enrollment.request(json.loads(con.execute(
             'SELECT config FROM quality_lifecycle_enrollments WHERE issue_id=?',(issue['id'],)).fetchone()[0]))
     require({k:issue.get(k) for k in ('id','workspace_id','title','description')}==c['issue'])
+    selected=admission.selection(b,request)
     context=dict(run_id=plan['run_id'],issue_id=plan['issue_id'],criteria=plan['criteria'],
+        read_paths=selected['read_paths'],editable_paths=selected['editable_paths'],
         criterion_tests=plan['criterion_tests'],new_tests=plan['new_tests'],baseline_tests=plan['baseline_tests'],
         product_files=plan['product_files'],title=issue.get('title',''),description=issue.get('description',''))
     text=('TESTS-ONLY V2. Read the declared base and write only the registered NEW tests (<=32768 UTF-8 bytes/file). '
+        'Every read_file/write_file path must be an exact absolute path from read_paths/editable_paths below. '
+        'Relative paths are rejected by the handler and ACP client; do not guess filenames or handler names. '
+        'Read the actual registered product and an existing test before authoring. After a successful write, '
+        'read the same absolute path back to verify that nonempty test bytes were saved. A denied edit is not a saved file. '
         'Use read_file and write_file; arbitrary patches, terminal, Python execution and product/baseline edits are forbidden. '
         'Express the acceptance behavior against the unchanged product. Do not run tests, create a positive implementation, '
         'weaken existing tests, request approval or claim Red/Green. Stop after writing the new tests. '

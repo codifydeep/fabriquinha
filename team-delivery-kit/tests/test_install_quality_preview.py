@@ -41,6 +41,14 @@ class PreviewInstallTests(unittest.TestCase):
     def test_only_image_and_explicit_disabled_flags_may_change(self):
         install.verify_preservation(self.before,self.after(),'sha256:'+'b'*64)
 
+    def test_disabled_overlay_wins_after_a_prior_exclusive_activation(self):
+        preview=install.ROOT/'compose.quality-v2-preview.yaml';exclusive=install.ROOT/'compose.quality-v2-exclusive.yaml'
+        core=install.ROOT/'compose.eval.yaml'
+        values=install.disabled_sources([core,preview,exclusive],runtime=True)
+        self.assertEqual(values[-1],preview);self.assertEqual(values.count(preview),1)
+        self.assertLess(values.index(exclusive),values.index(preview))
+        self.assertIn(install.ROOT/'compose.quality-v2-runtime.yaml',values)
+
     def test_startup_interpolation_preserves_namespace_ports_worker_and_call_ceiling(self):
         before=copy.deepcopy(self.before);before['Config']['Env'][1]='BROKER_WORKER_IMAGE=sha256:'+'a'*64
         companions={}

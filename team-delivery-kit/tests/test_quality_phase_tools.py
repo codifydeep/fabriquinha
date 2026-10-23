@@ -26,6 +26,8 @@ class QualityPhaseToolsTests(unittest.TestCase):
         for name,args in [('write_file',dict(path='/workspace/app.py',content='bad')),
                 ('write_file',dict(path='/workspace/tests/test_old.py',content='bad')),
                 ('write_file',dict(path='/workspace/tests/test_new.py',content='x'*32769)),
+                ('write_file',dict(path='tests/test_new.py',content='nonempty')),
+                ('read_file',dict(path='app.py')),('read_file',dict(path='./app.py')),
                 ('read_file',dict(path='/tmp/config')),('read_file',dict(path='/workspace/../tmp/key')),
                 ('read_file',dict(path='/workspace/app.py',limit=-1))]:
             self.assertIn('error',json.loads(self.control(name,args)))

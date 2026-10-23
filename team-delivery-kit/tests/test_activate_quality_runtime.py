@@ -32,6 +32,10 @@ class ActivationTests(unittest.TestCase):
             else:changed['HostConfig']['Memory']=1
             with self.subTest(kind=kind),self.assertRaises(ValueError):activation.verify(self.before,changed)
 
+    def test_existing_exclusive_fence_is_preserved_when_phase_flags_are_reenabled(self):
+        self.before['Config']['Env'].append('BROKER_QUALITY_EXCLUSIVE_ENABLED=1')
+        activation.verify(self.before,self.after)
+
     def prepare(self):
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);root=Path(temp.name).resolve()
         root.chmod(0o700);private=root/'.local-test';private.mkdir(mode=0o700)
