@@ -37,6 +37,10 @@ def store(con,binding,notifications,mode):
     if mode=='review' and con.execute("SELECT 1 FROM sqlite_master WHERE name='quality_native_scopes'").fetchone():
         quality=bool(con.execute("SELECT 1 FROM quality_native_scopes WHERE request_id=? AND task_id=? "
             "AND phase='test_review_v2'",(binding['request_id'],binding['task_id'])).fetchone())
+    if quality:
+        try:from . import quality_review_completion_receipts as completion
+        except ImportError:import quality_review_completion_receipts as completion
+        completion.store(con,binding,notifications)
     for messages in extract(notifications):
         if quality:
             try:from .quality_review_reads import accept_page

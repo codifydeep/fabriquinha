@@ -9,6 +9,7 @@ import ast
 import json
 import re
 import time
+from quality_review_verdict import parse as parse_decision, required_reads
 try:
     from . import quality_review_launch as launch, quality_test_review as review
     from . import quality_review_reads as reads, read_stream_receipts, native, validation_job
@@ -141,39 +142,6 @@ def load(b,source,*,request_id=None):
         and receipt['stage'] in ('tests_frozen','changes_requested','technical_blocked')
         and receipt['tests_approved'] is (receipt['stage']=='tests_frozen'))
     return receipt
-
-
-def parse_decision(output,packet):
-    require(isinstance(output,str) and 0<len(output.encode())<=16384)
-    text=output.strip()
-    fenced=re.fullmatch(r'```(?:json)?\s*\n(.*?)\n```',text,re.I|re.S)
-    if fenced:text=fenced.group(1)
-    def unique(pairs):
-        require(len({key for key,_ in pairs})==len(pairs));return dict(pairs)
-    def invalid(value):raise ValueError('non-finite review verdict')
-    value=json.loads(text,object_pairs_hook=unique,parse_constant=invalid)
-    require(isinstance(value,dict) and set(value)=={'action','reason','manifest_sha256','plan_sha256',
-        'red_sha256','criteria','findings'} and value['action'] in ('approve_tests','request_changes','escalate_cto')
-        and isinstance(value['reason'],str) and 0<len(value['reason'])<=1200 and bool(value['reason'].strip())
-        and all(value[key]==packet[key] for key in ('manifest_sha256','plan_sha256','red_sha256'))
-        and isinstance(value['criteria'],list) and all(isinstance(item,str) for item in value['criteria'])
-        and len(value['criteria'])==len(set(value['criteria']))
-        and set(value['criteria'])==set(packet['plan']['criteria'])
-        and isinstance(value['findings'],list) and len(value['findings'])<=8)
-    if value['action']=='approve_tests':require(not value['findings'])
-    if value['action']=='request_changes':require(bool(value['findings']))
-    return value
-
-
-def required_reads(value,packet,paths):
-    # Rejecting a concrete defect grants no implementation permission. Require
-    # every new test and cited file in full; approval still requires ALL files.
-    if value['action']!='request_changes':return paths
-    cited=[]
-    for finding in value['findings']:
-        require(isinstance(finding,dict) and isinstance(finding.get('path'),str))
-        path='/delivery/'+finding['path'];require(path in paths);cited.append(path)
-    return sorted(set(cited)|{'/delivery/'+p for p in packet['plan']['new_tests']})
 
 
 def completion_diagnostic(output,packet,files,paths,messages):

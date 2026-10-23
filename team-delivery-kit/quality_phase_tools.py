@@ -10,7 +10,8 @@ CONFLICTS=('DELIVERY_AUTHOR_FEEDBACK_JSON','DELIVERY_ADDITIVE_TEST_JSON',
 
 
 def validate(config,execution):
-    if (not isinstance(config,dict) or set(config)!={'version','phase','request_id','editable_paths','read_paths'}
+    keys={'version','phase','request_id','editable_paths','read_paths'}
+    if (not isinstance(config,dict) or set(config) not in (keys,keys|{'review_context'})
             or type(config['version']) is not int or config['version']!=2
             or config['phase'] not in ('tests_only_v2','test_review_v2','implementation_v2')
             or not isinstance(execution,str) or str(uuid.UUID(execution))!=execution
@@ -27,6 +28,10 @@ def validate(config,execution):
     if reviewing and config['editable_paths']:
         raise ValueError('test review has no editable files')
     if not set(config['editable_paths'])<=set(config['read_paths']):raise ValueError('editable files must be readable')
+    if 'review_context' in config:
+        if not reviewing:raise ValueError('review-stop context only belongs to immutable review')
+        from quality_review_stop import validate_context
+        validate_context(config['review_context'],config['read_paths'])
     return config
 
 

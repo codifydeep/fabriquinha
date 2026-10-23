@@ -76,6 +76,17 @@ Green ou homologação. Apenas tolerar o formato não resolveria a leitura incom
 O diagnóstico em fonte agora relata separadamente o formato e a cobertura de
 todos os arquivos, sem converter o parecer rejeitado em aprovação. Essa melhoria
 diagnóstica não implementa, por si só, a recuperação autônoma dessa falha.
+Uma candidata posterior acrescenta feedback **antes de encerrar o turno**:
+formato e páginas ausentes voltam ao mesmo revisor, sem novo grant, tarefa ou
+reinício do orçamento. O ACP v2 passa a fixar explicitamente 40 iterações.
+Duas conclusões sem progresso verificável interrompem a ação; progresso real
+pode continuar dentro do orçamento original, sem um teto menor de handoffs.
+Um canário passou pelo Hermes, handlers e ACP reais com respostas fixas em
+loopback: tentou aprovar cedo, recebeu feedback, leu os arquivos e retornou só
+o JSON final ao cliente. Rascunhos ficaram separados em diagnósticos sem
+autoridade. Não houve modelo, aprovação nativa nem alteração do produto. Essa
+candidata ainda precisa da qualificação encadeada, instalação e ensaio nativo;
+o bloqueio já encerrado não será apagado nem reinterpretado como aprovação.
 Foi reproduzida em testes uma corrida compatível com essa falha: a observação do
 watchdog avançava o estado antes do ACK de criação/start e a rotina rejeitava a
 confirmação tardia. A correção em fonte preserva a observação mais forte somente
@@ -1437,6 +1448,9 @@ flowchart TD
     F --> CG{Contrato de qualidade ativo validado?}
     CG -->|Sim| G[TDD: Red real registrado]
     G --> TR[Revisão independente e congelamento dos testes]
+    TR -.->|Candidata ainda não instalada| RS[Pre-stop: formato e páginas faltantes]
+    RS -.->|Mesmo turno e orçamento de 40 iterações| TR
+    RS -.->|Duas tentativas sem progresso| AD
     TR -->|Solicita mudanças nos testes novos| F
     TR -->|Aprova os testes exatos| IMPL[Implementação limitada aos arquivos do produto]
     IMPL --> CAND[Snapshot pós-implementação e candidato Git local]

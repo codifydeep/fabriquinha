@@ -319,5 +319,13 @@ def tool_config(b, request):
     context, state = load(b, c['source_task'])
     require(quality.digest(context) == c['assignment_sha256'] and state['stage'] == 'admitted'
         and state['request_id'] == request and state['review_task'] == c['task_id'])
-    return dict(version=2, phase='test_review_v2', request_id=request,
-        editable_paths=[], read_paths=c['read_paths'])
+    with b.db() as con:
+        captured=con.execute('SELECT context FROM quality_red_captures WHERE task_id=?',(c['source_task'],)).fetchone()
+    require(captured is not None)
+    packet=context['packet'];plan=packet['plan']
+    feedback=dict(packet={**{k:packet[k] for k in ('manifest_sha256','plan_sha256','red_sha256')},
+        'plan':{k:plan[k] for k in ('criteria','new_tests')}},
+        files=json.loads(captured[0])['copy']['prepared']['file_inventory'])
+    result=dict(version=2, phase='test_review_v2', request_id=request,
+        editable_paths=[], read_paths=c['read_paths'],review_context=feedback)
+    return validate_phase(result,request)

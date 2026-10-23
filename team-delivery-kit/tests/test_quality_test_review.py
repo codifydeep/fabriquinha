@@ -24,7 +24,9 @@ class QualityTestReviewTests(unittest.TestCase):
         self.b.QUALITY_REVIEW_ENABLED = True
         self.e.settings['agents'][self.b.QUALITY_CTO] = 'planning'
         (self.b.STATE/'native.json').write_text(json.dumps(self.e.settings))
-        if getattr(self,'snapshot_files',None) is not None:
+        if getattr(self,'snapshot_files',None) is None:
+            self.snapshot_files={path:b'fixture snapshot\n' for path in f.f.spec['files']}
+        if self.snapshot_files is not None:
             inventory={path:dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw))
                 for path,raw in self.snapshot_files.items()}
             self.capture.prepared.update(file_inventory=inventory,

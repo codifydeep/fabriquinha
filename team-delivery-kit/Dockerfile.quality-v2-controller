@@ -17,6 +17,8 @@ COPY broker/quality_test_revision.py /
 COPY broker/quality_review_bootstrap_recovery.py /
 COPY broker/quality_worker_runtime.py broker/quality_review_launch.py broker/quality_launch_router.py /
 COPY broker/quality_review_reads.py broker/quality_review_attestation.py broker/read_stream_receipts.py /
+COPY broker/quality_review_completion_receipts.py /
+COPY quality_review_verdict.py quality_review_stop.py /
 COPY broker/quality_implementation_admission.py /
 COPY broker/quality_implementation_launch.py /
 COPY broker/quality_delivery_capture.py /

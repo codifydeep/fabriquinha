@@ -757,6 +757,35 @@ before it is used in a native run.
 
 ### Evidence for requesting changes versus approval
 
+#### Pre-stop feedback candidate — not native-qualified
+
+`quality_review_stop.py` and `install_quality_review_stop.py` add a pinned,
+build-time seam before Hermes finalization. The same agent/turn receives an
+advisory report of invalid verdict format and the next missing read pages.
+Actual successful tool-result history is checked against the registered byte
+manifest; claims of reading are not progress. The ACP factory explicitly binds
+all v2 phases to 40 iterations. Feedback consumes that original loop budget:
+it does not create another task/session/grant, reset the budget, authorize tools,
+or mark tests approved. Two identical completion failures without new verified
+evidence stop the action; otherwise progress may continue within the budget.
+
+For this candidate review mode, ACP streams tool/thought events but defers agent
+text to the final result. Rejected drafts cannot concatenate into the native
+verdict. Pre-stop candidates and diagnostic hashes are retained as explicitly
+non-authoritative worker-advisory receipts; even a forged advisory approval
+cannot satisfy any freeze/admission gate. Final native identity, closed lease,
+full ACP read proof, exact verdict, findings and snapshot hashes are still checked
+independently by the controller. A concrete rejection retains its narrower
+new-tests-and-citations read requirement; approval never inherits that exception.
+
+The source/unit tests and a real Docker/Hermes/ACP canary passed with a fixed
+loopback provider: premature final answer → diagnostic → actual reads → exact
+final JSON, in the same turn, with 39 iterations remaining after the first call.
+No OpenRouter/model call, native reviewer approval, product code or delivery is
+involved. Installation, chained author/Red/review qualification and a new native
+review after a qualified changed condition remain required. Historical terminal
+review attestations are not reparsed or rewritten by this candidate.
+
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after
 complete, byte-bound reads of every new test and every cited file; omissions in
