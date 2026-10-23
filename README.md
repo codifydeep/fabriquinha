@@ -80,6 +80,14 @@ causa. O canário ampliado passou em Docker/ACP até a revisão após a correç�
 forçando as duas intercalações antes do ACK, sem modelo; doze auxiliares foram
 retirados e nenhuma aprovação foi concedida. A recuperação da execução nativa já admitida
 permanece separada: não se pode reutilizar o grant nem apagar a atestação falha.
+`quality_review_bootstrap_recovery.py` implementa em fonte essa recuperação
+restrita, ainda não instalada: exige manutenção selada, instalação comprovada
+do novo guard, worker retirado e arquivado e ausência de ACP, transporte, sessões
+e ferramentas. Mantém os registros antigos e cria apenas a possibilidade de uma
+nova revisão somente leitura, no mesmo snapshot. Admissão, atestação e relógio
+de observação da nova execução são separados. Aprovar a execução nova exige
+todas as leituras/provas normais; a falha antiga continua consultável por request.
+Não é recuperação genérica nem autorização de um segundo reparo idêntico.
 Na migração do scheduler, `--preserve-interrupted-tick` permite carregar um
 primeiro tick interrompido somente com fila vazia, serviço descarregado e
 desabilitado, controlador selado/ocioso e ambos os locks exclusivos. Seu estado

@@ -31,12 +31,27 @@ def initialize(con):
         'identity_sha256 TEXT,receipt_sha256 TEXT)')
     con.execute('CREATE TABLE IF NOT EXISTS quality_review_observation_windows('
         'source_task TEXT PRIMARY KEY,identity_sha256 TEXT,state TEXT,state_sha256 TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS quality_review_attempt_attestations('
+        'source_task TEXT PRIMARY KEY,request_id TEXT UNIQUE,identity TEXT,receipt TEXT,identity_sha256 TEXT,receipt_sha256 TEXT)')
+    con.execute('CREATE TABLE IF NOT EXISTS quality_review_attempt_windows('
+        'source_task TEXT PRIMARY KEY,request_id TEXT UNIQUE,identity_sha256 TEXT,state TEXT,state_sha256 TEXT)')
 
 
 def status(b,source):
     terminal=load(b,source)
     if terminal:return terminal
     with b.db() as con:
+        current=con.execute('SELECT state FROM quality_test_reviews WHERE source_task=?',(source,)).fetchone()
+        assignment=json.loads(current[0]) if current else {}
+        if 'bootstrap_marker' in assignment and assignment['stage']!='admitted':return None
+        request=assignment.get('request_id')
+        if review.capture.enrollment.exists(con,'quality_review_attempts') and con.execute(
+                'SELECT 1 FROM quality_review_attempts WHERE source_task=? AND request_id=?',(source,request)).fetchone():
+            if not review.capture.enrollment.exists(con,'quality_review_attempt_windows'):return None
+            row=con.execute('SELECT state,state_sha256 FROM quality_review_attempt_windows WHERE source_task=? AND request_id=?',(source,request)).fetchone()
+            if not row:return None
+            state=json.loads(row[0]);require(quality.digest(state)==row[1]);return state
+        if not review.capture.enrollment.exists(con,'quality_review_observation_windows'):return None
         row=con.execute('SELECT state,state_sha256 FROM quality_review_observation_windows '
             'WHERE source_task=?',(source,)).fetchone()
     if not row:return None
@@ -49,8 +64,14 @@ def observation_window(b,source,identity,context):
     with b.LOCK,b.db() as con:
         maintenance.transaction(con)
         if maintenance.current(con):raise validation_job.Pending('maintenance preserves original review observation')
+        initialize(con)
         row=con.execute('SELECT identity_sha256,state,state_sha256 FROM quality_review_observation_windows '
             'WHERE source_task=?',(source,)).fetchone()
+        renewed=(review.capture.enrollment.exists(con,'quality_review_attempts') and con.execute(
+            'SELECT 1 FROM quality_review_attempts WHERE source_task=? AND request_id=?',(source,identity['request_id'])).fetchone())
+        if renewed:
+            row=con.execute('SELECT identity_sha256,state,state_sha256 FROM quality_review_attempt_windows WHERE source_task=? AND request_id=?',
+                (source,identity['request_id'])).fetchone()
         if row:
             state=json.loads(row[1]);require(row[0]==quality.digest(identity) and quality.digest(state)==row[2])
         else:
@@ -59,18 +80,59 @@ def observation_window(b,source,identity,context):
         adjusted=clock.deadline(con,b.PREFIX,state['deadline'],now,budget=1800)
         state.update(observations=state['observations']+1,alert_due=now>=adjusted-1200,
             next_action='observe the original native task and closed lease; do not rerun review')
-        con.execute('INSERT INTO quality_review_observation_windows VALUES(?,?,?,?) '
-            'ON CONFLICT(source_task) DO UPDATE SET state=excluded.state,state_sha256=excluded.state_sha256',
-            (source,quality.digest(identity),json.dumps(state,sort_keys=True),quality.digest(state)))
+        if renewed:
+            con.execute('INSERT INTO quality_review_attempt_windows VALUES(?,?,?,?,?) '
+                'ON CONFLICT(source_task) DO UPDATE SET state=excluded.state,state_sha256=excluded.state_sha256',
+                (source,identity['request_id'],quality.digest(identity),json.dumps(state,sort_keys=True),quality.digest(state)))
+        else:
+            con.execute('INSERT INTO quality_review_observation_windows VALUES(?,?,?,?) '
+                'ON CONFLICT(source_task) DO UPDATE SET state=excluded.state,state_sha256=excluded.state_sha256',
+                (source,quality.digest(identity),json.dumps(state,sort_keys=True),quality.digest(state)))
     return state,now>=adjusted
 
 
-def load(b,source):
+def stored_row(con,source,request_id=None):
+    """Current or exact historical receipt for transactional downstream gates."""
+    if request_id is None:
+        current=con.execute('SELECT state,state_sha256 FROM quality_test_reviews WHERE source_task=?',(source,)).fetchone()
+        require(current is not None and quality.digest(json.loads(current[0]))==current[1])
+        request_id=json.loads(current[0]).get('request_id')
+    if request_id is None:return None
+    rows=[]
+    for table in ('quality_review_attestations','quality_review_attempt_attestations'):
+        if review.capture.enrollment.exists(con,table):
+            rows+=con.execute('SELECT identity,receipt,identity_sha256,receipt_sha256 FROM '+table+
+                ' WHERE source_task=? AND request_id=?',(source,request_id)).fetchall()
+    require(len(rows)<=1)
+    if not rows:return None
+    row=rows[0];identity,receipt=json.loads(row[0]),json.loads(row[1])
+    require(quality.digest(identity)==row[2] and quality.digest(receipt)==row[3]
+        and identity['source_task']==source and receipt['source_task']==source and receipt['request_id']==request_id)
+    return row[1],row[3]
+
+
+def load(b,source,*,request_id=None):
     with b.db() as con:
-        initialize(con)
-        row=con.execute('SELECT identity,receipt,identity_sha256,receipt_sha256 FROM quality_review_attestations '
-            'WHERE source_task=?',(source,)).fetchone()
-    if not row:return None
+        if not review.capture.enrollment.exists(con,'quality_review_attestations'):return None
+        rows=con.execute('SELECT identity,receipt,identity_sha256,receipt_sha256 FROM quality_review_attestations '
+            'WHERE source_task=?',(source,)).fetchall()
+        if review.capture.enrollment.exists(con,'quality_review_attempt_attestations'):
+            rows+=con.execute('SELECT identity,receipt,identity_sha256,receipt_sha256 FROM quality_review_attempt_attestations '
+                'WHERE source_task=?',(source,)).fetchall()
+        if not rows:return None
+        for old in rows:
+            old_identity,old_receipt=json.loads(old[0]),json.loads(old[1])
+            require(quality.digest(old_identity)==old[2] and quality.digest(old_receipt)==old[3]
+                and old_identity['namespace']==b.PREFIX and old_identity['source_task']==source
+                and old_receipt['source_task']==source)
+        if request_id is None:
+            current=con.execute('SELECT state,state_sha256 FROM quality_test_reviews WHERE source_task=?',(source,)).fetchone()
+            require(current is not None and quality.digest(json.loads(current[0]))==current[1])
+            request_id=json.loads(current[0]).get('request_id')
+        selected=[row for row in rows if json.loads(row[1]).get('request_id')==request_id]
+        require(len(selected)<=1)
+        if not selected:return None
+        row=selected[0]
     identity,receipt=json.loads(row[0]),json.loads(row[1])
     require(quality.digest(identity)==row[2] and quality.digest(receipt)==row[3]
         and identity['namespace']==b.PREFIX and identity['source_task']==source
@@ -266,7 +328,13 @@ def observe(b,source):
             if receipt['tests_approved']:
                 require(review.admission(con,request) is not None
                     and quality.digest(read_stream_receipts.load(con,receipt['review_task']))==receipt['reads_stream_sha256'])
-            con.execute('INSERT INTO quality_review_attestations VALUES(?,?,?,?,?,?)',
+            existing=con.execute('SELECT request_id FROM quality_review_attestations WHERE source_task=?',(source,)).fetchone()
+            table='quality_review_attestations'
+            if existing and existing[0]!=request:
+                require(review.capture.enrollment.exists(con,'quality_review_attempts') and
+                    con.execute('SELECT 1 FROM quality_review_attempts WHERE source_task=? AND request_id=?',(source,request)).fetchone())
+                table='quality_review_attempt_attestations'
+            con.execute('INSERT INTO '+table+' VALUES(?,?,?,?,?,?)',
                 (source,request,json.dumps(identity,sort_keys=True),json.dumps(receipt,sort_keys=True),
                     quality.digest(identity),quality.digest(receipt)))
         return receipt

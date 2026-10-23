@@ -32,6 +32,7 @@ SOURCES={
     'broker/quality_red_snapshot.py':'quality_red_snapshot.py','broker/quality_progress.py':'quality_progress.py',
     'broker/quality_test_review.py':'quality_test_review.py',
     'broker/quality_review_recovery.py':'quality_review_recovery.py',
+    'broker/quality_review_bootstrap_recovery.py':'quality_review_bootstrap_recovery.py',
     'broker/quality_test_revision.py':'quality_test_revision.py',
     'broker/quality_worker_runtime.py':'quality_worker_runtime.py',
     'broker/quality_review_launch.py':'quality_review_launch.py','broker/quality_launch_router.py':'quality_launch_router.py',

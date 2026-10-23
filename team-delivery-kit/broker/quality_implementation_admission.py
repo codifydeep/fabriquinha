@@ -187,7 +187,7 @@ def load(con,request):
     require(len(phase)==1 and tuple(phase[0])==tuple(context[k] for k in
         ('task_id','agent_id','scope','issue_id','mode','attempt','run_id','phase','plan_sha256'))
         and con.execute('SELECT max(attempt) FROM grants WHERE task_id=?',(context['task_id'],)).fetchone()[0]==1)
-    row=con.execute('SELECT receipt,receipt_sha256 FROM quality_review_attestations WHERE source_task=?',(context['source_task'],)).fetchone()
+    row=attestation.stored_row(con,context['source_task'])
     require(row is not None and quality.digest(json.loads(row[0]))==row[1]==context['frozen_sha256'])
     receipt=json.loads(row[0]);require(receipt['stage']=='tests_frozen' and receipt['tests_approved'] is True)
     registered=con.execute('SELECT context_sha256,state,state_sha256 FROM quality_implementation_handoffs '
@@ -234,7 +234,7 @@ def admit(b,source,task_id,agent_id,*,now=None):
             ('issue_id','base_sha','volume','manifest_sha256')))
         current=con.execute('SELECT context_sha256,state_sha256 FROM quality_implementation_handoffs WHERE source_task=?',(source,)).fetchone()
         require(tuple(current)==(quality.digest(context),quality.digest(state)))
-        frozen_row=con.execute('SELECT receipt,receipt_sha256 FROM quality_review_attestations WHERE source_task=?',(source,)).fetchone()
+        frozen_row=attestation.stored_row(con,source)
         require(frozen_row is not None and quality.digest(json.loads(frozen_row[0]))==frozen_row[1]==context['frozen_sha256'])
         require(not con.execute('SELECT 1 FROM quality_implementation_admissions WHERE source_task=? OR task_id=?',(source,task_id)).fetchone()
             and not con.execute('SELECT 1 FROM native_bindings WHERE task_id=?',(task_id,)).fetchone()

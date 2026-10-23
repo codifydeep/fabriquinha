@@ -44,8 +44,9 @@ with b.db() as con:
  pending=con.execute("SELECT count(*) FROM grants g LEFT JOIN leases l USING(request_id) WHERE g.deadline>? AND (g.used=0 OR (g.used=1 AND l.request_id IS NULL))",(time.time(),)).fetchone()[0]
 assert receipt and pending==0
 if native.issue_task_runs(settings,issue):
- import quality_review_recovery as recovery,quality_test_revision as revision
- if not revision.activation_ready(b,issue,sys.argv[2]):recovery.activation_ready(b,issue,sys.argv[2])
+ import quality_review_recovery as recovery,quality_test_revision as revision,quality_review_bootstrap_recovery as bootstrap
+ if not (bootstrap.activation_ready(b,issue,sys.argv[2]) or revision.activation_ready(b,issue,sys.argv[2])):
+  recovery.activation_ready(b,issue,sys.argv[2])
 assert settings["agents"].get(receipt["author"])=="implementation" and settings["agents"].get(receipt["reviewer"])=="review"
 print(json.dumps(dict(issue_id=issue,enrollment=receipt,source_sha256=hashlib.sha256(pathlib.Path(isolation.__file__).read_bytes()).hexdigest(),exclusive=b.QUALITY_EXCLUSIVE_ENABLED,
  flags=[b.QUALITY_V2_ENABLED,b.QUALITY_REVIEW_ENABLED,b.QUALITY_IMPLEMENTATION_ENABLED,b.QUALITY_TEAM_ENABLED]),sort_keys=True))

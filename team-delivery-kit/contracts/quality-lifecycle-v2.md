@@ -738,6 +738,23 @@ the cause of a historical failure or authorize a rerun. A review admitted but
 failed before ACP requires separately qualified recovery with the old execution,
 capability, snapshot and attestation preserved, not a pre-admission reset.
 
+`quality_review_bootstrap_recovery.py` is the source-only adapter for the observed
+zero-ACP failure. It requires the exact sealed maintenance operation, inactive
+native tasks/leases, a failed consumed review grant, matching worker policy
+receipts, restricted archive and observed absence of the exact retired worker.
+Any ACP event, transport intent, session, read receipt or tool event rejects this
+adapter. A verified installation receipt binds the previous reference image to
+the new controller and changed qualified guard. It grants no model/tool action.
+
+The original admission, grant, failed native task and attestation remain stored.
+One new handoff marker may lead to a fresh read-only review capability; old
+records are never overwritten or accepted as the new verdict. The new execution
+has its own observation window, and a valid attestation still requires its exact
+native task, closed lease, snapshot reads and verdict. Historical receipts can
+be read by request identity without migrating a read-only archive. This adapter
+is intentionally not a general retry service and must be installed/qualified
+before it is used in a native run.
+
 ### Evidence for requesting changes versus approval
 
 Approval requires authenticated complete reads of the entire registered snapshot.

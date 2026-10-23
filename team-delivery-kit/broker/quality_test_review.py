@@ -133,6 +133,10 @@ def save(b, source, context, before, after):
 
 
 def marker(b,context,state):
+    try:from . import quality_review_bootstrap_recovery as bootstrap
+    except ImportError:import quality_review_bootstrap_recovery as bootstrap
+    renewed=bootstrap.marker(b,context,state)
+    if renewed is not None:return renewed
     try:from . import quality_review_recovery as recovery
     except ImportError:import quality_review_recovery as recovery
     return recovery.marker(b,context,state)
@@ -146,6 +150,9 @@ def eligible_runs(b,context,state,runs):
     try:from . import quality_review_recovery as recovery,quality_test_revision as revision
     except ImportError:import quality_review_recovery as recovery,quality_test_revision as revision
     runs=revision.exclude_prior_reviews(b,context['source_task'],runs)
+    try:from . import quality_review_bootstrap_recovery as bootstrap
+    except ImportError:import quality_review_bootstrap_recovery as bootstrap
+    runs=bootstrap.exclude_failed(b,context,state,runs)
     return recovery.runs(b,context,state,runs)
 
 
@@ -198,6 +205,10 @@ def admission(con, request):
     initialize(con)
     row = con.execute('SELECT context,context_sha256 FROM quality_review_admissions '
         'WHERE request_id=?', (request,)).fetchone()
+    if capture.enrollment.exists(con,'quality_review_attempts'):
+        renewed=con.execute('SELECT context,context_sha256 FROM quality_review_attempts WHERE request_id=?',(request,)).fetchone()
+        require(not (row and renewed))
+        if renewed:row=renewed
     if not row:
         return None
     context = json.loads(row[0])
@@ -258,8 +269,12 @@ def admit(b, source, task_id, agent_id, *, now=None):
             and capture.source(con, source) == binding
             and capture.enrollment.lookup(con, e['issue_id']) == e
             and json.loads((b.STATE/'native.json').read_text()) == settings)
-        require(not con.execute('SELECT 1 FROM quality_review_admissions WHERE source_task=? OR task_id=?',
-            (source, task_id)).fetchone())
+        try:from . import quality_review_bootstrap_recovery as bootstrap
+        except ImportError:import quality_review_bootstrap_recovery as bootstrap
+        table=bootstrap.admission_table(b,con,source,context,state,task_id)
+        if table=='quality_review_admissions':
+            require(not con.execute('SELECT 1 FROM quality_review_admissions WHERE source_task=? OR task_id=?',
+                (source, task_id)).fetchone())
         require(not con.execute('SELECT 1 FROM native_bindings WHERE task_id=?', (task_id,)).fetchone())
         require(not con.execute('SELECT 1 FROM grants WHERE task_id=?', (task_id,)).fetchone())
         require(not con.execute('SELECT 1 FROM grants g LEFT JOIN leases l USING(request_id) '
@@ -286,7 +301,8 @@ def admit(b, source, task_id, agent_id, *, now=None):
             (request, task_id, agent_id, admitted['scope'], e['issue_id']))
         con.execute('INSERT INTO quality_native_scopes VALUES(?,?,?,?,?)',
             (request, task_id, e['run_id'], 'test_review_v2', e['plan_sha256']))
-        con.execute('INSERT INTO quality_review_admissions VALUES(?,?,?,?,?)',
+        require(table in ('quality_review_admissions','quality_review_attempts'))
+        con.execute('INSERT INTO '+table+' VALUES(?,?,?,?,?)',
             (source, task_id, request, json.dumps(admitted, sort_keys=True), quality.digest(admitted)))
         after = {**state, 'stage': 'admitted', 'review_task': task_id, 'request_id': request}
         con.execute('UPDATE quality_test_reviews SET state=?,state_sha256=? WHERE source_task=?',

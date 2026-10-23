@@ -15,6 +15,7 @@ try:
     from . import quality_candidate_binding as candidate,quality_green_capture as green
     from . import quality_sensitivity_capture as sensitivity
     from . import quality_test_revision as revision
+    from . import quality_review_bootstrap_recovery as bootstrap
     from . import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 except ImportError:
     import quality_progress as progress,quality_author_admission as author
@@ -23,6 +24,7 @@ except ImportError:
     import quality_candidate_binding as candidate,quality_green_capture as green
     import quality_sensitivity_capture as sensitivity
     import quality_test_revision as revision
+    import quality_review_bootstrap_recovery as bootstrap
     import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 
 quality=author.quality
@@ -120,7 +122,7 @@ def candidates(b):
             author.enrollment.canonical(source)
             old=load(b,source)
             if old and old[1]['stage'] in TERMINAL:
-                if old[1]['stage']!='technical_blocked' or not revision.eligible(b,source):continue
+                if old[1]['stage']!='technical_blocked' or not (revision.eligible(b,source) or bootstrap.eligible(b,source)):continue
             result.append((cursors.get(source,0),source))
         except (ValueError,KeyError,TypeError):quarantine(b,source,'team_journal_integrity_rejected')
     return [source for _,source in sorted(result)]

@@ -172,7 +172,7 @@ def register(b,source,*,maintenance_operation=None):
         after=dict(stage='prepared',owner=plan['author'],tests_approved=False,execution_authorized=False,delivery_approval=False)
         with b.LOCK,b.db() as con:
             authorize_maintenance(con,maintenance_operation);initialize(con)
-            persisted=con.execute('SELECT receipt,receipt_sha256 FROM quality_review_attestations WHERE source_task=?',(source,)).fetchone()
+            persisted=attestation.stored_row(con,source,request_id=previous['request_id'])
             require(persisted is not None and json.loads(persisted[0])==previous and persisted[1]==quality.digest(previous)
                 and json.loads((b.STATE/'native.json').read_bytes())==settings)
             require(not con.execute("SELECT 1 FROM leases WHERE status IN ('creating','starting','running','closing') AND request_id IN "
