@@ -863,6 +863,24 @@ durable call counter, maximum-call ceiling and every delivery gate. A failed
 native transport run still needs separately qualified recovery; changing the
 capacity alone neither reclassifies it nor grants new work or approval.
 
+`qualify_model_proxy_capacity.py` exercised actual HTTP in the built proxy image,
+with a fixed in-process upstream, no credentials, no Docker socket and no external
+network. It accepted 600,086-byte and 2,096,726-byte requests, rejected excess,
+and preserved the separate two-call fixture ceiling. The 128 MiB sandbox used
+temporary `/opt/data` instead of inheriting an anonymous volume; before/after
+volume inventories were identical. No model call or review approval occurred.
+
+`install_model_proxy_capacity.py` then installed that qualified image while the
+controller stayed sealed and idle. It archived the previous source, logs and
+counter, preserved all data/key mounts, resources, network, other containers and
+the exact paid-call ceiling/counter. Runtime GET probes verified the new capacity,
+then the same new proxy was stopped. A kernel lock fences simultaneous installs;
+durable intents fence uncertain copy/recreate/stop acknowledgments. The final
+Compose scope overlay owns the proxy selector; earlier overrides cannot silently
+select the old image. Auxiliary broker probe images remain pinned unchanged.
+The failed reviewer still needs a separately qualified transport recovery: this
+installation creates no task/grant and inherits no favorable verdict or reads.
+
 Approval requires authenticated complete reads of the entire registered snapshot.
 A concrete rejection grants no execution or approval authority. It may stop after
 complete, byte-bound reads of every new test and every cited file; omissions in

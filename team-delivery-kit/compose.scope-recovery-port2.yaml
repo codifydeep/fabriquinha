@@ -28,6 +28,9 @@ services:
       BROKER_GENERIC_CALIBRATION_SEAM_IMAGE: sha256:f85484409c92b52e7db70b8200b576b7e88da10372920f092c0508f86396c172
       BROKER_GENERIC_CALIBRATION_WRITER_IMAGE: sha256:90745d51a2b901a38b318d4f9c9558d5540f4fbae9a0f433a3d280f459f03639
   model-proxy:
-    image: sha256:5486353216661b5d9329e580dc071bfb85d852f285fb648f8897d64f7e61f15b
+    # Final proxy selector; keep the auxiliary broker probe images above pinned.
+    # Preserve delivery-kit-model-proxy:20261002.23 as pre-capacity rollback.
+    image: ${DELIVERY_KIT_MODEL_PROXY_IMAGE:-delivery-kit-model-proxy:20261023.1}
     environment:
       MODEL_PROXY_OPTIONAL_FILES_FEEDBACK: "1"
+      MODEL_PROXY_MAX_REQUEST_BYTES: '2097152'

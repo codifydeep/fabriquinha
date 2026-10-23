@@ -46,3 +46,4 @@ COPY author_read_policy.py /author_read_policy.py
 COPY read_stream_recovery_probe.py /read_stream_recovery_probe.py
 USER 10000:10000
 ENTRYPOINT ["python", "/model_proxy.py"]
+LABEL delivery-kit.component="model-proxy"

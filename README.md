@@ -19,8 +19,12 @@ persistente e imutável de novas execuções estão implementados em fonte, incl
 bloqueios contra uso do fluxo legado por uma issue v2.
 O controlador v2 está instalado **somente para qualificação nativa controlada**,
 em modo exclusivo que mantém os fluxos legados inativos. A manutenção de
-bootstrap foi concluída; o bloqueio atual é uma revisão incompleta, sem apagar
-ou converter os bloqueios antigos.
+bootstrap foi concluída; o bloqueio atual é a recuperação de uma falha de
+transporte durante a revisão completa, sem apagar ou converter bloqueios antigos.
+O proxy corrigido foi qualificado em HTTP real isolado e instalado sob manutenção:
+capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, sem
+credenciais nos testes. Ele permanece parado até a recuperação qualificada da
+execução falha. Isso ainda não comprova aprovação da revisão nem entrega autônoma.
 A ativação foi verificada sob manutenção; depois, a barreira foi liberada e
 um único card foi atribuído ao autor real. A instalação preservou os
 volumes de dados, a configuração de workers/modelos e os outros contêineres,
