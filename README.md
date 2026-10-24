@@ -30,11 +30,15 @@ sem duplicação dos envios aceitos ou bloqueio do TDD. A
 [integração pelo serviço](docs/HERMES-INTEGRATION-QUALIFICATION.md) passou depois:
 espera nativa de CI libera claims, reinício retoma o mesmo PR e build/deploy/
 rollback/QA reais terminam por handoff independente. Houve um crash de partida
-recuperado nativamente; autores/CI continuam sintéticos. Faltam entrada de brief,
+recuperado nativamente; autores/CI continuam sintéticos. Falta materializar o plano,
 aceite integral da release, Telegram/modelos/GitHub reais e instalação reproduzível.
 [Pausa/retomada e admissão](docs/HERMES-OPERATIONS-QUALIFICATION.md) também passaram
 com SDK real: duas interrupções, reinício pausado, perfil restaurado sem falso
 cooldown e TDD concluído preservando sessão/fase. Não liberam o provedor pago.
+A [entrada do brief e plano revisado](docs/HERMES-INTAKE-QUALIFICATION.md) passou
+também: Produto pergunta, CEO aprova o documento exato, Lead planeja e CTO pede
+mudanças/revisa, com sessões reais e respostas locais. O plano aprovado ainda
+não gera os cards de implementação; a release permanece sem homologação.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -43,6 +47,11 @@ ainda são sintéticos; Kanban, Git e jobs Docker são reais:
 
 ```mermaid
 flowchart LR
+    CEO[Operador: objetivo e aprovação do brief exato] --> IN[Produto: brief e perguntas de negócio]
+    IN --> HP[Revisão humana nativa; espera sem worker]
+    HP -->|Resposta somente ao documento correspondente| CEO
+    HP -->|Brief aprovado| PL[Lead: DAG; CTO: revisão independente]
+    PL -. Materialização dos cards ainda pendente .-> K
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
     C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
     F[Pausa persistente e preflight sem modelo] -->|Fence de spawn e ferramentas| C
@@ -60,7 +69,7 @@ flowchart LR
     M --> D[Build e deploy retomáveis; rollback e retorno]
     D --> Q[QA real em Chromium; evidência preservada]
     Q --> E[Recibo de QA; não declara release homologada]
-    E -. Brief, aceite integral e S4 pendentes .-> A[Fluxo com agentes e GitHub reais]
+    E -. Aceite integral e S4 pendentes .-> A[Fluxo com agentes e GitHub reais]
 ```
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium

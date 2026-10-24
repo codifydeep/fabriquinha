@@ -206,6 +206,7 @@ def install_backend(sandbox):
 
 
 def tool_names(sandbox):
+    if sandbox.run.kind in ('brief','plan'):return set()
     names={'read_file','search_files'}
     if not sandbox.run.reviewing and sandbox.run.kind!='diagnostic':names.update({'write_file','patch','terminal','process_manage'})
     return names
@@ -235,6 +236,9 @@ def restrict_handlers(sandbox,allowed):
 
 
 def register_delivery_tools(sandbox,quality,*,on_terminal=None):
+    if sandbox.run.kind in ('brief','plan'):
+        from .intake import register_draft
+        return register_draft(sandbox,on_terminal)
     if sandbox.run.kind=='diagnostic':
         from .recovery import register_diagnostic
         return register_diagnostic(sandbox,quality,on_terminal)
@@ -286,7 +290,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
         raise ValueError('qualification model route must be loopback only')
     from hermes_cli.profiles import get_active_profile_name
     if get_active_profile_name()!=sandbox.run.actor:raise ValueError('worker must bind the assigned profile')
-    install_backend(sandbox)
+    if sandbox.run.kind not in ('brief','plan'):install_backend(sandbox)
     from run_agent import AIAgent
     from hermes_state import SessionDB
     from toolsets import create_custom_toolset
@@ -305,7 +309,16 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
         if previous:
             if previous['profile_name']!=sandbox.run.actor:raise ValueError('session belongs to another profile')
             db.assert_resume_safe(session);history,_=db.get_resume_conversations(session)
-        phase=('Diagnose the recorded technical incident. Read immutable evidence; run diagnostic_validate for a real SPIKE. '
+        phase=('Refine the original objective into a verifiable product brief. Use brief_question only for essential user/business decisions, '
+               'not architecture or tools. Preserve all stated scope; do not ask the CEO to repeat supplied information. '
+               'Use brief_submit when ready for explicit CEO approval. This is not delivery or budget approval.'
+               if sandbox.run.kind=='brief' else
+               'Review the exact work plan against the approved brief and submit plan_review: approve or concrete changes. '
+               'Do not rewrite the plan or implement the product.' if sandbox.run.kind=='plan' and sandbox.run.reviewing else
+               'Create the technical work DAG from the approved brief using plan_submit. Cover every acceptance criterion. '
+               'Own technical choices; invoke CTO expertise through independent plan review, not the CEO. '
+               'Specify outcomes, owners and dependencies, not prewritten code or fabricated TDD evidence.' if sandbox.run.kind=='plan' else
+               'Diagnose the recorded technical incident. Read immutable evidence; run diagnostic_validate for a real SPIKE. '
                'Use diagnostic_decide with concrete findings: lead may escalate to CTO; resume needs a real experiment. '
                'Never edit the author, approve delivery, bypass tests or send technical choices to the CEO.'
                if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
@@ -317,8 +330,9 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
             fallback_model=None,ephemeral_system_prompt=phase)
         if agent.valid_tool_names!=allowed:raise ValueError('native tool surface diverged from phase policy')
         restrict_handlers(sandbox,allowed)
-        if sandbox.run.reviewing or sandbox.run.kind=='diagnostic':
-            label='Incident context' if sandbox.run.kind=='diagnostic' else 'TDD evidence (historical Red is not to be reproduced)'
+        if sandbox.run.reviewing or sandbox.run.kind in ('diagnostic','brief','plan'):
+            label=('Approved business context' if sandbox.run.kind in ('brief','plan') else
+                   'Incident context' if sandbox.run.kind=='diagnostic' else 'TDD evidence (historical Red is not to be reproduced)')
             prompt+='\nController-recorded '+label+':\n'+json.dumps(operations.evidence())
         if stop_requested:
             sandbox.board.ensure(sandbox.run)

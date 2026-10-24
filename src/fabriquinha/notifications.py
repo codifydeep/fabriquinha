@@ -13,6 +13,7 @@ EVENTS=dict(created='Assignment registered',spawned='Activity started',worker_re
     scheduled='Waiting for an external effect; worker released',
     reclaimed='Worker claim released; delivery not approved',
     review_requested='Submitted for independent review',changes_requested='Review finished: changes requested',
+    review_reopened='Response received; original author resumes',
     completed='Activity completed (not release homologation)',blocked='Activity blocked; technical diagnosis required',
     crashed='Worker crashed; recovery pending',timed_out='Worker timed out; recovery pending',
     gave_up='Automatic attempts exhausted; technical diagnosis required',
@@ -144,12 +145,15 @@ class Outbox:
                     try:body=json.loads(row['body'] or '{}')
                     except ValueError:body={}
                     mode='review' if phase and json.loads(phase[0] or '{}').get('source_status')=='review' else (body.get('kind','activity') if isinstance(body,dict) else 'activity')
-                    mode=mode if mode in ('review','tests','implementation','diagnostic','integration') else 'activity'
+                    mode=mode if mode in ('review','tests','implementation','diagnostic','integration','brief','plan','release') else 'activity'
                     actor=row['actor'] if re.fullmatch('[a-z][a-z0-9_-]{0,63}',row['actor'] or '') else 'controller'
                     task=row['task_id'] if re.fullmatch('t_[a-f0-9]{8,64}',row['task_id']) else 'unidentified-card'
                     event='started' if row['kind'] in ('spawned','worker_registered') else row['kind']
                     key='run:'+str(row['run_id'])+':started' if event=='started' else 'event:'+str(row['id'])
-                    text=f'[{self.project.namespace}] {actor} | {task} | run {row["run_id"] or "-"} | {mode}\n{EVENTS[row["kind"]]}'
+                    description=EVENTS[row['kind']]
+                    if row['kind']=='review_requested' and isinstance(body,dict) and body.get('kind')=='brief':
+                        description='Awaiting scoped CEO business input; not technical, budget or delivery approval'
+                    text=f'[{self.project.namespace}] {actor} | {task} | run {row["run_id"] or "-"} | {mode}\n{description}'
                     self.enqueue(key,dict(task=task,run=row['run_id'],actor=actor,mode=mode,event=event,text=text))
                 cursor['cursor']=row['id']
                 cursor['anchor']=self.anchor(row)
@@ -239,5 +243,11 @@ def alerts(outbox,cards,store,*,now,alert_after=600,escalate_after=1800):
             key=digest([card['id'],card['current_run_id'],marker,evidence,event])
             actor=card['assignee'] if re.fullmatch('[a-z][a-z0-9_-]{0,63}',card['assignee'] or '') else 'controller'
             owner=(outbox.project.technical_roles or {}).get('cto' if event=='stalled' else 'lead','techlead')
+            if card.get('business_input') and 'error' not in card['business_input']:
+                if event=='stalled':continue  # Business waits do not escalate to the CTO as technical stalls.
+                request=card['business_input']['request']
+                outbox.enqueue(key,dict(task=card['id'],run=None,actor='ceo',mode='brief',event='business_input_pending',
+                    text=f'[{outbox.project.namespace}] {card["id"]} | CEO business response pending: {request}. Not technical or budget approval.'))
+                continue
             text=f'[{outbox.project.namespace}] {card["id"]} | {actor} | {event}\nNo new controller-validated evidence for {int(age)}s. Technical owner: {owner}. Not a delivery result.'
             outbox.enqueue(key,dict(task=card['id'],run=card['current_run_id'],actor=actor,mode='monitor',event=event,text=text))

@@ -66,11 +66,17 @@ class Board:
                 if (not self.project.technical_roles or card.get('stage') not in self.project.technical_roles
                         or task.assignee!=self.project.technical_roles[card['stage']]):
                     raise ValueError('controller-assigned technical role required')
+            elif card.get('kind') in ('brief','plan'):
+                role='product' if card['kind']=='brief' else 'lead'
+                if not self.project.coordination_roles or task.assignee!=self.project.coordination_roles[role]:
+                    raise ValueError('controller-assigned coordination role required')
             else:
                 self.project.reviewer(author)
-        if (card.get('version') != 1 or card.get('kind') not in ('tests', 'implementation', 'integration', 'diagnostic')
+        if (card.get('version') != 1 or card.get('kind') not in ('tests', 'implementation', 'integration', 'diagnostic', 'brief', 'plan')
                 or not isinstance(card.get('release'), str) or not card['release']):
             raise ValueError('versioned delivery card required')
+        if card['kind']=='brief' and reviewing:
+            raise ValueError('business approval is not an agent review')
         return Run(task_id, run_id, task.assignee, card['kind'], reviewing, author,
                    card['release'], digest(card))
 

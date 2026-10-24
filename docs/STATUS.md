@@ -1,61 +1,34 @@
 # Status do projeto — 24 de outubro de 2026
 
-**Estratégia atual:** plano de simplificação aprovado, com [S0/S1 concluídos](HERMES-S1-QUALIFICATION.md).
-A fronteira Hermes + Kanban passou na prova nativa/Docker sem modelo e sem
-patches upstream. A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) passou com
-Red, mudanças, congelamento, Green, controle negativo e revisão imutável em
-Docker real, mas com autoria e decisões sintéticas. Timeout foi comprovado com
-falha preservada e job retirado. S2 permanece parcial; faltam operação completa,
-notificações/alertas e conexão de toda a entrega. A [primeira fatia S3](HERMES-S3-QUALIFICATION.md) conectou
-revisão, Git real, gate nativo de PR/CI com transporte simulado e suíte real do
-SHA de merge. Confirmações perdidas não duplicaram PR/merge. A cadeia foi ampliada
-e passou também por build real, Compose, rollback/retorno e QA independente em
-Chromium, com captura preservada e URL de loopback conferida. Isso é prova
-offline com fixtures: ainda faltam serviço contínuo, modelos e GitHub reais,
-incidentes executáveis e portabilidade. Nenhuma release autônoma foi qualificada.
-Uma prova posterior retomou PR/merge em novas claims nativas, liberou o slot
-durante espera e recusou a autoridade das claims antigas, sem duplicar efeitos.
-A suplência TDD foi exercitada com autor de testes separado do implementador.
-O roteiro acordou os cards explicitamente; ainda não existe wake loop instalado.
-Build e deploy também foram retomados em novas claims após perdas de confirmação
-simuladas, sem repetir os dois builds e quatro atualizações Compose esperados.
-Rollback e QA real em Chromium passaram com recibos de origem preservados. Avanço
-da branch antes/durante QA ou depois do build bloqueia o candidato antigo.
-A [ponte nativa](HERMES-AGENT-QUALIFICATION.md) passou com `AIAgent`, ferramentas,
-SQLite e Docker reais: nove respostas HTTP locais, retomada em outro processo sem
-duplicar histórico, Red independente e revisão sem handlers de escrita/admin.
-Uma segunda prova conectou submissão/parecer ao dispatcher nativo: dois cards,
-seis atividades e 16 respostas locais, com devolução, correção, congelamento,
-Green, controle negativo e revisão final. Autor e revisor retomaram sessões;
-resultados das ferramentas ficaram persistidos. Decisões são programadas, não
-julgamento de um modelo. O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md)
-passou com reinício preservando worker vivo, crash/retomada, arquivo/sessão
-preservados e sandbox órfã retirada antes da substituta: sete runs, dois cards,
-18 respostas locais. Outra prova recusou um segundo processo na mesma claim,
-sem bloquear o dono. O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md)
-passou com Lead → CTO → SPIKE real → orientação ao autor → gates TDD: nove runs,
-27 respostas locais e uma única retomada, mesmo após reinício. Incidente resolveu
-somente com evidência válida, não por existir um worker. A
-[outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou com conexão
-recusada, reinício e ACK perdido: 21 mensagens locais, uma notificação de início
-e término por run, sem duplicar envio aceito ou parar o trabalho. Status acompanha
-validações reais e fila; heartbeat não renova progresso. Telegram real não testado.
-A [integração pelo serviço](HERMES-INTEGRATION-QUALIFICATION.md) passou depois:
-nove runs, espera de CI e reinício com capacidade liberada, PR/merge únicos pela
-fixture, dois builds, quatro atualizações Compose e QA independente reais. Um
-crash de inicialização SQLite foi recuperado nativamente; a primeira tentativa
-da prova permanece não aprovada por falha na auditoria de identidade. Não houve
-reparo/handoff do operador na segunda tentativa. Deploy temporário foi retirado
-com evidências preservadas. A [pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md)
-passou depois: dois reclaims intencionais, reinício pausado sem rota, retorno do
-revisor sem gastar retry e TDD concluído em oito runs/19 respostas locais. Uma
-tentativa anterior foi interrompida por cache incorreto de perfil e permanece
-não aprovada. Faltam brief/planejamento/aceite de release, liberação autorizada do
-provedor/GitHub reais e migração. Não houve produção.
-Checks atuais: 139 testes do caminho novo e 4.523 da suíte histórica, todos sem
-falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
-O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
-esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.
+**Estratégia atual:** Hermes + Kanban nativos como único dono do ciclo de vida,
+com executor determinístico pequeno. Sem Temporal, broker ACP ou Multica no novo
+caminho. O legado e as chamadas pagas continuam pausados; nenhuma migração aplicada.
+
+| Área | Evidência atual | Limite |
+|---|---|---|
+| [S0/S1](HERMES-S1-QUALIFICATION.md) | Backup/referência e integração nativa/Docker revalidados | Zero patches upstream |
+| [TDD](HERMES-S2-QUALIFICATION.md) | Red real, revisão/freeze, Green e controles negativos | Autoria e decisões programadas |
+| [Sessões/ferramentas](HERMES-AGENT-QUALIFICATION.md) | SDK real, histórico persistido e handlers restritos | Sem julgamento real de modelo |
+| [Serviço](HERMES-RUNTIME-QUALIFICATION.md) | Reinício/crash, workspace/sessão preservados, isolamento e identidade | Qualificação isolada |
+| [Recuperação](HERMES-RECOVERY-QUALIFICATION.md) | Lead → CTO → SPIKE real → retomada, incidente só resolve com evidência | Classes de incidentes ainda incompletas |
+| [Outbox](HERMES-NOTIFICATIONS-QUALIFICATION.md) | Indisponibilidade/ACK perdido/reinício sem duplicar aceitos | Telegram real não testado |
+| [Integração](HERMES-INTEGRATION-QUALIFICATION.md) | CI libera claims, retomada automática, Git/build/Compose/QA/rollback reais | GitHub/CI simulados |
+| [Operação](HERMES-OPERATIONS-QUALIFICATION.md) | Pausa persistente, interrupção, retomada e perfil restaurado sem falso retry | Não libera consumo pago |
+| [Brief/plano](HERMES-INTAKE-QUALIFICATION.md) | Perguntas, aprovação exata do CEO, DAG completo e revisão Lead/CTO; nove atividades SDK | Dez respostas locais; não materializa cards executáveis |
+
+**S2 permanece parcial. Próxima fatia:** materializar o DAG aprovado em cards TDD
+e de integração, encadear bases dependentes e validar o aceite integral de release.
+Depois: liberação autorizada do provedor e S4 real sem condução de handoffs pelo
+operador; S5 segunda versão/memória/recuperação; S6 instalação/segundo repo/cutover;
+S7 Truco. Nenhuma release autônoma foi qualificada.
+
+Checks atuais: 150 testes do caminho novo e 4.523 históricos passaram, estes com
+oito skips preexistentes. A prova de intake também recuperou uma interrupção
+entre o commit da aprovação e a criação do plano, sem duplicar aprovação/cards.
+O núcleo tem 17 módulos funcionais + `__init__`, 3.936 linhas incluindo a lane S1;
+o desvio da meta 12/~3.000 segue explícito. Recibos completos continuam privados.
+As estimativas e detalhes históricos abaixo não são porcentagens de conclusão
+da nova arquitetura nem evidência de entrega autônoma.
 
 **Experimental. Autonomia completa ainda não qualificada.** Este é um resumo
 datado da instalação de referência, não uma consulta de estado vivo nem uma

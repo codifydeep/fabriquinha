@@ -23,8 +23,11 @@ Telegram real não foi ativado. A
 passou depois pelo serviço, com CI simulado, reinício e recuperação de um crash
 de partida. [Pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md) também
 passaram depois, com interrupção do SDK, preservação da revisão e perfil
-restaurado sem gastar retry. Brief/planejamento/aceite de release seguem pendentes
-antes de S4; não qualificar essas provas como autonomia completa.
+restaurado sem gastar retry. A [entrada do brief e planejamento independente](HERMES-INTAKE-QUALIFICATION.md)
+passou depois com três esclarecimentos, devolução do brief, aprovação exata do
+CEO e plano revisado pelo CTO. Foram nove atividades SDK/dez respostas locais;
+o DAG ainda não é materializado em cards de execução. Materialização/aceite de
+release e provedor real seguem pendentes antes de S4. Não é autonomia completa.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
@@ -859,8 +862,8 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | Análise e plano | Concluídos em documento | Fontes e código citados acima |
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
 | S0 Referência e ADR | Concluída; referência e arquivo comprimido reconferidos | Referência Git, hashes e restauração íntegra original do backup |
-| S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream; 117 testes atuais passaram |
-| S2 Executor/qualidade pequenos | Parcial: TDD, diagnóstico, outbox, integração, pausa/retomada e admissão passaram em isolamento | Faltam brief/planejamento/aceite integral e provedor autorizado; Telegram real não testado |
+| S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream |
+| S2 Executor/qualidade pequenos | Parcial: TDD, diagnóstico, outbox, integração, pausa/admissão e intake/plano revisado passaram isolados | Faltam materialização do DAG/aceite integral e provedor autorizado; Telegram real não testado |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP conectada ao serviço: publicação, espera, reinício, build/deploy/QA/rollback reais; CI simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
@@ -900,14 +903,15 @@ Próxima fatia após a prova offline S3:
    O incidente só resolveu após evidência válida dos gates do trabalho original.
    Outbox/alertas já passaram com falhas de conexão e ACK/reinício, sem bloquear
    o trabalho. A conexão de publicação/deploy/QA e a admissão básica de perfil/
-   recursos já passaram. Agora implementar a interface do brief e o plano de
-   trabalho com aceite da release. Não criar
+   recursos já passaram. Brief, aprovação de negócio e plano independente agora
+   passaram pelo SDK/serviço nativos. Agora materializar o DAG aprovado em cards
+   com bases dependentes e validar o aceite da release. Não criar
    outro ciclo de vida, nem implementar toda S5 antes de tentar S4. CEO não é
    fallback para decisões técnicas.
 5. Só depois resolver a pausa do provedor pelo caminho autorizado e executar S4
    com Produto/brief aprovado, modelo e GitHub reais. Preservar o contador e teto;
    não considerar uma fixture ou tarefa `done` como release homologada.
-   Antes de liberar consumo, concluir intake/aprovação e usar a pausa explícita
+   Antes de liberar consumo, concluir materialização/aceite após o intake aprovado e usar a pausa explícita
    qualificada: parar o dispatcher para reinício não significa interromper workers
    saudáveis. A admissão ainda não é monitoramento completo de capacidade nem
    diagnóstico de todo problema de infraestrutura. Manter uma fonte canônica de modelos

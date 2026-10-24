@@ -102,6 +102,17 @@ class NotificationDelivery(unittest.TestCase):
         self.assertEqual(self.outbox.summary()['queued'],2)
         self.assertEqual({r['message']['event'] for r in self.outbox.records()},{'unattended','stalled'})
 
+    def test_pending_business_response_is_not_a_technical_cto_stall(self):
+        card=dict(id='t_12345678',status='review',assignee='fabriquinha-ceo',current_run_id=None,
+            last_event_at=0,created_at=0,business_input=dict(request='a'*64))
+        self.clock[0]=2000
+        alerts(self.outbox,[card],self.store,now=2000)
+        records=self.outbox.records()
+        self.assertEqual(len(records),1)
+        self.assertEqual(records[0]['message']['event'],'business_input_pending')
+        self.assertEqual(records[0]['message']['actor'],'ceo')
+        self.assertNotIn('Technical owner',records[0]['message']['text'])
+
     def test_repeated_same_validation_job_cannot_keep_refreshing_progress(self):
         board=Mock();quality=Quality(self.project,self.store,None,board)
         run=Run('t_12345678',1,'backend','tests',False,'backend','v1','contract')

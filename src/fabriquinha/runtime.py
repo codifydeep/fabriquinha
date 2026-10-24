@@ -29,6 +29,7 @@ from .notifications import Outbox, alerts, validation_progress
 from .publication import Repository, GitHub, Publication
 from .deployment import Deployment
 from .operations import Control, ActivityPaused, doctor
+from .intake import Intake, DraftActivity
 
 
 class IntegrationRunner(Runner):
@@ -114,6 +115,7 @@ class Runtime:
         self.children=[];self.settlement={};self.recovery_issues={};self.integration_issues={}
         self.admission=None;self._next_admission=0
         self.recovery=Recovery(self.project,self.store,self.board)
+        self.intake=Intake(self.project,self.store,self.board);self.intake_issues={}
         self.outbox=Outbox(self.project,self.store)
 
     def settle(self,task=None,*,conn=None):
@@ -250,6 +252,10 @@ class Runtime:
                 self.maintain_pause(conn)
                 return dispatch.DispatchResult()
             self.settle(conn=conn)
+            try:
+                self.intake.reconcile(conn);self.intake_issues={}
+            except (ValueError,KeyError,TypeError,OSError) as error:
+                self.intake_issues={'category':type(error).__name__}
             self.integration_issues=self.wake_integrations(conn)
             self.recovery_issues=self.recovery.reconcile(conn,self.settle)
             admission=self.check_admission()
@@ -354,11 +360,16 @@ class Runtime:
                 except ValueError:card['contract']=None
                 try:card['last_validation']=validation_progress(card,self.store,self.project)
                 except (ValueError,OSError):card['last_validation']={'error':'EvidenceUnavailable'}
+                if card['status']=='review' and card['assignee']=='fabriquinha-ceo':
+                    try:
+                        pending=self.intake.pending(conn,card['id'])
+                        card['business_input']={key:value for key,value in pending.items() if key!='document'} if pending else None
+                    except (ValueError,KeyError,TypeError,OSError):card['business_input']={'error':'EvidenceUnavailable'}
             incidents=self.recovery.status(conn)
             control=self.control.read()
             if control['paused']:control={**control,**self.pause_status(conn)}
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
-                    integration_issues=self.integration_issues,control=control,admission=self.admission,
+                    integration_issues=self.integration_issues,intake_issues=self.intake_issues,control=control,admission=self.admission,
                     incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
@@ -419,7 +430,7 @@ class Runtime:
                 work=self.board.workspace(run);frozen=quality.freeze(run,self.board.input(run,'tests'))
                 if not any(work.iterdir()):self.store.checkout(frozen['snapshot'],work)
                 else:quality.protect(frozen['snapshot'],self.store.capture(work),exact_tests=True)
-            sandbox=Sandbox(self.project,self.store,self.board,run)
+            sandbox=(DraftActivity if run.kind in ('brief','plan') else Sandbox)(self.project,self.store,self.board,run)
             prompt='Delivery activity '+json.dumps(run.binding(),sort_keys=True)+'\n'+prompt
             result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'])
             write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
