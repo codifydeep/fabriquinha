@@ -75,19 +75,44 @@ page tuples, including mixed offsets when the total is already observed. Unknown
 files allow the first page only. Exact handler checks still reject duplicate,
 EOF and cross-product tuples, while unregistered paths remain forbidden. A page
 plan denial is described as such, not a diagnosis of lost access. The qualified
-candidate was installed under maintenance; native validation remains required. A technical
+candidate was installed under maintenance; an accepted native verdict remained pending. A technical
 hold assigned to CTO is visible accountability, not proof that the team has
 autonomously diagnosed and recovered the workflow.
 
 The following native run completed 53/71 files and preserved 121 full pages,
-but 37 other results became persisted-output previews under the aggregate turn
-budget. The per-result read_file exemption did not cover that second mechanism.
+but 33 results became persisted-output previews under the aggregate turn budget;
+four more were deduplication responses without content. The per-result read_file
+exemption did not cover the aggregate mechanism.
 Previews cannot count as complete reads and their /tmp spill paths are not granted.
 The qualified installed executor hook raises only the authenticated immutable
 review aggregate to the journal's existing bounded 8 MiB cap. Other phases,
 per-read limits, context compression, proxy request ceiling and iterations remain
 unchanged. A real 274,113-character tool batch returned without spill; the real
-legacy counter-control still spilled. Native qualification is still required.
+legacy counter-control still spilled. The native successor subsequently proved
+complete inspection of all 71 files; it did not produce an accepted verdict.
+
+### Current incident: phase semantics after complete inspection
+
+Controller receipts now prove 71/71 complete byte-bound file reads. The native
+task finished as `completed`, while its controller attestation and team state
+remain `technical_blocked` at `native_terminal_verdict`. Three advisory completion
+attempts contained prose. The fourth was JSON with matching hashes, but used
+`request_changes` with empty findings; the validator correctly rejected it.
+The terminal structured diagnostic is not a review decision.
+
+That candidate required Green, negative controls and an additional CTO approval
+before approving the test revision. This is a circular prerequisite: independent
+test review and freezing precede implementation/Green and negative controls.
+`approve_tests` is not delivery, merge or release approval. Missing downstream
+evidence is not a concrete defect in the tests, nor grounds to invent findings.
+
+The next correction must preserve this phase contract across every request and
+context compaction, and expose a bounded specific verdict-rejection diagnosis.
+Structured output may help format but cannot alone correct phase semantics.
+These changes are not installed or natively qualified yet. Do not select a
+verdict for the reviewer, extract approval from prose, inherit another run's
+reads or weaken the strict parser. A changed and qualified profile, compatible
+recovery route and fresh independent decision remain necessary.
 
 ### Failed incomplete inspection, not an inferred transport fix
 
@@ -114,11 +139,15 @@ native prompt. Do not reuse the failed-inspection classification or qualificatio
 identity to repeat an unchanged worker. A new source-qualified condition and
 the matching recovery route must be verified under sealed maintenance.
 
-After that review terminated, maintenance was sealed/drained again and the proxy
-stopped. The counter before the next qualification is 6,266/10,000; no ceiling or history was reset.
+After the latest review terminated, maintenance was sealed/drained again. During
+this documentation update, the controller and proxy containers were running;
+the counter was 6,276/10,000, with 3,724 calls remaining and no reset.
 Maintenance, provider pause and container stop are separate controls; consult
 live state before any operation. This document grants no maintenance release,
-model calls or delivery approval.
+model calls or delivery approval. This update started no model calls and changed
+no service state. The current v2 coordinator still stops at
+`awaiting_independent_delivery_review`; a local final-review policy draft is not
+an installed adapter or proof of the downstream PR/CI/deploy/QA/rollback chain.
 
 ## Bounded recovery
 

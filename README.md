@@ -45,13 +45,17 @@ a sucessora. Ela terminou após seis chamadas, 36 páginas aceitas e 26/71 arqui
 completos: o handler negou páginas pendentes fora do lote recomendado e o modelo
 interpretou isso como perda de acesso. A candidata seguinte separa ordem
 recomendada e tuplas pendentes permitidas, mantendo negação de repetição, EOF
-e caminhos estranhos. Ela foi qualificada e instalada. A instância voltou à manutenção
-selada, com proxy parado. Não houve aprovação, congelamento ou entrega nessa linhagem v2.
-O ensaio posterior completou 53/71 arquivos, mas 37 resultados viraram prévias
-de spill agregado. O executor qualificado agora preserva páginas completas só
+e caminhos estranhos. Ela foi qualificada e instalada. Essa tentativa voltou à
+manutenção sem aprovação, congelamento ou entrega nessa linhagem v2.
+O ensaio posterior completou 53/71 arquivos, mas teve 33 prévias de spill
+e quatro deduplicações sem conteúdo. O executor agora preserva páginas completas só
 na revisão autenticada, sob o teto de 8 MiB do diário, mantendo o corpo de 2 MiB
-do proxy, a compactação e os demais gates. A correção está instalada; falta
-seu parecer nativo independente, sem promover prévias antigas a evidências.
+do proxy, a compactação e os demais gates. A correção está instalada. A sucessora
+comprovou 71/71 arquivos, mas o controlador rejeitou o parecer: `request_changes`
+sem achados concretos e dependência circular de Green/controles negativos antes
+da aprovação dos testes. Corrigir a apresentação do contrato da fase e obter
+parecer independente válido ainda são necessários; não há congelamento ou
+homologação. O estado operacional datado está em [STATUS](docs/STATUS.md).
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),

@@ -73,17 +73,23 @@ modelo automático. A qualificação específica deve anteceder um novo ensaio p
 O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
 O controlador `20261023.33` e o worker `20261023.9` já estão instalados nessa
 referência; esses identificadores não constituem imagens publicadas para download.
-A sucessora liberada após a mudança qualificada também ficou bloqueada.
-O seletor atual inclui a correção de páginas pendentes, ainda sem aprovação nativa.
-Também preserva resultados completos em lotes grandes de revisão, sob o teto
+A sucessora liberada após a mudança qualificada também ficou bloqueada,
+agora com 71/71 arquivos integralmente comprovados e parecer inválido. A
+revisão dos testes não depende de Green ou dos controles negativos posteriores;
+essa fronteira ainda precisa ser reforçada na apresentação ao modelo. O
+seletor atual inclui a correção de páginas pendentes e preserva resultados
+completos em lotes grandes de revisão, sob o teto
 de 8 MiB do diário. Isso não aumenta o corpo de 2 MiB do proxy nem permite ler
 arquivos temporários de spill. Outros modos mantêm o orçamento original.
 Isso não autoriza iniciar o Truco ou repetir indefinidamente o ensaio.
 
 Manutenção, pausa do provedor e estado do contêiner do proxy são independentes.
-Após a revisão terminal de 23 de outubro, a barreira foi selada/drenada e o
-proxy parado novamente, preservando contador e teto. Para conferir somente
-os serviços dessa instância:
+Após a revisão terminal mais recente, a barreira foi selada/drenada novamente.
+Na consulta documental de 23 de outubro, controlador e proxy estavam em
+execução; o contador era 6.276/10.000. Não deduza liberação de dispatch a partir
+de contêineres em execução, nem que selar manutenção pare o proxy. Esta
+atualização não alterou esses serviços ou iniciou chamadas ao modelo.
+Para conferir somente os serviços dessa instância:
 
 ```bash
 docker ps -a \
@@ -96,6 +102,11 @@ Confirme a identidade exata antes de uma intervenção; filtros por nome não
 autorizam parar ou remover os resultados. Não use `docker inspect` sem filtrar
 campos: o ambiente completo pode conter segredos. O contador e o teto do proxy
 devem persistir em trocas de imagem, reinícios e recuperações.
+
+Parecer inválido com leitura completa é um incidente diferente de leitura
+incompleta ou corpo de requisição excedido. Consulte o recibo e a rota de
+recuperação compatível; não reclassifique o erro para reutilizar uma
+autorização anterior. A edição desta documentação não autoriza nova execução.
 
 ### Organização e retirada de testes
 

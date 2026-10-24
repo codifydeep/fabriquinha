@@ -13,23 +13,27 @@ da qualificação ponta a ponta ainda necessária.
    resistente à compactação do contexto; fila de páginas pendentes; bloqueio de
    repetição/EOF e diagnóstico estruturado antes de esgotar as 40 iterações.
    Progresso parcial conta; prosa, cache sem conteúdo e chamadas repetidas não.
-   Diário, captura e paradas já estão instalados após o canário Hermes/ACP de
-   563 KB, 219 páginas e duas compactações reais. A fila dependia de uma
+   Diário, captura e paradas já estão instalados. O canário atual Hermes/ACP
+   percorreu 563 KB, 219 páginas e uma compactação real. A fila dependia de uma
    resposta final prematura na versão anterior. A correção desde a primeira
    chamada também foi qualificada e instalada, sem impedir rejeição fundamentada.
    A revisão sucessora também bloqueou: o gate confundia o lote recomendado
    com todas as páginas pendentes permitidas. A candidata seguinte separa os
    dois conceitos e permite offsets mistos verificáveis, sem reduzir os gates.
    O marco continua aberto até parecer nativo aceito.
-   O ensaio posterior chegou a 53/71 arquivos completos, mas 37 resultados
-   viraram prévias de spill. O transporte completo restrito à revisão foi
-   qualificado acima do limiar antigo e instalado; falta sua prova nativa.
+   O ensaio posterior chegou a 53/71 arquivos completos, mas produziu 33 prévias
+   de spill e quatro deduplicações sem conteúdo. O transporte restrito à revisão foi
+   qualificado acima do limiar antigo e instalado. A sucessora comprovou
+   **71/71 arquivos**, mas o parecer foi rejeitado; leitura não equivale a aprovação.
 2. **Qualificação antes de novo ensaio:** fixtures com múltiplos arquivos e
    páginas, controles negativos e Hermes/handlers/ACP reais sem provedor.
    O caminho só de ferramentas já passou pela prova física de escala e
    compactação e foi instalado sob manutenção, com recuperação específica.
-   Concluir a prova nativa sem reduzir evidências,
-   sem apagar a falha ou reutilizar uma prova de capacidade para outro incidente.
+   Corrigir o contrato apresentado da fase e o diagnóstico de saída inválida:
+   `request_changes` requer achados concretos; Green e controles negativos não
+   podem ser pré-condições da revisão dos testes que os antecede. Qualificar
+   também esse comportamento após compactação, sem escolher a decisão em nome
+   do revisor, reduzir evidências ou reutilizar prova de outro incidente.
 3. **Contrato v2 ponta a ponta:** congelamento independente dos testes, Green,
    controles negativos, revisão da entrega, PR/CI, deploy, QA e rollback ligados
    ao mesmo commit. Não importar aprovações de contratos históricos.
@@ -60,10 +64,22 @@ Essa segunda correção passou na prova física e foi instalada; todas as falhas
   Parada estruturada, transporte válido ou mero estado `completed` não bastam.
 
 Os três primeiros controles passaram offline; o caminho de leitura desde a
-primeira resposta também passou no canário Hermes real com compactação. O
-último critério continua pendente. Acrescentar à qualificação leituras legítimas
-fora do lote recomendado, offsets mistos e negativas de plano que não sejam
-apresentadas como perda de acesso.
+primeira resposta também passou no canário Hermes real com compactação.
+Leituras fora da recomendação, offsets mistos e o orçamento agregado acima do
+limiar antigo já foram exercitados na qualificação instalada. A revisão nativa
+mais recente comprovou a inspeção integral. O último critério continua pendente:
+obter decisão independente válida, sem dependências circulares entre fases.
+
+### Próxima correção antes de novo ensaio
+
+- Apresentar a autoridade e o escopo da revisão dos testes a cada chamada,
+  inclusive após compactação. Aprovação dos testes não é aprovação da entrega.
+- Informar a causa específica da rejeição do parecer sem imprimir contexto
+  privado nem tornar o validador permissivo. JSON válido pode ter decisão inválida.
+- Exercitar rejeição sem findings, parecer obsoleto e inspeção incompleta,
+  mantendo livres as decisões fundamentadas de aprovar, pedir mudanças ou escalar.
+- Qualificar a mudança em ambiente isolado e instalar sob manutenção antes
+  de registrar recuperação por condição modificada. Não repetir o mesmo perfil.
 
 ### Continuidade após Green
 
@@ -72,6 +88,9 @@ como checkpoint terminal de seu coordenador. Chegar a esse estado não é conclu
 a release. A ponte seguinte precisa ser implementada e qualificada até revisão
 independente da entrega, publicação por PR/CI e deploy/QA/rollback no mesmo SHA.
 Não apresentar esse checkpoint como entrega autônoma completa.
+Uma política local de fatos da revisão final está em elaboração. Ainda faltam
+o adaptador controlador, proveniência nativa, validação própria do revisor e
+despacho persistente; um teste de política pura não comprova essas etapas.
 
 ## Entrega
 

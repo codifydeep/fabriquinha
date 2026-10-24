@@ -46,8 +46,9 @@ flowchart TD
     N -->|Só tuplas exatas ainda ausentes| R
     R --> F[Guard do parecer: formato e escopo da decisão]
     F -->|Evidência incompleta; mesmo orçamento de 40 iterações| P
+    F -->|Parecer inválido persistente| B
     J -->|Duas rodadas sem progresso| B[Bloqueio técnico preservado]
-    R --> E[Controlador confere bytes, identidade e parecer]
+    F -->|Parecer candidato válido| E[Controlador confere bytes, identidade e parecer]
     E -->|Mudanças válidas| A
     E -->|Prova incompleta ou falha| B
     B --> T[Tech Lead e CTO: recuperação ainda não qualificada integralmente]
@@ -76,12 +77,38 @@ realmente proibidas; não concedem novos caminhos ou evidência de inspeção.
 A qualificação física passou; o parecer nativo da nova revisão continua necessário.
 
 O ensaio subsequente completou 53/71 arquivos, mas o orçamento agregado do
-executor substituiu 37 resultados por prévias de spill. A isenção de
+executor produziu 33 prévias de spill; outras quatro respostas eram deduplicações
+sem conteúdo. Nenhuma delas contou como inspeção. A isenção de
 `read_file` por resultado não impedia esse segundo mecanismo. O novo hook
 `quality_review_budget.py` limita o agregado ao teto de 8 MiB já imposto pelo
 diário, somente para a revisão autenticada. Assim os resultados podem chegar
 inteiros à captura e à compactação; prévias não viram evidência. Outros modos,
 permissões, limite de corpo do proxy e orçamento de iterações permanecem iguais.
+
+A sucessora nativa comprovou 71/71 arquivos no controlador. O bloqueio atual
+está no parecer: a tentativa JSON de `request_changes` não continha achados e
+exigia Green e controles negativos antes de aprovar os testes. O controlador
+recusou a decisão, preservando `technical_blocked`. O transporte completo foi
+exercitado, mas não houve aprovação ou congelamento. Reforçar o contrato da
+fase a cada chamada e diagnosticar sua violação são trabalhos pendentes, não
+novas capacidades já instaladas.
+
+### Fronteiras entre as decisões de qualidade
+
+| Fase | O que uma decisão válida permite | O que não permite |
+|---|---|---|
+| Revisão independente dos testes | Congelar a revisão exata dos testes; o controlador ainda valida a admissão da implementação | Exigir Green como pré-condição, aprovar produto, merge ou release |
+| Implementação e Green | Produzir código contra testes congelados e registrar suíte completa | Editar os testes aprovados ou revisar o próprio trabalho |
+| Controles negativos | Demonstrar sensibilidade dos testes a regressões registradas | Substituir revisão independente da entrega |
+| Revisão da entrega | Avaliar a entrega exata, com leitura e validação próprias do revisor | Usar aprovação de outro snapshot ou dispensar PR/CI |
+| Homologação | Comprovar deploy, QA e rollback no commit qualificado | Declarar sucesso por encerramento de task ou worker ativo |
+
+Essa tabela descreve o contrato e não afirma que todas as transições estejam
+implementadas no coordenador v2. A inspeção integral permite decidir; nunca
+seleciona automaticamente o resultado da revisão. `request_changes` exige
+defeito concreto com evidência, e não ausência de uma etapa futura.
+
+### Diário e qualificação da leitura
 
 O diário é limitado a 512 pares/8 MiB, vincula execução e manifesto, não descarta
 evidências para caber no limite e sugere até 16 páginas com um offset comum
@@ -135,6 +162,9 @@ O coordenador `quality_team_progress.py` termina seu acompanhamento atual em
 `awaiting_independent_delivery_review`. Esse checkpoint não é `HOMOLOGADA`;
 a continuidade da cadeia v2 até revisão da entrega, PR/CI e deploy/QA/rollback
 ainda precisa ser implementada e qualificada.
+Uma política local em elaboração para os fatos da revisão final não altera
+essa fronteira: não autentica por si só a proveniência nativa, não cria um
+revisor, não executa validação e não concede merge.
 
 ## Fontes de verdade e responsabilidade
 

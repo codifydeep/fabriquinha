@@ -32,6 +32,8 @@ São estimativas de engenharia, não cobertura de testes, taxa de sucesso, SLA o
 comprovação de autonomia. Não resultam de um índice automatizado. Não comparar
 estimativas históricas como uma série de medições com metodologia constante.
 Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
+As estimativas foram mantidas nesta atualização: o avanço para 71/71 leituras
+não comprova decisão válida nem autonomia ponta a ponta.
 
 ## O que foi comprovado e o que não foi
 
@@ -60,9 +62,13 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
   com 26/71 arquivos completos. O revisor reportou negações de páginas pendentes
   fora do lote recomendado; o controlador manteve `technical_blocked`.
 - A revisão seguinte confirmou o uso de lotes, mas terminou com 53/71 arquivos
-  completos. O transporte preservou 121 páginas; 37 outros resultados viraram
-  prévias de spill. Essas prévias não foram aceitas como inspeção. Não houve
-  aprovação ou congelamento dos testes.
+  completos. O transporte preservou 121 páginas; houve 33 prévias de spill e
+  quatro respostas de deduplicação sem conteúdo. Elas não contaram como
+  inspeção. Essa é uma tentativa anterior, não o bloqueio mais recente.
+- Após a instalação do orçamento agregado restrito à revisão, a sucessora
+  comprovou **71/71 arquivos** no transporte do controlador. Terminou nativamente
+  em `completed`, mas o controlador manteve `technical_blocked` por parecer
+  inválido. Leitura completa não foi convertida em aprovação.
 - A última suíte offline registrada com captura, enforcement e paradas executou
   **4.384 testes: 4.376 aprovados e oito skips preexistentes**, sem falhas.
   Os 44 testes focados desta correção também passaram. Essas provas offline
@@ -70,7 +76,28 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
 
 Não houve congelamento dos testes, Green ou homologação nessa linhagem v2.
 
-## Último bloqueio: spill agregado dos resultados de leitura
+## Bloqueio atual: decisão da fase de revisão dos testes
+
+A revisão mais recente completou a inspeção integral. Antes de parar, o worker
+produziu três tentativas com prosa fora do contrato e uma tentativa JSON com
+`action=request_changes`, hashes correspondentes e `findings=[]`. O contrato
+exige achados concretos para solicitar mudanças; um objeto JSON bem formado
+não basta. O resultado terminal foi um diagnóstico, não um parecer aceito.
+
+A justificativa dessa última tentativa condicionava a aprovação dos testes a
+Green, controles negativos e uma aprovação adicional do CTO. Isso inverte o
+contrato vigente: os testes são revisados e congelados **antes** da implementação
+e de Green. Aprovar os testes não aprova implementação, merge ou release.
+Decisões técnicas continuam com a equipe, sem repassar essa questão ao CEO.
+
+A correção ainda necessária é explicitar essa fronteira em cada chamada,
+inclusive após compactação, e devolver erros de contrato específicos sem
+afrouxar o validador. Saída tipada pode auxiliar o formato, mas não resolve
+sozinha a dependência circular. Outra execução exige mudança qualificada;
+não se deve extrair aprovação da prosa, inventar findings ou repetir o mesmo
+perfil. Essa correção ainda não está instalada nem qualificada nativamente.
+
+## Histórico recente: paginação e spill agregado
 
 A versão anterior só projetava a fila depois de uma tentativa prematura de
 resposta final. A versão instalada agora prepara fila, schema restrito e gate
@@ -114,15 +141,16 @@ completos somente na fase autenticada de revisão imutável. Seu limite agregado
 os limites por leitura, a compactação real, o corpo de 2 MiB do proxy e as 40
 iterações permanecem. Outros modos mantêm o orçamento original; não há nova
 permissão para ler `/tmp`, executar terminal ou escrever.
-Ela foi instalada sob manutenção com restauração verificada; ainda exige
-aprovação nativa independente e toda a cadeia posterior.
+Ela foi instalada sob manutenção com restauração verificada. A sucessora
+comprovou o transporte integral dos 71 arquivos, mas ainda não produziu um
+parecer aceito. A cadeia posterior permanece pendente.
 
 A tentativa anterior, com 57/71 arquivos completos e 40 iterações consumidas,
 permanece preservada como falha distinta. A rejeição histórica por corpo acima
 de 512 KiB também não é a causa comprovada do bloqueio atual. Não se deve
 reutilizar a prova de capacidade do proxy para autorizar uma repetição idêntica.
 
-## Alcance da qualificação da candidata seguinte
+## Alcance da qualificação instalada
 
 O canário Hermes/ACP passou com respostas locais fixas: continuação após uma
 resposta prematura, handler restrito desde a primeira chamada, duplicata negada
@@ -147,10 +175,10 @@ orçamento usa uma iteração sintética; a fábrica ACP mantém 40.
 | Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.33`, instalado para qualificação controlada |
 | Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.9` |
 | Correção mais recente | Preservação limitada dos resultados completos antes da compactação, qualificada e instalada |
-| Manutenção na instalação | `sealed`, `drained=true`; liberação depende da recuperação e ativação verificadas |
-| Última revisão terminal | Nativa `completed`, 53/71 arquivos completos; controlador `technical_blocked` |
-| Proxy na instalação | Parado; limite de corpo configurado em 2 MiB |
-| Contador antes da nova validação | 6.266/10.000 chamadas, sem reset; teto não é monetário |
+| Manutenção na instalação | `sealed`, `drained=true`, consultada novamente nesta atualização |
+| Última revisão terminal | Nativa `completed`, 71/71 arquivos completos; parecer inválido e controlador `technical_blocked` |
+| Proxy na instalação | Contêiner em execução; limite de corpo configurado em 2 MiB. Isso não implica despacho ativo |
+| Contador consultado | 6.276/10.000 chamadas; 3.724 restantes, sem reset; teto não é monetário |
 
 Esta é uma fotografia, não monitoramento vivo: confirme tarefas, serviços e
 leases antes de agir. Manutenção, pausa do provedor e proxy desligado são
@@ -159,11 +187,11 @@ dados, outros serviços e fila do scheduler. O teto de chamadas não é monetár
 
 ## Próximos marcos, em ordem
 
-1. Validar nativamente a preservação de páginas em lotes grandes, após a
-   instalação/ativação e liberação controladas. A prova física passou acima
-   do limiar antigo de spill; não substitui parecer independente.
-2. Conferir o parecer da revisão seguinte no controlador, sem confundir turno
-   concluído com aprovação. Não repetir o perfil anterior ou ampliar iterações.
+1. Corrigir a apresentação persistente do contrato da fase: aprovação dos
+   testes antecede Green; solicitação de mudanças requer achado concreto.
+2. Qualificar diagnóstico e formato de saída, inclusive após compactação,
+   instalar sob manutenção e obter novo parecer independente válido. Não
+   repetir o perfil anterior, herdar leituras ou ampliar iterações.
 3. Exigir que a própria equipe conduza solicitações de mudanças, correção do
    autor e nova revisão dentro dos contratos persistentes.
 4. Comprovar revisão e congelamento, Green, controles negativos, revisão da
@@ -182,6 +210,13 @@ como aprovação e não encerra o incidente. Um parecer novo e independente cont
 obrigatório. O registro e o despacho funcionaram; a tentativa anterior voltou
 a bloquear, assim como a sucessora. Isso não comprova recuperação integral nem diagnóstico ou
 replanejamento universalmente autônomos pelo CTO.
+
+Uma política local de revisão final da entrega está em elaboração, mas não
+constitui adaptador instalado ou despacho nativo. O coordenador atual termina
+em `awaiting_independent_delivery_review`; faltam autenticação das evidências
+reais, validação própria do revisor e continuidade até PR/CI/deploy/QA/rollback.
+Não houve nova execução da suíte completa nesta atualização documental; o total
+de 4.384 acima refere-se à última execução registrada para o código instalado.
 
 ## Navegação
 

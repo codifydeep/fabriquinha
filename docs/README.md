@@ -33,17 +33,20 @@ ativar outra linhagem de execução.
 - **HOMOLOGADA:** único sucesso terminal da release, depois de revisão, PR/CI,
   deploy, QA e rollback verificáveis no mesmo commit.
 
-No estado de referência, a orientação de paginação desde a primeira chamada
-foi qualificada e instalada. A revisão sucessora também bloqueou: páginas
-pendentes fora do lote recomendado foram tratadas como operações proibidas.
-A correção seguinte separa ordem e permissão, já qualificada e instalada, ainda
-sem aprovação nativa. Os bloqueios anteriores continuam preservados. Temporal
-não é motor do runtime instalado.
+Na referência consultada, controlador `20261023.33` e worker `20261023.9`
+preservam resultados completos de leitura na revisão imutável. A revisão
+nativa mais recente comprovou **71/71 arquivos**, mas terminou em
+`technical_blocked`: o parecer não satisfez o contrato. Uma tentativa de
+`request_changes` sem achados concretos exigia etapas posteriores antes de
+aprovar os testes, criando uma dependência circular.
 
-O último ensaio expôs spill agregado: 37 prévias não puderam ser aceitas como
-inspeção. A correção de transporte completo, limitada à revisão e ao teto do
-diário, passou no canário de lotes grandes e foi instalada. Sua prova nativa
-continua necessária; o fluxo ainda não está homologado.
+O próximo trabalho é tornar inequívocos o contrato da fase e o diagnóstico do
+parecer, qualificar a mudança e obter outra decisão independente. Não é
+fabricar aprovação a partir da leitura completa. Ainda faltam congelamento,
+Green, controles negativos e a cadeia v2 de revisão da entrega até homologação.
+Os bloqueios anteriores permanecem preservados. Temporal não é motor do
+runtime instalado. Consulte [STATUS](STATUS.md) antes de qualquer retomada;
+esta atualização documental não inicia testes ou libera manutenção.
 
 ## Política de atualização
 

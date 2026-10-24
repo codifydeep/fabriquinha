@@ -18,20 +18,22 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
 | Revisão com parada por falta de progresso | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Preservada, sem aprovação. |
 | Revisão nativa após a orientação inicial | Despachada pelo coordenador; terminou após seis chamadas, 36 páginas aceitas e 26/71 arquivos completos. Páginas pendentes fora do lote recomendado foram negadas; escalonamento do revisor não foi aceito como parecer completo. `technical_blocked`, sem aprovação. |
-| Última revisão nativa terminal | 53/71 arquivos completos e 121 páginas aceitas; 37 prévias de spill não contam como inspeção. Seis chamadas; `completed` nativo, mas `technical_blocked` no controlador. Sem congelamento, Green ou homologação. |
+| Revisão anterior com spill | 53/71 arquivos completos e 121 páginas aceitas; 33 prévias de spill e quatro deduplicações sem conteúdo não contam como inspeção. Seis chamadas; sem aprovação. |
+| Última revisão nativa terminal | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
 | Última suíte completa registrada | 4.384 executados: 4.376 aprovados, oito skips preexistentes, sem falhas. Inclui orçamento agregado restrito à revisão e rejeição de drift no executor. Os 44 testes focados também passaram. |
+| Política final da entrega | Rascunho local, não instalado nem conectado ao despacho. Não qualifica a ponte após Green ou a publicação. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
 inicializasse a fila. A versão atual cobre esse caminho desde a primeira chamada.
 A nova fixture mede leituras reais e compactação real, preservando os controles
-de aprovação integral e rejeição fundamentada. A prova nativa permanece pendente;
+de aprovação integral e rejeição fundamentada. O parecer nativo aceito permanece pendente;
 o bloqueio anterior não foi convertido em sucesso ou defeito funcional do produto.
 A prova nativa subsequente expôs outra fronteira: o lote recomendado também
 restringia indevidamente páginas legítimas ainda pendentes. O modelo interpretou
 essas negações como falta de acesso. Uma candidata separa os dois conceitos,
 sem admitir repetição, EOF ou caminhos não registrados. Ela passou no canário
-físico e foi instalada; sua qualificação nativa ainda é obrigatória.
+físico e foi instalada; a revisão posterior exercitou a leitura, não aprovou os testes.
 
 O ensaio seguinte revelou spill por orçamento agregado, apesar da isenção de
 `read_file` por resultado. A nova prova usa lotes de até 64 páginas, superiores
@@ -48,11 +50,26 @@ estratégia possível do modelo. A memória desse diário é local à execução
 
 A mudança foi instalada com execução desligada, recuperada por condição
 modificada e ativada sob manutenção antes da liberação. Nenhuma leitura ou
-aprovação foi herdada da tentativa anterior. A equipe ainda precisa concluir
+aprovação foi herdada da tentativa anterior. A sucessora comprovou a inspeção
+integral dos 71 arquivos, mas não uma decisão válida. Três tentativas prévias
+continham prosa; a quarta tinha JSON e hashes correspondentes, porém combinava
+`request_changes` com `findings=[]`. O encerramento estruturado não passou como
+parecer. O validador não extraiu aprovação nem inventou achados.
+
+A justificativa condicionava a revisão dos testes a Green, controles negativos
+e aprovação adicional do CTO. Green e controles negativos vêm depois do
+congelamento; o contrato não impõe essa aprovação adicional do CTO como
+pré-condição. A apresentação inequívoca dessa fase,
+incluindo após compactação, e o diagnóstico específico da rejeição precisam
+ser corrigidos e qualificados antes de outro ensaio. A leitura completa desta
+execução não poderá ser herdada pela próxima. A equipe ainda precisa concluir
 a revisão e toda a cadeia posterior sob o contrato v2.
 
-Depois da revisão terminal, a manutenção foi selada e drenada novamente e o
-proxy foi parado. O contador permaneceu em 6.266/10.000 chamadas. São estados
+Depois da última revisão terminal, a manutenção foi selada e drenada novamente.
+Na consulta desta atualização o proxy estava em execução, com contador de
+6.276/10.000 chamadas e 3.724 restantes. Nenhuma chamada ao modelo foi iniciada
+por esta atualização documental. A suíte completa não foi reexecutada para
+alterações de documentação; o total acima tem escopo do código já qualificado. São estados
 independentes: uma task `completed`, uma lease fechada e uma revisão aprovada
 não são equivalentes. Confirme o estado vivo antes de agir. Nenhum resultado
 histórico abaixo substitui esse diagnóstico.

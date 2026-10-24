@@ -3,18 +3,19 @@
 Scope note, **23 October 2026**: this document describes patch adapters and
 historical qualification boundaries, not the current deployment inventory.
 The current v2 review is read-only; patch receipts cannot satisfy missing
-inspection or authorize a reviewer to edit tests or implementation. The current
-previous blocker was missing initial pending-page guidance in a tool-only review
-path, not a newly demonstrated patch persistence failure. That guidance is now
-qualified and installed; its native successor also blocked, not approved.
-The qualified installed successor separates recommended order from genuinely
-pending pages; it still grants no new paths or write authority and needs native validation.
-The later native run exposed aggregate result spill: 37 previews did not qualify
-as complete reads. The bounded whole-page transport fix is now qualified and
-installed for immutable review only. It grants no access to spill files and
-does not convert historical previews or patch receipts into read evidence.
-The earlier execution completed with a structured stall diagnostic, not an accepted review verdict.
-No patch adapter can supply its missing inspection or turn it into approval.
+inspection or authorize a reviewer to edit tests or implementation. Earlier
+blockers concerned initial page guidance, recommended-order versus pending-page
+permissions, and aggregate spill: 33 previews and four content-free deduplication
+responses did not qualify as reads. The bounded fixes are qualified and installed
+for immutable review; no access to spill files or write authority was granted.
+
+The latest native review proved 71/71 complete file reads but still ended in
+`technical_blocked`. Its candidate `request_changes` had no concrete findings
+and required downstream Green/negative controls before test approval. The
+controller accepted neither that candidate nor the terminal diagnostic as a
+review verdict. This is a phase/decision-contract issue, not a demonstrated
+patch persistence failure. Patch receipts cannot repair the verdict, provide
+missing review authority or convert any previous failure into approval.
 See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
 using any historical recovery mechanism below.
 
