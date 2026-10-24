@@ -46,6 +46,7 @@ flowchart TD
     N -->|Só tuplas exatas ainda ausentes| R
     R --> F[Guard do parecer: formato e escopo da decisão]
     F -->|Evidência incompleta; mesmo orçamento de 40 iterações| P
+    F -->|Conclusão prematura sem progresso: exigir leitura real| P
     F -->|Parecer inválido persistente| B
     J -->|Duas rodadas sem progresso| B[Bloqueio técnico preservado]
     F -->|Parecer candidato válido| E[Controlador confere bytes, identidade e parecer]
@@ -59,7 +60,7 @@ flowchart TD
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
 v2, não uma dispensa de execução. Feedback, planejador, diário e paradas estão
-instalados no controlador `20261023.33` e worker `20261023.9` da referência.
+instalados no controlador `20261023.35` e worker `20261023.11` da referência.
 `apply_request()` agora arma a orientação e o gate desde a primeira chamada,
 sem depender de uma resposta final prematura. Testes novos têm prioridade;
 uma rejeição fundamentada continua possível sem completar todo o escopo de
@@ -89,9 +90,23 @@ A sucessora nativa comprovou 71/71 arquivos no controlador. O bloqueio atual
 está no parecer: a tentativa JSON de `request_changes` não continha achados e
 exigia Green e controles negativos antes de aprovar os testes. O controlador
 recusou a decisão, preservando `technical_blocked`. O transporte completo foi
-exercitado, mas não houve aprovação ou congelamento. Reforçar o contrato da
-fase a cada chamada e diagnosticar sua violação são trabalhos pendentes, não
-novas capacidades já instaladas.
+exercitado, mas não houve aprovação ou congelamento naquela tentativa. A
+correção instalada repete o contrato da fase, hashes e critérios em cada pedido,
+inclusive após compactação, e informa categorias fixas de rejeição. Após a
+inspeção exigida, o pedido não oferece ferramentas e usa modo JSON somente
+para sintaxe. Parser, inspeção, citações e identidade continuam obrigatórios.
+O coordenador iniciou outra revisão nativa; ela terminou com 46/71 arquivos e
+duas promessas em prosa, antes da decisão final sem ferramentas. A correção
+seguinte exige uma leitura real pendente após conclusão prematura sem progresso;
+depois dessa leitura, permite outra decisão independente e rejeição fundamentada
+sem forçar todo o escopo de aprovação. JSON de sintaxe acompanha o modo
+automático; o handler e os gates locais continuam obrigatórios. A correção
+passou no canário real e foi instalada; ainda requer parecer nativo aceito.
+A revisão seguinte comprovou os 71 arquivos no controlador, mas o primeiro
+parecer final foi rejeitado como JSON inválido. A chamada de continuação recebeu
+HTTP 402, propagado como falha nativa e bloqueio técnico. O proxy mantém uma
+pausa persistente independente do teto de chamadas; não há parecer aceito ou
+aprovação herdável. Sua recuperação específica ainda precisa ser qualificada.
 
 ### Fronteiras entre as decisões de qualidade
 
@@ -127,12 +142,18 @@ real com sete respostas locais: ACP normal, negação de duplicatas, duas rodada
 sem progresso e saída no fim do orçamento. O controle desta última fronteira
 usa uma iteração sintética;
 a fábrica ACP permanece fixada em 40. A extensão de escala percorreu 219 páginas
-de 71 arquivos (563.066 bytes), com seis chamadas principais, uma sumarização
+de 71 arquivos (563.066 bytes), com sete chamadas principais, uma sumarização
 local e uma compactação real. Ela removeu 64 pares da conversa sem
 perder cobertura no diário. Essa extensão usa ferramentas desde a primeira
 resposta, sem inicializar estado de conclusão prematura. A candidata também
 exerceu 157 leituras fora da recomendação e quatro lotes com offsets mistos.
 O lote de 274.113 caracteres não gerou spill; o controle legado gerou, como esperado.
+Após a leitura completa e a compactação, a fixture emitiu uma rejeição sem
+findings; o guard a recusou com diagnóstico específico e a decisão seguinte
+permaneceu sem ferramentas. Outro controle começou pelos testes novos e
+obrigou a leitura restante após uma promessa prematura. São 16 respostas locais
+no conjunto, sem provedor;
+o resultado fixo da fixture não é um parecer independente real.
 A revisão nativa anterior terminou com sete chamadas, 16/71 arquivos
 completos e parada `read_progress_stalled` com 33 iterações restantes.
 A atestação bloqueou o diagnóstico como parecer inválido; não houve aprovação.
@@ -162,7 +183,10 @@ O coordenador `quality_team_progress.py` termina seu acompanhamento atual em
 `awaiting_independent_delivery_review`. Esse checkpoint não é `HOMOLOGADA`;
 a continuidade da cadeia v2 até revisão da entrega, PR/CI e deploy/QA/rollback
 ainda precisa ser implementada e qualificada.
-Uma política local em elaboração para os fatos da revisão final não altera
+`quality_delivery_review_policy.py`, em fonte, qualifica fatos vinculados a
+Red, revisão de testes, Green, controles negativos e validação própria do
+revisor no mesmo SHA. Seus seis testes são sintéticos; o módulo não está
+instalado ou despachado. Essa política pura não altera
 essa fronteira: não autentica por si só a proveniência nativa, não cria um
 revisor, não executa validação e não concede merge.
 

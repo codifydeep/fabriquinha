@@ -113,6 +113,15 @@ class QualityReviewAttestationTests(unittest.TestCase):
         self.update_verdict(action='request_changes',findings=[])
         self.assertEqual(self.call()['stage'],'technical_blocked')
 
+    def test_full_reads_do_not_repair_changes_without_findings_and_expose_fixed_category(self):
+        self.update_verdict(action='request_changes',findings=[],reason='private-fixture: require Green first')
+        result=self.call();diagnostic=result['incident']['completion_diagnostic']
+        self.assertEqual(result['stage'],'technical_blocked')
+        self.assertEqual(diagnostic['reads']['complete_files'],len(self.files))
+        self.assertEqual(diagnostic['verdict_rejection'],'changes_require_concrete_findings')
+        self.assertFalse(result['tests_approved']);self.assertFalse(result['execution_authorized'])
+        self.assertNotIn('private-fixture',json.dumps(diagnostic))
+
     def only_new_test_reads(self):
         with self.b.db() as con:
             rows=con.execute('SELECT call_id,messages FROM observed_read_stream').fetchall()

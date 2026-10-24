@@ -9,7 +9,7 @@ import ast
 import json
 import re
 import time
-from quality_review_verdict import parse as parse_decision, required_reads
+from quality_review_verdict import parse as parse_decision, required_reads, rejection_category
 try:
     from . import quality_review_launch as launch, quality_test_review as review
     from . import quality_review_reads as reads, read_stream_receipts, native, validation_job
@@ -147,14 +147,14 @@ def load(b,source,*,request_id=None):
 
 def completion_diagnostic(output,packet,files,paths,messages):
     """Pure repair evidence; cannot parse around prose or approve a past run."""
-    verdict_state='valid';required=paths
+    verdict_state='valid';required=paths;rejection=None
     try:
         choice=parse_decision(output,packet)
         required=required_reads(choice,packet,paths)
-    except (ValueError,KeyError,TypeError,UnicodeError):
-        verdict_state='invalid'
+    except (ValueError,KeyError,TypeError,UnicodeError) as error:
+        verdict_state='invalid';rejection=rejection_category(error)
     return dict(operation='immutable_review_completion_diagnostic_v1',
-        verdict_format=verdict_state,expected_format='one_exact_json_object',
+        verdict_format=verdict_state,verdict_rejection=rejection,expected_format='one_exact_json_object',
         manifest_sha256=packet['manifest_sha256'],
         output_sha256=hashlib.sha256(output.encode()).hexdigest() if isinstance(output,str) else None,
         reads=reads.assessment(files,packet['manifest_sha256'],paths,messages,required_paths=required),

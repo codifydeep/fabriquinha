@@ -113,6 +113,44 @@ or model calls; its native API authority remains explicitly synthetic.
 
 ## Required order
 
+### Phase-bound test-review decision
+
+The current worker repeats its controller-bound phase and exact manifest/plan/Red
+hashes and criteria in every outbound review request, including after context
+compaction. `approve_tests` concerns only the registered test revision. Green,
+negative controls, final delivery review, product PR/CI and deployment QA are
+downstream gates, not prerequisites of this decision. No extra CTO approval is
+invented; a concrete unresolved technical uncertainty may still be escalated to
+CTO. Technical decisions must not be redirected to CEO.
+
+After the required observed reads are complete, the outgoing request offers no
+tools and uses syntax-only JSON object mode. This is not a provider-side verdict
+schema or an approval operation: the strict local parser and independent
+controller identity, byte-bound read and citation gates remain authoritative.
+Concrete earlier rejection retains its smaller required inspection scope;
+approval still requires the complete registered snapshot. No action is selected
+for the reviewer and no prior run's reads are inherited.
+
+Parser feedback exposes only fixed rejection categories, never rejected prose or
+arbitrary exception text. In particular, `request_changes` with empty findings is
+rejected as `changes_require_concrete_findings`; missing future-stage evidence
+is not a concrete test defect. Changing prose does not count as progress.
+Changing a fixed structural error category can receive another correction within
+the original 40 iterations, while repeated unchanged failure remains blocked.
+The real Hermes canary exercises this rejection after full inspection and actual
+compaction with fixed local replies. It qualifies transport and feedback, not
+independent model judgment or a native test approval.
+
+A later native review stopped earlier with incomplete reads and prose promising
+to continue in another turn. The qualified continuation requires a real pending
+read after premature completion with unchanged coverage, even when all new tests
+have been read. One actual read reopens auto decision-making, preserving supported
+early rejection without forcing the entire unrelated approval scope. Auto mode
+requests JSON syntax alongside read tools; forced named reads retain their
+existing provider compatibility. An error-category cycle cannot rearm the same
+failed completion at unchanged coverage. The real four-call ACP control covers
+this path; neither fixed replies nor syntax control constitute native approval.
+
 ```mermaid
 flowchart LR
     A[Closed tests-only author and native completion] --> Q[Durable fair reconciliation]
@@ -905,7 +943,8 @@ approval remain necessary; this control cannot repair or approve the previous ru
 #### Aggregate spill must not erase immutable review pages
 
 The next native execution accepted 121 full read pages and completed 53/71
-files, but 37 other results became upstream `<persisted-output>` previews.
+files, but 33 results became upstream `<persisted-output>` previews and four
+more were deduplication responses without content.
 `read_file` is exempt from per-result spilling upstream, yet aggregate turn
 enforcement can still spill it. Those previews point outside the registered
 snapshot and cannot count as complete inspection. Page retries then encountered

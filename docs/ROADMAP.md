@@ -32,8 +32,11 @@ da qualificação ponta a ponta ainda necessária.
    Corrigir o contrato apresentado da fase e o diagnóstico de saída inválida:
    `request_changes` requer achados concretos; Green e controles negativos não
    podem ser pré-condições da revisão dos testes que os antecede. Qualificar
-   também esse comportamento após compactação, sem escolher a decisão em nome
-   do revisor, reduzir evidências ou reutilizar prova de outro incidente.
+   Essa correção já passou no canário Hermes real após compactação e está
+   instalada. A revisão seguinte parou com 46/71 arquivos e promessas em prosa.
+   A continuação por leitura real já passou no novo canário; falta seu
+   parecer nativo aceito. Não escolher a decisão em nome do revisor, reduzir evidências
+   ou reutilizar prova de outro incidente.
 3. **Contrato v2 ponta a ponta:** congelamento independente dos testes, Green,
    controles negativos, revisão da entrega, PR/CI, deploy, QA e rollback ligados
    ao mesmo commit. Não importar aprovações de contratos históricos.
@@ -70,7 +73,7 @@ limiar antigo já foram exercitados na qualificação instalada. A revisão nati
 mais recente comprovou a inspeção integral. O último critério continua pendente:
 obter decisão independente válida, sem dependências circulares entre fases.
 
-### Próxima correção antes de novo ensaio
+### Correção instalada e critério do ensaio sucessor
 
 - Apresentar a autoridade e o escopo da revisão dos testes a cada chamada,
   inclusive após compactação. Aprovação dos testes não é aprovação da entrega.
@@ -81,6 +84,20 @@ obter decisão independente válida, sem dependências circulares entre fases.
 - Qualificar a mudança em ambiente isolado e instalar sob manutenção antes
   de registrar recuperação por condição modificada. Não repetir o mesmo perfil.
 
+Os controles acima passaram na suíte offline e no canário físico. A correção
+foi instalada; a revisão seguinte voltou a bloquear antes da decisão final.
+O novo controle qualificado exige leitura pendente após resposta prematura e
+reabre a decisão após progresso real, preservando rejeição fundamentada antecipada.
+A aceitação de um novo parecer ainda não está comprovada; JSON válido ou leitura
+completa não constituem esse critério.
+
+A revisão após a continuação comprovou 71/71 arquivos. O primeiro parecer foi
+rejeitado; o provedor respondeu HTTP 402 à continuação, que terminou como
+falha nativa e bloqueio técnico. Antes de novo consumo, resolver o crédito com
+o operador e qualificar a recuperação dessa assinatura, mantendo o contador,
+o incidente e a independência da próxima decisão. Não usar a rota de inspeção
+incompleta para uma revisão que completou sua leitura.
+
 ### Continuidade após Green
 
 `quality_team_progress.py` ainda trata `awaiting_independent_delivery_review`
@@ -88,7 +105,8 @@ como checkpoint terminal de seu coordenador. Chegar a esse estado não é conclu
 a release. A ponte seguinte precisa ser implementada e qualificada até revisão
 independente da entrega, publicação por PR/CI e deploy/QA/rollback no mesmo SHA.
 Não apresentar esse checkpoint como entrega autônoma completa.
-Uma política local de fatos da revisão final está em elaboração. Ainda faltam
+Uma política de fatos da revisão final existe em fonte, com seis testes
+sintéticos e sem instalação. Ainda faltam
 o adaptador controlador, proveniência nativa, validação própria do revisor e
 despacho persistente; um teste de política pura não comprova essas etapas.
 

@@ -29,7 +29,7 @@ plans missing pages from the first model request and reports stalled progress
 or budget exhaustion structurally. Partial new coverage must count as progress; repeated calls,
 prose and cache responses without content must not. The bounded journal and
 pending-page planner, loop capture, handler enforcement and structured stops
-are installed in reference controller `20261023.33` and worker `20261023.9`.
+are installed in reference controller `20261023.35` and worker `20261023.11`.
 Dispatch checks without consuming; only the fenced handler claims the page
 atomically. The initial consuming check at both
 boundaries was rejected by the real registry canary and corrected without
@@ -37,11 +37,13 @@ rewriting that failure. The expanded canary passed with seven fixed local
 responses: normal ACP continuation, direct duplicate denial, stalled tool
 rounds and the budget boundary. The latter uses a one-iteration fixture loop;
 the ACP factory remains fixed at 40. No external model was called. The expanded
-next-candidate fixture also passed: 71 files, 563,066 bytes, 219 unique pages, six main local
+current candidate fixture also passed: 71 files, 563,066 bytes, 219 unique pages, seven main local
 responses and one local summary response. One real compression removed
 64 read pairs from conversation while the journal retained full byte-bound
 coverage. It exercised 157 pending reads outside recommendations and four
-mixed-offset batches. The complete fixed suite used fourteen local responses, no external model.
+mixed-offset batches. A separate four-call real ACP control reads the new tests,
+returns premature prose, is forced to read a pending file and then decides.
+The complete fixed suite used sixteen local responses, no external model.
 Installation, verified backup/restoration and host scheduler pin migration
 completed. The normal control retains a premature answer; the scale control
 uses tools from its first reply without initializing completion state. That
@@ -106,13 +108,27 @@ test review and freezing precede implementation/Green and negative controls.
 `approve_tests` is not delivery, merge or release approval. Missing downstream
 evidence is not a concrete defect in the tests, nor grounds to invent findings.
 
-The next correction must preserve this phase contract across every request and
-context compaction, and expose a bounded specific verdict-rejection diagnosis.
-Structured output may help format but cannot alone correct phase semantics.
-These changes are not installed or natively qualified yet. Do not select a
+The installed correction preserves this phase contract across every request and
+context compaction, and exposes fixed verdict-rejection categories. After the
+required inspection, no tools are offered and syntax-only JSON object mode is
+requested. This alone cannot correct semantic judgment or grant authority.
+Do not select a
 verdict for the reviewer, extract approval from prose, inherit another run's
 reads or weaken the strict parser. A changed and qualified profile, compatible
 recovery route and fresh independent decision remain necessary.
+
+The native successor stopped earlier: 46/71 files and 80 full pages, then two
+premature prose answers with 35 iterations left. It promised to read remaining
+pages later instead of calling the available tool; no verdict was accepted.
+The next candidate requires an actual pending read after premature completion
+without new coverage. Actual new coverage reopens independent decision-making,
+so a supported early rejection need not inspect unrelated approval-only files.
+Auto mode also requests JSON syntax while retaining reads; a forced named read
+retains its existing provider compatibility. Fixed parser-error alternation
+cannot rearm an already repeated failure with unchanged coverage. The real
+zero-model canary passed this continuation. It was installed and activated after
+verified backup/restoration and pin migration, then maintenance was released
+for coordinator dispatch. Native acceptance is still required.
 
 ### Failed incomplete inspection, not an inferred transport fix
 
@@ -139,14 +155,21 @@ native prompt. Do not reuse the failed-inspection classification or qualificatio
 identity to repeat an unchanged worker. A new source-qualified condition and
 the matching recovery route must be verified under sealed maintenance.
 
-After the latest review terminated, maintenance was sealed/drained again. During
-this documentation update, the controller and proxy containers were running;
-the counter was 6,276/10,000, with 3,724 calls remaining and no reset.
+After that latest review terminated, maintenance was sealed/drained again and
+the proxy stopped at 6,282/10,000, with 3,718 calls remaining and no reset.
+The same proxy was reactivated at that count after installing the qualified
+continuation; this does not approve tests or inherit any previous read.
+The resulting native review proved 71/71 full files and 171 pages, but its first
+final candidate was invalid JSON. The provider returned HTTP 402 on the next
+continuation. Native execution failed and the team remained technically blocked.
+The proxy entered a persistent payment pause at 6,291/10,000 and was stopped
+after maintenance was sealed/drained. Credit restoration and a recovery bound
+to this exact signature remain pending. Incomplete-inspection recovery does not
+apply to complete reads followed by payment failure; no rejected output is approval.
 Maintenance, provider pause and container stop are separate controls; consult
 live state before any operation. This document grants no maintenance release,
-model calls or delivery approval. This update started no model calls and changed
-no service state. The current v2 coordinator still stops at
-`awaiting_independent_delivery_review`; a local final-review policy draft is not
+model calls or delivery approval. The current v2 coordinator still stops at
+`awaiting_independent_delivery_review`; the source-only final-review policy is not
 an installed adapter or proof of the downstream PR/CI/deploy/QA/rollback chain.
 
 ## Bounded recovery

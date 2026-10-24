@@ -27,10 +27,10 @@ capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, se
 credenciais nos testes. A recuperação da falha por tamanho foi registrada e o
 ensaio seguinte ultrapassou o limite antigo sem aquela rejeição, mas falhou ao
 esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
-O hardening de paginação já foi instalado: controlador `20261023.33` e worker
-`20261023.9`, com diário limitado, captura no loop e paradas estruturadas.
+O hardening de paginação já foi instalado: controlador `20261023.35` e worker
+`20261023.11`, com diário limitado, captura no loop e paradas estruturadas.
 O canário Hermes/ACP percorreu 219 páginas e 563 KB; uma compactação real
-retirou 64 pares da conversa sem perder cobertura no diário. Foram 14 respostas
+retirou 64 pares da conversa sem perder cobertura no diário. Foram 16 respostas
 locais fixas, sem chamadas externas: 157 leituras fora da recomendação,
 quatro lotes mistos e um lote de 274 mil caracteres preservado sem spill.
 Após uma recuperação anterior, o coordenador iniciou uma revisão real que parou
@@ -53,9 +53,18 @@ na revisão autenticada, sob o teto de 8 MiB do diário, mantendo o corpo de 2 M
 do proxy, a compactação e os demais gates. A correção está instalada. A sucessora
 comprovou 71/71 arquivos, mas o controlador rejeitou o parecer: `request_changes`
 sem achados concretos e dependência circular de Green/controles negativos antes
-da aprovação dos testes. Corrigir a apresentação do contrato da fase e obter
-parecer independente válido ainda são necessários; não há congelamento ou
-homologação. O estado operacional datado está em [STATUS](docs/STATUS.md).
+da aprovação dos testes. A apresentação persistente do contrato da fase,
+diagnóstico específico e decisão final sem ferramentas em modo JSON de sintaxe
+passaram no canário físico e foram instalados. O coordenador iniciou outra
+revisão independente; ela voltou a bloquear com 46/71 arquivos e duas promessas
+em prosa de continuar depois. A continuação com leitura real, sem ampliar
+permissões ou orçamento, passou no canário seguinte e foi instalada com
+backup/restauração verificados, para nova revisão pelo coordenador. Ainda não há parecer nativo
+aceito, congelamento ou homologação. A revisão após essa correção comprovou
+71/71 arquivos, mas teve o primeiro parecer rejeitado e recebeu HTTP 402 na
+continuação. A instância está selada e o proxy parado após pausa persistente
+por pagamento, sem reset de contador ou aprovação fictícia. O estado datado está em
+[STATUS](docs/STATUS.md).
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),
@@ -614,6 +623,9 @@ flowchart TB
     S <--> B
     S <--> L[Ledgers privados, incidentes e recibos]
     B --> W[Workers Hermes isolados: até 2]
+    W --> RG[Guard da revisão: contrato de fase, diário e páginas]
+    RG -->|Conclusão prematura: exigir leitura pendente real| W
+    RG -->|Parecer candidato: atestação independente ainda obrigatória| B
     W --> P[Proxy de modelo: identidade e teto de chamadas]
     P --> M[Provedor LLM configurado]
     B --> E[Snapshots imutáveis e validação controlada]

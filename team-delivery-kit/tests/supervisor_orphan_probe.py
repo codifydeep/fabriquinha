@@ -29,6 +29,17 @@ def write(path, value):
 def workload(folder):
     entered = folder/'entered.json'
     previous = json.loads(entered.read_text()) if entered.exists() else []
+    # The real controller reconciles durable completion; this fixture replaces
+    # that reconciler, not the production admission/locks. A retry admitted
+    # AFTER the original released its lock must not simulate a fresh workload.
+    # While the original is still unfinished, duplicate entry is still recorded
+    # below and fails the real-process probe. This is not fresh application QA.
+    complete=read(folder/'autonomy-status'/(LABEL+'.json'))
+    if complete and complete.get('stage')=='deployed_qa_passed':
+        if (complete!=dict(label=LABEL,issue_id=ISSUE,stage='deployed_qa_passed',fixture_only=True)
+                or len(previous)!=1 or type(previous[0]) is not int):
+            raise ValueError('exact completed fixture workload receipt required')
+        return
     previous.append(os.getpid());write(entered,previous)
     deadline=time.monotonic()+15
     while not (folder/'release').exists():

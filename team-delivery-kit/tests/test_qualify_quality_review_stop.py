@@ -14,7 +14,8 @@ from test_review_execution_evidence import evidence,scale_evidence
 class QualityReviewStopQualificationTests(unittest.TestCase):
     def report(self):
         return dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',provider='fixed_loopback_not_model',
-            model_calls=0,fixed_provider_calls=3,total_fixed_provider_calls=14,execution_controls=evidence(),
+            model_calls=0,fixed_provider_calls=4,total_fixed_provider_calls=16,execution_controls=evidence(),
+            premature_after_tests_forced_read=True,
             scale_controls=scale_evidence(),fixture_source_sha256=driver.sha((driver.ROOT/'review_execution_evidence.py').read_bytes()),
             feedback_rounds=1,same_agent=True,max_iterations=40,
             acp=True,protected_files_unchanged=True,tests_approved=False,delivery_approval=False,
@@ -25,7 +26,8 @@ class QualityReviewStopQualificationTests(unittest.TestCase):
         self.assertEqual(validate_report(report,guards),report)
         for change in (dict(acp=False),dict(provider='openrouter'),dict(model_calls=1),dict(model_calls=False),
                 dict(max_iterations=999),dict(same_agent=False),dict(fixed_provider_calls=2),
-                dict(tests_approved=True),dict(guard_sources={**guards,'feedback':'0'*64})):
+                dict(tests_approved=True),dict(premature_after_tests_forced_read=False),
+                dict(guard_sources={**guards,'feedback':'0'*64})):
             value={**report,**change}
             with self.subTest(change=change),self.assertRaises(ValueError):validate_report(value,guards)
 

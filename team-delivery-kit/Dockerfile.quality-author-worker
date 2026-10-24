@@ -13,6 +13,10 @@
 # while the pending-page/recommended-order distinction is qualified.
 # Retain delivery-kit-quality-author-worker:20261023.8 as the installed rollback
 # until aggregate-spill preservation is qualified in a new native review.
+# Retain delivery-kit-quality-author-worker:20261023.9 as the installed rollback
+# while phase-bound verdict feedback and final syntax-only JSON mode qualify.
+# Retain delivery-kit-quality-author-worker:20261023.10 as the installed rollback
+# while actual-read continuation after premature prose is qualified.
 FROM delivery-kit-generic-calibration:20261011.7
 USER root
 COPY quality_phase_tools.py portable_contract.py test_runner_policy.py broker/review_tool_policy.py /opt/hermes/

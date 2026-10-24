@@ -33,16 +33,23 @@ ativar outra linhagem de execução.
 - **HOMOLOGADA:** único sucesso terminal da release, depois de revisão, PR/CI,
   deploy, QA e rollback verificáveis no mesmo commit.
 
-Na referência consultada, controlador `20261023.33` e worker `20261023.9`
+Na referência consultada, controlador `20261023.35` e worker `20261023.11`
 preservam resultados completos de leitura na revisão imutável. A revisão
-nativa mais recente comprovou **71/71 arquivos**, mas terminou em
+nativa terminal anterior comprovou **71/71 arquivos**, mas terminou em
 `technical_blocked`: o parecer não satisfez o contrato. Uma tentativa de
 `request_changes` sem achados concretos exigia etapas posteriores antes de
 aprovar os testes, criando uma dependência circular.
 
-O próximo trabalho é tornar inequívocos o contrato da fase e o diagnóstico do
-parecer, qualificar a mudança e obter outra decisão independente. Não é
-fabricar aprovação a partir da leitura completa. Ainda faltam congelamento,
+O contrato da fase e o diagnóstico específico foram corrigidos, qualificados
+no Hermes real sem provedor e instalados com backup/restauração verificados.
+O coordenador despachou outra revisão nativa: ela parou com 46/71 arquivos e
+duas promessas em prosa de continuar depois. A continuação por leitura real
+passou na qualificação seguinte e foi instalada, sem ampliar orçamento ou forçar
+aprovação. A recuperação foi registrada e a manutenção liberada para o coordenador.
+A revisão seguinte comprovou 71/71 arquivos, mas o primeiro parecer final foi
+rejeitado; a continuação recebeu HTTP 402. A instância está selada e o proxy
+parado após pausa por pagamento, sem aprovação fictícia. É necessário resolver
+o crédito e qualificar a retomada dessa falha específica. Faltam congelamento,
 Green, controles negativos e a cadeia v2 de revisão da entrega até homologação.
 Os bloqueios anteriores permanecem preservados. Temporal não é motor do
 runtime instalado. Consulte [STATUS](STATUS.md) antes de qualquer retomada;

@@ -9,13 +9,24 @@ permissions, and aggregate spill: 33 previews and four content-free deduplicatio
 responses did not qualify as reads. The bounded fixes are qualified and installed
 for immutable review; no access to spill files or write authority was granted.
 
-The latest native review proved 71/71 complete file reads but still ended in
+An earlier native review proved 71/71 complete file reads but still ended in
 `technical_blocked`. Its candidate `request_changes` had no concrete findings
 and required downstream Green/negative controls before test approval. The
 controller accepted neither that candidate nor the terminal diagnostic as a
 review verdict. This is a phase/decision-contract issue, not a demonstrated
 patch persistence failure. Patch receipts cannot repair the verdict, provide
 missing review authority or convert any previous failure into approval.
+The phase-bound notice, fixed parser categories and tool-free final JSON syntax
+mode have since passed the real fixed-response Hermes canary and been installed.
+The coordinator dispatched a fresh native review; it stopped with 46/71 files
+and premature prose before final decision. A further continuation control passed
+the real canary: perform an actual pending read after a promise, then reopen an
+independent decision. It grants no write, patch, broader paths or approval.
+Native acceptance remains pending. Patch tools remain forbidden throughout review.
+That later native run proved 71/71 full reads; its first final candidate was
+rejected, then the provider returned HTTP 402 on continuation. The native failure,
+payment pause and technical hold remain preserved. Patch receipts cannot resolve
+credit, transfer inspection to a fresh review or authorize payment recovery.
 See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
 using any historical recovery mechanism below.
 

@@ -15,6 +15,10 @@
 # while the pending-page successor is qualified; do not overwrite its image tag.
 # Retain delivery-kit-quality-v2-controller:20261023.32 as the installed rollback
 # until whole-page aggregate transport qualifies; historical reviews stay blocked.
+# Retain delivery-kit-quality-v2-controller:20261023.33 as the installed rollback
+# while phase-specific verdict diagnostics qualify; no previous approval is inferred.
+# Retain delivery-kit-quality-v2-controller:20261023.34 as the installed rollback
+# while premature-completion continuation is qualified independently.
 FROM delivery-kit-execution-broker:20261021.512
 COPY broker/server.py /broker.py
 COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /

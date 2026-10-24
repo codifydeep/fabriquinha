@@ -54,24 +54,32 @@ class Handler(BaseHTTPRequestHandler):
                 'No tests or delivery have been approved. Follow the original operator fixture '
                 'and the controller notices for exact pending paths and offsets.')),'stop','summary')
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
-        maximum=6 if scenario=='scale' else 1 if scenario=='budget' else 3
+        maximum=7 if scenario=='scale' else 1 if scenario=='budget' else 4 if scenario=='normal' else 3
         if index>=maximum:
             self.send_response(400);self.end_headers();self.wfile.write(b'{"error":"fixed fixture call ceiling"}');return
         if scenario=='normal' and index==1:
+            assert body.get('tool_choice')=='auto'
+            assert body.get('response_format')==dict(type='json_object')
+        elif scenario=='normal' and index==2:
             assert body.get('tool_choice')==dict(type='function',function=dict(name='read_file')),body.get('tool_choice')
             assert [t['function']['name'] for t in body.get('tools',[])]==['read_file']
             assert body.get('parallel_tool_calls') is True
             assert any(m.get('role')=='system' and 'controller_review_continuation_v1' in str(m.get('content'))
                 for m in body.get('messages',[]))
-        elif scenario=='normal' and index==2:
-            assert body.get('tool_choice')!=dict(type='function',function=dict(name='read_file'))
+        elif scenario=='normal' and index==3:
+            assert body.get('tool_choice')=='none' and body.get('response_format')==dict(type='json_object')
+            assert not body.get('tools') and not body.get('parallel_tool_calls')
         message=dict(role='assistant',content=('Premature approval\n'+verdict) if index==0 else verdict)
         finish='stop'
-        if scenario=='normal' and index==1:
+        if scenario=='normal' and index in (0,2):
+            assert body.get('response_format')==(dict(type='json_object') if index==0 else None)
+            chosen=['tests/test_new.py'] if index==0 else ['app.py']
             message=dict(role='assistant',content=None,tool_calls=[dict(id='read-'+str(i),type='function',
                 function=dict(name='read_file',arguments=json.dumps(dict(path='/delivery/'+p,offset=1,limit=100))))
-                for i,p in enumerate(FILES)])
+                for i,p in enumerate(chosen,index)])
             finish='tool_calls'
+        elif scenario=='normal' and index==1:
+            message=dict(role='assistant',content='I read the new tests. I will read the remaining app file in a later turn.')
         elif (scenario=='stall' and index>0) or scenario=='budget':
             args=(dict(path='/delivery/app.py',offset=401,limit=100) if scenario=='stall' else
                 dict(path='/delivery/tests/test_new.py',offset=1,limit=1))
@@ -84,8 +92,17 @@ class Handler(BaseHTTPRequestHandler):
             assert len(notices)==1
             note=json.loads(notices[0][notices[0].index('{'):])
             assert note['request_id']=='60000000-0000-4000-8000-000000000005'
+            assert note['phase_contract']['phase']=='immutable_test_revision_review_v2'
+            assert note['phase_contract']['approval_scope']=='exact_test_revision_only'
+            assert note['phase_contract']['downstream_gates']==['implementation_green','negative_controls',
+                'independent_delivery_review','product_pr_ci','same_commit_deploy_qa_rollback']
+            assert 'not prerequisites' in notices[0] and 'Do not invent an additional CTO approval' in notices[0]
+            assert note['verdict_contract']['criteria']==['A01']
+            assert all(note['verdict_contract'][key]==config_value for key,config_value in
+                json.loads(verdict).items() if key in ('manifest_sha256','plan_sha256','red_sha256'))
             if note['remaining_files']:
                 assert body.get('tool_choice')=='auto'
+                assert body.get('response_format')==dict(type='json_object')
                 # Reproduce a real model's large parallel batch, not the
                 # smaller recommended cohort that hid aggregate spill.
                 pages=note['pending_reads'][:64];assert 1<=len(pages)<=64
@@ -104,7 +121,18 @@ class Handler(BaseHTTPRequestHandler):
                 finish='tool_calls'
             else:
                 assert note['complete_files']==71
-                assert body.get('tool_choice')!=dict(type='function',function=dict(name='read_file'))
+                assert body.get('tool_choice')=='none' and body.get('response_format')==dict(type='json_object')
+                assert not body.get('tools') and not body.get('parallel_tool_calls')
+                if index==5:
+                    # Syntactically valid JSON is still not a valid review.
+                    # The real local guard must reject it, preserve it, and
+                    # give specific feedback after a REAL context compression.
+                    bad={**json.loads(verdict),'action':'request_changes','reason':
+                        'Fixed invalid control: require Green and negative controls before test review.'}
+                    message=dict(role='assistant',content=json.dumps(bad))
+                else:
+                    assert index==6
+                    assert note['verdict_rejection']=='changes_require_concrete_findings'
         return self.respond(body,message,finish,index)
 
     def respond(self,body,message,finish,index):
@@ -178,12 +206,12 @@ try:
         result=agent.run_conversation(prompt)
 finally:server.shutdown();server.server_close()
 assert result['final_response']==verdict,result.get('final_response')
-assert len(calls)==3,calls
+assert len(calls)==4,calls
 notes=[json.loads(s.split(':',1)[1]) for s in audit if s.startswith('QUALITY_REVIEW_COMPLETION_ATTEMPT_V1:')]
 print(json.dumps(dict(stage='fixed_probe_observed',fixed_calls=calls,auxiliary=auxiliary,
     audit_notes=len(notes),acp=acp_mode,agent_text_chunks=len(text_chunks))))
-assert len(notes)==1 and notes[0]['diagnostic']['remaining_files']==2 and not notes[0]['diagnostic']['blocked'],notes
-assert notes[0]['diagnostic']['remaining_iterations']==39,notes
+assert len(notes)==1 and notes[0]['diagnostic']['remaining_files']==1 and not notes[0]['diagnostic']['blocked'],notes
+assert notes[0]['diagnostic']['remaining_iterations']==38,notes
 assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in FILES.items())
 
 
@@ -322,9 +350,12 @@ def scale_compaction_control():
         executor.enforce_turn_budget=original_budget_enforcer
         local.shutdown();local.server_close()
     assert result['final_response']==verdict,result
-    assert len(calls)==6 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert len(calls)==7 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
     assert outside_recommendations and mixed_offset_batches
-    assert not hasattr(current,'_quality_review_completion')  # Tools from call zero, never a premature final.
+    completed=current._quality_review_completion
+    assert completed['attempts']==1 and not completed['blocked']
+    rejected=json.loads(completed['candidate'])
+    assert rejected['action']=='request_changes' and rejected['findings']==[]
     assert len(commits)==len(scale_summaries)==compressor.compression_count and all(n>0 for n in commits),commits
     assert current._quality_review_journal.plan()['complete_files']==71
     largest=max(p['chars'] for p in transport)
@@ -338,6 +369,7 @@ def scale_compaction_control():
         out_of_recommended_reads=len(outside_recommendations),mixed_offset_batches=len(mixed_offset_batches),
         largest_batch_chars=largest,legacy_turn_budget_chars=200000,
         review_turn_budget_chars=MAX_BYTES,spill_previews=0,legacy_spill_observed=True,
+        phase_contract_persisted=True,invalid_final_verdict_rejected=True,json_only_after_inspection=True,
         snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
 
 
@@ -355,6 +387,7 @@ guard_sources={key:hashlib.sha256(Path(path).read_bytes()).hexdigest() for key,p
     'session':'/opt/hermes/acp_adapter/session.py','executor':'/opt/hermes/agent/tool_executor.py'}.items()}
 print(json.dumps(dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',
     provider='fixed_loopback_not_model',model_calls=0,fixed_provider_calls=len(normal_calls),
+    premature_after_tests_forced_read=True,
     total_fixed_provider_calls=len(normal_calls)+controls['stall']['provider_calls']+controls['budget']['provider_calls']
         +scale['main_provider_calls']+scale['summary_provider_calls'],
     execution_controls=controls,scale_controls=scale,

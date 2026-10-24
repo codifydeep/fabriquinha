@@ -130,10 +130,100 @@ class QualityReviewStopTests(unittest.TestCase):
         self.assertFalse(agent._quality_review_journal.messages())
         stop.guard(agent,[],'not a verdict',38,self.env)
         completed=stop.apply_request(agent,request,self.messages(),37,self.env)
-        self.assertEqual(completed['tools'],request['tools']);self.assertEqual(completed['tool_choice'],'auto')
+        self.assertNotIn('tools',completed);self.assertEqual(completed['tool_choice'],'none')
+        self.assertEqual(completed['response_format'],dict(type='json_object'))
         self.assertIn('no verdict has been accepted',completed['messages'][0]['content'])
         self.assertEqual(request['messages'],[dict(role='user',content='review')])
         self.assertIs(stop.apply_request(agent,request,[],39,{}),request)
+
+    def test_phase_contract_and_exact_bindings_survive_dropped_context_on_every_request(self):
+        agent=SimpleNamespace();request=self.api_request()
+        for history in ([],self.messages()):
+            result=stop.apply_request(agent,request,history,39,self.env)
+            content=result['messages'][0]['content'];note=json.loads(content[content.index('{'):])
+            self.assertEqual(note['phase_contract']['phase'],'immutable_test_revision_review_v2')
+            self.assertEqual(note['phase_contract']['approval_scope'],'exact_test_revision_only')
+            self.assertIn('implementation_green',note['phase_contract']['downstream_gates'])
+            self.assertIn('negative_controls',note['phase_contract']['downstream_gates'])
+            self.assertIn('not prerequisites',content)
+            self.assertIn('Do not invent an additional CTO approval',content)
+            for key in ('manifest_sha256','plan_sha256','red_sha256'):
+                self.assertEqual(note['verdict_contract'][key],self.config['review_context']['packet'][key])
+            self.assertEqual(note['verdict_contract']['criteria'],['A01'])
+            self.assertEqual(note['verdict_contract']['action_findings'],dict(
+                approve_tests='empty',request_changes='concrete_nonempty',escalate_cto='evidence_bound'))
+            self.assertFalse(note['tests_approved']);self.assertFalse(note['delivery_approval'])
+
+    def test_full_reads_invalid_decision_gets_specific_feedback_not_more_reads_or_approval(self):
+        agent=SimpleNamespace();choice={**self.verdict,'action':'request_changes'}
+        result=stop.guard(agent,self.messages(),json.dumps(choice),35,self.env)
+        self.assertEqual(result['remaining_files'],0)
+        self.assertEqual(result['verdict_rejection'],'changes_require_concrete_findings')
+        self.assertFalse(result['blocked']);self.assertFalse(result['tests_approved'])
+        self.assertNotIn('Batch the next',result['next_action'])
+        revised=stop.apply_request(agent,self.api_request(),[],34,self.env)
+        self.assertEqual(revised['response_format'],dict(type='json_object'))
+        self.assertEqual(revised['tool_choice'],'none');self.assertNotIn('tools',revised)
+        self.assertNotIn('parallel_tool_calls',revised)
+        self.assertIn('changes_require_concrete_findings',revised['messages'][0]['content'])
+        self.assertIn('No approval is inferred',revised['messages'][0]['content'])
+        # A fresh valid independent choice is still needed. Never repair the
+        # candidate or make journal completeness an approval operation.
+        self.assertEqual(agent._quality_review_completion['candidate'],json.dumps(choice))
+        self.assertIsNone(stop.guard(agent,[],json.dumps(self.verdict),33,self.env))
+
+    def test_fixed_error_category_change_is_progress_but_prose_churn_is_not(self):
+        agent=SimpleNamespace()
+        first=stop.guard(agent,self.messages(),'private-fixture prose',37,self.env)
+        changed=stop.guard(agent,[],json.dumps({**self.verdict,'action':'request_changes'}),36,self.env)
+        self.assertNotEqual(first['progress_sha256'],changed['progress_sha256'])
+        self.assertFalse(changed['blocked']);self.assertEqual(changed['repeated_without_progress'],1)
+        repeated=stop.guard(agent,[],json.dumps({**self.verdict,'action':'request_changes',
+            'reason':'Different private-fixture prose'}),35,self.env)
+        self.assertTrue(repeated['blocked']);self.assertEqual(repeated['repeated_without_progress'],2)
+        self.assertNotIn('private-fixture',json.dumps(repeated))
+
+    def test_alternating_parser_errors_do_not_rearm_the_same_failed_action(self):
+        agent=SimpleNamespace()
+        stop.guard(agent,self.messages(),'not JSON',39,self.env)
+        stop.guard(agent,[],json.dumps({**self.verdict,'action':'request_changes'}),38,self.env)
+        repeated=stop.guard(agent,[],'different non-JSON prose',37,self.env)
+        self.assertTrue(repeated['blocked']);self.assertEqual(repeated['repeated_without_progress'],2)
+
+    def test_premature_prose_after_new_tests_forces_actual_read_not_a_read_promise(self):
+        agent=SimpleNamespace();request=self.api_request()
+        first=stop.apply_request(agent,request,[],40,self.env)
+        self.assertEqual(first['response_format'],dict(type='json_object'))
+        stop.guard(agent,self.messages()[2:],'Will read the rest next',37,self.env)
+        result=stop.apply_request(agent,request,[],36,self.env)
+        self.assertEqual(result['tool_choice'],dict(type='function',function=dict(name='read_file')))
+        self.assertNotIn('response_format',result)  # Named-tool compatibility is unchanged.
+        self.assertEqual(result['tools'][0]['function']['parameters']['properties']['path']['enum'],['/delivery/app.py'])
+
+    def test_one_actual_read_reopens_early_rejection_without_forcing_full_approval_scope(self):
+        config=copy.deepcopy(self.config);inventory=config['review_context']['files']
+        inventory['unrelated.py']=dict(sha256=hashlib.sha256(b'x\n').hexdigest(),bytes=2)
+        config['read_paths'].append('/delivery/unrelated.py')
+        manifest=hashlib.sha256(json.dumps({'files':inventory},sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        config['review_context']['packet']['manifest_sha256']=manifest
+        env={**self.env,phase.KEY:json.dumps(config)}
+        agent=SimpleNamespace();request=self.api_request()
+        stop.guard(agent,self.messages()[2:],'Will read the rest next',37,env)
+        forced=stop.apply_request(agent,request,[],36,env)
+        self.assertEqual(forced['tool_choice']['function']['name'],'read_file')
+        stop.checkpoint(agent,self.messages()[:2],35,after_tools=True,environment=env)
+        result=stop.apply_request(agent,request,[],35,env)
+        self.assertEqual(result['tool_choice'],'auto')
+        self.assertEqual(result['response_format'],dict(type='json_object'))
+        self.assertIn('/delivery/unrelated.py',result['messages'][0]['content'])
+        choice={**self.verdict,'manifest_sha256':manifest,'action':'request_changes',
+            'findings':[dict(path='tests/test_new.py')]}
+        self.assertIsNone(stop.guard(agent,[],json.dumps(choice),34,env))
+
+    def test_existing_response_format_is_not_silently_overwritten_after_reads_complete(self):
+        with self.assertRaises(ValueError):
+            stop.apply_request(SimpleNamespace(),{**self.api_request(),
+                'response_format':dict(type='json_schema')},self.messages(),39,self.env)
 
     def test_changed_request_missing_registry_or_blocked_loop_never_sends_a_model_call(self):
         agent=SimpleNamespace();stop.guard(agent,[],json.dumps(self.verdict),39,self.env)
@@ -151,8 +241,20 @@ class QualityReviewStopTests(unittest.TestCase):
         agent=SimpleNamespace();choice={**self.verdict,'action':'request_changes','findings':[dict(path='tests/test_new.py')]}
         stop.guard(agent,[],json.dumps(choice),39,self.env)
         result=stop.apply_request(agent,self.api_request(),self.messages()[2:],38,self.env)
-        self.assertEqual(result['tool_choice'],'auto')
+        self.assertEqual(result['tool_choice'],'none')
+        self.assertEqual(result['response_format'],dict(type='json_object'))
         self.assertIn('"remaining_files": 0',result['messages'][0]['content'])
+
+    def test_final_json_syntax_mode_survives_the_existing_proxy_adapter_chain(self):
+        import model_proxy
+        from model_policy import MODEL
+        request={**self.api_request(),'model':MODEL,'provider':dict(require_parameters=True)}
+        result=stop.apply_request(SimpleNamespace(),request,self.messages(),39,self.env)
+        canonical=model_proxy.validate_request(copy.deepcopy(result))
+        wire=model_proxy.provider_request(canonical)
+        self.assertEqual(wire['response_format'],dict(type='json_object'))
+        self.assertEqual(wire['tool_choice'],'none');self.assertNotIn('tools',wire)
+        self.assertTrue(wire['provider']['require_parameters'])
 
     def test_actual_new_page_is_progress_but_does_not_reset_original_budget(self):
         agent=SimpleNamespace()

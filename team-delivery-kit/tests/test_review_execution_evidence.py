@@ -14,11 +14,12 @@ def evidence():
 
 def scale_evidence():
     return dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=219,
-        main_provider_calls=6,summary_provider_calls=1,max_iterations=40,complete_files=71,
+        main_provider_calls=7,summary_provider_calls=1,max_iterations=40,complete_files=71,
         compactions=1,dropped_read_pairs=16,duplicate_reads=0,eof_reads=0,
         out_of_recommended_reads=1,mixed_offset_batches=1,
         largest_batch_chars=300000,legacy_turn_budget_chars=200000,
         review_turn_budget_chars=8*1024*1024,spill_previews=0,legacy_spill_observed=True,
+        phase_contract_persisted=True,invalid_final_verdict_rejected=True,json_only_after_inspection=True,
         tool_only_from_first_call=True,snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
 
 
@@ -54,5 +55,7 @@ class ReviewExecutionEvidenceTests(unittest.TestCase):
                 dict(mixed_offset_batches=0),dict(mixed_offset_batches=True),
                 dict(largest_batch_chars=200000),dict(largest_batch_chars=True),
                 dict(review_turn_budget_chars=16*1024*1024),dict(spill_previews=1),dict(legacy_spill_observed=False),
+                dict(phase_contract_persisted=False),dict(invalid_final_verdict_rejected=False),
+                dict(json_only_after_inspection=False),dict(phase_contract_persisted=1),
                 dict(duplicate_reads=1),dict(eof_reads=1),dict(tests_approved=True),dict(model_calls=False)):
             with self.subTest(change=change),self.assertRaises(ValueError):contract.validate_scale({**scale_evidence(),**change})

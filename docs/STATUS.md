@@ -70,15 +70,24 @@ não comprova decisão válida nem autonomia ponta a ponta.
   em `completed`, mas o controlador manteve `technical_blocked` por parecer
   inválido. Leitura completa não foi convertida em aprovação.
 - A última suíte offline registrada com captura, enforcement e paradas executou
-  **4.384 testes: 4.376 aprovados e oito skips preexistentes**, sem falhas.
-  Os 44 testes focados desta correção também passaram. Essas provas offline
+  **4.405 testes: 4.397 aprovados e oito skips preexistentes**, sem falhas.
+  Os 80 testes focados de revisão e três de processos também passaram. Essas provas offline
   não substituem a qualificação nativa.
+- A tentativa após o ajuste da fase terminou com 46/71 arquivos completos,
+  80 páginas preservadas e duas respostas prematuras em prosa. Restavam 35
+  iterações; o agente prometeu ler depois em vez de executar as páginas. O
+  controlador manteve o bloqueio, sem congelar os testes.
+- A revisão após o controle de continuação comprovou **71/71 arquivos e 171
+  páginas** no controlador. Seu primeiro parecer final foi rejeitado como
+  `invalid_json`; na chamada de continuação, o provedor retornou HTTP 402.
+  A execução nativa terminou como `failed`, com bloqueio técnico preservado,
+  sem parecer aceito. O proxy entrou em pausa persistente por pagamento.
 
 Não houve congelamento dos testes, Green ou homologação nessa linhagem v2.
 
-## Bloqueio atual: decisão da fase de revisão dos testes
+## Bloqueios preservados: decisão da fase e conclusão prematura
 
-A revisão mais recente completou a inspeção integral. Antes de parar, o worker
+A revisão anterior completou a inspeção integral. Antes de parar, o worker
 produziu três tentativas com prosa fora do contrato e uma tentativa JSON com
 `action=request_changes`, hashes correspondentes e `findings=[]`. O contrato
 exige achados concretos para solicitar mudanças; um objeto JSON bem formado
@@ -90,12 +99,38 @@ contrato vigente: os testes são revisados e congelados **antes** da implementa�
 e de Green. Aprovar os testes não aprova implementação, merge ou release.
 Decisões técnicas continuam com a equipe, sem repassar essa questão ao CEO.
 
-A correção ainda necessária é explicitar essa fronteira em cada chamada,
-inclusive após compactação, e devolver erros de contrato específicos sem
-afrouxar o validador. Saída tipada pode auxiliar o formato, mas não resolve
-sozinha a dependência circular. Outra execução exige mudança qualificada;
+A correção qualificada e instalada explicita essa fronteira em cada chamada,
+inclusive após compactação, e devolve erros de contrato específicos sem
+afrouxar o validador. Na decisão após inspeção completa, o pedido não oferece
+ferramentas e usa modo JSON somente para sintaxe; o parser local e os gates do
+controlador continuam obrigatórios. Isso não resolve por si só o julgamento
+semântico. Outra execução exige mudança qualificada;
 não se deve extrair aprovação da prosa, inventar findings ou repetir o mesmo
-perfil. Essa correção ainda não está instalada nem qualificada nativamente.
+perfil. A sucessora expôs uma fronteira anterior: depois de ler os testes novos,
+o modo automático ainda permitia duas promessas em prosa sem executar leituras.
+Sua falha com 46/71 arquivos permanece preservada.
+
+A correção seguinte, já qualificada offline, no Hermes real e instalada, exige uma leitura
+pendente após conclusão prematura sem nova cobertura. Uma leitura real reabre
+a decisão automática, preservando a rejeição fundamentada antes de ler todo o
+escopo não relacionado exigido para aprovação. O modo automático também recebe
+JSON apenas para sintaxe; chamadas de leitura continuam disponíveis. Alternar
+categorias de erro não rearma uma falha já repetida na mesma cobertura.
+Nada disso aumenta iterações, autoriza ferramentas ou escolhe a decisão.
+
+### Interrupção mais recente: pagamento do provedor
+
+O controle de continuação foi instalado e a nova revisão completou a inspeção
+real. A sintaxe solicitada ao provedor não substituiu o parser: o primeiro
+parecer foi rejeitado e recebeu feedback no mesmo turno. O HTTP 402 na chamada
+seguinte interrompeu esse caminho antes de outra decisão. Não é uma nova falha
+comprovada de leitura nem esgotamento de iterações; restavam 33 na tentativa
+de conclusão preservada. Não há aprovação para recuperar do texto rejeitado.
+
+Crédito disponível e teto de chamadas são controles diferentes. É necessário
+resolver o pagamento com o operador e qualificar uma retomada compatível com
+essa falha exata. Não reaproveitar a rota de inspeção incompleta, apagar o hold
+do provedor ou herdar as leituras desta execução para outra revisão.
 
 ## Histórico recente: paginação e spill agregado
 
@@ -156,12 +191,16 @@ O canário Hermes/ACP passou com respostas locais fixas: continuação após uma
 resposta prematura, handler restrito desde a primeira chamada, duplicata negada
 e paradas por ausência de progresso e fim do orçamento. A extensão começou por
 ferramentas, sem resposta prematura, e inspecionou 71 arquivos, 563.066 bytes e
-219 páginas em seis chamadas principais e uma sumarização local. O maior lote
+219 páginas em sete chamadas principais e uma sumarização local. O maior lote
 teve 274.113 caracteres, acima do limite agregado antigo de 200 mil, sem prévias
 de spill. O controle legado continuou produzindo spill. Foram 157 leituras fora
 da recomendação e quatro lotes mistos. Uma compactação real removeu 64 pares da
-conversa sem perder cobertura no diário. O conjunto usou 14 respostas locais,
-sem chamadas ao provedor.
+conversa sem perder cobertura no diário. Depois da leitura e compactação,
+o guard recusou `request_changes` sem findings e devolveu a categoria específica;
+o contrato da fase e os hashes permaneceram no pedido final sem ferramentas.
+O controle de continuação também começou lendo os testes novos, emitiu a
+promessa prematura e foi obrigado a executar a leitura pendente pelo handler.
+O conjunto usou 16 respostas locais, sem chamadas ao provedor.
 
 Essa prova cobre o caminho de ferramentas desde a primeira chamada com respostas
 fixas. Não comprova a decisão de um modelo real, aprovação nativa, memória entre
@@ -172,13 +211,16 @@ orçamento usa uma iteração sintética; a fábrica ACP mantém 40.
 
 | Item | Estado observado em 23 de outubro |
 |---|---|
-| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.33`, instalado para qualificação controlada |
-| Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.9` |
-| Correção mais recente | Preservação limitada dos resultados completos antes da compactação, qualificada e instalada |
-| Manutenção na instalação | `sealed`, `drained=true`, consultada novamente nesta atualização |
-| Última revisão terminal | Nativa `completed`, 71/71 arquivos completos; parecer inválido e controlador `technical_blocked` |
-| Proxy na instalação | Contêiner em execução; limite de corpo configurado em 2 MiB. Isso não implica despacho ativo |
-| Contador consultado | 6.276/10.000 chamadas; 3.724 restantes, sem reset; teto não é monetário |
+| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.35`, instalado para qualificação controlada |
+| Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.11` |
+| Correção instalada | Contrato de fase, rejeição específica, continuação por leitura real e proteção contra alternância de erros |
+| Instalação/ativação | Backup/restauração, migração do pin e preservação de dados/outros serviços verificados |
+| Manutenção na instalação | Selada e drenada após o encerramento com falha por pagamento |
+| Revisão anterior terminal | Nativa `completed`, 71/71 arquivos completos; parecer inválido preservado, sem aprovação |
+| Revisão intermediária terminal | 46/71 arquivos completos, duas respostas em prosa; sem aprovação |
+| Última revisão após continuação por leitura real | 71/71 arquivos, 171 páginas; parecer inválido seguido de HTTP 402, execução nativa `failed` e equipe `technical_blocked` |
+| Proxy na instalação | Parado após pausa persistente por pagamento; limite de corpo preservado em 2 MiB |
+| Contador após a última tentativa | 6.291/10.000 chamadas; 3.709 restantes, sem reset; teto não é monetário |
 
 Esta é uma fotografia, não monitoramento vivo: confirme tarefas, serviços e
 leases antes de agir. Manutenção, pausa do provedor e proxy desligado são
@@ -187,11 +229,10 @@ dados, outros serviços e fila do scheduler. O teto de chamadas não é monetár
 
 ## Próximos marcos, em ordem
 
-1. Corrigir a apresentação persistente do contrato da fase: aprovação dos
-   testes antecede Green; solicitação de mudanças requer achado concreto.
-2. Qualificar diagnóstico e formato de saída, inclusive após compactação,
-   instalar sob manutenção e obter novo parecer independente válido. Não
-   repetir o perfil anterior, herdar leituras ou ampliar iterações.
+1. Confirmar pagamento resolvido com o operador e qualificar a retomada para
+   essa falha específica, sem reiniciar ou reenviar operações automaticamente.
+2. Conferir parecer, independência e evidências no controlador; somente uma
+   decisão válida pode avançar. Não herdar leituras ou ampliar iterações.
 3. Exigir que a própria equipe conduza solicitações de mudanças, correção do
    autor e nova revisão dentro dos contratos persistentes.
 4. Comprovar revisão e congelamento, Green, controles negativos, revisão da
@@ -211,12 +252,19 @@ obrigatório. O registro e o despacho funcionaram; a tentativa anterior voltou
 a bloquear, assim como a sucessora. Isso não comprova recuperação integral nem diagnóstico ou
 replanejamento universalmente autônomos pelo CTO.
 
-Uma política local de revisão final da entrega está em elaboração, mas não
+Uma política de revisão final da entrega foi adicionada em fonte, mas não
 constitui adaptador instalado ou despacho nativo. O coordenador atual termina
 em `awaiting_independent_delivery_review`; faltam autenticação das evidências
 reais, validação própria do revisor e continuidade até PR/CI/deploy/QA/rollback.
-Não houve nova execução da suíte completa nesta atualização documental; o total
-de 4.384 acima refere-se à última execução registrada para o código instalado.
+Seus seis testes de política pura integram a suíte de 4.405 acima; não são uma
+revisão nativa nem autorização de publicação. O módulo não está instalado ou
+conectado ao despacho.
+
+Uma execução intermediária da suíte falhou no probe de processo órfão. Um novo
+teste reproduziu que a fixture contava reconciliação tardia de trabalho concluído
+como nova execução. A correção ficou na fixture; SIGKILL, locks reais e execução
+única continuam exigidos. A suíte completa foi reexecutada e passou. Isso não
+constitui prova de recuperação de worker/modelo nem entrega do produto.
 
 ## Navegação
 

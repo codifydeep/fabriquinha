@@ -71,12 +71,17 @@ custo nem uma permissão para elevar o teto de chamadas. Não há fallback de
 modelo automático. A qualificação específica deve anteceder um novo ensaio pago.
 
 O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
-O controlador `20261023.33` e o worker `20261023.9` já estão instalados nessa
+O controlador `20261023.35` e o worker `20261023.11` já estão instalados nessa
 referência; esses identificadores não constituem imagens publicadas para download.
 A sucessora liberada após a mudança qualificada também ficou bloqueada,
 agora com 71/71 arquivos integralmente comprovados e parecer inválido. A
 revisão dos testes não depende de Green ou dos controles negativos posteriores;
-essa fronteira ainda precisa ser reforçada na apresentação ao modelo. O
+essa fronteira agora acompanha cada pedido ao modelo, mesmo após compactação.
+O pedido final, após a inspeção exigida, usa JSON apenas para sintaxe e não
+oferece ferramentas; a decisão ainda passa pelos gates locais. A nova revisão
+despachada pelo coordenador terminou com 46/71 arquivos e promessas em prosa,
+sem parecer aceito. A continuação por leitura real passou no canário seguinte
+e foi instalada/ativada sob manutenção, com recuperação registrada. O
 seletor atual inclui a correção de páginas pendentes e preserva resultados
 completos em lotes grandes de revisão, sob o teto
 de 8 MiB do diário. Isso não aumenta o corpo de 2 MiB do proxy nem permite ler
@@ -84,11 +89,20 @@ arquivos temporários de spill. Outros modos mantêm o orçamento original.
 Isso não autoriza iniciar o Truco ou repetir indefinidamente o ensaio.
 
 Manutenção, pausa do provedor e estado do contêiner do proxy são independentes.
-Após a revisão terminal mais recente, a barreira foi selada/drenada novamente.
-Na consulta documental de 23 de outubro, controlador e proxy estavam em
-execução; o contador era 6.276/10.000. Não deduza liberação de dispatch a partir
-de contêineres em execução, nem que selar manutenção pare o proxy. Esta
-atualização não alterou esses serviços ou iniciou chamadas ao modelo.
+Após a revisão terminal, a barreira foi selada/drenada e o proxy parado para
+qualificação. A instalação verificou backup/restauração e migrou o pin sem
+apagar histórico; a ativação separada manteve a barreira até conferir os
+limites. Antes da nova revisão, o proxy foi reativado com 6.276/10.000 chamadas
+e a manutenção liberada. A revisão terminou bloqueada em 6.282/10.000 e a
+instância foi selada/drenada novamente, com proxy parado. Após qualificar e
+instalar a continuação por leitura real, o proxy foi reativado e a barreira
+liberada para novo despacho pelo coordenador. Não deduza liberação de dispatch a partir de contêineres
+em execução, nem que selar manutenção pare o proxy.
+Esse novo despacho terminou com 71/71 arquivos, parecer rejeitado e HTTP 402 na
+continuação. A referência voltou à manutenção selada/drenada, com proxy parado
+e pausa persistente por pagamento em 6.291/10.000 chamadas. Repor crédito não
+dispensa conferir e qualificar a retomada; não zere o contador, troque o modelo
+ou reutilize autorizações de uma classe diferente de falha.
 Para conferir somente os serviços dessa instância:
 
 ```bash

@@ -13,15 +13,17 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa anterior | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Continua preservada, não aprovada. |
-| Instalação do hardening | Controlador `20261023.33` e worker `20261023.9`; preservação restrita de resultados completos, backup/restauração verificados, pin do serviço host migrado, dados e contador preservados. |
-| Canário físico da candidata seguinte | Hermes/ACP real, 219 páginas/71 arquivos/563.066 bytes; lote de 274.113 caracteres sem spill, controle legado com spill, 157 leituras fora da recomendação e quatro lotes mistos. Uma compactação retirou 64 pares sem perder cobertura. Conjunto: 14 respostas locais, zero externas. Não é aprovação nativa. |
+| Instalação do hardening | Controlador `20261023.35` e worker `20261023.11`; contrato da fase, rejeição específica, continuação por leitura real e bloqueio de erros alternados; backup/restauração, pin, dados e contador preservados. |
+| Canário físico da candidata de continuação | Hermes/ACP real, 219 páginas/71 arquivos/563.066 bytes; lote de 274.113 caracteres sem spill, controle legado com spill, 157 leituras fora da recomendação e quatro lotes mistos. Uma compactação retirou 64 pares sem perder cobertura. Rejeição sem findings recusada com diagnóstico específico; contrato e hashes preservados. Controle separado obrigou leitura real após promessa prematura com testes novos já lidos. Conjunto: 16 respostas locais, zero externas. Não é aprovação nativa. |
 | Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
 | Revisão com parada por falta de progresso | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Preservada, sem aprovação. |
 | Revisão nativa após a orientação inicial | Despachada pelo coordenador; terminou após seis chamadas, 36 páginas aceitas e 26/71 arquivos completos. Páginas pendentes fora do lote recomendado foram negadas; escalonamento do revisor não foi aceito como parecer completo. `technical_blocked`, sem aprovação. |
 | Revisão anterior com spill | 53/71 arquivos completos e 121 páginas aceitas; 33 prévias de spill e quatro deduplicações sem conteúdo não contam como inspeção. Seis chamadas; sem aprovação. |
-| Última revisão nativa terminal | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
-| Última suíte completa registrada | 4.384 executados: 4.376 aprovados, oito skips preexistentes, sem falhas. Inclui orçamento agregado restrito à revisão e rejeição de drift no executor. Os 44 testes focados também passaram. |
-| Política final da entrega | Rascunho local, não instalado nem conectado ao despacho. Não qualifica a ponte após Green ou a publicação. |
+| Revisão terminal com inspeção completa | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
+| Revisão sucessora terminal | 46/71 arquivos, 80 páginas, seis chamadas; duas promessas em prosa, sem novas leituras, com 35 iterações restantes. `technical_blocked`, sem aprovação. |
+| Último ensaio após controle de continuação | **71/71 arquivos e 171 páginas** comprovados no controlador. Primeiro parecer `invalid_json`, feedback com 33 iterações restantes; chamada seguinte HTTP 402. Nativo `failed`, equipe `technical_blocked`, sem congelamento ou aprovação. |
+| Última suíte completa registrada | 4.405 executados: 4.397 aprovados, oito skips preexistentes, sem falhas. Passaram também 80 testes focados de revisão e três de processos. A falha intermediária do probe órfão foi investigada; fixture corrigida com novo teste de reconciliação tardia, sem mudar locks ou retirar o probe. |
+| Política final da entrega | Implementação em fonte e seis testes sintéticos, não instalada nem conectada ao despacho. Não qualifica a ponte após Green ou a publicação. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
@@ -59,20 +61,31 @@ parecer. O validador não extraiu aprovação nem inventou achados.
 A justificativa condicionava a revisão dos testes a Green, controles negativos
 e aprovação adicional do CTO. Green e controles negativos vêm depois do
 congelamento; o contrato não impõe essa aprovação adicional do CTO como
-pré-condição. A apresentação inequívoca dessa fase,
-incluindo após compactação, e o diagnóstico específico da rejeição precisam
-ser corrigidos e qualificados antes de outro ensaio. A leitura completa desta
-execução não poderá ser herdada pela próxima. A equipe ainda precisa concluir
+pré-condição. A apresentação da fase a cada chamada e o diagnóstico específico
+passaram no canário Hermes/ACP, foram instalados sob manutenção e originaram
+uma recuperação por condição modificada. O modo JSON final só restringe a
+sintaxe; não fornece aprovação ou substitui os gates locais. A leitura completa
+anterior não foi herdada pela nova execução. A equipe ainda precisa concluir
 a revisão e toda a cadeia posterior sob o contrato v2.
 
-Depois da última revisão terminal, a manutenção foi selada e drenada novamente.
-Na consulta desta atualização o proxy estava em execução, com contador de
-6.276/10.000 chamadas e 3.724 restantes. Nenhuma chamada ao modelo foi iniciada
-por esta atualização documental. A suíte completa não foi reexecutada para
-alterações de documentação; o total acima tem escopo do código já qualificado. São estados
+Depois da revisão terminal, a manutenção foi selada/drenada para a troca.
+O proxy ficou desligado durante a qualificação offline; foi reativado com
+6.276/10.000 chamadas e 3.724 restantes antes de liberar a manutenção e observar
+o despacho nativo pelo coordenador. Essa tentativa terminou bloqueada após seis
+chamadas, elevando o contador a 6.282/10.000. A instância foi selada/drenada e
+o proxy parado para qualificar a continuação por leitura real. O contador não
+foi resetado. Essa correção foi instalada e ativada; o mesmo proxy foi iniciado
+e a manutenção liberada após conferência, para despacho pelo coordenador. São estados
 independentes: uma task `completed`, uma lease fechada e uma revisão aprovada
 não são equivalentes. Confirme o estado vivo antes de agir. Nenhum resultado
 histórico abaixo substitui esse diagnóstico.
+
+A última execução terminou depois em falha por pagamento, com inspeção integral
+real, mas sem parecer aceito. O contador chegou a 6.291/10.000; o proxy entrou
+em pausa persistente e foi parado após selar/drenar a instância. Não houve
+aprovação a partir do parecer rejeitado ou das leituras completas. A recuperação
+de crédito e sua retomada específica continuam pendentes; a rota de inspeção
+incompleta não se aplica a esse caso.
 
 ## Evidências históricas — não representam o estado vivo
 

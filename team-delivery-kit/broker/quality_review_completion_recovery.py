@@ -122,7 +122,8 @@ def qualification(b,value,operation):
     report=value.get('report') or {}
     require(report.get('operation')=='real_hermes_review_stop_loop_canary_v1' and report.get('status')=='passed'
         and report.get('provider')=='fixed_loopback_not_model' and report.get('acp') is True
-        and report.get('model_calls')==0 and report.get('fixed_provider_calls')==3
+        and report.get('model_calls')==0 and report.get('fixed_provider_calls')==4
+        and report.get('premature_after_tests_forced_read') is True
         and report.get('feedback_rounds')==1 and report.get('max_iterations')==40
         and report.get('same_agent') is True and report.get('protected_files_unchanged') is True
         and report.get('tests_approved') is False and report.get('delivery_approval') is False
@@ -133,7 +134,7 @@ def qualification(b,value,operation):
     validate_execution_controls(report.get('execution_controls'))
     execution_evidence.validate_scale(report.get('scale_controls'))
     require(type(report.get('total_fixed_provider_calls')) is int
-        and report['total_fixed_provider_calls']==13+report['scale_controls']['summary_provider_calls']
+        and report['total_fixed_provider_calls']==15+report['scale_controls']['summary_provider_calls']
         and report.get('fixture_source_sha256')==hashlib.sha256(Path(execution_evidence.__file__).read_bytes()).hexdigest())
     return quality.digest(report['guard_sources'])
 

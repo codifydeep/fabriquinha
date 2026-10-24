@@ -29,10 +29,11 @@ def scale_files():
 
 def validate_scale(value):
     expected=dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=219,
-        main_provider_calls=6,max_iterations=40,complete_files=71,
+        main_provider_calls=7,max_iterations=40,complete_files=71,
         duplicate_reads=0,eof_reads=0,snapshot_unchanged=True,
         legacy_turn_budget_chars=200000,review_turn_budget_chars=8*1024*1024,
         spill_previews=0,legacy_spill_observed=True,
+        phase_contract_persisted=True,invalid_final_verdict_rejected=True,json_only_after_inspection=True,
         tool_only_from_first_call=True,model_calls=0,tests_approved=False,delivery_approval=False)
     if not isinstance(value,dict) or set(value)!=set(expected)|{'dropped_read_pairs','summary_provider_calls','compactions',
             'out_of_recommended_reads','mixed_offset_batches','largest_batch_chars'}:
