@@ -9,9 +9,10 @@ snapshots e recibos operacionais completos permanecem privados.
 
 **Revisão estratégica de 24/10:** [análise e plano de simplificação](SIMPLIFICATION-REVIEW-2026-10-24.md).
 Propõe Hermes + Kanban com uma camada pequena de entrega, condicionado à prova
-de isolamento. É uma proposta para aprovação; não altera o runtime nem substitui
-automaticamente os contratos vigentes. Deve ser lida antes de planejar nova
-expansão dos adaptadores atuais.
+de isolamento. Plano e mudanças de contrato foram aprovados;
+[S0/S1 estão concluídos](HERMES-S1-QUALIFICATION.md) no escopo da prova sem modelo.
+O [ADR 0001](ADR-0001-HERMES-FIRST.md) rege o caminho novo. A referência antiga
+permanece pausada e não deve receber nova expansão como pré-requisito da simplificação.
 
 | Documento | Quando consultar |
 |---|---|

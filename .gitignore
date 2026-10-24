@@ -12,6 +12,8 @@
 !/.github/
 !/team-delivery-kit/
 !/bootstrap/
+!/src/
+!/tests/
 /bootstrap/*
 !/bootstrap/infra/
 /bootstrap/infra/*

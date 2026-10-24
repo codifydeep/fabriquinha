@@ -2,8 +2,9 @@
 
 Data: 24 de outubro de 2026. Base de código examinada: `e33c893f`.
 Destinatários: proprietário do projeto e GPT 6.1 Sol, responsável pela futura execução.
-Estado: **proposta para aprovação; nenhuma migração ou mudança de contrato foi aplicada**.
-Desenvolvimento, despacho de agentes e chamadas pagas permanecem pausados.
+Estado: **plano e mudanças de contrato aprovados pelo proprietário em 24/10/2026**.
+S0/S1 concluídos; [resultado e limites da prova](HERMES-S1-QUALIFICATION.md).
+A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
 
@@ -415,7 +416,8 @@ Histórico de falhas antigas não é convertido em aprovação.
 
 ### Pontos de simplificação que alteram o contrato atual
 
-São propostas, não mudanças já autorizadas pelo simples pedido de análise:
+As mudanças abaixo foram aprovadas pelo proprietário após a análise, para o
+novo caminho. Não alteram retroativamente os ensaios históricos:
 
 | Regra atual | Regra proposta | Garantia preservada |
 |---|---|---|
@@ -424,7 +426,7 @@ São propostas, não mudanças já autorizadas pelo simples pedido de análise:
 | Recuperação por rota específica da classe histórica | Política comum de incidentes e efeitos idempotentes | Evidência, limites e não duplicação |
 | Histórico de sessão autentica repetidamente toda a cadeia | Identidade de execução na borda e recibos de artefato | Autoria/revisão/SHA rastreáveis |
 
-A aprovação futura deste plano deve registrar essas escolhas em um ADR. Sol não
+O [ADR 0001](ADR-0001-HERMES-FIRST.md) registra essas escolhas. Sol não
 deve manter as duas políticas contraditórias ativas simultaneamente nem chamar
 essa mudança de aprovação retroativa.
 
@@ -831,12 +833,12 @@ o protocolo indefinidamente para compensar julgamento fraco.
 
 ## 14. Quadro durável e instrução de continuidade
 
-| Etapa | Estado na criação deste plano | Prova necessária |
+| Etapa | Estado atual | Prova necessária |
 |---|---|---|
 | Análise e plano | Concluídos em documento | Fontes e código citados acima |
-| Aprovação da estratégia/contrato | Pendente | Aceite do proprietário |
-| S0 Referência e ADR | Não iniciado | Política única e recuperação preservada |
-| S1 Viabilidade Hermes isolado | Não iniciado | Bateria física sem modelo |
+| Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
+| S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
+| S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
 | S2 Executor/qualidade pequenos | Não iniciado | Invariantes e limites demonstrados |
 | S3 Publicação/deploy conectados | Não iniciado | Cadeia determinística completa |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
@@ -847,7 +849,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 Ao retomar com GPT 6.1 Sol:
 
 1. Ler este documento, `AGENTS.md` e a última linha de progresso registrada.
-2. Confirmar se o proprietário aprovou a proposta e quais ajustes fez.
+2. Considerar a aprovação registrada no ADR 0001 e ler o resultado S0/S1.
 3. Conferir estado vivo e autorização de consumo sem iniciar o legado por hábito.
 4. Começar pela primeira etapa incompleta. Não retomar automaticamente a antiga
    tarefa de adicionar outra admissão/recuperação à ponte v2.
@@ -856,6 +858,8 @@ Ao retomar com GPT 6.1 Sol:
 6. Manter código e documentos no Git. Mudanças da automação podem ir à `main`
    conforme autorização vigente; produtos continuam com PR/revisão/CI.
 
-O pedido que originou este plano autoriza análise e documentação. Não autoriza
-a migração já nesta interação. Os experimentos existentes permanecem pausados,
-os bloqueios preservados e nenhuma versão foi declarada homologada por esta revisão.
+O proprietário aprovou o plano e autorizou a execução inicial de S0/S1. Essas
+etapas demonstraram a viabilidade da fronteira Hermes/Kanban em ambiente separado.
+O gateway de produção, modelo real e entrega de software ainda exigem as etapas
+seguintes. Os experimentos existentes permanecem pausados, os bloqueios preservados
+e nenhuma versão foi declarada homologada por essa qualificação.

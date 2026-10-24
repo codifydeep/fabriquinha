@@ -1,5 +1,11 @@
 # Status do projeto — 24 de outubro de 2026
 
+**Estratégia atual:** plano de simplificação aprovado, com [S0/S1 concluídos](HERMES-S1-QUALIFICATION.md).
+A fronteira Hermes + Kanban passou na prova nativa/Docker sem modelo e sem
+patches upstream. Próxima etapa: S2/S3, uma pequena cadeia de qualidade/entrega.
+O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
+esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.
+
 **Experimental. Autonomia completa ainda não qualificada.** Este é um resumo
 datado da instalação de referência, não uma consulta de estado vivo nem uma
 garantia de funcionamento em outra instalação. Evidências operacionais,

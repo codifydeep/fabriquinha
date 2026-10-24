@@ -1,0 +1,18 @@
+{
+  "scope": "zero-model native Kanban and Docker seam qualification, not product delivery",
+  "hermes": {
+    "repository": "https://github.com/NousResearch/hermes-agent",
+    "tag": "v0.22.0",
+    "tag_object": "84094bd903791c35867605e28e25075baa293adc",
+    "commit": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "local_patches": 0,
+    "python": "3.14"
+  },
+  "deterministic_worker": {
+    "cached_tag_observed": "python:3.12-slim-bookworm",
+    "registry_reference": "python@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+    "tested_platform": "linux/arm64",
+    "actual_image_id": "sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+    "published_project_image": false
+  }
+}
