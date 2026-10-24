@@ -5,8 +5,9 @@ Destinatários: proprietário do projeto e GPT 6.1 Sol, responsável pela futura
 Estado: **plano e mudanças de contrato aprovados pelo proprietário em 24/10/2026**.
 S0/S1 concluídos; [resultado e limites da prova](HERMES-S1-QUALIFICATION.md).
 S2 parcial: [mecanismos TDD qualificados sem modelo](HERMES-S2-QUALIFICATION.md).
-S3 parcial: [Git e fronteira PR/CI conectados ao TDD no ensaio](HERMES-S3-QUALIFICATION.md);
-GitHub permanece simulado; deploy/QA/rollback ainda não implementados no caminho novo.
+[S3 passou no escopo offline Python/HTTP](HERMES-S3-QUALIFICATION.md), incluindo
+build, Compose, QA em Chromium e rollback reais. GitHub e decisões permanecem
+simulados; serviço contínuo e entrega por agentes reais ainda não qualificados.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
@@ -843,11 +844,36 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
 | S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
 | S2 Executor/qualidade pequenos | Parcial: TDD, sandbox e recibos qualificados com fixtures | Faltam serviço contínuo, sessões reais e incidentes executáveis |
-| S3 Publicação/deploy conectados | Parcial: Git e PR/CI simulados conectados ao TDD e suíte integrada real | Faltam build/deploy/QA/rollback e GitHub real na S4 |
+| S3 Publicação/deploy conectados | Cadeia offline Python/HTTP passou: TDD, Git, build, deploy/QA/rollback reais; GitHub simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
 | S6 Instalação/segundo repo/cutover | Não iniciado | Reprodução limpa e caminho único |
 | S7 Retomada do Truco | Não iniciado | Plataforma qualificada e brief confirmado |
+
+Próxima fatia após a prova offline S3:
+
+1. Integrar sessões e ferramentas reais Hermes ao mesmo `dispatch_once`, com
+   terminal/edição na sandbox e submissão/parecer pelo controlador. Qualificar
+   primeiro com transporte de modelo local fixo, sem confundi-lo com julgamento real.
+2. Espera por CI/provedor/revisão deve liberar capacidade e preservar a fase.
+   Não manter um processo ocupado só para observar, nem reiniciar efeito já aceito.
+   Conferir a semântica upstream: se uma retomada agendada cria outro `run_id`,
+   separar claim/autorização atual da identidade durável da entrega. Os efeitos
+   atuais usam `Run.binding()` com número do run; a prova de confirmação perdida
+   retomou o mesmo run e não qualifica uma nova claim. Antes de S4, provar que
+   outra claim retoma o mesmo PR/build/deploy, preservando recibos e proveniência,
+   sem criar outro ciclo de vida ou relaxar aprovação por revisão exata.
+3. Completar a matriz com suplentes explicitamente permitidos. Hoje a configuração
+   escolhe um revisor por autor e bloqueia conflito com autoria de testes; antes
+   de S4 deve encaminhar ao suplente válido, sem dispensar independência. A
+   integração/deploy deve ser de DevOps, com QA independente, não revisão de
+   implementação pelo próprio autor dos testes.
+4. Transformar falhas em diagnóstico executável de Tech Lead/CTO e implantar
+   outbox/status persistentes, sem outro ciclo de vida. Registrar decisão técnica
+   não equivale a despachar sua execução. CEO não é o fallback técnico.
+5. Só depois resolver a pausa do provedor pelo caminho autorizado e executar S4
+   com Produto/brief aprovado, modelo e GitHub reais. Preservar o contador e teto;
+   não considerar uma fixture ou tarefa `done` como release homologada.
 
 Ao retomar com GPT 6.1 Sol:
 

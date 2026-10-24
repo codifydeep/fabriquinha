@@ -13,6 +13,8 @@ from fixtures.github_transport import FakeGitHub
 from fabriquinha.effects import Pending
 from fabriquinha.kanban_lane import native
 from fabriquinha.publication import GitHub, Publication, Repository
+from fabriquinha.deployment import Deployment
+from fabriquinha.executor import docker
 from qualify_hermes_s2 import qualify, observe
 
 
@@ -96,18 +98,40 @@ def integrate(project, store, board, quality, implementation, review, frozen):
     assert publication['head_sha'] != publication['merge_sha'] == value['commit']
     assert publication['snapshot'] == value['snapshot']
     assert value['ci']['source_pr_head_sha'] == publication['head_sha']
+    deployment=None
+    if project.browser_image:
+        delivery=Deployment(project,store,board,quality.runner)
+        baseline=observe(lambda:delivery.artifact(run,integrated,repo,baseline=True))
+        candidate=observe(lambda:delivery.artifact(run,integrated,repo))
+        rollout=observe(lambda:delivery.rollout(run,candidate,baseline))
+        board.review(run,'Independent deployed browser QA after real rollback and restoration',
+                     {'rollout':rollout,'integrated':integrated,'published_pr':publication['pr']})
+        with kbc.connect_closing() as conn:
+            claimed=kb.claim_review_task(conn,task)
+            assert claimed is not None
+        qa_run=board.current(task,claimed.current_run_id)
+        release=observe(lambda:delivery.qa(qa_run,rollout))
+        proof=store.receipt(release,kind='release_evidence')['payload']
+        deployment=dict(candidate=candidate,baseline=baseline,rollout=rollout,release_evidence=release,
+            image=proof['image'],commit=proof['commit'],url=proof['url'],checks=proof['checks'],
+            real_compose=True,real_browser=True,real_rollback=True,delivery_approval=False)
+        with patch('hermes_cli.kanban_pr_acceptance._api',github.api):
+            board.finish_review(qa_run,'Synthetic S3 infrastructure proof; not product homologation',
+                {'published_pr':publication['pr'],'integrated':integrated,'release_evidence':release})
     with patch('hermes_cli.kanban_pr_acceptance._api',github.api):
         with kbc.connect_closing() as conn:
-            assert kb.complete_task(conn,task,summary='PR/CI simulator and real integrated suite; not homologated',
-                expected_run_id=run.number, metadata={'published_pr':publication['pr'],'integrated':integrated})
+            if deployment is None:
+                assert kb.complete_task(conn,task,summary='PR/CI simulator and real integrated suite; not homologated',
+                    expected_run_id=run.number, metadata={'published_pr':publication['pr'],'integrated':integrated})
             event = conn.execute('SELECT payload FROM task_events WHERE task_id=? AND kind=? ORDER BY id DESC LIMIT 1',
                                  (task,'pr_acceptance')).fetchone()
             assert json.loads(event[0])['ok']
+    assert not docker('ps','-aq','--filter','label=com.docker.compose.project='+project.namespace+'-tests').strip()
     return dict(qualification=True, real_git=True, github_effects_simulated=True,
         native_required_checks_processed=github.api_calls, complete_integrated_suite=True,
         lost_create_ack_did_not_duplicate=True,lost_merge_ack_did_not_duplicate=True,
         merge_sha_differs_from_head=True, misleading_ci_refused=refused, publication=published,integrated=integrated,
-        real_github_ci=False,delivery_approval=False,model_calls=0)
+        deployment=deployment,real_github_ci=False,delivery_approval=False,model_calls=0)
 
 
 if __name__ == '__main__':
@@ -115,5 +139,8 @@ if __name__ == '__main__':
     parser.add_argument('--root',type=Path,required=True)
     parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image',required=True)
+    parser.add_argument('--browser-image')
+    parser.add_argument('--namespace',default='delivery-kit-hermes-s2')
     args=parser.parse_args()
-    qualify(args.root.resolve(),args.upstream.resolve(),args.image,after_review=integrate)
+    qualify(args.root.resolve(),args.upstream.resolve(),args.image,after_review=integrate,
+            browser_image=args.browser_image,namespace=args.namespace)

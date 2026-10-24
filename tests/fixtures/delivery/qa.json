@@ -1,0 +1,1 @@
+{"version":1,"checks":[{"id":"greeting","path":"/","actions":[{"action":"fill","selector":"#name","value":"Ada"},{"action":"click","selector":"#greet"}],"selector":"#result","text":"Hello, Ada"}]}

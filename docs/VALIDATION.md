@@ -11,8 +11,12 @@ Na suíte histórica atual: 4.523 testes, oito skips preexistentes, nenhuma falh
 A [fatia S3](HERMES-S3-QUALIFICATION.md) passou com Git real, PR/CI simulados,
 gate nativo e oitavo job Docker no SHA de merge. PR/merge não foram duplicados
 após confirmações perdidas; quatro entradas de CI enganosa foram recusadas.
-O total do caminho novo passou a 46 testes. Publicação GitHub real e
-build/deploy/QA/rollback pelo caminho novo continuam pendentes.
+O total do caminho novo passou a 57 testes. A cadeia offline também passou por
+build de duas imagens, deploy, rollback/retorno, URL de loopback e QA real de
+navegador, com captura arquivada e imagem/commit exatos. As tentativas recusadas
+por argumento, rede e transporte de captura foram preservadas; não receberam
+aprovação retroativa. Publicação GitHub real, serviço contínuo e autores/revisores
+com modelo continuam pendentes. Zero chamadas ao modelo e nenhuma migração.
 
 ## Referência atual
 

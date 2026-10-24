@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from fabriquinha.artifacts import Store, protected_unchanged
+from fabriquinha.artifacts import Store, protected_unchanged, digest
 from fabriquinha.config import Project
 
 
@@ -44,6 +44,14 @@ class ProjectBoundaries(unittest.TestCase):
         self.assertTrue(config.qualification)
         with self.assertRaises(ValueError):
             Project.parse({**configuration(), 'qualification': 'false'})
+
+    def test_browser_toolchain_is_explicit_without_changing_old_project_identity(self):
+        old={k:v for k,v in configuration().items() if k!='version'}
+        old.update(max_workers=2,timeout_seconds=120)
+        self.assertEqual(Project.parse(configuration()).fingerprint(),digest(old))
+        browser=Project.parse({**configuration(),'browser_image':'sha256:'+'b'*64})
+        self.assertNotEqual(browser.fingerprint(),digest(old))
+        with self.assertRaises(ValueError):Project.parse({**configuration(),'browser_image':'browser:latest'})
 
 
 class ArtifactBoundaries(unittest.TestCase):

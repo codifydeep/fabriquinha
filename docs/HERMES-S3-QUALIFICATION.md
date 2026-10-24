@@ -1,12 +1,14 @@
-# S3 parcial — Publicação e validação do commit integrado
+# S3 — Cadeia offline até deploy, QA e rollback
 
 Data: 24/10/2026. [Plano aprovado](SIMPLIFICATION-REVIEW-2026-10-24.md),
 [ADR 0001](ADR-0001-HERMES-FIRST.md), [fatia TDD S2](HERMES-S2-QUALIFICATION.md).
 
-**Resultado: revisão → Git → fronteira PR/CI → suíte do commit integrado
-funcionou no ensaio isolado. Git, Kanban e jobs Docker são reais; GitHub e suas
-respostas de CI são simulados.** Não houve PR real de produto, modelo, instalação,
-migração, deploy ou homologação. S3 continua parcial.
+**Resultado: cadeia offline completa na stack inicial Python/HTTP:** TDD → revisão
+→ Git → fronteira PR/CI → suíte integrada → build → deploy → rollback/retorno →
+QA independente em Chromium. Git, Kanban, imagens, Compose e navegador são reais;
+autores, pareceres e transporte GitHub/CI são sintéticos. Não houve modelo,
+PR real de produto, migração ou homologação de release. A prova é de infraestrutura,
+não de autonomia. Publicação/CI reais e serviço contínuo continuam pendentes.
 
 ## Caminho implementado
 
@@ -47,7 +49,10 @@ flowchart LR
     M --> C[Checks do SHA integrado]
     C --> V[Mesmo conteúdo revisado e suíte Docker completa]
     V --> R[Recibo integrado; ainda não homologado]
-    R -. Pendente .-> D[Build por digest, deploy, QA e rollback]
+    R --> D[Build por digest e Compose local]
+    D --> B[Rollback e retorno ao candidato]
+    B --> Q[Revisor independente: QA em Chromium]
+    Q --> E[Evidência de entrega; sem aprovação de release]
 ```
 
 ## Evidência e alcance
@@ -77,14 +82,83 @@ workflows GitHub executados ou crédito de provedor consumido.
 | Conclusão nativa | `complete_task` processa e registra seu próprio evento `pr_acceptance` |
 | Isolamento | Mesmo job fixo S2: snapshot somente leitura, sem rede/socket/credenciais |
 
-Quinze testes unitários da publicação também passaram, usando Git real local e
+Dezesseis testes unitários da publicação também passaram, usando Git real local e
 transporte GitHub simulado. Cobrem espera de CI com prazo persistente, revisão
 antiga/não aprovada, dependência inválida, avanço da base, conteúdo de merge
 diferente e bloqueio de escrita real no GitHub em modo de qualificação.
 
-Total do caminho novo: 46 testes sem falhas. Suíte histórica: 4.523 testes,
+Total do caminho novo: 57 testes sem falhas. Suíte histórica: 4.523 testes,
 oito skips preexistentes e nenhuma falha. Os registros completos ficam privados.
 Todos os auxiliares Docker desta prova foram arquivados e retirados por ID exato.
+
+## Build, rollback e QA reais
+
+O `Dockerfile.web` é canônico, com Python oficial por digest, sem dependência da
+imagem antiga do controlador e sem executar Dockerfile ou comandos do produto.
+Seu contexto é montado a partir dos arquivos exatos do snapshot, em subdiretório
+próprio: um `.dockerignore` do produto não pode esconder testes ou trocar o build.
+Artefatos carregam commit integrado, manifesto, receita e ID real da imagem.
+
+Foram construídas uma baseline com suíte aprovada e a candidata integrada. Cada
+imagem foi construída uma vez e reutilizada por ID, sem rebuild entre deploy e QA.
+O Compose executou baseline → candidata → rollback à baseline → retorno à candidata.
+O controlador preservou logs/metadados antes de substituir cada contêiner e
+verificou a imagem saudável em cada etapa. Não foram apagados volumes.
+
+O pedido de QA foi registrado no Kanban e assumido por outro perfil. O job fixo
+de navegador recebeu apenas driver e contrato declarativo dos testes congelados,
+ambos somente leitura. Executou health/identidade, preencheu o formulário,
+acionou o botão e verificou a resposta real. Uma captura PNG foi conferida
+visualmente e preservada fora do contêiner, com hash no recibo. O controlador
+também conferiu a URL de loopback e revalidou a mesma imagem/contêiner após o QA.
+
+Um controle técnico adicional recusou a baseline antiga como candidata e executou
+o navegador com SHA deliberadamente errado. O job falhou na identidade HTTP,
+foi arquivado/retirado e não alterou o deployment atual. Esse probe é sintético,
+sem claim de agente real, e não recebe aprovação de release.
+
+O job usa rede interna exclusiva de QA, UID 10000, raiz somente leitura, recursos
+limitados e nenhum socket, banco, credencial ou diretório privado do controlador
+fornecido por mounts. O web usa UID 65534 e publicação somente em loopback.
+Sua bridge permite egress; não descrevemos o produto como airgapped. A decisão
+e a prova de rede estão no [ADR 0002](ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md).
+
+O toolchain de navegador reutilizado é uma imagem local já existente, selecionada
+por ID exato. Não foi baixada imagem grande nem iniciada dependência de modelo.
+**Essa imagem ainda não é uma base pública reproduzível**; reconstruir/pinar o
+toolchain de navegador continua obrigatório para S6. A funcionalidade do job não
+depende de código do harness antigo, mas seus binários ainda vêm desse cache.
+
+A evidência final liga PR simulado, commit de merge, suíte, imagem, URL, QA,
+captura e rollback. `delivery_approval=false` permanece explícito: não existe
+brief real aprovado nem autoria/julgamento por modelos neste ensaio.
+
+### Tentativas preservadas e retirada
+
+Antes da prova final, três tentativas não qualificaram a cadeia completa:
+
+1. Argumento de imagem incompleto recusado antes de iniciar workers.
+2. Servidor saudável em rede interna sem porta publicada; prazo persistente
+   encerrou a espera sem repetir Compose. Probes confirmaram a causa.
+3. Deploy/rollback e checks de navegador passaram, mas a captura guardada no
+   tmpfs não sobreviveu ao término do job. O gate recusou a evidência incompleta.
+
+O transporte foi corrigido para PNG limitado e validado na saída do driver,
+sem acrescentar mount gravável. Uma regressão reproduziu a falha antes da correção.
+A tentativa final começou do zero e atravessou toda a cadeia sem reparo em curso;
+continua sendo uma execução sintética de infraestrutura, não entrega autônoma.
+
+As claims das duas tentativas que executaram foram bloqueadas pela API nativa;
+não ficaram workers ou runs abertos. Depois da prova substituta saudável, os dois
+serviços obsoletos foram retirados com logs/metadados privados, conferência dos
+artefatos, leases encerradas e validação dos IDs. A candidata final foi preservada.
+Imagens de recuperação, snapshots, bancos e volumes não foram removidos; Toso,
+Reforma e outros projetos não foram alterados.
+
+Também foi reproduzida uma corrida de publicação anterior ao primeiro push:
+um snapshot de autor antigo poderia apagar testes integrados por outra entrega.
+Agora a baseline Red deve ser exatamente a árvore Git da base capturada. Uma base
+mais nova exige rebase, preservação dos testes atuais e nova revisão, antes do PR.
 
 ## Limites e próxima implementação
 
@@ -98,15 +172,19 @@ Todos os auxiliares Docker desta prova foram arquivados e retirados por ID exato
   divergente ou prazo esgotado não produz merge. O adaptador contínuo ainda
   precisa transformar a espera em estado nativo sem ocupar worker e encaminhar
   diagnóstico ao Tech Lead/CTO; esse requisito de S2 não está concluído.
-- Faltam build canônico a partir do SHA integrado, deploy Compose por imagem
-  exata, QA do ambiente implantado, rollback/retorno e recibo final da release.
+  As confirmações perdidas foram retomadas no mesmo run. Outra claim, caso o
+  agendamento nativo gere um novo `run_id`, ainda precisa de identidade de entrega
+  estável para não duplicar PR/build/deploy. Isso é pré-condição de S4, não prova
+  coberta pelo canário de restart do mesmo run.
+- Build, deploy, QA e rollback foram conectados na stack Python/HTTP sem estado.
+  Isso não qualifica migrações de banco, outras stacks, mobile, 3D ou produção.
 - `HOMOLOGADA` continua indisponível nesta prova. Faltam ainda serviço contínuo,
   incidentes executáveis, modelo real, segunda release/memória e portabilidade.
 
-O próximo passo é conectar o recibo integrado ao build/deploy/QA/rollback, sem
-outro banco de fases, sem alterar o produto antigo e sem generalizar novas stacks
-antes dessa fatia funcionar. Só depois seguir para S4 e consumo de modelo, com
-a pausa do provedor resolvida pelo caminho autorizado.
+O próximo passo é conectar os mecanismos qualificados ao dispatcher contínuo e
+às sessões reais Hermes, com espera que libere capacidade, incidente executável
+e notificação persistente. Não acrescentar outro banco de fases. Depois seguir
+para S4 e consumo de modelo, com a pausa resolvida pelo caminho autorizado.
 
 ## Reproduzir sem credenciais ou modelo
 
@@ -123,3 +201,10 @@ Use uma raiz nova; o roteiro não aceita um home de produção.
 O simulador está em `tests/fixtures/github_transport.py`, separado do código
 operacional. Ele recusa repositório não local ou configuração sem qualificação.
 Não publicar a raiz privada produzida pelo roteiro.
+
+Para incluir Compose, rollback e navegador, forneça também `--browser-image
+sha256:ID_EXATO_DO_TOOLCHAIN` e um `--namespace delivery-kit-web-proof` novo.
+O namespace não pode conter outro deployment atual: o controlador o preserva,
+em vez de substituir recursos sem correspondência aos artefatos declarados.
+A prova mantém a candidata final acessível. Retire uma prova antiga somente
+com seu estado/evidência preservados, leases encerradas e propriedade revalidada.

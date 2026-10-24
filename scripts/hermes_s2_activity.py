@@ -22,6 +22,7 @@ checks = dict(old_test_write_denied=denied(root/'tests/test_health.py'))
 if phase == 'tests':
     checks['product_write_denied'] = denied(root/'app.py')
     shutil.copyfile('/fixture/test_greeting.py', root/'tests/test_greeting.py')
+    shutil.copyfile('/fixture/qa.json', root/'tests/qa.json')
     if len(sys.argv) > 2 and sys.argv[2] == 'bad-tests':
         test = root/'tests/test_greeting.py'
         test.write_text(test.read_text().replace('Hello, Ada', 'Hi, Ada'))

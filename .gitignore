@@ -16,6 +16,7 @@
 !/tests/
 !/Dockerfile.validation
 !/Dockerfile.validation.dockerignore
+!/Dockerfile.web
 /bootstrap/*
 !/bootstrap/infra/
 /bootstrap/infra/*

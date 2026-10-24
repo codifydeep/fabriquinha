@@ -17,13 +17,14 @@ class Project:
     qualification: bool
     max_workers: int = 2
     timeout_seconds: int = 120
+    browser_image: str | None = None
 
     @classmethod
     def parse(cls, value):
         required = {'version', 'namespace', 'repository', 'branch', 'validation_image',
                     'tests_dir', 'reviewers', 'qualification'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or set(value) - required - {'max_workers', 'timeout_seconds'}
+                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image'}
                 or type(value['version']) is not int or value['version'] != 1):
             raise ValueError('versioned project contract required')
         if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}', str(value['namespace']))
@@ -44,11 +45,16 @@ class Project:
         if type(workers) is not int or not 1 <= workers <= 2 or type(timeout) is not int or not 1 <= timeout <= 3600:
             raise ValueError('bounded execution required')
         fields = {k: value[k] for k in required - {'version', 'reviewers'}}
-        return cls(**fields, reviewers=MappingProxyType(dict(reviewers)), max_workers=workers, timeout_seconds=timeout)
+        browser=value.get('browser_image')
+        if browser is not None and not re.fullmatch(r'sha256:[a-f0-9]{64}',str(browser)):
+            raise ValueError('exact browser toolchain image required')
+        return cls(**fields, reviewers=MappingProxyType(dict(reviewers)), max_workers=workers,
+                   timeout_seconds=timeout,browser_image=browser)
 
     def fingerprint(self):
         return digest({name: dict(value) if name == 'reviewers' else value
-                       for name in self.__dataclass_fields__ for value in (getattr(self, name),)})
+                       for name in self.__dataclass_fields__ for value in (getattr(self, name),)
+                       if name!='browser_image' or value is not None})
 
     def reviewer(self, author):
         try:

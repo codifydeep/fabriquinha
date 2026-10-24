@@ -1,5 +1,6 @@
 """Host executor failure receipts; fixed fake Docker transport, no daemon."""
 import json
+import base64
 from pathlib import Path
 import subprocess
 import sys
@@ -9,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.artifacts import Store
+from fabriquinha.artifacts import Store, digest
 from fabriquinha.config import Project
 from fabriquinha.effects import EffectBlocked, Journal
 from fabriquinha.executor import Runner
@@ -112,6 +113,23 @@ class FailedJobRecovery(unittest.TestCase):
             with self.assertRaises(EffectBlocked):
                 self.runner.run(self.run, self.snapshot, 'green')
         self.assertEqual(stop_sent, [True])
+
+    def test_browser_screenshot_is_collected_from_stdout_not_disappearing_tmpfs(self):
+        self.failure='none'
+        png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lD8AAAAASUVORK5CYII=')
+        self.output=json.dumps(dict(version=1,status='passed',png_base64=base64.b64encode(png).decode()))
+        expected=dict(binding=self.run.binding(),project=self.runner.project.fingerprint(),snapshot=self.snapshot,
+                      phase='browser',image='sha256:'+'b'*64,commit='a'*40)
+        expected['key']=digest(expected)
+        def transport(*args,**kwargs):
+            if args[0]=='cp':raise subprocess.CalledProcessError(1,['docker','cp'])
+            return self.docker(*args,**kwargs)
+        with patch('fabriquinha.executor.docker',transport),patch.object(self.runner,'inspect',self.inspect):
+            key=self.runner._execute(self.run,expected,['create'])
+        receipt=self.store.receipt(key,kind='browser_job')['payload']
+        self.assertTrue(receipt['screenshot_sha256'])
+        self.assertNotIn('png_base64',receipt['report'])
+        self.assertEqual((self.store.root/'jobs'/expected['key']/'screenshot.png').read_bytes(),png)
 
 
 if __name__ == '__main__':

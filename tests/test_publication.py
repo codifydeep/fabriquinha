@@ -47,7 +47,7 @@ class PublicationFlow(unittest.TestCase):
         self.review_run = Run('implementation', 2, 'lead', 'implementation', True,
                               'backend', 'v1', 'contract')
         red = self.store.record('red', {}, dict(red_job='fixture-red-job',baseline_job='fixture-baseline-job',
-                                               new_cases=['test_behavior']))
+                                               new_cases=['test_behavior'],baseline=self.store.capture(seed)))
         frozen = self.store.record('tests_frozen', {}, dict(red=red))
         green = self.store.record('green', {}, dict(cases=['test_behavior'], snapshot=self.snapshot,
                                                    freeze=frozen,job='fixture-green-job'))
@@ -168,6 +168,17 @@ class PublicationFlow(unittest.TestCase):
         with self.assertRaises(EffectBlocked):
             self.publish()
         self.assertEqual(self.github.calls['merge'], 0)
+
+    def test_newly_merged_tests_cannot_be_deleted_by_an_older_author_snapshot(self):
+        newer=self.root/'new-base';newer.mkdir()
+        (newer/'app.py').write_text('VALUE = 1\n')
+        (newer/'tests').mkdir()
+        (newer/'tests/test_existing.py').write_text('import unittest, app\nclass Existing(unittest.TestCase):\n def test_contract(self): self.assertIsInstance(app.VALUE,int)\n')
+        new_snapshot=self.store.capture(newer)
+        commit=self.repo.propose(new_snapshot,self.repo.base(),'fixture-prior-delivery','lead')
+        self.repo.git('push','origin',commit+':refs/heads/'+self.project.branch)
+        with self.assertRaises(EffectBlocked):self.publish()
+        self.assertEqual(self.github.calls,dict(create=0,merge=0))
 
     def test_merge_content_change_requires_another_independent_review(self):
         other = self.root/'other'; other.mkdir()

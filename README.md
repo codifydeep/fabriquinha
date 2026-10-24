@@ -9,9 +9,10 @@ mudanças de contrato foram aprovados; [S0/S1 passaram](docs/HERMES-S1-QUALIFICA
 na prova sem modelo. A [primeira fatia S2](docs/HERMES-S2-QUALIFICATION.md) passou
 com TDD real, testes congelados, revisão imutável e recuperação de timeout;
 os autores e pareceres ainda são fixtures sintéticas. A [fatia de integração S3](docs/HERMES-S3-QUALIFICATION.md)
-já conecta revisão, Git real, PR/CI simulados e suíte real no commit de merge,
-inclusive após confirmações perdidas. S2/S3 permanecem parciais; faltam serviço
-contínuo, publicação real e deploy/QA/rollback no caminho novo.
+já conecta revisão, Git real, PR/CI simulados, suíte real no commit de merge,
+build, Compose, QA em Chromium e rollback, inclusive após confirmações perdidas.
+A cadeia offline Python/HTTP passou; faltam serviço contínuo, modelos e GitHub
+reais, recuperação da equipe e instalação reproduzível.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -25,7 +26,9 @@ flowchart LR
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]
     P --> M[Merge e suíte no SHA integrado]
-    M -. Pendente .-> D[Build, deploy, QA e rollback]
+    M --> D[Build, deploy, rollback e retorno]
+    D --> Q[QA real em Chromium; evidência preservada]
+    Q -. Pendente .-> A[Fluxo com agentes e GitHub reais]
 ```
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium

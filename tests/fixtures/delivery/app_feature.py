@@ -6,6 +6,7 @@ import sys
 from urllib.parse import parse_qs, urlsplit
 
 PAGE = b'''<!doctype html><html lang="en"><title>Greeting</title>
+<link rel="icon" href="data:,">
 <label>Name <input id="name" value="Ada"></label><button id="greet">Greet</button>
 <p id="result" role="status"></p><script>
 document.querySelector('#greet').onclick=async()=>{

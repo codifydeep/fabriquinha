@@ -25,7 +25,10 @@ flowchart LR
     E --> J[effects.py: intenção e observação]
     Q --> P[publication.py: Git e PR/CI]
     P --> M[Suíte do commit integrado]
-    M -. Pendente .-> D[Deploy, QA e rollback]
+    M --> D[deployment.py: build e Compose]
+    D --> R[Rollback e retorno por ID de imagem]
+    R --> Q2[browser.py: QA real com contrato congelado]
+    Q2 -. Pendente .-> A2[Agentes reais e serviço contínuo]
 ```
 
 O journal não mantém tarefas ou releases. O store não é montado nos workers;
@@ -33,7 +36,12 @@ somente o snapshot necessário atravessa a fronteira. Não há import do broker
 histórico, ACP ou um segundo scheduler no caminho novo. A [prova S3](HERMES-S3-QUALIFICATION.md)
 usa Git real e transporte GitHub simulado, com checks processados pelo Hermes
 upstream. Não foi exercitada publicação GitHub real. O adaptador contínuo,
-incidentes executáveis e build/deploy/QA/rollback continuam pendentes.
+incidentes executáveis e os agentes reais continuam pendentes.
+Build/deploy/rollback e QA em Chromium já passaram na stack Python/HTTP local.
+O navegador tem rede interna própria; só o web publica porta em loopback e
+pode ter egress pela bridge. Não se afirma airgap do produto; ver
+[ADR 0002](ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md).
+O toolchain de navegador ainda usa cache local e precisa de base pública em S6.
 
 ## Instalação de referência antiga, preservada e pausada
 

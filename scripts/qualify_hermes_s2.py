@@ -31,7 +31,7 @@ def observe(call):
             time.sleep(0.1)
 
 
-def qualify(root, upstream, image, *, after_review=None):
+def qualify(root, upstream, image, *, after_review=None, browser_image=None, namespace='delivery-kit-hermes-s2'):
     if root.exists():
         raise ValueError('fresh isolated S2 root required')
     root.mkdir(parents=True, mode=0o700)
@@ -42,9 +42,10 @@ def qualify(root, upstream, image, *, after_review=None):
     from hermes_cli.profiles import create_profile
     for name in ('s2-author', 's2-lead'):
         create_profile(name, no_skills=True, description='Deterministic S2 qualification')
-    project = Project.parse(dict(version=1, namespace='delivery-kit-hermes-s2',
+    project = Project.parse(dict(version=1, namespace=namespace,
         repository='https://github.com/example/qualification', branch='release/qualification',
-        validation_image=image, tests_dir='tests', reviewers={'s2-author':'s2-lead'}, qualification=True))
+        validation_image=image, tests_dir='tests', reviewers={'s2-author':'s2-lead'}, qualification=True,
+        browser_image=browser_image))
     store = Store(root/'private')
     board = Board(project)
     runner = Runner(project, store)
@@ -189,7 +190,8 @@ def qualify(root, upstream, image, *, after_review=None):
                   next_stage='PR/CI and exact-commit deploy/QA/rollback')
     if after_review:
         result['integration'] = after_review(project, store, board, quality, implementation, receipt, frozen)
-        result['next_stage'] = 'exact-image deploy/QA/rollback and real agent execution'
+        result['next_stage'] = ('continuous native agent lane, incidents and real model/GitHub validation'
+            if result['integration'].get('deployment') else 'exact-image deploy/QA/rollback and real agent execution')
     write_json(root/'receipt.json', result)
     print(json.dumps(result, indent=2))
     return result

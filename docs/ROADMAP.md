@@ -8,7 +8,9 @@ sem modelo. A [fatia mecânica S2](HERMES-S2-QUALIFICATION.md) também passou;
 S2 continua parcial e deve ser conectada à publicação/deploy em S3, sem outra
 campanha de gates pré-Red. Nenhuma migração foi aplicada.
 A [primeira integração S3](HERMES-S3-QUALIFICATION.md) passou com Git e suíte
-integrada reais, mas PR/CI simulados. Próximo incremento: build/deploy/QA/rollback.
+integrada reais, mas PR/CI simulados. Depois passou por build, Compose, QA em
+Chromium e rollback. Próximo incremento: serviço contínuo Hermes, incidentes e
+notificações persistentes, antes da entrega real S4.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 

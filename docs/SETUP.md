@@ -6,9 +6,13 @@ e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
 
 Para o caminho novo Hermes aprovado, consulte as provas isoladas
-[S1](HERMES-S1-QUALIFICATION.md) e [S2](HERMES-S2-QUALIFICATION.md).
+[S1](HERMES-S1-QUALIFICATION.md), [S2](HERMES-S2-QUALIFICATION.md) e
+[S3](HERMES-S3-QUALIFICATION.md).
 Elas não exigem Multica nem iniciam a instalação antiga. Os comandos Multica
 abaixo documentam a referência histórica; não são pré-requisito da simplificação.
+S3 pode construir e manter um demo local com Compose, QA de navegador e rollback,
+sem modelo ou GitHub real. O navegador ainda requer toolchain local previamente
+selecionado por ID; não há promessa de reprodução limpa dessa dependência até S6.
 
 ## 1. Testes offline primeiro
 

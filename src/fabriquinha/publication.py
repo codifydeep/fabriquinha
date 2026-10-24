@@ -282,6 +282,12 @@ class Publication:
                                      checks_deadline=time.time()+900))
         inputs = json.loads(initial.read_bytes())
         base, branch = inputs['base'], inputs['branch']
+        review=self.store.receipt(review_id,kind='delivery_review')['payload']
+        green=self.store.receipt(review['green'],kind='green')['payload']
+        frozen=self.store.receipt(green['freeze'],kind='tests_frozen')['payload']
+        red=self.store.receipt(frozen['red'],kind='red')['payload']
+        if self.repo.snapshot(base)!=red['baseline']:
+            raise EffectBlocked('reviewed work uses an older baseline; rebase and preserve current regression tests')
         identity = dict(binding=run.binding(), project=self.project.fingerprint(), review=review_id,
                         snapshot=snapshot, base=base, branch=branch)
         body = self.description(run,review_id,snapshot)
