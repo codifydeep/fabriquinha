@@ -85,6 +85,29 @@ class Board:
         if self.current(run.task, run.number) != run:
             raise ValueError('assignment or contract changed')
 
+    def closed_review(self, task_id):
+        """Read completed native provenance; never grants tool/worker authority."""
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            task=kb.get_task(conn,task_id);row=kb.latest_run(conn,task_id)
+            if not task or task.status!='done' or not row or row.outcome!='completed':
+                raise ValueError('completed independent review required')
+            claim=conn.execute("SELECT id,payload FROM task_events WHERE task_id=? AND run_id=? AND kind='claimed' ORDER BY id DESC LIMIT 1",
+                               (task_id,row.id)).fetchone()
+            complete=conn.execute("SELECT id FROM task_events WHERE task_id=? AND run_id=? AND kind='completed' ORDER BY id DESC LIMIT 1",
+                                  (task_id,row.id)).fetchone()
+            origin=conn.execute("SELECT e.payload,r.metadata FROM task_events e JOIN task_runs r ON r.id=e.run_id "
+                "WHERE e.task_id=? AND e.kind='review_requested' AND e.id<? ORDER BY e.id DESC LIMIT 1",
+                (task_id,claim['id'] if claim else 0)).fetchone()
+            if (not claim or not complete or complete['id']<=claim['id'] or not origin
+                    or json.loads(claim['payload']).get('source_status')!='review'):
+                raise ValueError('manual done or synthetic approval is not a native independent execution')
+            author=json.loads(origin['payload']).get('implementer');body=json.loads(task.body)
+            if row.profile!=task.assignee or row.profile not in self.project.reviewers_for(author):
+                raise ValueError('completed review identity outside the matrix')
+            run=Run(task_id,row.id,row.profile,body['kind'],True,author,body['release'],digest(body))
+            return run,row.metadata or {},json.loads(origin['metadata'] or '{}')
+
     def workspace(self, run):
         self.ensure(run)
         kb, kbc, _ = native()

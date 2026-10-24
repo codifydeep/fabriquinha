@@ -79,7 +79,7 @@ class Runner:
         config,host=info['Config'],info['HostConfig']
         mounts={m['Destination']:m for m in info.get('Mounts',[]) if m['Type']!='tmpfs'}
         sources={'/qa.py':ROOT/'src/fabriquinha/browser.py',
-                 '/qa-contract.json':self.store.tree(expected['snapshot'])/self.project.tests_dir/'qa.json'}
+                 '/qa-contracts':self.store.tree(expected['snapshot'])/self.project.tests_dir}
         if (info['Image']!=self.project.browser_image or config.get('User')!='10000:10000'
                 or config.get('Labels',{}).get('fabriquinha.job')!=expected['key']
                 or config.get('Labels',{}).get('com.docker.compose.project')!=self.project.namespace+'-tests'
@@ -116,7 +116,7 @@ class Runner:
             '--pids-limit','256','--log-opt','max-size=1m','--log-opt','max-file=2',
             '--tmpfs','/tmp:rw,nosuid,size=256m','--env','FABRIQUINHA_SOURCE_SHA='+commit,
             '--mount',f'type=bind,src={ROOT/"src/fabriquinha/browser.py"},dst=/qa.py,readonly',
-            '--mount',f'type=bind,src={self.store.tree(snapshot)/self.project.tests_dir/"qa.json"},dst=/qa-contract.json,readonly',
+            '--mount',f'type=bind,src={self.store.tree(snapshot)/self.project.tests_dir},dst=/qa-contracts,readonly',
             self.project.browser_image,'-B','/qa.py']
         return self._execute(run,expected,command)
 

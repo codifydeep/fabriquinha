@@ -118,13 +118,102 @@ observou a aprovação já existente e criou um único plano; Lead/CTO concluír
 a revisão. O recibo registra `approval_creation_gap_recovered=true`. Não houve
 nova aprovação humana ou conserto manual de cards para recuperar essa lacuna.
 
-**Ainda falta:** materializar o DAG em cards TDD/integradores executáveis,
-encadear bases de incrementos dependentes e validar aceite integral para
-`HOMOLOGADA`. A âncora `RELEASE` permanece `blocked` no Kanban: não é falha de
-worker nem entrega. Não há homologação/cancelamento qualificado aqui; nem um
-`done` bruto libera outra release enquanto essa fronteira não existir.
+Essa foi a fronteira da primeira fatia. A materialização e o aceite foram
+conectados depois, conforme a prova abaixo. Cancelamento qualificado ainda não
+foi implementado; pausa operacional não equivale a cancelar uma release.
 
-O núcleo passou de 16 para 17 módulos funcionais, além de `__init__`, próximo de
-quatro mil linhas incluindo a lane S1. É desvio visível da meta 12/~3.000, não
-licença para reconstruir um broker. O módulo novo reúne documentos e a borda
-CEO/planejamento sobre APIs nativas; não tem executor ou scheduler próprio.
+## DAG executável e aceite integral — continuação
+
+O contrato opcional `delivery_roles` define `tests` e `integration`, ambos na
+matriz de revisão. Exige coordenação e navegador configurados. Não há upgrade
+silencioso de instalações: esses papéis mudam o fingerprint do projeto.
+
+```json
+{"delivery_roles":{"tests":"quality_security","integration":"devops"}}
+```
+
+`releases.py` materializa o plano aprovado, não uma decomposição predefinida pelo
+operador. Cada pacote gera teste/Red, implementação/Green e integração/QA, com
+revisões nativas independentes. Todos começam estacionados; o grafo imutável só
+é ativado depois de completo. Reinício durante a criação não deixa metade das
+dependências pronta para despacho. Alteração de corpo, dependência ou workspace
+é recusada antes de iniciar um worker de modelo, como indisponibilidade nativa,
+sem congelar os slots de outros cards/diagnósticos.
+
+O DAG preserva suas dependências. Nesta primeira stack, acrescenta uma ordem
+topológica sequencial às integrações na mesma branch. O pacote seguinte recebe
+o snapshot integrado/qualificado do anterior; não usa uma cópia antiga da base.
+Não é concorrência de branches arbitrárias ou merge automático de conflitos.
+Dois workers continuam sendo teto, não obrigação de paralelismo.
+
+Os contratos de navegador agora podem crescer por arquivos novos
+`tests/qa.<identificador>.json`. `qa.json` continua suportado. O controlador
+combina todos, exige IDs únicos e mantém o limite de 20 cenários dessa stack.
+Arquivos antigos permanecem protegidos, sem permissão para reescrever ou apagar
+um cenário anterior. Implementação e revisão recebem o conjunto congelado.
+
+O gate final exige:
+
+- Plano e brief exatos, com cobertura de todos os critérios aprovados.
+- Conclusão por execuções independentes reais no Kanban: `done` manual ou run
+  sintético não substitui a proveniência de revisão dos pacotes.
+- Recibos Red/freeze/Green/controles/revisão vinculados aos respectivos cards.
+- Cada base seguinte igual à entrega integrada anterior; suíte cumulativa.
+- Publicação, commit de merge, artefato, QA implantado e rollback consistentes.
+- QA final cobrindo todos os critérios, não apenas o último pacote.
+- Branch ainda no mesmo commit, CI obrigatório verde e o mesmo container/imagem/
+  URL qualificados pelo QA ainda saudáveis no instante do aceite.
+
+Somente o controlador grava `release_acceptance` e conclui a âncora. Uma nova
+release exige esse encerramento válido, não apenas um `done` bruto. No ensaio,
+o recibo exercita o estado `HOMOLOGADA`, mas contém `qualification=true` e
+**`delivery_approval=false`**. A notificação diz qualificação determinística,
+nunca entrega autônoma de produto. Isso não libera chamadas pagas ou produção.
+
+### Tentativas e causas preservadas
+
+1. **Não aprovada.** Primeiro incremento passou por TDD/integração/deploy/QA. O
+   Hermes vinculou legitimamente `completion_contract` à URL exata do PR; a
+   primeira conferência do grafo esperava somente o nome do repo. Foi corrigida
+   para aceitar a vinculação apenas com publicação/rollout próprios, nunca um
+   PR irmão verde. A tentativa foi pausada/drenada antes da correção.
+2. **Não aprovada.** QA encerrou na abertura do SQLite, com falso WAL
+   "somente leitura". Native retry retomou, mas o roteiro pausou ao detectar o
+   crash; não houve aprovação retroativa. Arquivos atuais eram graváveis e o
+   WAL já havia desaparecido. Evidências e runs foram preservados.
+3. **Passou.** Um experimento controlado reproduziu o preflight upstream:
+   fechar a última conexão entre `is_file` e `os.access` faz o WAL desaparecer e
+   produz aquela mensagem. Manter outra conexão aberta conserva o WAL e os
+   dados. Serviço e worker agora mantêm conexão nativa por sua vida útil, sem
+   transação de escrita aberta, chmod, remoção de WAL, retry por texto de erro ou
+   patch no Hermes. A tentativa nova concluiu sem crash/reparo do operador.
+
+A prova completa `scripts/qualify_hermes_release.py` verificou:
+
+| Evidência | Resultado |
+|---|---|
+| Cards | 9: release, brief, plano e 6 cards gerados para 2 pacotes dependentes |
+| Runs nativos | 24: 9 conclusões, 8 pedidos de revisão e 7 esperas agendadas |
+| SDK/modelo | 11 atividades SDK, 17 respostas locais; zero chamadas pagas ou julgamento real |
+| Publicação | 2 PRs simulados distintos; Git e commits de merge reais em remoto bare local |
+| Qualidade | Red/freeze/Green/controles/revisão; regressões do primeiro pacote preservadas no segundo |
+| Build/operação | 3 artefatos reais, 7 atualizações Compose; reutiliza o candidato anterior como rollback |
+| QA | 2 jobs Chromium reais; QA final cobre os 2 critérios no mesmo commit/imagem |
+| Aceite | 1 recibo integral de qualificação; não é entrega autônoma ou aprovação de produto |
+
+As implantações temporárias das tentativas foram retiradas após confirmar
+ausência de workers/claims/efeitos, com logs e evidências privados preservados.
+A URL do ensaio é histórica, não ambiente de homologação disponível ao CEO.
+Nenhum volume, snapshot ou recurso de Toso/Reforma foi removido por essa prova.
+Após a retirada dos deployments, o plano oficial de imagens removeu cinco
+versões antigas desse ensaio; conservou duas recentes, referências protegidas e
+imagens em uso. Logs/metadados ficaram arquivados privadamente antes das remoções.
+
+O núcleo atual tem 18 módulos funcionais + `__init__`, 4.301 linhas incluindo a
+lane S1. O desvio da meta 12/~3.000 permanece visível. O módulo adicional reúne
+materialização e gate final sobre o Kanban, não outro scheduler/DB.
+
+**Próxima fronteira:** completar contexto técnico do planejamento e admissão
+metered do provedor, respeitando a pausa financeira; depois S4 com modelo e
+GitHub reais. O ciclo offline não substitui esse ensaio, a segunda release com
+memória/incidente, instalação reproduzível ou retomada do Truco.

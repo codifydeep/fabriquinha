@@ -30,9 +30,18 @@ def contract(value):
     return value['checks']
 
 
+def load_contract(folder):
+    """Append-only frozen files, not permission to weaken a previous scenario."""
+    folder=Path(folder);checks=[]
+    paths=([folder/'qa.json'] if (folder/'qa.json').exists() else [])+sorted(folder.glob('qa.*.json'))
+    for path in paths:checks.extend(contract(json.loads(path.read_bytes())))
+    value=dict(version=1,checks=checks);contract(value)
+    return value
+
+
 def main():
     from playwright.sync_api import sync_playwright, expect
-    checks=contract(json.loads(Path('/qa-contract.json').read_bytes()))
+    checks=contract(load_contract(Path('/qa-contracts')))
     source=os.environ['FABRIQUINHA_SOURCE_SHA']
     target='http://web:8080'
     errors=[]; completed=[]; page=None; image=None

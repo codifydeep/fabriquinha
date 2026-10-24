@@ -102,10 +102,8 @@ class Intake:
             old=next((task for task in roots if json.loads(task.body)['release']==key),None)
             if old:
                 if json.loads(old.body)['request']!=value:raise ValueError('request key reused with another objective')
-            elif roots:
-                # Until the final acceptance/cancellation gate is installed,
-                # even a raw CLI "done" cannot make another release eligible.
-                raise ValueError('one release only; no qualified terminal release receipt yet')
+            elif any(not self.terminal(task) for task in roots):
+                raise ValueError('one active release; raw done is not qualified terminal evidence')
             else:
                 anchor=kb.create_task(conn,title='RELEASE '+value['label'],assignee=self.project.coordination_roles['lead'],
                     body=json.dumps(dict(version=1,kind='release',release=key,project=self.project.fingerprint(),request=value)),
@@ -139,10 +137,24 @@ class Intake:
         brief(proposal['payload']['document'])
         return record,proposal
 
+    def terminal(self,anchor):
+        if anchor.status!='done':return False
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:row=kb.latest_run(conn,anchor.id)
+        if not row or row.outcome!='completed' or not row.metadata or 'release_acceptance' not in row.metadata:return False
+        record=self.store.receipt(row.metadata['release_acceptance'],kind='release_acceptance');body=json.loads(anchor.body)
+        expected=dict(actor='controller',task=anchor.id,release=body['release'],contract=digest(body))
+        data=record['payload']
+        if (record['binding']!=expected or data['project']!=self.project.fingerprint() or data['state']!='HOMOLOGADA'
+                or data['qualification'] is not self.project.qualification or data['delivery_approval'] is not (not self.project.qualification)):
+            raise ValueError('scoped final release acceptance required')
+        return True
+
     def _reconcile(self,conn):
         if not self.project.coordination_roles:return
         kb,_,_=native()
         for anchor in self.roots(conn):
+            if self.terminal(anchor):continue
             if anchor.status!='blocked':raise ValueError('release anchor changed without qualified terminal evidence')
             task_id=self._card(conn,anchor,'brief');task=kb.get_task(conn,task_id)
             if task.status!='done':continue
@@ -257,6 +269,8 @@ class DraftTools:
         self.a.ensure()
         if self.run.reviewing:raise ValueError('review cannot replace the plan')
         document=brief(args) if self.run.kind=='brief' else plan(args,self.evidence()['approved_brief'],self.a.project)
+        if self.run.kind=='brief' and self.a.project.delivery_roles and len(document['criteria'])>20:
+            raise ValueError('the qualified browser contract supports at most 20 acceptance criteria')
         payload=dict(project=self.a.project.fingerprint(),document=document)
         if self.run.kind=='plan':payload['approval']=self.a.board.input(self.run,'approved_brief')
         receipt=self.a.store.record('product_brief' if self.run.kind=='brief' else 'work_plan',self.run.binding(),payload)

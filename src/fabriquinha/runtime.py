@@ -30,6 +30,7 @@ from .publication import Repository, GitHub, Publication
 from .deployment import Deployment
 from .operations import Control, ActivityPaused, doctor
 from .intake import Intake, DraftActivity
+from .releases import Releases
 
 
 class IntegrationRunner(Runner):
@@ -116,6 +117,7 @@ class Runtime:
         self.admission=None;self._next_admission=0
         self.recovery=Recovery(self.project,self.store,self.board)
         self.intake=Intake(self.project,self.store,self.board);self.intake_issues={}
+        self.releases=Releases(self.project,self.store,self.board,self.intake);self.release_issues={}
         self.outbox=Outbox(self.project,self.store)
 
     def settle(self,task=None,*,conn=None):
@@ -158,6 +160,11 @@ class Runtime:
         if not admission['ready']:
             from tools.process_registry import RestartSafeScopeUnavailable
             raise RestartSafeScopeUnavailable('runtime admission deferred; inspect doctor/status')
+        if self.project.delivery_roles:
+            try:self.releases.admit(task)
+            except (ValueError,KeyError,TypeError,OSError):
+                from tools.process_registry import RestartSafeScopeUnavailable
+                raise RestartSafeScopeUnavailable('assigned release graph invalid; no model worker started') from None
         self.settle(task.id)
         with self.control.lock():
             try:self.control.ensure()
@@ -256,6 +263,7 @@ class Runtime:
                 self.intake.reconcile(conn);self.intake_issues={}
             except (ValueError,KeyError,TypeError,OSError) as error:
                 self.intake_issues={'category':type(error).__name__}
+            self.release_issues=self.releases.reconcile(conn,self.release_services)
             self.integration_issues=self.wake_integrations(conn)
             self.recovery_issues=self.recovery.reconcile(conn,self.settle)
             admission=self.check_admission()
@@ -315,6 +323,9 @@ class Runtime:
         # factory in their own process; no test endpoint/config bypass is shipped.
         return Repository(self.project,self.store,assignee=run.actor),GitHub(self.project,run.actor)
 
+    def release_services(self,actor,*,task=None):
+        return Repository(self.project,self.store,assignee=actor),GitHub(self.project,actor)
+
     def integrate(self,run,quality):
         self.board.ensure(run)
         if run.kind!='integration':raise ValueError('native integration activity required')
@@ -336,11 +347,13 @@ class Runtime:
             publication.require_ci(github.accept(published['pr'],artifact['commit']),artifact['commit'],time.time())
             evidence=deployment.qa(run,rollout,repo)
             self.board.finish_review(run,'Independent deployed QA; release acceptance remains separate',
-                dict(published_pr=published['pr'],integrated=integrated,release_evidence=evidence))
+                dict(published_pr=published['pr'],integrated=integrated,release_evidence=evidence,
+                     baseline=artifact['snapshot'],base_commit=artifact['commit']))
             return dict(status='qa_completed',release_evidence=evidence,delivery_approval=False)
         published=publication.publish(run,self.board.input(run,'delivery'))
         integrated=publication.validate_integrated(run,published,quality)
-        previous=deployment.artifact(run,integrated,repo,baseline=True)
+        previous=self.releases.rollback_artifact(run) if self.project.delivery_roles else None
+        if previous is None:previous=deployment.artifact(run,integrated,repo,baseline=True)
         candidate=deployment.artifact(run,integrated,repo)
         rollout=deployment.rollout(run,candidate,previous,repo)
         self.board.review(run,'Independent deployed QA after rollback and restoration',
@@ -369,10 +382,19 @@ class Runtime:
             control=self.control.read()
             if control['paused']:control={**control,**self.pause_status(conn)}
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
-                    integration_issues=self.integration_issues,intake_issues=self.intake_issues,control=control,admission=self.admission,
+                    integration_issues=self.integration_issues,intake_issues=self.intake_issues,release_issues=self.release_issues,
+                    control=control,admission=self.admission,
                     incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
+        # Keep WAL sidecars present across short native API connections. This
+        # is a connection lifetime, not an open write txn or an error retry.
+        _,kbc,_=native()
+        with kbc.connect_closing() as keeper:
+            keeper.execute('SELECT id FROM tasks LIMIT 1').fetchone()
+            return self._serve(stop,interval=interval)
+
+    def _serve(self,stop,*,interval=15):
         if not 0.1<=interval<=60:raise ValueError('bounded dispatch interval required')
         if not self.control.read()['paused']:model_route(self.project,self.root/'route.json')
         self.status()  # Validate the read surface before any worker is spawned.
@@ -404,6 +426,12 @@ class Runtime:
         # Do not terminate healthy detached workers on dispatcher shutdown.
 
     def worker(self,task,number):
+        _,kbc,_=native()
+        with kbc.connect_closing() as keeper:
+            keeper.execute('SELECT id FROM tasks LIMIT 1').fetchone()
+            return self._worker(task,number)
+
+    def _worker(self,task,number):
         kb,kbc,dispatch=native();sandbox=None
         with kbc.connect_closing() as conn:
             if not dispatch.adopt_worker_pid(conn,task,number,os.getpid()):
@@ -418,6 +446,9 @@ class Runtime:
             os.environ['HERMES_HOME']=str(self.root/'home/profiles'/run.actor)
             runner=IntegrationRunner if run.kind=='integration' else Runner
             quality=Quality(self.project,self.store,runner(self.project,self.store),self.board)
+            if self.project.delivery_roles and run.kind in ('tests','implementation','integration'):
+                context=self.releases.prepare(run,quality)
+                prompt+='\nController-approved package context:\n'+json.dumps(context)
             if run.kind=='integration':
                 try:result=self.integrate(run,quality)
                 except Pending:

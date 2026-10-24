@@ -14,18 +14,22 @@ caminho. O legado e as chamadas pagas continuam pausados; nenhuma migração apl
 | [Outbox](HERMES-NOTIFICATIONS-QUALIFICATION.md) | Indisponibilidade/ACK perdido/reinício sem duplicar aceitos | Telegram real não testado |
 | [Integração](HERMES-INTEGRATION-QUALIFICATION.md) | CI libera claims, retomada automática, Git/build/Compose/QA/rollback reais | GitHub/CI simulados |
 | [Operação](HERMES-OPERATIONS-QUALIFICATION.md) | Pausa persistente, interrupção, retomada e perfil restaurado sem falso retry | Não libera consumo pago |
-| [Brief/plano](HERMES-INTAKE-QUALIFICATION.md) | Perguntas, aprovação exata do CEO, DAG completo e revisão Lead/CTO; nove atividades SDK | Dez respostas locais; não materializa cards executáveis |
+| [Brief/plano](HERMES-INTAKE-QUALIFICATION.md) | Perguntas, aprovação exata do CEO, DAG completo e revisão Lead/CTO; nove atividades SDK | Primeira fatia com dez respostas locais, complementada abaixo |
+| [Ciclo de release](HERMES-INTAKE-QUALIFICATION.md#dag-executável-e-aceite-integral--continuação) | Dois incrementos, seis cards gerados, bases encadeadas, três artefatos, sete atualizações Compose, QA e aceite integral | Terceira tentativa passou; autores/CI sintéticos, não produto autônomo |
 
-**S2 permanece parcial. Próxima fatia:** materializar o DAG aprovado em cards TDD
-e de integração, encadear bases dependentes e validar o aceite integral de release.
+**S2 permanece parcial.** Materialização e aceite integral passaram no ciclo
+offline: 24 runs nativos, 11 atividades SDK e 17 respostas locais. Foram corrigidos
+um conflito com a vinculação nativa do PR e a corrida de desaparecimento do WAL;
+as duas falhas permanecem no histórico. **Próxima fatia:** completar contexto de
+planejamento e admissão do provedor, sem retirar a pausa financeira por hábito.
 Depois: liberação autorizada do provedor e S4 real sem condução de handoffs pelo
 operador; S5 segunda versão/memória/recuperação; S6 instalação/segundo repo/cutover;
 S7 Truco. Nenhuma release autônoma foi qualificada.
 
-Checks atuais: 150 testes do caminho novo e 4.523 históricos passaram, estes com
-oito skips preexistentes. A prova de intake também recuperou uma interrupção
-entre o commit da aprovação e a criação do plano, sem duplicar aprovação/cards.
-O núcleo tem 17 módulos funcionais + `__init__`, 3.936 linhas incluindo a lane S1;
+Checks atuais: 165 testes do caminho novo e 4.523 históricos passaram, estes com
+oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
+e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.
+O núcleo tem 18 módulos funcionais + `__init__`, 4.301 linhas incluindo a lane S1;
 o desvio da meta 12/~3.000 segue explícito. Recibos completos continuam privados.
 As estimativas e detalhes históricos abaixo não são porcentagens de conclusão
 da nova arquitetura nem evidência de entrega autônoma.

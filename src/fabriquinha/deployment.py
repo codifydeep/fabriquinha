@@ -8,7 +8,7 @@ import subprocess
 import time
 import urllib.request
 from .artifacts import digest, files
-from .browser import contract
+from .browser import contract, load_contract
 from .effects import Journal, Pending, EffectBlocked, write_json
 from .executor import ROOT, docker
 from .publication import sha
@@ -90,7 +90,7 @@ class Deployment:
                     or repository.snapshot(commit)!=snapshot):
                 raise ValueError('passing exact Git baseline required for bootstrap rollback')
         else:
-            contract(json.loads((self.store.tree(snapshot)/self.project.tests_dir/'qa.json').read_bytes()))
+            load_contract(self.store.tree(snapshot)/self.project.tests_dir)
         recipe=ROOT/'Dockerfile.web'
         scope=dict(subject=run.subject(),project=self.project.fingerprint(),review=review_id,
                       commit=sha(commit),snapshot=snapshot,role=role,recipe=hashlib.sha256(recipe.read_bytes()).hexdigest())
@@ -263,7 +263,7 @@ class Deployment:
             with opener.open(before['url']+path,timeout=5) as response:
                 if response.status!=200 or json.loads(response.read(4097))!=expected_value:
                     raise ValueError('CEO local URL identity/health mismatch')
-        expected=contract(json.loads((self.store.tree(artifact['snapshot'])/self.project.tests_dir/'qa.json').read_bytes()))
+        expected=contract(load_contract(self.store.tree(artifact['snapshot'])/self.project.tests_dir))
         job=self.runner.browser(run,artifact['snapshot'],artifact['commit'])
         evidence=self.store.receipt(job,kind='browser_job')
         value=evidence['payload'];report=value['report']

@@ -153,6 +153,18 @@ class Outbox:
                     description=EVENTS[row['kind']]
                     if row['kind']=='review_requested' and isinstance(body,dict) and body.get('kind')=='brief':
                         description='Awaiting scoped CEO business input; not technical, budget or delivery approval'
+                    if row['kind']=='completed' and isinstance(body,dict) and body.get('kind')=='release':
+                        description='Release closed without qualified acceptance; technical diagnosis required'
+                        proof=conn.execute('SELECT metadata FROM task_runs WHERE id=?',(row['run_id'],)).fetchone()
+                        try:
+                            metadata=json.loads(proof[0] or '{}') if proof else {}
+                            record=self.store.receipt(metadata['release_acceptance'],kind='release_acceptance');data=record['payload']
+                            if (record['binding']!=dict(actor='controller',task=task,release=body['release'],contract=digest(body))
+                                    or data['project']!=self.project.fingerprint() or data['state']!='HOMOLOGADA'
+                                    or data['qualification'] is not self.project.qualification):raise ValueError('foreign release evidence')
+                            description=('Deterministic release qualification completed; not autonomous product delivery' if self.project.qualification
+                                else 'Release HOMOLOGADA')+'\nCommit: '+data['commit']+'\nURL: '+data['url']
+                        except (ValueError,KeyError,TypeError,OSError):pass
                     text=f'[{self.project.namespace}] {actor} | {task} | run {row["run_id"] or "-"} | {mode}\n{description}'
                     self.enqueue(key,dict(task=task,run=row['run_id'],actor=actor,mode=mode,event=event,text=text))
                 cursor['cursor']=row['id']

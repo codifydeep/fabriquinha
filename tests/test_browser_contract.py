@@ -1,9 +1,11 @@
 import sys
 import unittest
+import tempfile
+import json
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.browser import contract
+from fabriquinha.browser import contract, load_contract
 
 
 def scenario():
@@ -29,6 +31,17 @@ class FrozenBrowserContract(unittest.TestCase):
         with self.assertRaises(ValueError):contract(value)
         value=scenario();value['checks'][0]['actions']*=20
         with self.assertRaises(ValueError):contract(value)
+
+    def test_new_increment_adds_contract_without_editing_existing_regressions(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);original=json.dumps(scenario())
+            (root/'qa.json').write_text(original)
+            additional=scenario();additional['checks'][0]['id']='another'
+            (root/'qa.join.json').write_text(json.dumps(additional))
+            self.assertEqual([item['id'] for item in load_contract(root)['checks']],['greeting','another'])
+            self.assertEqual((root/'qa.json').read_text(),original)
+            (root/'qa.duplicate.json').write_text(original)
+            with self.assertRaises(ValueError):load_contract(root)
 
 
 if __name__=='__main__':unittest.main()

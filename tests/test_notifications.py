@@ -92,6 +92,27 @@ class NotificationDelivery(unittest.TestCase):
         self.assertEqual(records[0]['message']['actor'],'backend')
         self.assertNotIn('lead',records[0]['message']['text'])
 
+    def test_release_notice_requires_receipt_and_distinguishes_a_fixture_from_autonomy(self):
+        conn=sqlite3.connect(':memory:');conn.row_factory=sqlite3.Row;self.addCleanup(conn.close)
+        conn.executescript('CREATE TABLE tasks(id,assignee,body);CREATE TABLE task_runs(id,profile,metadata);'
+            'CREATE TABLE task_events(id INTEGER PRIMARY KEY,task_id,run_id,kind,payload,created_at);')
+        body=dict(kind='release',release='execution')
+        from fabriquinha.artifacts import digest
+        proof=self.store.record('release_acceptance',dict(actor='controller',task='t_12345678',release='execution',contract=digest(body)),
+            dict(project=self.project.fingerprint(),state='HOMOLOGADA',qualification=True,delivery_approval=False,
+                 commit='a'*40,url='http://127.0.0.1:12345'))
+        conn.execute('INSERT INTO tasks VALUES(?,?,?)',('t_12345678','lead',json.dumps(body)))
+        conn.execute('INSERT INTO task_runs VALUES(?,?,?)',(1,'lead',json.dumps({'release_acceptance':proof})))
+        self.outbox.capture(conn)
+        conn.execute("INSERT INTO task_events VALUES(1,'t_12345678',1,'completed','{}',901)")
+        self.outbox.capture(conn)
+        message=self.outbox.records()[0]['message']['text']
+        self.assertIn('not autonomous product delivery',message);self.assertIn('http://127.0.0.1:12345',message)
+        conn.execute('UPDATE task_runs SET metadata=? WHERE id=1',('{}',))
+        conn.execute("INSERT INTO task_events VALUES(2,'t_12345678',1,'completed','{}',902)")
+        self.outbox.capture(conn)
+        self.assertTrue(any('without qualified acceptance' in item['message']['text'] for item in self.outbox.records()))
+
     def test_alerts_use_validation_evidence_not_heartbeat_and_dedupe_by_evidence(self):
         cards=[dict(id='t_12345678',status='ready',assignee='backend',current_run_id=None,
             last_event_at=0,created_at=0,last_heartbeat_at=99999)]

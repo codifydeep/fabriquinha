@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import sqlite3
 import threading
-from contextlib import nullcontext
+from contextlib import nullcontext, contextmanager
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -37,6 +37,26 @@ class NativeRuntime(unittest.TestCase):
                 with Owner(self.root):pass
         with Owner(self.root):pass
         self.assertEqual(self.runtime.children,[])
+
+    def test_native_connection_lifetime_covers_service_and_worker_without_a_write_transaction(self):
+        self.assertTrue(hasattr(Runtime,'_serve'))
+        self.assertTrue(hasattr(Runtime,'_worker'))
+        held=[];connection=Mock()
+        @contextmanager
+        def connect():
+            held.append(True)
+            try:yield connection
+            finally:held.pop()
+        def active(*args,**kwargs):
+            self.assertEqual(held,[True]);return 'active'
+        api=SimpleNamespace(connect_closing=connect)
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch.object(self.runtime,'_serve',side_effect=active),patch.object(self.runtime,'_worker',side_effect=active):
+            self.assertEqual(self.runtime.serve(threading.Event()),'active')
+            self.assertEqual(held,[])
+            self.assertEqual(self.runtime.worker('card',1),'active')
+            self.assertEqual(held,[])
+        self.assertTrue(all(call.args[0]=='SELECT id FROM tasks LIMIT 1' for call in connection.execute.call_args_list))
 
     def test_graceful_shutdown_refreshes_final_notification_status(self):
         stop=threading.Event();stop.set()
@@ -117,6 +137,21 @@ class NativeRuntime(unittest.TestCase):
              patch.object(self.runtime,'check_admission',return_value=dict(ready=True,missing_profiles=['backend'])), \
              patch.object(self.runtime,'settle'),patch.object(self.runtime,'_spawn',return_value=42):
             self.assertEqual(self.runtime.spawn(task,'/unused'),42)
+
+    def test_invalid_graph_defers_only_that_spawn_before_any_model_worker(self):
+        value=configuration();value.update(coordination_roles={'product':'product','lead':'lead'},
+            delivery_roles={'tests':'qa','integration':'devops'},browser_image='sha256:'+'b'*64,
+            reviewers={'backend':'lead','lead':'cto','qa':'lead','devops':'qa'})
+        self.runtime.project=Project.parse(value);self.runtime.releases=Mock()
+        task=SimpleNamespace(id='work',current_run_id=7,assignee='backend')
+        modules={'tools':SimpleNamespace(),'tools.process_registry':SimpleNamespace(RestartSafeScopeUnavailable=EffectBlocked)}
+        with patch.dict(sys.modules,modules),patch.object(self.runtime,'check_admission',return_value={'ready':True}), \
+             patch.object(self.runtime,'settle'),patch.object(self.runtime,'_spawn',return_value=42) as spawn:
+            self.runtime.releases.admit.side_effect=ValueError('invalid graph')
+            with self.assertRaises(EffectBlocked):self.runtime.spawn(task,'/unused')
+            spawn.assert_not_called();self.assertFalse(self.runtime.control.read()['paused'])
+            self.runtime.releases.admit.side_effect=None
+            self.assertEqual(self.runtime.spawn(SimpleNamespace(id='diagnosis'),'/unused'),42)
 
     def test_second_process_cannot_adopt_an_already_owned_run_or_block_its_owner(self):
         conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False)

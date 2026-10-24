@@ -158,7 +158,7 @@ class IntegrationLifecycle(unittest.TestCase):
         self.runtime.store=Mock()
         self.runtime.store.receipt.side_effect=[
             {'payload':{'candidate':'candidate'}},
-            {'payload':{'integrated':'integrated','commit':'merge'}},
+            {'payload':{'integrated':'integrated','commit':'merge','snapshot':'snapshot'}},
             {'payload':{'publication':'publication'}},
             {'payload':{'pr':'https://github.com/example/product/pull/1'}}]
         with patch('fabriquinha.runtime.native',return_value=(kb,SimpleNamespace(connect_closing=lambda:conn),None)), \
@@ -171,6 +171,8 @@ class IntegrationLifecycle(unittest.TestCase):
             deployment.return_value.qa.assert_called_once_with(run,'rollout',repo)
             board.finish_review.assert_called_once()
             self.assertEqual(board.finish_review.call_args.args[2]['release_evidence'],'qa-proof')
+            self.assertEqual(board.finish_review.call_args.args[2]['baseline'],'snapshot')
+            self.assertEqual(board.finish_review.call_args.args[2]['base_commit'],'merge')
             self.assertFalse(result['delivery_approval'])
             publication.return_value.publish.assert_not_called()
 

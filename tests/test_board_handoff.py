@@ -14,6 +14,24 @@ from test_delivery_core import configuration
 
 
 class ClosedParentHandoff(unittest.TestCase):
+    def test_release_evidence_cannot_use_manual_done_as_an_independent_review(self):
+        conn=sqlite3.connect(':memory:');conn.row_factory=sqlite3.Row;self.addCleanup(conn.close)
+        conn.executescript('CREATE TABLE task_events(id,task_id,run_id,kind,payload);CREATE TABLE task_runs(id,metadata);')
+        task=SimpleNamespace(status='done',assignee='lead',body=json.dumps(dict(version=1,kind='tests',release='v1')))
+        run=SimpleNamespace(id=2,outcome='completed',profile='lead',metadata={'tests':'frozen'})
+        kb=SimpleNamespace(get_task=lambda *args:task,latest_run=lambda *args:run)
+        kbc=SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(conn))
+        conn.execute('INSERT INTO task_runs VALUES(1,?)',(json.dumps({'red':'actual-red'}),))
+        conn.execute('INSERT INTO task_events VALUES(1,?,?,?,?)',('task',1,'review_requested',json.dumps({'implementer':'backend'})))
+        conn.execute('INSERT INTO task_events VALUES(3,?,?,?,?)',('task',2,'completed','{}'))
+        with patch('fabriquinha.board.native',return_value=(kb,kbc,None)):
+            with self.assertRaises(ValueError):Board(Project.parse(configuration())).closed_review('task')
+            conn.execute('INSERT INTO task_events VALUES(2,?,?,?,?)',('task',2,'claimed',json.dumps({'source_status':'review'})))
+            result=Board(Project.parse(configuration())).closed_review('task')
+            self.assertEqual(result[0].author,'backend');self.assertEqual(result[2],{'red':'actual-red'})
+            run.profile=task.assignee='backend'
+            with self.assertRaises(ValueError):Board(Project.parse(configuration())).closed_review('task')
+
     def test_current_review_accepts_configured_substitute_not_an_unlisted_role(self):
         project = Project.parse({**configuration(), 'reviewers': {'backend':['lead','cto']}})
         conn = sqlite3.connect(':memory:'); self.addCleanup(conn.close)

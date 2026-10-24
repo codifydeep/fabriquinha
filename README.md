@@ -30,15 +30,21 @@ sem duplicação dos envios aceitos ou bloqueio do TDD. A
 [integração pelo serviço](docs/HERMES-INTEGRATION-QUALIFICATION.md) passou depois:
 espera nativa de CI libera claims, reinício retoma o mesmo PR e build/deploy/
 rollback/QA reais terminam por handoff independente. Houve um crash de partida
-recuperado nativamente; autores/CI continuam sintéticos. Falta materializar o plano,
-aceite integral da release, Telegram/modelos/GitHub reais e instalação reproduzível.
+recuperado nativamente; autores/CI continuam sintéticos. A continuação do brief
+e do aceite está descrita abaixo; ainda faltam admissão do provedor,
+Telegram/modelos/GitHub reais e instalação reproduzível.
 [Pausa/retomada e admissão](docs/HERMES-OPERATIONS-QUALIFICATION.md) também passaram
 com SDK real: duas interrupções, reinício pausado, perfil restaurado sem falso
 cooldown e TDD concluído preservando sessão/fase. Não liberam o provedor pago.
 A [entrada do brief e plano revisado](docs/HERMES-INTAKE-QUALIFICATION.md) passou
 também: Produto pergunta, CEO aprova o documento exato, Lead planeja e CTO pede
 mudanças/revisa, com sessões reais e respostas locais. O plano aprovado ainda
-não gera os cards de implementação; a release permanece sem homologação.
+não gerava cards naquela fatia. A continuação agora passou pelo ciclo offline
+inteiro: dois pacotes dependentes geraram seis cards, integraram dois commits,
+preservaram regressões e produziram aceite integral com QA/rollback reais.
+O recibo é de qualificação, não aprovação de produto: autores/CI são fixtures.
+Duas tentativas anteriores permanecem falhas; a terceira passou após corrigir
+vinculação do PR e vida útil das conexões SQLite, sem patch upstream.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -51,7 +57,8 @@ flowchart LR
     IN --> HP[Revisão humana nativa; espera sem worker]
     HP -->|Resposta somente ao documento correspondente| CEO
     HP -->|Brief aprovado| PL[Lead: DAG; CTO: revisão independente]
-    PL -. Materialização dos cards ainda pendente .-> K
+    PL --> DG[Grafo imutável: cards e bases dependentes]
+    DG --> K
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
     C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
     F[Pausa persistente e preflight sem modelo] -->|Fence de spawn e ferramentas| C
@@ -68,8 +75,10 @@ flowchart LR
     P --> M[Merge e suíte no SHA integrado]
     M --> D[Build e deploy retomáveis; rollback e retorno]
     D --> Q[QA real em Chromium; evidência preservada]
-    Q --> E[Recibo de QA; não declara release homologada]
-    E -. Aceite integral e S4 pendentes .-> A[Fluxo com agentes e GitHub reais]
+    Q --> E[Recibo de QA: commit e imagem exatos]
+    E --> RG[Gate integral: critérios, histórico, CI e serviço atual]
+    RG --> RA[Aceite de qualificação; não é entrega autônoma]
+    RA -. S4 ainda pendente .-> A[Fluxo com agentes e GitHub reais]
 ```
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium

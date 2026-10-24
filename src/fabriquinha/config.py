@@ -20,13 +20,14 @@ class Project:
     browser_image: str | None = None
     technical_roles: dict | None = None
     coordination_roles: dict | None = None
+    delivery_roles: dict | None = None
 
     @classmethod
     def parse(cls, value):
         required = {'version', 'namespace', 'repository', 'branch', 'validation_image',
                     'tests_dir', 'reviewers', 'qualification'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles'}
+                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles'}
                 or type(value['version']) is not int or value['version'] != 1):
             raise ValueError('versioned project contract required')
         if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}', str(value['namespace']))
@@ -71,15 +72,21 @@ class Project:
                 or coordination['product']==coordination['lead'] or coordination['lead'] not in matrix
                 or roles is not None and coordination['lead']!=roles['lead']):
             raise ValueError('product and independently reviewed technical lead required')
+        delivery=value.get('delivery_roles')
+        if delivery is not None and (not coordination or not browser or not isinstance(delivery,dict)
+                or set(delivery)!={'tests','integration'} or delivery['tests']==delivery['integration']
+                or any(not isinstance(role,str) or role not in matrix for role in delivery.values())):
+            raise ValueError('explicit reviewed tests/integration roles, coordination and browser required')
         return cls(**fields, reviewers=MappingProxyType(matrix), max_workers=workers,
                    timeout_seconds=timeout,browser_image=browser,
                    technical_roles=MappingProxyType(dict(roles)) if roles else None,
-                   coordination_roles=MappingProxyType(dict(coordination)) if coordination else None)
+                   coordination_roles=MappingProxyType(dict(coordination)) if coordination else None,
+                   delivery_roles=MappingProxyType(dict(delivery)) if delivery else None)
 
     def fingerprint(self):
-        return digest({name: dict(value) if name in ('reviewers','technical_roles','coordination_roles') and value is not None else value
+        return digest({name: dict(value) if name in ('reviewers','technical_roles','coordination_roles','delivery_roles') and value is not None else value
                        for name in self.__dataclass_fields__ for value in (getattr(self, name),)
-                       if name not in ('browser_image','technical_roles','coordination_roles') or value is not None})
+                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles') or value is not None})
 
     def reviewers_for(self, author):
         try:

@@ -86,6 +86,7 @@ def missing_profiles(project):
     for author in project.reviewers:names.update(project.reviewers_for(author))
     names.update((project.technical_roles or {}).values())
     names.update((project.coordination_roles or {}).values())
+    names.update((project.delivery_roles or {}).values())
     return sorted(name for name in names if not profile_exists(name))
 
 

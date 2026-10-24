@@ -1,0 +1,268 @@
+"""Materialize a reviewed DAG and accept its evidence; Hermes owns all states."""
+import json
+from pathlib import Path
+import time
+import re
+import subprocess
+from .artifacts import digest, identity
+from .effects import Journal, Pending, EffectBlocked, write_json
+from .intake import plan
+from .kanban_lane import native
+from .publication import Publication
+from .deployment import Deployment
+
+
+def ordered(tasks):
+    remaining={item['id']:item for item in tasks};result=[];done=set()
+    if len(remaining)!=len(tasks):raise ValueError('unique package IDs required')
+    while remaining:
+        ready=[key for key,item in remaining.items() if set(item['depends_on'])<=done]
+        if not ready:raise ValueError('known acyclic package dependencies required')
+        for key in ready:result.append(remaining.pop(key));done.add(key)
+    return result
+
+
+class Releases:
+    def __init__(self,project,store,board,intake):
+        self.project,self.store,self.board,self.intake=project,store,board,intake
+        self.journal=Journal(store.root/'effects')
+
+    @staticmethod
+    def binding(anchor):
+        body=json.loads(anchor.body)
+        return dict(actor='controller',task=anchor.id,release=body['release'],contract=digest(body))
+
+    def folder(self,anchor):return self.store.root/'releases'/identity(json.loads(anchor.body)['release'])
+
+    def body(self,kind,release,anchor,review,package,inputs):
+        return dict(version=1,kind=kind,release=release,release_anchor=anchor,release_plan=review,
+            package=package['id'],criteria=package['criteria'],acceptance=package['acceptance'],inputs=inputs)
+
+    def closed(self,task,key,kind):
+        run,metadata,handoff=self.board.closed_review(task)
+        receipt_id=metadata.get(key);record=self.store.receipt(receipt_id,kind=kind)
+        if record['binding']!=run.binding() or record['payload']['project']!=self.project.fingerprint():
+            raise ValueError('completed receipt must match exact native run and project')
+        return receipt_id,record,handoff
+
+    def specification(self,conn,anchor):
+        kb,_,_=native();release=json.loads(anchor.body)['release']
+        row=conn.execute('SELECT id FROM tasks WHERE idempotency_key=? AND status!=?',(digest([release,'plan']),'archived')).fetchone()
+        task=kb.get_task(conn,row['id']) if row else None
+        if not task or task.status!='done':return None
+        review_id,review,handoff=self.closed(task.id,'plan_review','plan_review')
+        body=json.loads(task.body);approval=body['inputs']['approved_brief']
+        business,brief=self.intake.approved(approval)
+        proposed=self.store.receipt(review['payload']['plan'],kind='work_plan')
+        if (review['payload']['verdict']['decision']!='approve' or handoff.get('plan')!=review['payload']['plan']
+                or review['binding']['release']!=release or review['binding']['author']!=self.project.coordination_roles['lead']
+                or proposed['binding']['task']!=task.id or proposed['binding']['contract']!=digest(body)
+                or proposed['binding']['actor']!=review['binding']['author'] or proposed['binding']['release']!=release
+                or proposed['payload']['project']!=self.project.fingerprint() or proposed['payload']['approval']!=approval
+                or business['binding']['release']!=release):raise ValueError('exact approved plan and business scope required')
+        document=plan(proposed['payload']['document'],brief['payload']['document'],self.project)
+        return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document)
+
+    def seed(self,anchor,specification,services):
+        path=self.folder(anchor)/'seed.json'
+        expected=dict(project=self.project.fingerprint(),plan_review=specification['review'])
+        if not path.exists():
+            repository,_=services(self.project.delivery_roles['integration'])
+            base=repository.base();snapshot=repository.snapshot(base)
+            write_json(path,{**expected,'commit':base,'snapshot':snapshot})
+        value=json.loads(path.read_bytes())
+        if any(value.get(key)!=item for key,item in expected.items()):raise ValueError('release seed scope drift')
+        self.store.tree(value['snapshot'])
+        return self.store.record('release_seed',self.binding(anchor),value)
+
+    def materialize(self,conn,anchor,specification,services):
+        kb,_,_=native();path=self.folder(anchor)/'graph.json';binding=self.binding(anchor)
+        if path.exists():
+            graph_id=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(graph_id,kind='release_graph')
+            graph=record['payload']
+            if record['binding']!=binding or graph['project']!=self.project.fingerprint() or graph['plan_review']!=specification['review']:
+                raise ValueError('release graph or approved plan changed')
+        else:
+            seed=self.seed(anchor,specification,services);baseline=self.store.receipt(seed,kind='release_seed')['payload']
+            previous=None;by_package={};items=[]
+            for package in ordered(specification['document']['tasks']):
+                self.project.reviewer(package['owner'],exclude=(self.project.delivery_roles['tests'],))
+                parents=[specification['task'],*[by_package[key] for key in package['depends_on']]]
+                if previous and previous not in parents:parents.append(previous)
+                test_inputs={'baseline':'parent:'+previous+':baseline' if previous else baseline['snapshot']}
+                cards={}
+                for phase in ('tests','implementation','integration'):
+                    owner=(package['owner'] if phase=='implementation' else self.project.delivery_roles[phase])
+                    inputs=(test_inputs if phase=='tests' else {'tests':'parent:'+cards['tests']['id']+':tests'}
+                            if phase=='implementation' else {'delivery':'parent:'+cards['implementation']['id']+':delivery'})
+                    deps=parents if phase=='tests' else [cards['tests' if phase=='implementation' else 'implementation']['id']]
+                    body=self.body(phase,binding['release'],anchor.id,specification['review'],package,inputs)
+                    workspace=self.store.root.parent/'work'/binding['release']/package['id']/phase
+                    workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
+                    contract=self.project.repository.removeprefix('https://github.com/') if phase=='integration' else 'local-only'
+                    task=kb.create_task(conn,title=phase.upper()+' '+package['title'],body=json.dumps(body),assignee=owner,
+                        parents=deps,workspace_kind='dir',workspace_path=str(workspace),completion_contract=contract,
+                        initial_status='blocked',max_retries=2,max_runtime_seconds=600,
+                        idempotency_key=digest([binding['release'],specification['review'],package['id'],phase]))
+                    cards[phase]=dict(id=task,body=body,parents=deps,workspace=str(workspace),owner=owner,completion_contract=contract)
+                previous=cards['integration']['id'];by_package[package['id']]=previous
+                items.append(dict(package=package,cards=cards))
+            graph=dict(project=self.project.fingerprint(),plan_review=specification['review'],seed=seed,items=items,
+                serialized_integrations=True,qualification=self.project.qualification)
+            graph_id=self.store.record('release_graph',binding,graph);write_json(path,{'receipt':graph_id})
+        # Every card starts parked. Publish the whole immutable graph before
+        # activating any card, so a crash cannot dispatch half-built dependencies.
+        for item in graph['items']:
+            for card in item['cards'].values():
+                self.check_card(conn,card)
+                task=kb.get_task(conn,card['id'])
+                if task.status=='blocked' and kb.latest_run(conn,task.id) is None:
+                    if self.board.guard:self.board.guard()
+                    if not kb.unblock_task(conn,task.id):raise ValueError('native initial graph activation refused')
+        return graph_id,graph
+
+    def check_card(self,conn,card):
+        kb,_,_=native();task=kb.get_task(conn,card['id'])
+        parents={row[0] for row in conn.execute('SELECT parent_id FROM task_links WHERE child_id=?',(card['id'],))}
+        if (not task or json.loads(task.body)!=card['body'] or task.workspace_kind!='dir' or task.workspace_path!=card['workspace']
+                or (task.completion_contract!=card['completion_contract'] and not self.bound_contract(conn,task))
+                or parents!=set(card['parents'])):
+            raise ValueError('materialized contract/dependencies/workspace changed; preserve work')
+        allowed={card['owner'],*self.project.reviewers_for(card['owner'])}
+        if task.assignee not in allowed:raise ValueError('materialized card owner changed')
+        return task
+
+    def bound_contract(self,conn,task):
+        """Native acceptance binds repo -> exact PR once; never a green sibling."""
+        body=json.loads(task.body)
+        if body.get('kind')!='integration' or not re.fullmatch(re.escape(self.project.repository)+r'/pull/[1-9][0-9]*',task.completion_contract or ''):
+            return False
+        row=conn.execute("SELECT r.metadata FROM task_events e JOIN task_runs r ON r.id=e.run_id "
+            "WHERE e.task_id=? AND e.kind='review_requested' ORDER BY e.id DESC LIMIT 1",(task.id,)).fetchone()
+        handoff=json.loads(row['metadata'] or '{}') if row else {}
+        if handoff.get('published_pr')!=task.completion_contract:return False
+        rollout=self.store.receipt(handoff['rollout'],kind='rollout')['payload']
+        artifact=self.store.receipt(rollout['candidate'],kind='artifact')['payload']
+        integrated=self.store.receipt(artifact['integrated'],kind='integrated')['payload']
+        publication=self.store.receipt(integrated['publication'],kind='publication')
+        return (publication['binding']['task']==task.id and publication['binding']['contract']==digest(body)
+                and publication['binding']['release']==body['release'] and publication['payload']['pr']==task.completion_contract)
+
+    def admit(self,task):
+        """Per-card spawn fence: bad contracts cannot starve unrelated diagnosis."""
+        body=json.loads(task.body)
+        if body.get('kind') not in ('tests','implementation','integration'):return
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            anchor=kb.get_task(conn,body.get('release_anchor'))
+            if not anchor or anchor.status!='blocked':raise ValueError('active release anchor required')
+            graph=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')
+            if graph['binding']!=self.binding(anchor) or graph['payload']['project']!=self.project.fingerprint():raise ValueError('graph scope changed')
+            card=next((item['cards'][body['kind']] for item in graph['payload']['items'] if item['package']['id']==body.get('package')),None)
+            if not card or card['id']!=task.id:raise ValueError('graph-owned assignment required')
+            self.check_card(conn,card)
+
+    def prepare(self,run,quality):
+        """Admit only graph-owned work; seed empty test workspaces, never reset."""
+        self.board.ensure(run);kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            body=json.loads(kb.get_task(conn,run.task).body)
+            anchor=kb.get_task(conn,body.get('release_anchor'))
+            if not anchor or anchor.status!='blocked' or self.intake.terminal(anchor):raise ValueError('active release graph required')
+            record=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')
+            if record['binding']!=self.binding(anchor) or record['payload']['project']!=self.project.fingerprint():raise ValueError('foreign graph')
+            card=next((item['cards'][run.kind] for item in record['payload']['items']
+                       if item['package']['id']==body.get('package')),None)
+            if not card or card['id']!=run.task or card['owner']!=run.author:raise ValueError('current graph-owned assignment required')
+            self.check_card(conn,card)
+        if run.kind=='tests' and not run.reviewing:
+            source=self.board.input(run,'baseline');workspace=self.board.workspace(run)
+            if not any(workspace.iterdir()):self.store.checkout(source,workspace)
+            else:quality.protect(source,self.store.capture(workspace))
+        review=self.store.receipt(body['release_plan'],kind='plan_review')
+        proposed=self.store.receipt(review['payload']['plan'],kind='work_plan')
+        _,brief=self.intake.approved(proposed['payload']['approval'])
+        return dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
+            acceptance=body['acceptance'],stack='qualified Python HTTP, port 8080, /health and /identity; no downloads/network in workers',
+            tdd='Add assertion tests before implementation. Never change old tests or configs. Full suite and negative controls required.',
+            browser='Add '+self.project.tests_dir+'/qa.'+body['package']+'-'+run.release[:12]+'.json with check IDs matching these criteria; preserve every old QA contract.')
+
+    def package_evidence(self,item,previous):
+        cards=item['cards'];tests,frozen,_=self.closed(cards['tests']['id'],'tests','tests_frozen')
+        delivery,review,_=self.closed(cards['implementation']['id'],'delivery','delivery_review')
+        qa_id,qa,handoff=self.closed(cards['integration']['id'],'release_evidence','release_evidence')
+        red=self.store.receipt(frozen['payload']['red'],kind='red');green=self.store.receipt(review['payload']['green'],kind='green')
+        controls=self.store.receipt(review['payload']['controls'],kind='controls')
+        artifact=self.store.receipt(qa['payload']['artifact'],kind='artifact')
+        integrated=self.store.receipt(qa['payload']['integrated'],kind='integrated')
+        publication=self.store.receipt(integrated['payload']['publication'],kind='publication')
+        if (green['payload']['freeze']!=tests or review['payload']['verdict']['decision']!='approve'
+                or controls['payload']['green']!=review['payload']['green'] or controls['binding']!=green['binding']
+                or green['binding']['task']!=cards['implementation']['id'] or red['binding']['task']!=cards['tests']['id']
+                or red['payload']['baseline']!=previous['snapshot'] or publication['payload']['base_sha']!=previous['commit']
+                or publication['payload']['review']!=delivery or artifact['payload']['review']!=delivery
+                or artifact['payload']['snapshot']!=review['payload']['snapshot'] or integrated['payload']['snapshot']!=review['payload']['snapshot']
+                or artifact['payload']['integrated']!=qa['payload']['integrated'] or handoff.get('rollout')!=qa['payload']['rollout']
+                or qa['payload']['commit']!=artifact['payload']['commit'] or qa['payload']['commit']!=integrated['payload']['commit']
+                or qa['payload']['image']!=artifact['payload']['image'] or not qa['payload']['rollback_verified']
+                or not set(previous.get('cases',[]))<=set(green['payload']['cases'])):
+            raise ValueError('each package requires exact reviewed TDD, integrated base, deployed QA and rollback')
+        self.store.tree(artifact['payload']['snapshot'])
+        return dict(package=item['package']['id'],criteria=item['package']['criteria'],tests=tests,delivery=delivery,
+            qa=qa_id,commit=qa['payload']['commit'],snapshot=artifact['payload']['snapshot'],cases=green['payload']['cases'],
+            checks=qa['payload']['checks'],pr=publication['payload']['pr'])
+
+    def rollback_artifact(self,run):
+        self.board.ensure(run);kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            body=json.loads(kb.get_task(conn,run.task).body);anchor=kb.get_task(conn,body['release_anchor'])
+        graph=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')['payload']
+        for index,item in enumerate(graph['items']):
+            if item['cards']['integration']['id']!=run.task:continue
+            if not index:return None
+            _,qa,_=self.closed(graph['items'][index-1]['cards']['integration']['id'],'release_evidence','release_evidence')
+            return qa['payload']['artifact']
+        raise ValueError('integration is not part of its current graph')
+
+    def accept(self,conn,anchor,specification,graph_id,graph,services):
+        kb,_,_=native()
+        if not all(kb.get_task(conn,card['id']).status=='done' for item in graph['items'] for card in item['cards'].values()):return None
+        prior=self.store.receipt(graph['seed'],kind='release_seed')['payload'];evidence=[]
+        for item in graph['items']:
+            prior=self.package_evidence(item,prior);evidence.append(prior)
+        final=evidence[-1];criteria={item['id'] for item in specification['brief']['criteria']}
+        if not criteria<=set(final['checks']):raise ValueError('final deployed QA must cover every approved criterion')
+        qa=self.store.receipt(final['qa'],kind='release_evidence')['payload']
+        deployment=Deployment(self.project,self.store,self.board,None);artifact=deployment.read_artifact(qa['artifact'])
+        live=deployment.service(artifact)
+        if not live or not live['healthy'] or any(live[key]!=qa[key] for key in ('container','image','url')):
+            raise EffectBlocked('the exact QA-qualified deployment is no longer healthy/current')
+        last=graph['items'][-1]['cards']['integration']['id']
+        repository,github=services(self.project.delivery_roles['integration'],task=last)
+        if repository.remote_head(self.project.branch)!=final['commit']:raise EffectBlocked('release branch advanced after QA')
+        ci=github.accept(final['pr'],final['commit'])
+        Publication(self.project,self.store,self.board,repository,github).require_ci(ci,final['commit'],time.time())
+        if self.board.guard:self.board.guard()
+        acceptance=self.store.record('release_acceptance',self.binding(anchor),dict(project=self.project.fingerprint(),
+            state='HOMOLOGADA',qualification=self.project.qualification,delivery_approval=not self.project.qualification,
+            brief=specification['approval'],plan_review=specification['review'],graph=graph_id,packages=evidence,
+            criteria=sorted(criteria),final_qa=final['qa'],commit=final['commit'],image=qa['image'],url=qa['url'],ci=ci))
+        if not kb.complete_task(conn,anchor.id,summary='HOMOLOGADA'+(' — deterministic qualification only' if self.project.qualification else ''),
+                metadata={'release_acceptance':acceptance}):raise ValueError('native release acceptance refused')
+        return acceptance
+
+    def reconcile(self,conn,services):
+        if not self.project.delivery_roles:return {}
+        kb,_,_=native();issues={}
+        with self.journal.lock(['releases',self.project.fingerprint()]):
+            for anchor in self.intake.roots(conn):
+                try:
+                    if self.intake.terminal(anchor):continue
+                    if anchor.status!='blocked':raise ValueError('release anchor changed without terminal evidence')
+                    spec=self.specification(conn,anchor)
+                    if spec is None:continue
+                    graph_id,graph=self.materialize(conn,anchor,spec,services)
+                    self.accept(conn,anchor,spec,graph_id,graph,services)
+                except (ValueError,KeyError,TypeError,OSError,subprocess.SubprocessError,EffectBlocked,Pending) as error:
+                    issues[anchor.id]=dict(category=type(error).__name__,detail=str(error)[:500],owner=self.project.coordination_roles['lead'])
+        return issues
