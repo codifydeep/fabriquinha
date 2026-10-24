@@ -27,7 +27,7 @@ capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, se
 credenciais nos testes. A recuperação da falha por tamanho foi registrada e o
 ensaio seguinte ultrapassou o limite antigo sem aquela rejeição, mas falhou ao
 esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
-O hardening de paginação já foi instalado: controlador `20261023.35` e worker
+O hardening de paginação já foi instalado: controlador `20261023.36` e worker
 `20261023.11`, com diário limitado, captura no loop e paradas estruturadas.
 O canário Hermes/ACP percorreu 219 páginas e 563 KB; uma compactação real
 retirou 64 pares da conversa sem perder cobertura no diário. Foram 16 respostas
@@ -63,7 +63,13 @@ backup/restauração verificados, para nova revisão pelo coordenador. Ainda nã
 aceito, congelamento ou homologação. A revisão após essa correção comprovou
 71/71 arquivos, mas teve o primeiro parecer rejeitado e recebeu HTTP 402 na
 continuação. A instância está selada e o proxy parado após pausa persistente
-por pagamento, sem reset de contador ou aprovação fictícia. O estado datado está em
+por pagamento, sem reset de contador ou aprovação fictícia. A nova recuperação
+específica passou em canário Linux com oito consultas HTTP locais, nenhuma ao
+provedor real, e está instalada com execução desligada. Crédito real, registro,
+migração do pin e ativação ainda precisam ser conferidos; o scheduler permanece
+desabilitado/descarregado. A suíte offline mais recente executou 4.432 testes,
+com oito skips preexistentes e nenhuma falha. Isso não comprova autonomia.
+O estado datado está em
 [STATUS](docs/STATUS.md).
 
 **Documentação:** [índice de leitura](docs/README.md),

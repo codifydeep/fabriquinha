@@ -21,6 +21,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Paginação instalada desde a primeira chamada | `quality_review_paging.py`, `quality_review_stop.py`, `install_quality_review_stop.py` |
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
 | Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
+| Recuperação de pagamento assistida pelo operador | `quality_provider_resolution.py`, `quality_review_provider_access.py`, `broker/quality_review_payment_recovery.py`, `qualify_quality_provider_access.py` |
 | Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
 | Transporte completo na revisão | `quality_review_budget.py`, hook fixo em `agent/tool_executor.py` |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
@@ -53,6 +54,10 @@ flowchart TD
     E -->|Mudanças válidas| A
     E -->|Prova incompleta ou falha| B
     B --> T[Tech Lead e CTO: recuperação ainda não qualificada integralmente]
+    R -->|HTTP 402| V[Pausa persistente do provedor; falha preservada]
+    V -.-> U[Operador: confirmar remediação e conferir crédito/chave]
+    U -.-> K[Registro vinculado ao evento; sem aprovação ou despacho]
+    K -.->|Após ativação separada: nova revisão com leituras próprias| R
     E -.->|Aprovação completa ainda pendente neste ensaio| G[Testes congelados e implementação]
     G -.-> D[Green, controles negativos, revisão, PR e CI]
     D -.-> H[Mesmo commit: deploy, QA, rollback e homologação]
@@ -60,7 +65,9 @@ flowchart TD
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
 v2, não uma dispensa de execução. Feedback, planejador, diário e paradas estão
-instalados no controlador `20261023.35` e worker `20261023.11` da referência.
+instalados no controlador `20261023.36` e worker `20261023.11` da referência.
+O controlador novo está com execução desligada, manutenção selada/drenada e
+serviço host descarregado. Instalação não significa despacho habilitado.
 `apply_request()` agora arma a orientação e o gate desde a primeira chamada,
 sem depender de uma resposta final prematura. Testes novos têm prioridade;
 uma rejeição fundamentada continua possível sem completar todo o escopo de
@@ -86,8 +93,8 @@ diário, somente para a revisão autenticada. Assim os resultados podem chegar
 inteiros à captura e à compactação; prévias não viram evidência. Outros modos,
 permissões, limite de corpo do proxy e orçamento de iterações permanecem iguais.
 
-A sucessora nativa comprovou 71/71 arquivos no controlador. O bloqueio atual
-está no parecer: a tentativa JSON de `request_changes` não continha achados e
+A sucessora nativa comprovou 71/71 arquivos no controlador. Naquela tentativa,
+o bloqueio estava no parecer: o JSON de `request_changes` não continha achados e
 exigia Green e controles negativos antes de aprovar os testes. O controlador
 recusou a decisão, preservando `technical_blocked`. O transporte completo foi
 exercitado, mas não houve aprovação ou congelamento naquela tentativa. A
@@ -106,7 +113,33 @@ A revisão seguinte comprovou os 71 arquivos no controlador, mas o primeiro
 parecer final foi rejeitado como JSON inválido. A chamada de continuação recebeu
 HTTP 402, propagado como falha nativa e bloqueio técnico. O proxy mantém uma
 pausa persistente independente do teto de chamadas; não há parecer aceito ou
-aprovação herdável. Sua recuperação específica ainda precisa ser qualificada.
+aprovação herdável. A recuperação específica passou na qualificação isolada
+descrita abaixo, mas não foi exercitada com o provedor real.
+
+### Recuperação de pagamento e autoridade do operador
+
+O CLI host `quality_review_provider_access.py` exige confirmação explícita
+antes de qualquer efeito. O programa fixo roda dentro do mesmo proxy, único
+componente desse caminho que recebe a chave real. Consulta apenas crédito e
+limites da chave, sem comandos arbitrários, compra ou chamada ao modelo.
+
+O controlador revalida o evento original, execução nativa, snapshot, identidades,
+lease fechada, worker retirado, contador e recibo com prazo de 15 minutos. O CLI
+exige qualificações separadas do worker e do canário de pagamento na manutenção
+corrente. O proxy deve estar parado no registro. A condição modificada fica
+persistida com a falha anterior; o registro não cria task/grant nem aprova testes.
+Uma revisão nova precisa produzir suas próprias leituras e decisão independente.
+
+Intenção persistida e locks distinguem efeito em curso, conclusão parcial e
+resultado não observado. Confirmação perdida permite observar o mesmo efeito;
+conclusão parcial só pode finalizar o recibo positivo original sem repetir HTTP.
+Isso não concede ao worker ferramentas financeiras ou administrativas.
+
+O canário Linux usa uma fixture HTTP loopback e chave falsa, sem rede externa,
+credencial real ou socket Docker. Seus oito pedidos locais não comprovam saldo
+disponível. O adaptador foi instalado desligado; remediação real, migração do
+pin, registro e ativação continuam pendentes. O caminho é assistido pelo operador,
+não uma recuperação financeira autônoma já demonstrada.
 
 ### Fronteiras entre as decisões de qualidade
 

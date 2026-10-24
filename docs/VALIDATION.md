@@ -13,7 +13,7 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa anterior | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Continua preservada, não aprovada. |
-| Instalação do hardening | Controlador `20261023.35` e worker `20261023.11`; contrato da fase, rejeição específica, continuação por leitura real e bloqueio de erros alternados; backup/restauração, pin, dados e contador preservados. |
+| Instalação de referência | Controlador `20261023.36` instalado com execução desligada; worker `20261023.11` preservado. Backup/restauração e dados verificados. Manutenção selada/drenada, proxy parado, serviço host desabilitado/descarregado; migração do novo pin e ativação pendentes. |
 | Canário físico da candidata de continuação | Hermes/ACP real, 219 páginas/71 arquivos/563.066 bytes; lote de 274.113 caracteres sem spill, controle legado com spill, 157 leituras fora da recomendação e quatro lotes mistos. Uma compactação retirou 64 pares sem perder cobertura. Rejeição sem findings recusada com diagnóstico específico; contrato e hashes preservados. Controle separado obrigou leitura real após promessa prematura com testes novos já lidos. Conjunto: 16 respostas locais, zero externas. Não é aprovação nativa. |
 | Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
 | Revisão com parada por falta de progresso | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Preservada, sem aprovação. |
@@ -22,7 +22,11 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Revisão terminal com inspeção completa | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
 | Revisão sucessora terminal | 46/71 arquivos, 80 páginas, seis chamadas; duas promessas em prosa, sem novas leituras, com 35 iterações restantes. `technical_blocked`, sem aprovação. |
 | Último ensaio após controle de continuação | **71/71 arquivos e 171 páginas** comprovados no controlador. Primeiro parecer `invalid_json`, feedback com 33 iterações restantes; chamada seguinte HTTP 402. Nativo `failed`, equipe `technical_blocked`, sem congelamento ou aprovação. |
-| Última suíte completa registrada | 4.405 executados: 4.397 aprovados, oito skips preexistentes, sem falhas. Passaram também 80 testes focados de revisão e três de processos. A falha intermediária do probe órfão foi investigada; fixture corrigida com novo teste de reconciliação tardia, sem mudar locks ou retirar o probe. |
+| Última suíte completa registrada | **4.432 executados: 4.424 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de recuperação: 50 testes aprovados. Os 27 novos testes não substituem nem removem os anteriores. |
+| Recuperação de pagamento em fixture Linux | Oito consultas HTTP locais, zero ao provedor real e zero ao modelo. Confirmação obrigatória, saldo zero recusado, chave sem limite explícito, contador preservado, locks, leitura do resultado sem repetição e conclusão parcial sem repetir HTTP. Não comprova crédito real ou retomada nativa. |
+| Isolamento do canário de pagamento | UID 10000, rede externa indisponível, raiz somente leitura, sem chave real ou socket Docker; `/opt/data` temporário explícito para não criar volume anônimo herdado da imagem. Auxiliar retirado após preservar o recibo. |
+| Recuperação de confirmação perdida | Um erro ao salvar o recibo final do qualificador foi reproduzido por regressão e corrigido. A observação do mesmo resultado preservado concluiu o recibo sem executar outro canário. Não é prova de recuperação completa da equipe. |
+| Remediação real do provedor | Não executada; confirmação humana, consulta real e registro da recuperação ainda pendentes. A pausa e o contador 6.291/10.000 permanecem preservados. |
 | Política final da entrega | Implementação em fonte e seis testes sintéticos, não instalada nem conectada ao despacho. Não qualifica a ponte após Green ou a publicação. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
@@ -86,6 +90,33 @@ em pausa persistente e foi parado após selar/drenar a instância. Não houve
 aprovação a partir do parecer rejeitado ou das leituras completas. A recuperação
 de crédito e sua retomada específica continuam pendentes; a rota de inspeção
 incompleta não se aplica a esse caso.
+
+### Recuperação de pagamento: prova isolada versus prova real
+
+A nova rota está instalada, mas desligada para execução. O contrato vincula o
+evento HTTP 402 original à execução nativa que falhou, ao proxy exato, ao código
+qualificado e ao contador. O registro exige duas qualificações na manutenção
+corrente: worker de revisão e canário físico de pagamento. Não cria tarefa,
+grant, parecer ou autorização de merge; apenas prepara uma revisão sucessora
+para despacho posterior pelo coordenador.
+
+Os testes cobrem rejeição de prova obsoleta ou de outro pedido, contador
+divergente, proxy ainda ativo durante o registro, mistura com outra rota e
+tentativa de rearmar a mesma condição sob outro identificador. Cobrem também
+que as leituras completas da tentativa anterior não suprem a inspeção da nova.
+O prazo da prova de remediação é 15 minutos; a fixture não substitui essa prova.
+
+A confirmação do operador precede efeitos. A consulta real, quando autorizada,
+é restrita aos endpoints oficiais de crédito e chave, dentro do proxy que já
+possui a credencial. Não compra crédito, altera limites ou chama o modelo.
+Após resposta incerta, observa-se o recibo original e o lock; uma conclusão
+parcial exige prova positiva preservada e não repete a consulta. O registro
+posterior exige o mesmo proxy parado e mantém a falha histórica.
+
+Nada disso foi executado com crédito real nesta qualificação. Também não
+comprova escalonamento financeiro autônomo, um novo parecer aceito, Green,
+PR/CI, implantação, QA ou rollback. O serviço host continua descarregado e a
+nova imagem ainda requer migração de pin e ativação separada.
 
 ## Evidências históricas — não representam o estado vivo
 

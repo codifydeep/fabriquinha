@@ -32,8 +32,9 @@ São estimativas de engenharia, não cobertura de testes, taxa de sucesso, SLA o
 comprovação de autonomia. Não resultam de um índice automatizado. Não comparar
 estimativas históricas como uma série de medições com metodologia constante.
 Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
-As estimativas foram mantidas nesta atualização: o avanço para 71/71 leituras
-não comprova decisão válida nem autonomia ponta a ponta.
+As estimativas foram mantidas nesta atualização: a inspeção de 71/71 arquivos
+e a recuperação de pagamento qualificada com fixture não comprovam decisão
+válida nem autonomia ponta a ponta.
 
 ## O que foi comprovado e o que não foi
 
@@ -52,7 +53,8 @@ não comprova decisão válida nem autonomia ponta a ponta.
 - O diário de leituras, a captura no loop, o enforcement e as paradas
   estruturadas foram qualificados e instalados. A troca preservou dados e
   configurações, com backup compactado e restauração verificados. O serviço
-  host foi migrado para o novo pin, sem resetar sua fila ou seu histórico.
+  host foi migrado naquele ciclo sem resetar fila ou histórico. A troca mais
+  recente exige outra migração, ainda pendente na fotografia abaixo.
 - A revisão anterior consumiu sete chamadas e terminou com diagnóstico `read_progress_stalled`:
   16 dos 71 arquivos tiveram leitura integral comprovada. O controlador manteve
   `technical_blocked`, sem aceitar o diagnóstico como parecer ou aprovação.
@@ -69,10 +71,10 @@ não comprova decisão válida nem autonomia ponta a ponta.
   comprovou **71/71 arquivos** no transporte do controlador. Terminou nativamente
   em `completed`, mas o controlador manteve `technical_blocked` por parecer
   inválido. Leitura completa não foi convertida em aprovação.
-- A última suíte offline registrada com captura, enforcement e paradas executou
-  **4.405 testes: 4.397 aprovados e oito skips preexistentes**, sem falhas.
-  Os 80 testes focados de revisão e três de processos também passaram. Essas provas offline
-  não substituem a qualificação nativa.
+- A última suíte offline registrada executou **4.432 testes: 4.424 aprovados e
+  oito skips preexistentes**, sem falhas. O conjunto focado de recuperação
+  executou 50 testes, também sem falhas. Foram acrescentados 27 testes sem
+  retirar ou enfraquecer os anteriores. Essas provas não substituem a qualificação nativa.
 - A tentativa após o ajuste da fase terminou com 46/71 arquivos completos,
   80 páginas preservadas e duas respostas prematuras em prosa. Restavam 35
   iterações; o agente prometeu ler depois em vez de executar as páginas. O
@@ -82,6 +84,12 @@ não comprova decisão válida nem autonomia ponta a ponta.
   `invalid_json`; na chamada de continuação, o provedor retornou HTTP 402.
   A execução nativa terminou como `failed`, com bloqueio técnico preservado,
   sem parecer aceito. O proxy entrou em pausa persistente por pagamento.
+- A recuperação específica de pagamento foi implementada e instalada no
+  controlador com execução desligada. O canário Linux descartável comprovou
+  confirmação obrigatória, rejeição de saldo zero, preservação do
+  contador, locks e observação de efeito incerto, incluindo conclusão parcial
+  sem repetir consultas. Usou oito requisições HTTP à fixture local, zero ao
+  provedor real e zero ao modelo. Não verificou o crédito da instalação.
 
 Não houve congelamento dos testes, Green ou homologação nessa linhagem v2.
 
@@ -127,10 +135,28 @@ seguinte interrompeu esse caminho antes de outra decisão. Não é uma nova falh
 comprovada de leitura nem esgotamento de iterações; restavam 33 na tentativa
 de conclusão preservada. Não há aprovação para recuperar do texto rejeitado.
 
-Crédito disponível e teto de chamadas são controles diferentes. É necessário
-resolver o pagamento com o operador e qualificar uma retomada compatível com
-essa falha exata. Não reaproveitar a rota de inspeção incompleta, apagar o hold
-do provedor ou herdar as leituras desta execução para outra revisão.
+Crédito disponível e teto de chamadas são controles diferentes. A rota específica
+agora está implementada, qualificada com fixture e instalada, mas ainda não foi
+executada contra o provedor real. Confirmação humana de remediação continua
+pendente. O canário não consultou a chave real nem pagou ou alterou limites.
+
+A retomada exige vincular o HTTP 402 original à execução, ao mesmo proxy,
+contador e código; conferir crédito/chave por operações oficiais somente de
+leitura; e registrar a condição modificada sob manutenção. O operador deve
+confirmar a remediação explicitamente. A prova tem validade de 15 minutos e
+não autoriza ativação, despacho ou aprovação. O registro exige tanto a
+qualificação do worker de revisão quanto a do canário de pagamento, ambas
+vinculadas à manutenção corrente e, no segundo caso, à imagem do controlador.
+
+Confirmação perdida exige observar o efeito original, não reenviar a operação.
+Uma conclusão parcial pode ser finalizada apenas a partir do recibo positivo
+original, com identidade, contador e lock conferidos, sem repetir HTTP. A
+execução seguinte terá leituras e parecer próprios; nenhum teste será congelado
+por herdar evidências antigas. A rota não reinicia o autor nem encerra o incidente.
+Não reaproveitar a recuperação de inspeção incompleta para essa falha.
+
+Esse caminho ainda é uma operação assistida pelo operador. A classificação e o
+escalonamento financeiro automáticos pela equipe não estão qualificados.
 
 ## Histórico recente: paginação e spill agregado
 
@@ -211,10 +237,11 @@ orçamento usa uma iteração sintética; a fábrica ACP mantém 40.
 
 | Item | Estado observado em 23 de outubro |
 |---|---|
-| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.35`, instalado para qualificação controlada |
+| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.36`, instalação concluída com execução desligada |
 | Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.11` |
-| Correção instalada | Contrato de fase, rejeição específica, continuação por leitura real e proteção contra alternância de erros |
-| Instalação/ativação | Backup/restauração, migração do pin e preservação de dados/outros serviços verificados |
+| Correção instalada | Controles de revisão anteriores e registro restrito de recuperação por pagamento; sem remediação real comprovada |
+| Instalação/ativação | Backup/restauração e preservação dos dados verificados; nova imagem ainda não ativada |
+| Serviço host | Desabilitado e descarregado; migração do pin para a nova imagem ainda pendente |
 | Manutenção na instalação | Selada e drenada após o encerramento com falha por pagamento |
 | Revisão anterior terminal | Nativa `completed`, 71/71 arquivos completos; parecer inválido preservado, sem aprovação |
 | Revisão intermediária terminal | 46/71 arquivos completos, duas respostas em prosa; sem aprovação |
@@ -229,8 +256,9 @@ dados, outros serviços e fila do scheduler. O teto de chamadas não é monetár
 
 ## Próximos marcos, em ordem
 
-1. Confirmar pagamento resolvido com o operador e qualificar a retomada para
-   essa falha específica, sem reiniciar ou reenviar operações automaticamente.
+1. Concluir a migração do pin sob manutenção. Após confirmação humana de
+   pagamento resolvido, obter prova real vinculada à falha e registrar a
+   recuperação. Só então avaliar ativação separada; não repetir efeitos incertos.
 2. Conferir parecer, independência e evidências no controlador; somente uma
    decisão válida pode avançar. Não herdar leituras ou ampliar iterações.
 3. Exigir que a própria equipe conduza solicitações de mudanças, correção do
@@ -256,7 +284,7 @@ Uma política de revisão final da entrega foi adicionada em fonte, mas não
 constitui adaptador instalado ou despacho nativo. O coordenador atual termina
 em `awaiting_independent_delivery_review`; faltam autenticação das evidências
 reais, validação própria do revisor e continuidade até PR/CI/deploy/QA/rollback.
-Seus seis testes de política pura integram a suíte de 4.405 acima; não são uma
+Seus seis testes de política pura integram a suíte completa acima; não são uma
 revisão nativa nem autorização de publicação. O módulo não está instalado ou
 conectado ao despacho.
 

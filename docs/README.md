@@ -33,7 +33,7 @@ ativar outra linhagem de execução.
 - **HOMOLOGADA:** único sucesso terminal da release, depois de revisão, PR/CI,
   deploy, QA e rollback verificáveis no mesmo commit.
 
-Na referência consultada, controlador `20261023.35` e worker `20261023.11`
+Na referência consultada, controlador `20261023.36` e worker `20261023.11`
 preservam resultados completos de leitura na revisão imutável. A revisão
 nativa terminal anterior comprovou **71/71 arquivos**, mas terminou em
 `technical_blocked`: o parecer não satisfez o contrato. Uma tentativa de
@@ -48,9 +48,16 @@ passou na qualificação seguinte e foi instalada, sem ampliar orçamento ou for
 aprovação. A recuperação foi registrada e a manutenção liberada para o coordenador.
 A revisão seguinte comprovou 71/71 arquivos, mas o primeiro parecer final foi
 rejeitado; a continuação recebeu HTTP 402. A instância está selada e o proxy
-parado após pausa por pagamento, sem aprovação fictícia. É necessário resolver
-o crédito e qualificar a retomada dessa falha específica. Faltam congelamento,
-Green, controles negativos e a cadeia v2 de revisão da entrega até homologação.
+parado após pausa por pagamento, sem aprovação fictícia. O controlador novo foi
+instalado com execução desligada; o serviço host está desabilitado e descarregado.
+A recuperação específica de pagamento passou por qualificação Linux isolada,
+com oito consultas HTTP a uma fixture local e nenhuma chamada ao provedor real.
+Isso não comprova crédito disponível: faltam confirmação humana, prova real e
+registro da recuperação, além de migração do pin e ativação separada.
+A última suíte offline executou 4.432 testes, com oito skips preexistentes e
+nenhuma falha. A estimativa consolidada permanece em 70%; não é medição de autonomia.
+Faltam congelamento, Green, controles negativos e a cadeia v2 de revisão da
+entrega até homologação.
 Os bloqueios anteriores permanecem preservados. Temporal não é motor do
 runtime instalado. Consulte [STATUS](STATUS.md) antes de qualquer retomada;
 esta atualização documental não inicia testes ou libera manutenção.

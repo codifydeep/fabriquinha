@@ -27,6 +27,11 @@ That later native run proved 71/71 full reads; its first final candidate was
 rejected, then the provider returned HTTP 402 on continuation. The native failure,
 payment pause and technical hold remain preserved. Patch receipts cannot resolve
 credit, transfer inspection to a fresh review or authorize payment recovery.
+A separate operator-confirmed payment route is now installed execution-disabled
+and qualified against a fixed Linux loopback fixture, not the real provider.
+It does not expose patches or financial tools to the reviewer; real remediation,
+registration and a fresh independent verdict remain pending. See the
+[payment recovery boundary](QA-PROTOCOL-RECOVERY.md#operator-confirmed-payment-recovery-isolated-qualification-only).
 See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
 using any historical recovery mechanism below.
 

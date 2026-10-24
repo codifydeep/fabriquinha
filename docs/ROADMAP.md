@@ -31,7 +31,7 @@ da qualificação ponta a ponta ainda necessária.
    compactação e foi instalado sob manutenção, com recuperação específica.
    Corrigir o contrato apresentado da fase e o diagnóstico de saída inválida:
    `request_changes` requer achados concretos; Green e controles negativos não
-   podem ser pré-condições da revisão dos testes que os antecede. Qualificar
+   podem ser pré-condições da revisão dos testes que os antecede.
    Essa correção já passou no canário Hermes real após compactação e está
    instalada. A revisão seguinte parou com 46/71 arquivos e promessas em prosa.
    A continuação por leitura real já passou no novo canário; falta seu
@@ -93,10 +93,27 @@ completa não constituem esse critério.
 
 A revisão após a continuação comprovou 71/71 arquivos. O primeiro parecer foi
 rejeitado; o provedor respondeu HTTP 402 à continuação, que terminou como
-falha nativa e bloqueio técnico. Antes de novo consumo, resolver o crédito com
-o operador e qualificar a recuperação dessa assinatura, mantendo o contador,
-o incidente e a independência da próxima decisão. Não usar a rota de inspeção
-incompleta para uma revisão que completou sua leitura.
+falha nativa e bloqueio técnico. A recuperação específica já passou em fixture
+Linux e foi instalada com execução desligada no controlador `20261023.36`.
+Antes de novo consumo, concluir a migração do pin, obter confirmação humana e
+prova real de remediação, registrar a condição modificada e avaliar ativação
+separada, mantendo contador, incidente e independência da próxima decisão.
+Não usar a rota de inspeção incompleta para uma revisão que completou sua leitura.
+
+### Critérios de saída da recuperação de pagamento
+
+- Prova real recente de crédito/chave, vinculada ao evento 402 e à execução
+  original, sem resetar contador ou elevar limites implicitamente.
+- Qualificações de worker e pagamento na manutenção corrente; identidade do
+  proxy e imagem do controlador revalidadas antes do registro.
+- Efeito incerto observado pela mesma intenção, sem consultas ou registros
+  duplicados. A fixture comprovou esse controle, não o percurso real inteiro.
+- Nova revisão despachada pelo coordenador, com leituras e decisão próprias.
+  Remediação de crédito não encerra o incidente nem equivale a aprovação.
+
+Os controles determinísticos e o canário físico passaram; a consulta ao
+provedor real e a retomada nativa não ocorreram. Automação do escalonamento
+financeiro permanece trabalho futuro, sem atribuir compras ou credenciais aos agentes.
 
 ### Continuidade após Green
 

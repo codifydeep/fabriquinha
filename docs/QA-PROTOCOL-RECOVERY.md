@@ -29,7 +29,10 @@ plans missing pages from the first model request and reports stalled progress
 or budget exhaustion structurally. Partial new coverage must count as progress; repeated calls,
 prose and cache responses without content must not. The bounded journal and
 pending-page planner, loop capture, handler enforcement and structured stops
-are installed in reference controller `20261023.35` and worker `20261023.11`.
+are installed in reference controller `20261023.36` and worker `20261023.11`.
+The latest controller installation is execution-disabled under sealed/drained
+maintenance. The host scheduler is disabled/unloaded; its new pin migration and
+activation remain pending. Installed code is not an active native recovery.
 Dispatch checks without consuming; only the fenced handler claims the page
 atomically. The initial consuming check at both
 boundaries was rejected by the real registry canary and corrected without
@@ -44,8 +47,9 @@ coverage. It exercised 157 pending reads outside recommendations and four
 mixed-offset batches. A separate four-call real ACP control reads the new tests,
 returns premature prose, is forced to read a pending file and then decides.
 The complete fixed suite used sixteen local responses, no external model.
-Installation, verified backup/restoration and host scheduler pin migration
-completed. The normal control retains a premature answer; the scale control
+The earlier installation, verified backup/restoration and host scheduler pin
+migration completed. The latest controller replacement still requires its own
+pin migration. The normal control retains a premature answer; the scale control
 uses tools from its first reply without initializing completion state. That
 qualifies the fixed tool-only path, not every strategy of a real model.
 Approval still requires independent, byte-bound
@@ -93,7 +97,7 @@ unchanged. A real 274,113-character tool batch returned without spill; the real
 legacy counter-control still spilled. The native successor subsequently proved
 complete inspection of all 71 files; it did not produce an accepted verdict.
 
-### Current incident: phase semantics after complete inspection
+### Preserved incident: phase semantics after complete inspection
 
 Controller receipts now prove 71/71 complete byte-bound file reads. The native
 task finished as `completed`, while its controller attestation and team state
@@ -168,7 +172,48 @@ to this exact signature remain pending. Incomplete-inspection recovery does not
 apply to complete reads followed by payment failure; no rejected output is approval.
 Maintenance, provider pause and container stop are separate controls; consult
 live state before any operation. This document grants no maintenance release,
-model calls or delivery approval. The current v2 coordinator still stops at
+model calls or delivery approval.
+
+### Operator-confirmed payment recovery: isolated qualification only
+
+The payment-specific route is implemented and installed execution-disabled.
+`quality_review_provider_access.py` is an operator-only host CLI, not a worker
+tool. Explicit confirmation is required before effects. A fixed program runs in
+the same already-running proxy and queries official read-only credit/key
+endpoints; no model call, purchase, arbitrary command or budget increase is allowed.
+The proxy must be stopped before registration.
+
+The proof binds the original upstream 402 event, failed native execution,
+proxy identity/image, qualified source, unchanged counter and current maintenance.
+It expires after 900 seconds. Registration requires separate current-maintenance
+qualifications for the review worker and the Linux payment canary, the latter
+bound to the controller image. Historical failure and read receipts remain
+preserved. Complete historical reads are allowed as facts of this payment
+incident, never as inspection credit for its successor.
+
+The fixed Linux canary passed eight loopback HTTP requests with a fake key,
+zero real-provider/model calls, no credentials or Docker socket, read-only root
+and explicit temporary `/opt/data` instead of an inherited anonymous volume.
+It exercised confirmation, zero-balance rejection, unlimited-key handling,
+counter preservation, locking, readback and partial completion without repeated
+HTTP. A lost final qualification receipt was recovered from the same saved
+output, without launching another helper. The complete offline suite ran 4,432
+tests: 4,424 passed and eight preexisting skips; 50 focused tests also passed.
+
+An uncertain acknowledgement permits `observe-resolution` or
+`observe-registration`, not resubmission. `finish-resolution` requires an observed
+partial result, the original positive unexpired receipt, unchanged counter and
+free lock; it completes that operation without another HTTP query. Unknown or
+in-progress effects remain visible rather than being reclassified as failure.
+
+No real credit verification or recovery registration has occurred. A reported
+account balance alone is not the required key-specific proof. The payment hold
+and 6,291/10,000 counter remain intact. Automatic financial incident routing is
+not qualified; this is an operator-assisted path. Registration creates no task,
+grant, approval or maintenance release; activation and coordinator dispatch are
+separate. Fresh review evidence and a valid independent verdict are still required.
+
+The current v2 coordinator still stops at
 `awaiting_independent_delivery_review`; the source-only final-review policy is not
 an installed adapter or proof of the downstream PR/CI/deploy/QA/rollback chain.
 

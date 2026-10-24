@@ -71,8 +71,11 @@ custo nem uma permissão para elevar o teto de chamadas. Não há fallback de
 modelo automático. A qualificação específica deve anteceder um novo ensaio pago.
 
 O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
-O controlador `20261023.35` e o worker `20261023.11` já estão instalados nessa
+O controlador `20261023.36` e o worker `20261023.11` já estão instalados nessa
 referência; esses identificadores não constituem imagens publicadas para download.
+O controlador novo está com execução desligada, manutenção selada/drenada e
+serviço host desabilitado/descarregado. A migração do pin e a ativação da nova
+imagem ainda estão pendentes. Não inicie o serviço host com o pin antigo.
 A sucessora liberada após a mudança qualificada também ficou bloqueada,
 agora com 71/71 arquivos integralmente comprovados e parecer inválido. A
 revisão dos testes não depende de Green ou dos controles negativos posteriores;
@@ -121,6 +124,48 @@ Parecer inválido com leitura completa é um incidente diferente de leitura
 incompleta ou corpo de requisição excedido. Consulte o recibo e a rota de
 recuperação compatível; não reclassifique o erro para reutilizar uma
 autorização anterior. A edição desta documentação não autoriza nova execução.
+
+### Recuperação específica após HTTP 402
+
+Esta é uma operação assistida pelo operador, não parte da instalação genérica.
+Os utilitários `quality_review_provider_access.py` e
+`qualify_quality_provider_access.py` estão na implementação local em qualificação;
+confira sua presença, versão e `--help` antes de usar um checkout publicado.
+A qualificação isolada já passou, mas não verificou o crédito real da chave.
+Saldo informado e teto de chamadas não substituem a prova exigida pelo contrato.
+
+Ordem operacional, sempre sobre identidades conferidas da instalação:
+
+1. Manter a manutenção selada/drenada, sem workers ou efeitos pendentes.
+   Conferir imagem instalada, backup/restauração e migração do pin do serviço.
+2. Conferir duas qualificações na mesma manutenção: worker de revisão e
+   canário Linux de pagamento na imagem atual do controlador. O canário usa
+   fixture local, não credenciais reais.
+3. Após confirmação humana de remediação, iniciar somente o proxy exato para
+   consultar crédito/chave. A pausa persistente continua impedindo chamadas ao
+   modelo. O CLI não inicia ou para serviços automaticamente.
+4. Usar a ação `resolve` com namespace, imagem por digest, tarefa do autor,
+   revisão que falhou e operação de manutenção exatos. O flag
+   `--operator-confirms-remediation` registra confirmação efetivamente recebida,
+   não uma autorização que o próprio agente possa presumir.
+5. Preservar o recibo, parar o mesmo proxy e executar `register` com
+   `--qualification` e `--payment-qualification` correspondentes. A prova expira
+   em 15 minutos; contador, código e identidade não podem mudar nesse intervalo.
+6. Conferir o registro antes de uma ativação separada. Registro não libera a
+   manutenção, despacha agente, aprova testes ou autoriza merge. Só o coordenador
+   poderá despachar a nova revisão depois da ativação controlada.
+
+Se a confirmação de um efeito se perder, usar `observe-resolution` ou
+`observe-registration` para a mesma operação, sem reenviar o efeito original.
+`in_progress` ou `not_observed` não autorizam nova tentativa. A ação
+`finish-resolution` só é admitida depois de observar `resolution_incomplete`,
+com recibo positivo original ainda válido, contador inalterado e lock livre;
+ela finaliza a operação sem repetir consultas HTTP. Falhas permanecem visíveis.
+
+Nenhuma credencial ou resposta integral do provedor deve ir ao Git ou ao chat.
+Os logs/recibos ficam em armazenamento privado restrito. Não use o resolver
+legado diretamente para contornar o registro da recuperação v2. Não substitua
+essa rota por recuperação de capacidade ou de inspeção incompleta.
 
 ### Organização e retirada de testes
 
