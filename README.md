@@ -6,7 +6,11 @@ Uma equipe de agentes de IA para transformar um brief de produto em software rev
 avaliam o custo do desenho atual e propõem uma retomada com Hermes + Kanban,
 condicionada à validação de uma integração pequena e isolada. O plano e as
 mudanças de contrato foram aprovados; [S0/S1 passaram](docs/HERMES-S1-QUALIFICATION.md)
-na prova sem modelo. A instalação antiga descrita abaixo permanece como referência
+na prova sem modelo. A [primeira fatia S2](docs/HERMES-S2-QUALIFICATION.md) passou
+com TDD real, testes congelados, revisão imutável e recuperação de timeout;
+os autores e pareceres ainda são fixtures sintéticas. S2 permanece parcial e
+PR/CI/deploy do caminho novo ainda não estão conectados.
+A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium

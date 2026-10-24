@@ -18,6 +18,20 @@ class ImageSelectionTests(unittest.TestCase):
             'BROKER_QUALITY_CTO=not-an-image']))])
         self.assertEqual(refs,{'sha256:'+'1'*64,'delivery-kit-green:3'})
         self.assertNotIn('sha256:'+'1'*64,[r['id'] for r in select(self.rows(),set(),refs)])
+
+    def test_small_hermes_lane_source_images_are_preserved(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        import cleanup_obsolete_images as cleanup
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);kit=root/'team-delivery-kit';kit.mkdir()
+            source=root/'src/fabriquinha';source.mkdir(parents=True)
+            (root/'Dockerfile.validation').write_text('FROM python@sha256:'+'a'*64+'\n')
+            (source/'config.py').write_text('IMAGE="delivery-kit-validator:20261024.1"\n')
+            with patch.object(cleanup,'ROOT',kit):refs=cleanup.references()
+        self.assertIn('python@sha256:'+'a'*64,refs)
+        self.assertIn('delivery-kit-validator:20261024.1',refs)
     def test_preserves_toso_aliases_external_and_dangling(self):
         self.assertTrue(protected_tag('registry.example/toso-old:latest'))
         for repo,tag in [('toso-old','latest'),('reforma-api','old'),('<none>','<none>')]:

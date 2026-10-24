@@ -1,5 +1,15 @@
 # Estado de validação — 2026-10-24
 
+## Caminho novo Hermes
+
+[S0/S1](HERMES-S1-QUALIFICATION.md): onze controles nativos/físicos passaram.
+[S2 parcial](HERMES-S2-QUALIFICATION.md): onze controles TDD passaram no ciclo
+com Docker/HTTP reais e participantes sintéticos; uma prova adicional confirmou
+timeout, evidência preservada, retirada e rejeição após reinício. Trinta e um testes
+unitários novos passaram. Nenhuma chamada de modelo, instalação ou homologação.
+Na suíte histórica atual: 4.523 testes, oito skips preexistentes, nenhuma falha.
+Publicação/CI/deploy/QA/rollback pelo caminho novo continuam pendentes.
+
 ## Referência atual
 
 O resumo vigente está em [STATUS.md](STATUS.md). O contrato atual é

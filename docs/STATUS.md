@@ -2,7 +2,13 @@
 
 **Estratégia atual:** plano de simplificação aprovado, com [S0/S1 concluídos](HERMES-S1-QUALIFICATION.md).
 A fronteira Hermes + Kanban passou na prova nativa/Docker sem modelo e sem
-patches upstream. Próxima etapa: S2/S3, uma pequena cadeia de qualidade/entrega.
+patches upstream. A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) passou com
+Red, mudanças, congelamento, Green, controle negativo e revisão imutável em
+Docker real, mas com autoria e decisões sintéticas. Timeout foi comprovado com
+falha preservada e job retirado. S2 permanece parcial; faltam serviço contínuo,
+incidentes executáveis e S3 (PR/CI/deploy/QA/rollback), antes de S4 com modelo real.
+Checks atuais: 31 testes do caminho novo e 4.523 da suíte histórica, todos sem
+falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.
 

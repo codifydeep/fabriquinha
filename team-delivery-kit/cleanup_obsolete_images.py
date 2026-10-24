@@ -56,6 +56,8 @@ def references():
     paths+=list((ROOT/'broker').rglob('*.py'))
     paths+=list((ROOT.parent/'bootstrap/infra').rglob('*.yaml'))
     paths+=list((ROOT.parent/'bootstrap/infra').rglob('Dockerfile*'))
+    paths+=list(ROOT.parent.glob('Dockerfile*'))
+    paths+=list((ROOT.parent/'src/fabriquinha').glob('*.py'))
     pattern=r'(?:sha256:[a-f0-9]{64}|[a-zA-Z0-9][a-zA-Z0-9./_-]*(?:@sha256:[a-f0-9]{64}|:[a-zA-Z0-9_.-]+))'
     for path in paths:
         if path.is_file() and not path.is_symlink():refs.update(re.findall(pattern,path.read_text(errors='replace')))

@@ -11,6 +11,8 @@ snapshots e recibos operacionais completos permanecem privados.
 Propõe Hermes + Kanban com uma camada pequena de entrega, condicionado à prova
 de isolamento. Plano e mudanças de contrato foram aprovados;
 [S0/S1 estão concluídos](HERMES-S1-QUALIFICATION.md) no escopo da prova sem modelo.
+A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) qualificou os mecanismos TDD
+e timeout com fixtures, ainda sem autonomia, serviço contínuo ou publicação.
 O [ADR 0001](ADR-0001-HERMES-FIRST.md) rege o caminho novo. A referência antiga
 permanece pausada e não deve receber nova expansão como pré-requisito da simplificação.
 
@@ -24,8 +26,10 @@ permanece pausada e não deve receber nova expansão como pré-requisito da simp
 | [QA-PROTOCOL-RECOVERY](QA-PROTOCOL-RECOVERY.md) | Recuperação vinculada a evidências; texto técnico em inglês |
 | [PATCH-RECEIPTS](PATCH-RECEIPTS.md) | Alcance dos recibos de edição; não concedem escrita ao revisor |
 
-O [README principal](../README.md) apresenta o projeto. O contrato normativo de
-qualidade está em [quality-lifecycle-v2](../team-delivery-kit/contracts/quality-lifecycle-v2.md).
+O [README principal](../README.md) apresenta o projeto. O contrato instalado na
+referência antiga está em [quality-lifecycle-v2](../team-delivery-kit/contracts/quality-lifecycle-v2.md).
+O caminho novo segue o ADR 0001 e o plano aprovado, sem gate universal de leitura
+integral. Não combinar as regras contraditórias das duas linhagens.
 As seções históricas dos documentos não são inventário vivo nem comandos para
 ativar outra linhagem de execução.
 

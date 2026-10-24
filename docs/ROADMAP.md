@@ -4,7 +4,9 @@ Não usamos quantidade de código, workers ativos ou percentual subjetivo como c
 
 Uma [revisão estratégica com plano de simplificação](SIMPLIFICATION-REVIEW-2026-10-24.md)
 foi aprovada em 24/10/2026. [S0/S1 passaram](HERMES-S1-QUALIFICATION.md) no escopo
-sem modelo; a próxima fatia é S2/S3 do novo plano. Nenhuma migração foi aplicada.
+sem modelo. A [fatia mecânica S2](HERMES-S2-QUALIFICATION.md) também passou;
+S2 continua parcial e deve ser conectada à publicação/deploy em S3, sem outra
+campanha de gates pré-Red. Nenhuma migração foi aplicada.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 

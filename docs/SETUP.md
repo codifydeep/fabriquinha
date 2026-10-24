@@ -5,6 +5,11 @@ antes de ativar agentes. O kit continua experimental; não há instalação comp
 e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
 
+Para o caminho novo Hermes aprovado, consulte as provas isoladas
+[S1](HERMES-S1-QUALIFICATION.md) e [S2](HERMES-S2-QUALIFICATION.md).
+Elas não exigem Multica nem iniciam a instalação antiga. Os comandos Multica
+abaixo documentam a referência histórica; não são pré-requisito da simplificação.
+
 ## 1. Testes offline primeiro
 
 Siga o README para criar um ambiente Python isolado e executar a suíte. Não são necessárias credenciais. Os checks públicos não executam os ensaios com modelos.

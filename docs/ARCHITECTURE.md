@@ -8,6 +8,31 @@ estivesse instalado.
 Estado de referência: **24 de outubro de 2026**. Componentes existentes não
 significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 
+## Caminho Hermes isolado em construção
+
+[S0/S1](HERMES-S1-QUALIFICATION.md) qualificaram dispatcher, recuperação nativa
+e isolamento. A [fatia S2](HERMES-S2-QUALIFICATION.md) acrescenta o fluxo abaixo,
+sem instalar um novo gateway nem migrar o Multica. Autores/revisores são fixtures.
+
+```mermaid
+flowchart LR
+    K[Hermes Kanban: único ciclo de vida] --> B[board.py: run autenticado]
+    B --> W[Sandbox do autor ou revisor]
+    W --> A[artifacts.py: snapshot e recibos privados]
+    A --> E[executor.py: validação fixa em Docker]
+    E --> Q[quality.py: Red, freeze, Green e controles]
+    Q --> B
+    E --> J[effects.py: intenção e observação]
+    Q -. S3 pendente .-> P[GitHub PR e CI; deploy, QA e rollback]
+```
+
+O journal não mantém tarefas ou releases. O store não é montado nos workers;
+somente o snapshot necessário atravessa a fronteira. Não há import do broker
+histórico, ACP ou um segundo scheduler no caminho novo. O adaptador contínuo,
+incidentes executáveis e a publicação ainda precisam ser implementados.
+
+## Instalação de referência antiga, preservada e pausada
+
 | Área | Entradas principais |
 |---|---|
 | Configuração e contratos | `team.example.json`, `kit_contract.py`, `project_selection.py`, `portable_contract.py`, `portable_run_spec.py` |
