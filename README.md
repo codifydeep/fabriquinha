@@ -19,8 +19,11 @@ A [ponte de ferramentas/sessões nativas](docs/HERMES-AGENT-QUALIFICATION.md)
 também passou com `AIAgent` real, respostas locais fixas e retomada em outro processo.
 As ferramentas de submissão/parecer já percorreram o ciclo TDD pelo dispatcher
 nativo: dois cards, seis atividades, mudanças/correção e testes congelados.
-A cadeia offline Python/HTTP passou; faltam serviço contínuo, modelos e GitHub
-reais, recuperação da equipe e instalação reproduzível.
+O [serviço contínuo](docs/HERMES-RUNTIME-QUALIFICATION.md) passou depois em ambiente
+isolado: reinício preservando worker saudável e recuperação de crash com sessão/
+arquivo preservados e sandbox órfã retirada antes da substituta. Faltam conexão
+integral ao serviço, incidentes executáveis, modelos/GitHub reais e instalação
+reproduzível.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -30,7 +33,7 @@ ainda são sintéticos; Kanban, Git e jobs Docker são reais:
 ```mermaid
 flowchart LR
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
-    C[Serviço operacional contínuo ainda pendente] -.-> N
+    C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
     K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
@@ -38,7 +41,7 @@ flowchart LR
     P --> M[Merge e suíte no SHA integrado]
     M --> D[Build e deploy retomáveis; rollback e retorno]
     D --> Q[QA real em Chromium; evidência preservada]
-    Q -. Pendente .-> A[Fluxo com agentes e GitHub reais]
+    Q -. Conexão integral ao serviço pendente .-> A[Fluxo com agentes e GitHub reais]
 ```
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium

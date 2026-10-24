@@ -180,8 +180,9 @@ foram arquivados e retirados. Workspace, snapshots e sessões foram preservados.
 
 ## O que falta para autonomia
 
-- Transformar a integração qualificada no serviço operacional contínuo, incluindo
-  publicação/deploy: o loop de observação da fixture não é um daemon instalado.
+- O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md) já qualificou
+  TDD, reinício/crash, retirada da sandbox órfã e retomada. Falta conectar também
+  publicação/deploy e instalar a operação completa, não só o fluxo da fixture.
 - Persistir a referência de continuação no contexto nativo, liberar slots em
   esperas, preservar o modo do revisor e despachar diagnóstico técnico real.
 - Conectar status/notificações duráveis e, depois, qualificar modelo/GitHub reais
@@ -189,6 +190,6 @@ foram arquivados e retirados. Workspace, snapshots e sessões foram preservados.
 - Validar memória de projeto entre perfis/releases; retomar a sessão de um autor
   não prova memória agentica de toda a equipe ou resistência à compactação.
 
-A suíte do caminho novo totaliza 81 testes sem falhas. As provas físicas acima
+A suíte do caminho novo passou depois a 89 testes sem falhas. As provas físicas acima
 complementa testes unitários; não é substituída por eles. A configuração nova
 permanece separada do runtime legado pausado e do Truco.

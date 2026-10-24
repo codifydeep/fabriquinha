@@ -20,7 +20,9 @@ a publicação local do web e a rede interna do QA.
 A [ponte de ferramentas e sessões](HERMES-AGENT-QUALIFICATION.md) qualificou
 `AIAgent` e SQLite reais com respostas locais fixas. Uma segunda prova conectou
 as ferramentas de submissão/parecer ao dispatcher nativo para o ciclo TDD de dois
-cards. Serviço contínuo ainda não instalado; não é uma entrega autônoma.
+cards. O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md) qualificou
+reinício, crash, retirada da sandbox órfã e retomada de arquivo/sessão. Operação
+completa ainda não instalada; não é uma entrega autônoma.
 O [ADR 0001](ADR-0001-HERMES-FIRST.md) rege o caminho novo. A referência antiga
 permanece pausada e não deve receber nova expansão como pré-requisito da simplificação.
 

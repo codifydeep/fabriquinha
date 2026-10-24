@@ -26,5 +26,10 @@ sandbox Docker, sem socket, banco ou credenciais por mounts. A política que lim
 handlers do registry exige um processo dedicado por claim: nunca habilitá-la em
 gateway multiplexado. O Hermes fixado e os plugins aprovados do adaptador são
 parte da base confiável; não carregar plugins fornecidos pelo produto gerado.
+O serviço novo reconstrói uma sandbox antiga somente para retirada, após conferir
+run e identidade do processo morto. Isso não restaura a autoridade da claim.
+Uma segunda invocação de worker sobre o mesmo run é recusada sem bloquear o dono.
+O arquivo privado da rota não pode ser público ou symlink; a entrada operacional
+atual recusa projeto de produção, sem levantar automaticamente a pausa do provedor.
 
 Ao encontrar uma vulnerabilidade com segredo, não abra issue pública com o valor. Use o canal privado de segurança do GitHub, se habilitado, ou contate o proprietário sem anexar credenciais. Revogue segredos antes de limpar o histórico; não reescreva histórico sem autorização.

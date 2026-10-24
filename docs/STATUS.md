@@ -5,7 +5,7 @@ A fronteira Hermes + Kanban passou na prova nativa/Docker sem modelo e sem
 patches upstream. A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) passou com
 Red, mudanças, congelamento, Green, controle negativo e revisão imutável em
 Docker real, mas com autoria e decisões sintéticas. Timeout foi comprovado com
-falha preservada e job retirado. S2 permanece parcial; faltam serviço contínuo e
+falha preservada e job retirado. S2 permanece parcial; faltam operação completa e
 incidentes executáveis. A [primeira fatia S3](HERMES-S3-QUALIFICATION.md) conectou
 revisão, Git real, gate nativo de PR/CI com transporte simulado e suíte real do
 SHA de merge. Confirmações perdidas não duplicaram PR/merge. A cadeia foi ampliada
@@ -28,9 +28,13 @@ Uma segunda prova conectou submissão/parecer ao dispatcher nativo: dois cards,
 seis atividades e 16 respostas locais, com devolução, correção, congelamento,
 Green, controle negativo e revisão final. Autor e revisor retomaram sessões;
 resultados das ferramentas ficaram persistidos. Decisões são programadas, não
-julgamento de um modelo. Faltam serviço contínuo e cadeia integral com provedor
-e GitHub reais, incidentes executáveis e notificações.
-Checks atuais: 81 testes do caminho novo e 4.523 da suíte histórica, todos sem
+julgamento de um modelo. O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md)
+passou com reinício preservando worker vivo, crash/retomada, arquivo/sessão
+preservados e sandbox órfã retirada antes da substituta: sete runs, dois cards,
+18 respostas locais. Outra prova recusou um segundo processo na mesma claim,
+sem bloquear o dono. Faltam cadeia integral no serviço, provedor/GitHub reais,
+incidentes executáveis e notificações. Não houve ativação de produção.
+Checks atuais: 89 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

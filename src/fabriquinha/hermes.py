@@ -58,6 +58,30 @@ class Sandbox:
         self.journal=Journal(store.root/'effects')
         self.cid=None;self.closed=False;self.closing=False
 
+    @classmethod
+    def recover(cls,project,store,expected):
+        """Retirement only, from a trusted private create intent, never a worker argument.
+
+        The runtime must first prove the native worker is dead. No new tool
+        authority is granted by reconstructing an old lease.
+        """
+        from .board import Run
+        if (not isinstance(expected,dict) or set(expected)!={'binding','project','workspace','phase','baseline_tests','image'}
+                or expected['project']!=project.fingerprint() or expected['image']!=project.validation_image):
+            raise ValueError('exact controller-owned sandbox intent required')
+        run=Run(**expected['binding'])
+        phase='review' if run.reviewing else run.kind
+        if (run.kind not in ('tests','implementation') or expected['phase']!=phase
+                or not Path(expected['workspace']).is_absolute()):
+            raise ValueError('known sandbox phase and absolute workspace required')
+        sandbox=cls.__new__(cls)
+        sandbox.project,sandbox.store,sandbox.board,sandbox.run=project,store,None,run
+        sandbox.expected,sandbox.phase,sandbox.workspace=expected,phase,Path(expected['workspace'])
+        sandbox.key=digest(expected);sandbox.folder=store.root/'agents'/sandbox.key
+        sandbox.journal=Journal(store.root/'effects')
+        sandbox.cid=None;sandbox.closed=False;sandbox.closing=True
+        return sandbox
+
     def ensure(self):
         if self.closed or self.closing:raise ValueError('sandbox lease closed')
         self.board.ensure(self.run)

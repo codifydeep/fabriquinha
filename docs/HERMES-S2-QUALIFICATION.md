@@ -14,7 +14,9 @@ A [ponte nativa de ferramentas/sessões](HERMES-AGENT-QUALIFICATION.md) passou
 posteriormente com `AIAgent`, respostas HTTP locais e retomada em outro processo.
 A prova seguinte conectou submissão/parecer ao dispatcher nativo: dois cards,
 seis atividades, devolução/correção e retomada de sessões, com 16 respostas locais.
-Faltam o serviço contínuo e o trabalho com decisões de um modelo real.
+O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md) qualificou depois
+reinício/crash/retomada e retirada da sandbox órfã antes da substituta. Faltam
+incidentes/notificações, cadeia integral no serviço e decisões de um modelo real.
 
 ## O que efetivamente foi executado
 

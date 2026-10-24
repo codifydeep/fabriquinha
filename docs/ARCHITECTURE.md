@@ -29,15 +29,15 @@ flowchart LR
     M --> D[deployment.py: build e Compose]
     D --> R[Rollback e retorno por ID de imagem]
     R --> Q2[browser.py: QA real com contrato congelado]
-    Q2 -. Pendente .-> A2[Agentes reais e serviço contínuo]
+    Q2 -. Pendente .-> A2[Conexão integral ao serviço e agentes reais]
 ```
 
 O journal não mantém tarefas ou releases. O store não é montado nos workers;
 somente o snapshot necessário atravessa a fronteira. Não há import do broker
 histórico, ACP ou um segundo scheduler no caminho novo. A [prova S3](HERMES-S3-QUALIFICATION.md)
 usa Git real e transporte GitHub simulado, com checks processados pelo Hermes
-upstream. Não foi exercitada publicação GitHub real. O adaptador contínuo,
-incidentes executáveis e os agentes reais continuam pendentes.
+upstream. Não foi exercitada publicação GitHub real. Incidentes executáveis,
+conexão integral ao serviço e os agentes reais continuam pendentes.
 Build/deploy/rollback e QA em Chromium já passaram na stack Python/HTTP local.
 O navegador tem rede interna própria; só o web publica porta em loopback e
 pode ter egress pela bridge. Não se afirma airgap do produto; ver
@@ -51,6 +51,10 @@ instala um serviço contínuo nem conecta toda a cadeia com decisões reais.
 `hermes.py` registra um
 backend pela API de plugins, sem patch upstream; sua política de registry exige
 processo isolado por claim e nunca deve ser instalada num gateway compartilhado.
+O [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md), em `runtime.py`, passou
+depois com TDD nativo, reinício preservando worker vivo e recuperação de crash.
+Retira a sandbox órfã por identidade antes da substituta; retoma arquivo/sessão.
+Não instala gateway nem outro banco de tarefas; a rota de produção segue bloqueada.
 
 Publicação e build/deploy separam autorização atual da identidade do efeito:
 nova claim não renova CI nem repete build/Compose já aceitos. Artefatos e etapas

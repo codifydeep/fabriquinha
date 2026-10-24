@@ -13,6 +13,10 @@ abaixo documentam a referência histórica; não são pré-requisito da simplifi
 S3 pode construir e manter um demo local com Compose, QA de navegador e rollback,
 sem modelo ou GitHub real. O navegador ainda requer toolchain local previamente
 selecionado por ID; não há promessa de reprodução limpa dessa dependência até S6.
+O [serviço contínuo TDD](HERMES-RUNTIME-QUALIFICATION.md) já passou em isolamento
+com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
+as rotas de fixture expiram e não devem ser reutilizadas como produção. A entrada
+operacional ainda recusa provedores reais, preservando a pausa anterior.
 
 ## 1. Testes offline primeiro
 

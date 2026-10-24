@@ -2,6 +2,13 @@
 
 ## Caminho novo Hermes
 
+O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md) percorreu TDD com
+reinício do dispatcher sem matar/duplicar o worker, crash real, retirada da
+sandbox órfã antes da substituta e retomada de arquivo/sessão. Dois cards, sete
+runs, 18 respostas HTTP locais; zero chamadas pagas. A prova nativa de processo
+duplicado recusou a mesma claim sem bloquear o dono. Ainda não é a cadeia inteira
+de entrega operada continuamente ou julgamento por modelo.
+
 [S0/S1](HERMES-S1-QUALIFICATION.md): onze controles nativos/físicos passaram.
 [S2 parcial](HERMES-S2-QUALIFICATION.md): onze controles TDD passaram no ciclo
 com Docker/HTTP reais e participantes sintéticos; uma prova adicional confirmou
@@ -11,7 +18,7 @@ Na suíte histórica atual: 4.523 testes, oito skips preexistentes, nenhuma falh
 A [fatia S3](HERMES-S3-QUALIFICATION.md) passou com Git real, PR/CI simulados,
 gate nativo e oitavo job Docker no SHA de merge. PR/merge não foram duplicados
 após confirmações perdidas; quatro entradas de CI enganosa foram recusadas.
-O total do caminho novo passou a 81 testes. A [ponte nativa de agente](HERMES-AGENT-QUALIFICATION.md)
+O total do caminho novo passou a 89 testes. A [ponte nativa de agente](HERMES-AGENT-QUALIFICATION.md)
 executou o `AIAgent` real com nove respostas HTTP locais: ferramentas nativas,
 escrita limitada por mounts, Red independente, leitura do snapshot de revisão,
 negação de handlers de escrita/terminal/admin e retomada de sessão em outro
@@ -39,7 +46,7 @@ A cadeia offline anterior também passou por
 build de duas imagens, deploy, rollback/retorno, URL de loopback e QA real de
 navegador, com captura arquivada e imagem/commit exatos. As tentativas recusadas
 por argumento, rede e transporte de captura foram preservadas; não receberam
-aprovação retroativa. Publicação GitHub real, serviço contínuo e autores/revisores
+aprovação retroativa. Publicação GitHub real, operação completa e autores/revisores
 com modelo continuam pendentes. Zero chamadas ao modelo e nenhuma migração.
 
 ## Referência atual

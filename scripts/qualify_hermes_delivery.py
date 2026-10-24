@@ -105,7 +105,7 @@ def worker(root,upstream,task,number):
         server.shutdown();server.server_close();thread.join(timeout=5);sandbox.close()
 
 
-def qualify(root,upstream,image):
+def create_trial(root,upstream,image,*,namespace='delivery-kit-hermes-native-flow'):
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,dispatch=native()
@@ -116,7 +116,7 @@ def qualify(root,upstream,image):
         write_json(home/'profiles'/name/'config.yaml',dict(model={'streaming':False,'context_length':65536},
             auxiliary={'title_generation':{'enabled':False}},
             tools={'tool_search':{'enabled':'off'}},terminal={'backend':'fabriquinha','cwd':'/workspace'}))
-    project=dict(version=1,namespace='delivery-kit-hermes-native-flow',repository='https://github.com/example/qualification',
+    project=dict(version=1,namespace=namespace,repository='https://github.com/example/qualification',
         branch='release/qualification',validation_image=image,tests_dir='tests',reviewers={'flow-author':'flow-reviewer'},qualification=True)
     write_json(root/'project.json',project);store=Store(root/'private')
     source=root/'work/tests';(source/'tests').mkdir(parents=True)
@@ -133,6 +133,14 @@ def qualify(root,upstream,image):
             body=json.dumps(dict(version=1,kind='implementation',release='native-flow',inputs={'tests':'parent:'+tests+':tests'})),
             assignee='flow-author',workspace_kind='dir',workspace_path=str(implementation),parents=[tests],
             completion_contract='local-only',max_retries=2,max_runtime_seconds=600)
+    return tests,impl
+
+
+def qualify(root,upstream,image):
+    tests,impl=create_trial(root,upstream,image)
+    kb,kbc,dispatch=native()
+    project=json.loads((root/'project.json').read_bytes())
+    source=root/'work/tests';implementation=root/'work/implementation'
     children=[]
     def spawn(task,workspace,*,board=None):
         folder=root/'runs'/str(task.current_run_id);folder.mkdir(parents=True,mode=0o700)

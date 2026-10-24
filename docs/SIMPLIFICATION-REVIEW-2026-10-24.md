@@ -11,6 +11,9 @@ simulados; serviço contínuo e entrega por agentes reais ainda não qualificado
 A ponte `AIAgent`/ferramentas/sessões passou depois com respostas locais; as
 operações fixas de submissão/parecer percorreram dois cards e seis atividades
 pelo dispatcher nativo. Essa prova não instala serviço operacional nem migra estado.
+Uma prova posterior do [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md) passou
+com reinício, crash, retirada da sandbox órfã e retomada de arquivo/sessão.
+O serviço completo da equipe e a instalação de produção continuam pendentes.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
@@ -846,7 +849,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
 | S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
 | S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
-| S2 Executor/qualidade pequenos | Parcial: TDD, sandbox e ponte AIAgent/ferramentas/sessões reais com respostas locais | Faltam submissão/parecer no modelo, serviço contínuo e incidentes executáveis |
+| S2 Executor/qualidade pequenos | Parcial: TDD, ferramentas/sessões e serviço contínuo isolado com reinício/crash/retomada | Faltam incidentes executáveis, notificações e conexão integral da entrega ao serviço |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP passou: TDD, Git, build, deploy/QA/rollback reais; GitHub simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
@@ -857,9 +860,10 @@ Próxima fatia após a prova offline S3:
 
 1. A ponte de sessões/ferramentas reais passou com transporte local fixo, sem patch
    no loop Hermes: escrita/terminal na sandbox, revisão sem handlers proibidos,
-   Red real e sessão retomada em outro processo sem duplicação. Agora registrar
-   submissão/parecer como ferramentas fixas do controlador e conectar os workers
-   ao mesmo `dispatch_once`. Não confundir o canário com julgamento real. A
+   Red real e sessão retomada em outro processo sem duplicação. Submissão/parecer
+   já passaram como ferramentas fixas no `dispatch_once`; o serviço contínuo
+   isolado recuperou crash e reinício, preservando workspace/sessão e retirando
+   a sandbox órfã antes da substituta. Não confundir isso com julgamento real. A
    política de registry pertence ao processo isolado, nunca ao gateway multiplexado.
 2. Espera por CI/provedor/revisão deve liberar capacidade e preservar a fase.
    Não manter um processo ocupado só para observar, nem reiniciar efeito já aceito.
@@ -868,7 +872,8 @@ Próxima fatia após a prova offline S3:
    preservada e claims antigas sem autoridade. Aprovações continuam ligadas à
    execução exata. Build/deploy também passaram entre claims, com artefato e
    etapas de origem preservados, rollback e QA independente no mesmo candidato.
-   Faltam wake loop automático e sessões reais; não criar outro ciclo de vida
+   O serviço TDD já acorda os cards nativamente. Faltam ligar também as esperas de
+   CI/provedor ao serviço, com suas continuações; não criar outro ciclo de vida
    para isso. Atenção: `scheduled` volta a `ready`
    no upstream, portanto não usar esse caminho genericamente para revisores.
 3. A matriz já aceita suplentes explicitamente permitidos. O handoff TDD deriva
