@@ -57,7 +57,7 @@ chamadas ao modelo ou alteração da pausa. A causa do 402, confirmação de
 remediação, registro da recuperação e ativação separada permanecem pendentes.
 A migração do pin foi concluída,
 preservando fila e histórico, sem iniciar o serviço.
-A última suíte offline executou 4.504 testes, com oito skips preexistentes e
+A última suíte offline executou 4.522 testes, com oito skips preexistentes e
 nenhuma falha. A estimativa consolidada permanece em 70%; não é medição de autonomia.
 Faltam congelamento, Green, controles negativos e a cadeia v2 de revisão da
 entrega até homologação.

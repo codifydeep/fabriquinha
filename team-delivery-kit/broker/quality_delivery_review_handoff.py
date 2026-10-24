@@ -193,6 +193,14 @@ def available(con,agent,now,*,own=None):
         if request==own or state['stage'] not in ('dispatch_intent','awaiting_delivery_review_admission'):continue
         if context['reviewer']==agent:return False
         intents+=1
+    if con.execute("SELECT 1 FROM sqlite_master WHERE name='quality_delivery_revisions'").fetchone():
+        for request,raw,state,sha,state_sha in con.execute('SELECT review_request,context,state,context_sha256,state_sha256 FROM quality_delivery_revisions'):
+            context,state=json.loads(raw),json.loads(state)
+            require(quality.digest(context)==sha and quality.digest(state)==state_sha and context['review_request']==request
+                and state['stage'] in ('prepared','dispatch_intent','awaiting_product_revision_admission','technical_blocked'))
+            if request==own or state['stage'] not in ('dispatch_intent','awaiting_product_revision_admission'):continue
+            if context['author']==agent:return False
+            intents+=1
     return active+reserved+intents<2 and not busy and not pending
 
 

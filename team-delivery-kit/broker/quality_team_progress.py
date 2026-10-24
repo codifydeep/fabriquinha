@@ -15,6 +15,7 @@ try:
     from . import quality_candidate_binding as candidate,quality_green_capture as green
     from . import quality_sensitivity_capture as sensitivity
     from . import quality_test_revision as revision
+    from . import quality_delivery_review_progress as delivery_review
     from . import quality_review_bootstrap_recovery as bootstrap
     from . import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 except ImportError:
@@ -24,6 +25,7 @@ except ImportError:
     import quality_candidate_binding as candidate,quality_green_capture as green
     import quality_sensitivity_capture as sensitivity
     import quality_test_revision as revision
+    import quality_delivery_review_progress as delivery_review
     import quality_review_bootstrap_recovery as bootstrap
     import controller_maintenance as maintenance,maintenance_job_clock as clock,validation_job
 
@@ -32,7 +34,7 @@ require=author.require
 IMAGES=('QUALITY_PREP_IMAGE','QUALITY_WORKER_IMAGE','QUALITY_COPY_IMAGE','QUALITY_RED_IMAGE',
     'QUALITY_REVIEW_WORKER_IMAGE','QUALITY_GREEN_JOB_IMAGE')
 TERMINAL={'technical_blocked','awaiting_independent_delivery_review','test_revision_handed_off'}
-STAGES=TERMINAL|{'awaiting_git_binding','waiting_author','waiting_red','review_ready','waiting_review_capacity','waiting_review_dispatch',
+STAGES=TERMINAL|delivery_review.STAGES|{'awaiting_git_binding','waiting_author','waiting_red','review_ready','waiting_review_capacity','waiting_review_dispatch',
     'awaiting_review_admission','waiting_test_review','tests_frozen','waiting_implementation_capacity',
     'waiting_implementation_dispatch','awaiting_implementation_admission','waiting_delivery_capture','waiting_green',
     'awaiting_sensitivity','waiting_sensitivity','waiting_revision_capacity','waiting_revision_dispatch','awaiting_test_revision'}
@@ -43,6 +45,11 @@ def initialize(con):
         'identity TEXT,state TEXT,identity_sha256 TEXT,state_sha256 TEXT,observed_at REAL)')
     con.execute('CREATE TABLE IF NOT EXISTS quality_team_quarantine(source_task TEXT PRIMARY KEY,state TEXT,state_sha256 TEXT)')
     con.execute('CREATE TABLE IF NOT EXISTS quality_team_health(namespace TEXT PRIMARY KEY,state TEXT,state_sha256 TEXT)')
+
+
+def terminal(b,stage):
+    return stage in TERMINAL and not (stage=='awaiting_independent_delivery_review'
+        and getattr(b,'QUALITY_DELIVERY_REVIEW_ENABLED',False) is True)
 
 
 def finish(b,value):
@@ -121,7 +128,7 @@ def candidates(b):
         try:
             author.enrollment.canonical(source)
             old=load(b,source)
-            if old and old[1]['stage'] in TERMINAL:
+            if old and terminal(b,old[1]['stage']):
                 try:from . import quality_review_completion_recovery as completion
                 except ImportError:import quality_review_completion_recovery as completion
                 if old[1]['stage']!='technical_blocked' or not (revision.eligible(b,source) or completion.eligible(b,source) or bootstrap.eligible(b,source)):continue
@@ -276,6 +283,13 @@ def advance(b,identity,phase):
     if result['stage']=='technical_blocked':return blocked(identity,result,
         review_problem=result.get('owner')==identity['cto'],category='sensitivity_observation_blocked')
     require(result['stage']=='awaiting_independent_delivery_review')
+    if getattr(b,'QUALITY_DELIVERY_REVIEW_ENABLED',False) is True:
+        phase['value']='final_delivery_review'
+        advanced=delivery_review.advance(b,state['request_id'],identity['techlead'])
+        require(advanced['stage'] in delivery_review.STAGES|{'technical_blocked'}
+            and advanced['execution_authorized'] is False and advanced['delivery_approval'] is False)
+        return {**outcome(advanced['stage'],advanced['owner'],advanced),
+            **{k:advanced[k] for k in ('incident','next_action') if k in advanced}}
     return outcome('awaiting_independent_delivery_review',identity['reviewer'],result)
 
 
@@ -333,7 +347,7 @@ def tick(b,*,limit=2):
                 if phase['value']=='test_revision':revision.hold(b,source,'revision_evidence_rejected')
                 result=blocked(identity,dict(phase=phase['value']),review_problem='review' in phase['value'],
                     category='immutable_quality_team_evidence_rejected')
-            if result['stage']==before['stage'] and result['stage'] not in TERMINAL and time.time()>=deadline:
+            if result['stage']==before['stage'] and not terminal(b,result['stage']) and time.time()>=deadline:
                 result=blocked(identity,before,review_problem='review' in before['stage'],category='quality_phase_observation_deadline')
             if phase['value']=='test_revision' and result['stage']=='technical_blocked':
                 revision.hold(b,source,result.get('incident',{}).get('category','revision_technical_block'))

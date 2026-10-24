@@ -281,14 +281,31 @@ The 512-page quality read bound applies to the separate delivery-review scope,
 including genuine empty files; no prior test-review completion is imported.
 Durable approval facts never authorize merge or release. Changes address the
 original implementer; technical failures retain CTO ownership and a persistent
-deadline, without identical retries. These modules remain source-only; change
-dispatch, native qualification and coordinator continuation are not implemented.
+deadline, without identical retries. These modules remain source-only.
+
+`quality_delivery_revision.py` prepares correction only from a durable
+`changes_requested` attestation, the same rejected candidate and original frozen
+tests. The original implementer is the target; editable paths contain only
+declared product files. Findings in tests or other non-product files go to CTO
+diagnosis, never implicit test authority. Dispatch persists intent before wakeup,
+reserves the profile/global slot alongside pending final reviews, and observes
+unknown acknowledgements without issuing another POST. Waiting for capacity and
+confirmation has persistent deadlines and technical ownership.
+
+`quality_delivery_review_progress.py` is called by the source team coordinator
+only with the final-review flag explicitly enabled. It authenticates persisted
+phase records, advances final review and correction dispatch, and keeps waiting
+checkpoints active. Approved delivery reaches `awaiting_publication`, never
+`HOMOLOGADA`; elapsed waiting time escalates rather than silently finishing.
+Correction admission/launch, new capture/validation/review and publication remain
+unfinished. The image packaging/import smoke does not qualify native behavior.
 
 Both adapters are source-only, opt-in and disabled by default. They are not
 installed, exposed as worker tools or routed from the coordinator/launch layer.
 The source worker, native transport/read provenance and typed delivery verdict
-still require installed/native qualification. Change-request recovery and
-persistent post-review continuation remain unimplemented.
+still require installed/native qualification. Product-correction admission and
+execution, recapture/revalidation and publication after the source coordinator
+continuation remain unimplemented.
 SQLite/native/job fixtures passing are not proof of a real independent review,
 complete autonomous recovery or the PR/CI/deploy/QA/rollback chain.
 

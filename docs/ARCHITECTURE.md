@@ -28,6 +28,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Admissão e validação final em fonte, não instaladas | `broker/quality_delivery_review_handoff.py`, `broker/quality_delivery_review_validation.py` |
 | Worker/transporte final em fonte, não roteado | `broker/quality_delivery_review_launch.py`, fase de handlers `delivery_review_v2`; exige recibo original e snapshot somente leitura |
 | Parecer e atestação final em fonte, não roteados | `quality_delivery_review_verdict.py`, `broker/quality_delivery_review_attestation.py`; só o stream do controlador prova leitura |
+| Correção/continuação em fonte, não instaladas | `broker/quality_delivery_revision.py`, `broker/quality_delivery_review_progress.py`; opt-in em `quality_team_progress.py`, sem admissão do autor ou publicação implementadas |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
@@ -160,6 +161,8 @@ flowchart LR
     F -.-> C[Admissão e recibo no controlador: em fonte, não instalados]
     C -.-> R[Inspeção e decisão independente do revisor]
     R -.-> P[Gates de PR, CI e homologação]
+    R -.-> S[Handoff de correção ao autor original: em fonte]
+    S -.-> N[Admissão, correção e nova revisão: pendentes]
 ```
 
 Somente o executor passou na qualificação física com fixture; as setas
@@ -181,8 +184,10 @@ O worker somente leitura, parser do parecer e atestação da decisão já existe
 em fonte. A atestação confere conclusão nativa, execução fechada, política
 inspecionada, sessão ACP, stream próprio e citações byte a byte. Mudanças apontam
 para o autor original; incidentes técnicos apontam para o CTO, sem autorizar
-execução. Ainda faltam qualificação nativa, roteamento e despacho das mudanças
-ao implementador e continuidade do coordenador. Os adaptadores não foram
+execução. O despacho de mudanças e a continuação do coordenador já existem em
+fonte, opt-in: uma aprovação aguarda publicação, não encerra a release. Ainda
+faltam admissão/execução do autor corrigindo, revalidação da nova entrega,
+publicação e qualificação nativa. Os adaptadores não foram
 adicionados ao despacho instalado: uma capability criada em fixture não prova
 que um worker real foi lançado ou que o produto foi aprovado.
 

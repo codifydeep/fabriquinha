@@ -71,7 +71,7 @@ válida nem autonomia ponta a ponta.
   comprovou **71/71 arquivos** no transporte do controlador. Terminou nativamente
   em `completed`, mas o controlador manteve `technical_blocked` por parecer
   inválido. Leitura completa não foi convertida em aprovação.
-- A última suíte offline registrada executou **4.504 testes: 4.496 aprovados e
+- A última suíte offline registrada executou **4.522 testes: 4.514 aprovados e
   oito skips preexistentes**, sem falhas. O conjunto focado de recuperação
   executou 50 testes, também sem falhas. Aos 27 testes novos de recuperação
   somaram-se dez do executor final/rede, sem retirar ou enfraquecer os anteriores.
@@ -82,6 +82,8 @@ válida nem autonomia ponta a ponta.
   adaptador final; o conjunto focado dessas três áreas executou 24, sem falhas.
   Outros 19 cobrem parser/atestação final e a regressão do diário; o conjunto
   focado de parecer, atestação, worker e leituras executou 34, sem falhas.
+  Mais 18 cobrem despacho de correção, avanço do coordenador e fontes da imagem;
+  o conjunto focado com as regressões do coordenador executou 37, sem falhas.
   Essas provas não substituem a qualificação nativa.
 - A tentativa após o ajuste da fase terminou com 46/71 arquivos completos,
   80 páginas preservadas e duas respostas prematuras em prosa. Restavam 35
@@ -326,9 +328,19 @@ de leitura paginada, sem escrita, shell ou capacidades legadas. Não foi instala
 ou ligada ao roteador. O parecer tipado e sua atestação agora existem em fonte:
 exigem execução nativa concluída/fechada, inspeção do contêiner, sessão ACP e
 leituras próprias de todos os arquivos no snapshot exato. Rejeição exige citação
-real e aponta ao autor original; falhas técnicas ficam com o CTO. Não despacham
-correção ou liberam merge. Ainda faltam qualificação nativa, recuperação de
-mudanças e ligação do coordenador. São resultados de fixtures, não de agentes reais.
+real e aponta ao autor original; falhas técnicas ficam com o CTO. A atestação não
+despacha correção ou libera merge. O adaptador seguinte agora prepara e registra
+esse despacho em fonte, preservando o candidato rejeitado e o teste congelado.
+Achados fora dos arquivos de produto vão ao CTO, sem permissão de editar testes.
+Capacidade e confirmação perdida têm reservas/prazos, sem repetir POSTs.
+O coordenador opt-in atravessa a revisão em fixtures: mudanças levam ao handoff
+do autor e aprovação a `awaiting_publication`. Esses checkpoints seguem ativos,
+com prazo de observação; não viram `HOMOLOGADA`. O comportamento antigo permanece
+quando o flag dedicado está desligado.
+Ainda faltam admissão/execução da correção, nova captura/validação/revisão e a
+ponte de publicação. A imagem candidata `20261024.37` compilou e importou esses
+módulos com execução desligada; não substituiu a instalação `20261023.36`.
+São resultados de fixtures/build, não de agentes reais.
 
 Outra regressão foi reproduzida e corrigida no diário: a fase final caía no
 caminho legado, que descartava arquivos vazios e limitava a 128 páginas. Agora

@@ -22,7 +22,7 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Revisão terminal com inspeção completa | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
 | Revisão sucessora terminal | 46/71 arquivos, 80 páginas, seis chamadas; duas promessas em prosa, sem novas leituras, com 35 iterações restantes. `technical_blocked`, sem aprovação. |
 | Último ensaio após controle de continuação | **71/71 arquivos e 171 páginas** comprovados no controlador. Primeiro parecer `invalid_json`, feedback com 33 iterações restantes; chamada seguinte HTTP 402. Nativo `failed`, equipe `technical_blocked`, sem congelamento ou aprovação. |
-| Última suíte completa registrada | **4.504 executados: 4.496 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de handoff/validação/linhagem: 60 testes; parecer/atestação/worker/leituras: 34. Os novos testes não substituem nem removem os anteriores. |
+| Última suíte completa registrada | **4.522 executados: 4.514 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de handoff/validação/linhagem: 60; parecer/atestação/worker/leituras: 34; despacho/coordenação/fontes da imagem: 37. Os novos testes não substituem nem removem os anteriores. |
 | Recuperação de pagamento em fixture Linux | Oito consultas HTTP locais, zero ao provedor real e zero ao modelo. Confirmação obrigatória, saldo zero recusado, chave sem limite explícito, contador preservado, locks, leitura do resultado sem repetição e conclusão parcial sem repetir HTTP. Não comprova crédito real ou retomada nativa. |
 | Isolamento do canário de pagamento | UID 10000, rede externa indisponível, raiz somente leitura, sem chave real ou socket Docker; `/opt/data` temporário explícito para não criar volume anônimo herdado da imagem. Auxiliar retirado após preservar o recibo. |
 | Recuperação de confirmação perdida | Um erro ao salvar o recibo final do qualificador foi reproduzido por regressão e corrigido. A observação do mesmo resultado preservado concluiu o recibo sem executar outro canário. Não é prova de recuperação completa da equipe. |
@@ -39,6 +39,8 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Adaptador final em fonte | Recibo da suíte reautenticado antes do worker; snapshot único somente leitura, rede interna do proxy e nenhuma chave de infraestrutura. Handlers negam escrita e shell. Fixtures offline; sem instalação, roteamento ou parecer nativo. |
 | Parecer final e atestação em fonte | Esquema exato, hashes da entrega/validação, critérios e citações reais. Conclusão nativa, lease fechado, política inspecionada e leituras do próprio stream obrigatórios. Recibo durável não autoriza merge; mudanças apontam ao autor, incidentes ao CTO. Não instalado/qualificado nativamente. |
 | Diário da fase final | Regressão real reproduzida e corrigida: arquivos vazios não eram preservados e vigorava limite legado de 128 páginas. A fase autenticada agora usa 512 páginas, isolada da revisão dos testes. |
+| Correção e coordenador em fonte | Handoff ao implementador original com candidato rejeitado/testes congelados; achados nos testes ficam com CTO. Intenção antes do wakeup, reservas e prazos fixos. Um tick atravessou a revisão e chegou a `awaiting_publication` em fixture; não homologa. Admissão/execução da correção e publicação ainda faltam. |
+| Candidata Docker `20261024.37` | Compilação/importação com execução desligada aprovadas, sem rede de build e sem instalação. Os dois Dockerfiles agora incluem as dependências da nova ponte. Não é qualificação nativa ou prova de execução ponta a ponta. |
 
 A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
 inicializasse a fila. A versão atual cobre esse caminho desde a primeira chamada.
@@ -145,7 +147,8 @@ Esse diagnóstico não alterou as permissões da entrega ou do contêiner.
 
 Admissão e autenticação do recibo no controlador foram implementadas depois em
 fonte, seguidas por worker/transporte, parser e atestação do parecer. A prova
-atual usa fixtures nativas/SQLite/jobs; faltam despacho de mudanças, integração do coordenador e qualificação
+atual usa fixtures nativas/SQLite/jobs. O despacho e a continuação foram ligados
+em fonte; faltam admissão/execução da correção, publicação e qualificação
 nativa. Não há revisão da entrega aprovada, PR/CI ou homologação a partir dessas fixtures.
 
 ## Evidências históricas — não representam o estado vivo

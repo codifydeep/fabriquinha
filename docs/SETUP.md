@@ -182,8 +182,11 @@ admissão e o vínculo do recibo à execução. O flag `QUALITY_DELIVERY_REVIEW_
 para o fluxo completo. O adaptador `quality_delivery_review_launch.py` também
 existe em fonte e exige o recibo original antes do worker somente leitura.
 O parser e a atestação também existem em fonte, sem roteamento instalado.
-Não habilite o flag manualmente: faltam qualificação nativa, roteamento,
-despacho de mudanças e integração com o coordenador. O executor
+O coordenador e o despacho da correção agora estão ligados em fonte por flags
+opt-in; `QUALITY_DELIVERY_REVISION_ENABLED` também é desligado por padrão.
+Não habilite esses flags manualmente: faltam admissão/execução da correção,
+revalidação, publicação e qualificação nativa. A candidata `20261024.37` apenas
+compilou/importou os módulos, sem substituir o controlador instalado. O executor
 isolado não faz essa autenticação nem aceita parecer. Na qualificação, a imagem
 rodou como UID 10000, sem rede externa, credenciais, socket ou mounts graváveis
 da entrega. Somente `/tmp` era gravável. Não habilite um workflow de produto

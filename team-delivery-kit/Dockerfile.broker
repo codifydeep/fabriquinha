@@ -108,6 +108,11 @@ COPY broker/quality_candidate_binding.py broker/quality_green_capture.py /
 COPY broker/quality_candidate_rpc.py /
 COPY broker/quality_sensitivity_capture.py /
 COPY broker/quality_team_progress.py /
+COPY broker/quality_delivery_review_handoff.py broker/quality_delivery_review_validation.py /
+COPY broker/quality_delivery_review_launch.py broker/quality_delivery_review_attestation.py /
+COPY broker/quality_delivery_revision.py broker/quality_delivery_review_progress.py /
+COPY quality_delivery_review_policy.py quality_delivery_review_verdict.py /
+COPY broker/quality_test_revision.py broker/quality_review_bootstrap_recovery.py /
 COPY broker/controller_maintenance.py broker/maintenance_job_clock.py /
 COPY broker/planning_review_observation.py /planning_review_observation.py
 COPY tests/acp_initialize_probe.py /acp_initialize_probe.py

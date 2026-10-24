@@ -135,9 +135,11 @@ instalados nem conectados ao loop. Faltam os seguintes componentes e provas:
   a revisão dos testes não pode ser reutilizada como parecer da entrega.
 - Qualificação nativa das leituras próprias, parser tipado e atestação
   independente já implementados em fonte, no snapshot/SHA exatos.
-- Solicitações de mudanças ao implementador original, mantendo testes congelados
-  e invalidando a aprovação/validação anterior após nova entrega.
-- Continuação persistente do coordenador, PR/CI e deploy/QA/rollback no mesmo SHA.
+- Admissão e execução do handoff de correção já preparado/despachado em fonte;
+  nova captura, Green, controles e revisão, preservando os testes congelados e
+  invalidando a aprovação anterior para a nova entrega.
+- Publicação após `awaiting_publication`, checkpoint ativo do coordenador em
+  fonte, com PR/CI e deploy/QA/rollback no mesmo SHA.
 - Qualificação nativa e recuperação de falhas sem o operador conduzir cada etapa.
 
 A prova isolada do executor ou dos novos adaptadores não supre esses controles

@@ -199,7 +199,7 @@ It exercised confirmation, zero-balance rejection, unlimited-key handling,
 counter preservation, locking, readback and partial completion without repeated
 HTTP. A lost final qualification receipt was recovered from the same saved
 output, without launching another helper. The latest complete offline suite ran
-4,504 tests: 4,496 passed and eight preexisting skips. Earlier focused recovery
+4,522 tests: 4,514 passed and eight preexisting skips. Earlier focused recovery
 and executor/network suites passed; the new handoff/validation/lineage and
 related regression set passed 60 tests.
 
@@ -246,7 +246,13 @@ complete-read attestation and typed final verdict now exist in source, not in
 the installed router. They require terminal native identity, closed lease,
 inspected immutable worker policy, successful ACP session and the exact bound
 read stream; concrete findings must quote actual snapshot lines. Native
-qualification, change-request dispatch and coordinator continuation remain pending.
+qualification remains pending. Source-only correction dispatch now preserves
+the rejected seed and test freeze, targets the original author and observes
+unknown acknowledgements without reposting. Findings outside product files go
+to CTO. The opt-in team continuation reaches this handoff or awaits publication;
+neither is a terminal release success. Correction admission/execution,
+recapture/revalidation and publication remain unfinished. The candidate image
+compiled with execution disabled; it was not installed or natively qualified.
 
 Source delivery capture also now applies the authenticated prior-author revision
 filter already used at implementation admission. Raw task count previously
