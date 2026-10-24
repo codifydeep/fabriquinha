@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import threading
 from urllib.parse import urlsplit
 from .artifacts import digest
 from .effects import Journal, EffectBlocked, write_json
@@ -269,7 +270,7 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     return {name},operations
 
 
-def run_activity(sandbox,quality,route,prompt,*,run_seconds=600):
+def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None):
     """Trusted SDK adapter; no lifecycle inference from the assistant's prose.
 
     Route comes from controller configuration, not a model tool argument.
@@ -289,7 +290,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600):
     from run_agent import AIAgent
     from hermes_state import SessionDB
     from toolsets import create_custom_toolset
-    db=SessionDB();agent=None;terminal={}
+    db=SessionDB();agent=None;terminal={};watcher=None;watch_done=threading.Event()
     def finished(result):
         terminal.update(result)
         agent.interrupt(tool_reason='delivery_handoff')
@@ -319,11 +320,24 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600):
         if sandbox.run.reviewing or sandbox.run.kind=='diagnostic':
             label='Incident context' if sandbox.run.kind=='diagnostic' else 'TDD evidence (historical Red is not to be reproduced)'
             prompt+='\nController-recorded '+label+':\n'+json.dumps(operations.evidence())
+        if stop_requested:
+            sandbox.board.ensure(sandbox.run)
+            def watch():
+                while not watch_done.is_set():
+                    if stop_requested() and not terminal and not agent.is_interrupted:
+                        agent.hard_interrupt(tool_reason='operator_pause')
+                    watch_done.wait(0.1)
+            watcher=threading.Thread(target=watch,daemon=True);watcher.start()
         result=agent.run_conversation(prompt,conversation_history=history,
                                      system_message=previous.get('system_prompt') if previous else None)
+        if not terminal and stop_requested and stop_requested():
+            from .operations import ActivityPaused
+            raise ActivityPaused('SDK activity interrupted by operational pause')
         if not terminal:raise ValueError('activity ended without a controller-validated native handoff')
         return dict(transition=terminal,session=agent.session_id,resumed=bool(previous),
                     sdk_exit=result.get('exit_reason'),delivery_approval=False)
     finally:
+        watch_done.set()
+        if watcher:watcher.join(timeout=1)
         if agent:agent.close()
         db.close();sandbox.close()

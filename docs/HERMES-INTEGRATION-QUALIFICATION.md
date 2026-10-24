@@ -128,8 +128,9 @@ HERMES_DISABLE_LAZY_INSTALLS=1 .local-hermes-agent/venv/bin/python \
 
 ## Próximos limites
 
-Faltam admissão de perfis/recursos, pausa/drain explícitos, brief/plano/aprovação
-de negócio e critério integral de aceite da release. Incidentes de integração
+A [pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md) passaram depois,
+com limites próprios documentados. Faltam brief/plano/aprovação de negócio e
+critério integral de aceite da release. Incidentes de integração
 ainda não percorrem todo o diagnóstico técnico qualificado para TDD. Telegram,
 modelo e GitHub reais, segunda release/memória e instalação portátil permanecem
 pendentes. Não converter essas lacunas em mais uma rodada de controles genéricos

@@ -32,6 +32,9 @@ espera nativa de CI libera claims, reinício retoma o mesmo PR e build/deploy/
 rollback/QA reais terminam por handoff independente. Houve um crash de partida
 recuperado nativamente; autores/CI continuam sintéticos. Faltam entrada de brief,
 aceite integral da release, Telegram/modelos/GitHub reais e instalação reproduzível.
+[Pausa/retomada e admissão](docs/HERMES-OPERATIONS-QUALIFICATION.md) também passaram
+com SDK real: duas interrupções, reinício pausado, perfil restaurado sem falso
+cooldown e TDD concluído preservando sessão/fase. Não liberam o provedor pago.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -42,6 +45,7 @@ ainda são sintéticos; Kanban, Git e jobs Docker são reais:
 flowchart LR
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
     C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
+    F[Pausa persistente e preflight sem modelo] -->|Fence de spawn e ferramentas| C
     K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
     K --> L[Diagnóstico Lead/CTO: SPIKE e orientação]
     L -->|Retomada nativa; gates preservados| T

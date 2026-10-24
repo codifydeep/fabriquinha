@@ -37,8 +37,9 @@ class Run:
 
 class Board:
     """Private controller API. Workers submit decisions, never Run identities."""
-    def __init__(self, project):
+    def __init__(self, project, *, guard=None):
         self.project = project
+        self.guard = guard
 
     def current(self, task_id, run_id):
         kb, kbc, _ = native()
@@ -74,6 +75,7 @@ class Board:
                    card['release'], digest(card))
 
     def ensure(self, run):
+        if self.guard:self.guard()
         if self.current(run.task, run.number) != run:
             raise ValueError('assignment or contract changed')
 

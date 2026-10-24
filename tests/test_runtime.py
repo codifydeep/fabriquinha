@@ -19,6 +19,7 @@ from fabriquinha.config import Project
 from fabriquinha.effects import write_json, EffectBlocked
 from fabriquinha.hermes import Sandbox
 from fabriquinha.runtime import Runtime, Owner, model_route
+from fabriquinha.operations import ActivityPaused
 from test_delivery_core import configuration
 
 
@@ -89,8 +90,9 @@ class NativeRuntime(unittest.TestCase):
         with self.assertRaises(ValueError):model_route(self.runtime.project,path)
 
     def test_spawn_uses_fixed_worker_command_without_inherited_provider_keys(self):
-        task=SimpleNamespace(id='task',current_run_id=7)
+        task=SimpleNamespace(id='task',current_run_id=7,assignee='backend')
         with patch.dict(os.environ,GH_TOKEN='must-not-inherit',OPENROUTER_API_KEY='must-not-inherit'), \
+             patch.object(self.runtime,'check_admission',return_value=dict(ready=True,missing_profiles=[])), \
              patch.object(self.runtime,'settle'), \
              patch('fabriquinha.runtime.subprocess.Popen') as popen:
             popen.return_value.pid=42
@@ -107,6 +109,14 @@ class NativeRuntime(unittest.TestCase):
         self.runtime.settlement={'older':dict(run=1,category='EffectBlocked')}
         self.runtime.settle('different',conn=Mock())
         self.assertIn('older',self.runtime.settlement)
+
+    def test_cached_missing_profile_cannot_refuse_a_fresh_native_dispatch(self):
+        task=SimpleNamespace(id='task',current_run_id=7,assignee='backend')
+        modules={'tools':SimpleNamespace(),'tools.process_registry':SimpleNamespace(RestartSafeScopeUnavailable=EffectBlocked)}
+        with patch.dict(sys.modules,modules), \
+             patch.object(self.runtime,'check_admission',return_value=dict(ready=True,missing_profiles=['backend'])), \
+             patch.object(self.runtime,'settle'),patch.object(self.runtime,'_spawn',return_value=42):
+            self.assertEqual(self.runtime.spawn(task,'/unused'),42)
 
     def test_second_process_cannot_adopt_an_already_owned_run_or_block_its_owner(self):
         conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False)
@@ -148,6 +158,77 @@ class NativeRuntime(unittest.TestCase):
              patch.object(Sandbox,'recover') as recover:
             self.runtime.settle('task',conn=conn)
         recover.return_value.close.assert_called_once()
+
+    def test_pause_fences_even_direct_delivery_handlers_before_native_state_access(self):
+        self.runtime.control.pause()
+        with patch.object(self.runtime.board,'current',side_effect=AssertionError('gate crossed pause')):
+            with self.assertRaises(ActivityPaused):self.runtime.board.ensure(Mock())
+
+    def test_paused_tick_does_not_dispatch_diagnose_or_probe_model_resources(self):
+        self.runtime.control.pause();conn=Mock()
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(conn));dispatcher=Mock()
+        with patch('fabriquinha.runtime.native',return_value=(None,api,dispatcher)), \
+             patch.object(self.runtime,'maintain_pause') as maintenance, \
+             patch.object(self.runtime,'check_admission') as admission, \
+             patch.object(self.runtime.recovery,'reconcile') as recovery:
+            self.runtime.tick()
+        maintenance.assert_called_once_with(conn)
+        admission.assert_not_called();recovery.assert_not_called();dispatcher.dispatch_once.assert_not_called()
+
+    def test_failed_admission_allows_native_reconciliation_but_no_new_workers(self):
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()));dispatcher=Mock()
+        with patch('fabriquinha.runtime.native',return_value=(None,api,dispatcher)), \
+             patch.object(self.runtime,'settle'),patch.object(self.runtime,'wake_integrations'), \
+             patch.object(self.runtime.recovery,'reconcile'), \
+             patch.object(self.runtime,'check_admission',return_value=dict(ready=False,missing_profiles=[])):
+            self.runtime.tick()
+        self.assertEqual(dispatcher.dispatch_once.call_args.kwargs['max_spawn'],0)
+
+    def test_pause_reclaims_only_after_verified_death_and_retains_native_phase_handling(self):
+        marker=self.runtime.control.pause();conn=Mock();kb=Mock()
+        row=dict(id=7,task_id='task',worker_pid=123,worker_started_at='fp',claim_lock='local')
+        conn.execute.return_value.fetchall.return_value=[row]
+        kb.get_task.return_value=SimpleNamespace(id='task',status='running',current_run_id=7)
+        with patch('fabriquinha.runtime.native',return_value=(kb,None,None)), \
+             patch('fabriquinha.runtime.worker_alive',return_value=True),patch.object(self.runtime,'settle'):
+            self.runtime.maintain_pause(conn)
+        kb.reclaim_task.assert_not_called()
+        with patch('fabriquinha.runtime.native',return_value=(kb,None,None)), \
+             patch('fabriquinha.runtime.worker_alive',return_value=False),patch.object(self.runtime,'settle'):
+            self.runtime.maintain_pause(conn)
+        kb.reclaim_task.assert_called_once_with(conn,'task',reason='operator_pause:'+marker['episode'])
+
+    def test_invalid_control_is_a_fence_not_an_operator_reclaim_authority(self):
+        self.runtime.control.pause();(self.root/'control.json').write_text('corrupt')
+        conn=Mock();kb=Mock()
+        with patch('fabriquinha.runtime.native',return_value=(kb,None,None)),patch.object(self.runtime,'settle') as settle:
+            self.runtime.maintain_pause(conn)
+        conn.execute.assert_not_called();kb.reclaim_task.assert_not_called();settle.assert_not_called()
+
+    def test_resume_refuses_busy_workers_and_does_not_clear_provider_gate(self):
+        episode=self.runtime.control.pause()['episode']
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()))
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch.object(self.runtime,'maintain_pause'), \
+             patch.object(self.runtime,'pause_status',return_value=dict(agents_stopped=False)), \
+             patch('fabriquinha.runtime.model_route') as route:
+            with self.assertRaises(EffectBlocked):self.runtime.resume(episode)
+        route.assert_not_called();self.assertTrue(self.runtime.control.read()['paused'])
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch.object(self.runtime,'maintain_pause'), \
+             patch.object(self.runtime,'pause_status',return_value=dict(agents_stopped=True,pending_effects=['original'])), \
+             patch.object(self.runtime,'check_admission',return_value=dict(ready=True)), \
+             patch('fabriquinha.runtime.model_route',side_effect=ValueError('provider pause')):
+            with self.assertRaises(ValueError):self.runtime.resume(episode)
+        self.assertTrue(self.runtime.control.read()['paused'])
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch.object(self.runtime,'maintain_pause'), \
+             patch.object(self.runtime,'pause_status',return_value=dict(agents_stopped=True,pending_effects=['original'])), \
+             patch.object(self.runtime,'check_admission',return_value=dict(ready=True)), \
+             patch('fabriquinha.runtime.model_route'):
+            result=self.runtime.resume(episode)
+        self.assertEqual(result['pending_effects'],['original'])
+        self.assertFalse(self.runtime.control.read()['paused'])
 
 
 if __name__=='__main__':unittest.main()

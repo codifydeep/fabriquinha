@@ -28,6 +28,7 @@ from .recovery import Recovery
 from .notifications import Outbox, alerts, validation_progress
 from .publication import Repository, GitHub, Publication
 from .deployment import Deployment
+from .operations import Control, ActivityPaused, doctor
 
 
 class IntegrationRunner(Runner):
@@ -108,8 +109,10 @@ class Runtime:
         if installation.exists() and json.loads(installation.read_bytes())!=binding:
             raise ValueError('installation contract changed; explicit reconfiguration required')
         if not installation.exists():write_json(installation,binding)
-        self.store=Store(self.root/'private');self.board=Board(self.project)
+        self.store=Store(self.root/'private');self.control=Control(self.root,self.project)
+        self.board=Board(self.project,guard=self.control.ensure)
         self.children=[];self.settlement={};self.recovery_issues={};self.integration_issues={}
+        self.admission=None;self._next_admission=0
         self.recovery=Recovery(self.project,self.store,self.board)
         self.outbox=Outbox(self.project,self.store)
 
@@ -147,7 +150,21 @@ class Runtime:
         return self.settlement
 
     def spawn(self,task,workspace,*,board=None):
+        admission=self.check_admission()
+        # Profile existence is checked freshly by the native dispatcher. The
+        # cached doctor list is diagnostic, never a second per-profile guard.
+        if not admission['ready']:
+            from tools.process_registry import RestartSafeScopeUnavailable
+            raise RestartSafeScopeUnavailable('runtime admission deferred; inspect doctor/status')
         self.settle(task.id)
+        with self.control.lock():
+            try:self.control.ensure()
+            except ActivityPaused:
+                from tools.process_registry import RestartSafeScopeUnavailable
+                raise RestartSafeScopeUnavailable('operational pause; no worker started') from None
+            return self._spawn(task,workspace,board=board)
+
+    def _spawn(self,task,workspace,*,board=None):
         folder=self.root/'runs'/str(task.current_run_id);folder.mkdir(mode=0o700,parents=True,exist_ok=True)
         env={key:os.environ[key] for key in ('PATH','PYTHONPATH','HERMES_HOME','HERMES_KANBAN_DB',
              'HERMES_KANBAN_BOARD','HERMES_DISABLE_LAZY_INSTALLS','PYTHONDONTWRITEBYTECODE') if key in os.environ}
@@ -160,6 +177,68 @@ class Runtime:
         self.children.append(process)
         return process.pid
 
+    def check_admission(self,*,force=False):
+        now=time.monotonic()
+        if force or self.admission is None or now>=self._next_admission:
+            self.admission=doctor(self.project,self.root,self.store)
+            self._next_admission=now+15
+        return self.admission
+
+    def pause_status(self,conn):
+        busy=[];open_runs=[]
+        for row in conn.execute('SELECT * FROM task_runs').fetchall():
+            if row['ended_at'] is None:open_runs.append(row['id'])
+            event=conn.execute("SELECT 1 FROM task_events WHERE run_id=? AND kind IN ('spawned','worker_registered') LIMIT 1",(row['id'],)).fetchone()
+            if row['ended_at'] is not None and not row['worker_pid'] and not event:continue
+            try:
+                if worker_alive(recorded_worker(conn,row)):busy.append(dict(task=row['task_id'],run=row['id'],state='alive'))
+            except (ValueError,EffectBlocked):busy.append(dict(task=row['task_id'],run=row['id'],state='unverified'))
+        pending=[]
+        for path in (self.store.root/'effects').glob('*.json'):
+            if json.loads(path.read_bytes()).get('state')!='done':pending.append(path.stem)
+        unretired=[]
+        for path in (self.store.root/'agents').glob('*/sandbox.json'):
+            if not (path.parent/'retirement.json').exists():unretired.append(path.parent.name)
+        stopped=not (busy or open_runs or unretired or self.settlement)
+        return dict(agents_stopped=stopped,drained=stopped and not pending,busy=busy,open_runs=open_runs,
+                    unretired_sandboxes=unretired,pending_effects=pending)
+
+    def maintain_pause(self,conn):
+        control=self.control.read()
+        if not control['paused'] or control['error']:return
+        kb,_,_=native()
+        for row in conn.execute('SELECT * FROM task_runs WHERE ended_at IS NULL').fetchall():
+            try:
+                if worker_alive(recorded_worker(conn,row)):continue
+            except (ValueError,EffectBlocked):continue
+            current=kb.get_task(conn,row['task_id'])
+            if current.status=='running' and current.current_run_id==row['id']:
+                # Already dead: reclaim cannot release a second worker beside
+                # it, preserves review phase and does not spend a retry.
+                kb.reclaim_task(conn,current.id,reason='operator_pause:'+str(control['episode']))
+        self.settle(conn=conn)
+
+    def pause(self):
+        control=self.control.pause();_,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            self.maintain_pause(conn);status=self.pause_status(conn)
+        self.outbox.enqueue('pause:'+control['episode'],{'text':self.project.namespace+': pause requested; draining current activities.'})
+        return dict(control=control,**status,delivery_approval=False)
+
+    def resume(self,episode):
+        with self.control.lock():
+            old=self.control.read()
+            if old['error'] or not old['paused'] or old['episode']!=episode:raise ValueError('exact current pause episode required')
+            _,kbc,_=native()
+            with kbc.connect_closing() as conn:
+                self.maintain_pause(conn);status=self.pause_status(conn)
+            if not status['agents_stopped']:raise EffectBlocked('workers/claims/sandboxes not settled; pause remains active')
+            if not self.check_admission(force=True)['ready']:raise EffectBlocked('runtime admission failed; pause remains active')
+            model_route(self.project,self.root/'route.json')  # Not a release of the old paid-provider gate.
+            control=self.control.resume(episode)
+        self.outbox.enqueue('resume:'+episode,{'text':self.project.namespace+': dispatch resumed; delivery gates remain mandatory.'})
+        return dict(control=control,pending_effects=status['pending_effects'],delivery_approval=False)
+
     def tick(self):
         self.children=[child for child in self.children if child.poll() is None]
         # A changed project file cannot silently grant a live service authority.
@@ -167,10 +246,14 @@ class Runtime:
             raise ValueError('project changed while service was running')
         _,kbc,dispatch=native()
         with kbc.connect_closing() as conn:
+            if self.control.read()['paused']:
+                self.maintain_pause(conn)
+                return dispatch.DispatchResult()
             self.settle(conn=conn)
             self.integration_issues=self.wake_integrations(conn)
             self.recovery_issues=self.recovery.reconcile(conn,self.settle)
-            return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers,
+            admission=self.check_admission()
+            return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers if admission['ready'] else 0,
                 max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)
 
     def park_integration(self,run,*,now=None):
@@ -272,13 +355,15 @@ class Runtime:
                 try:card['last_validation']=validation_progress(card,self.store,self.project)
                 except (ValueError,OSError):card['last_validation']={'error':'EvidenceUnavailable'}
             incidents=self.recovery.status(conn)
+            control=self.control.read()
+            if control['paused']:control={**control,**self.pause_status(conn)}
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
-                    integration_issues=self.integration_issues,
+                    integration_issues=self.integration_issues,control=control,admission=self.admission,
                     incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
         if not 0.1<=interval<=60:raise ValueError('bounded dispatch interval required')
-        model_route(self.project,self.root/'route.json')
+        if not self.control.read()['paused']:model_route(self.project,self.root/'route.json')
         self.status()  # Validate the read surface before any worker is spawned.
         _,kbc,_=native()
         enabled=threading.Event()
@@ -318,6 +403,7 @@ class Runtime:
             prompt=kb.build_worker_context(conn,task)
         run=self.board.current(task,number)
         try:
+            self.control.ensure()
             os.environ['HERMES_HOME']=str(self.root/'home/profiles'/run.actor)
             runner=IntegrationRunner if run.kind=='integration' else Runner
             quality=Quality(self.project,self.store,runner(self.project,self.store),self.board)
@@ -335,8 +421,14 @@ class Runtime:
                 else:quality.protect(frozen['snapshot'],self.store.capture(work),exact_tests=True)
             sandbox=Sandbox(self.project,self.store,self.board,run)
             prompt='Delivery activity '+json.dumps(run.binding(),sort_keys=True)+'\n'+prompt
-            result=run_activity(sandbox,quality,route,prompt)
+            result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'])
             write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
+        except ActivityPaused:
+            interrupted=self.store.record('activity_interrupted',run.binding(),dict(project=self.project.fingerprint(),
+                pause=self.control.read()['episode'],delivery_approval=False))
+            write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),interrupted=interrupted))
+            # Keep claim until this process is really gone. Paused maintenance
+            # then reclaims it natively, without changing author/review phase.
         except BaseException as error:
             failure=self.store.record('worker_failure',run.binding(),dict(project=self.project.fingerprint(),
                 category=type(error).__name__,message=str(error)[:2000]))
@@ -350,9 +442,10 @@ class Runtime:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('serve','worker','status'))
+    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--task');parser.add_argument('--run',type=int);parser.add_argument('--interval',type=float,default=15)
+    parser.add_argument('--expect-pause')
     args=parser.parse_args()
     if args.operation=='serve':
         with Owner(args.root):
@@ -363,7 +456,12 @@ def main():
         def terminated(*_):raise SystemExit(143)
         signal.signal(signal.SIGTERM,terminated)
         Runtime(args.root,args.upstream).worker(args.task,args.run)
-    else:print(json.dumps(Runtime(args.root,args.upstream).status(),indent=2))
+    else:
+        runtime=Runtime(args.root,args.upstream)
+        value=(runtime.pause() if args.operation=='pause' else runtime.resume(args.expect_pause)
+               if args.operation=='resume' else runtime.check_admission(force=True)
+               if args.operation=='doctor' else runtime.status())
+        print(json.dumps(value,indent=2))
 
 
 if __name__=='__main__':main()

@@ -21,8 +21,10 @@ indisponibilidade de conexão, ACK perdido, reinício e 21 mensagens locais.
 Telegram real não foi ativado. A
 [conexão de publicação/esperas/deploy/QA](HERMES-INTEGRATION-QUALIFICATION.md)
 passou depois pelo serviço, com CI simulado, reinício e recuperação de um crash
-de partida. Brief/planejamento/aceite de release e admissão/pausa seguem pendentes
-antes de S4; não qualificar essa prova como autonomia completa.
+de partida. [Pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md) também
+passaram depois, com interrupção do SDK, preservação da revisão e perfil
+restaurado sem gastar retry. Brief/planejamento/aceite de release seguem pendentes
+antes de S4; não qualificar essas provas como autonomia completa.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
@@ -858,7 +860,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
 | S0 Referência e ADR | Concluída; referência e arquivo comprimido reconferidos | Referência Git, hashes e restauração íntegra original do backup |
 | S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream; 117 testes atuais passaram |
-| S2 Executor/qualidade pequenos | Parcial: serviço TDD, recuperação Lead/CTO/SPIKE, outbox/alertas e esperas de integração passaram em isolamento | Faltam admissão/pausa e brief/planejamento/aceite integral; Telegram real não testado |
+| S2 Executor/qualidade pequenos | Parcial: TDD, diagnóstico, outbox, integração, pausa/retomada e admissão passaram em isolamento | Faltam brief/planejamento/aceite integral e provedor autorizado; Telegram real não testado |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP conectada ao serviço: publicação, espera, reinício, build/deploy/QA/rollback reais; CI simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
@@ -883,7 +885,8 @@ Próxima fatia após a prova offline S3:
    etapas de origem preservados, rollback e QA independente no mesmo candidato.
    O serviço TDD já acorda os cards nativamente. A continuação de integração/CI
    também passou no serviço, usando `scheduled` e recibos, sem outro ciclo de vida.
-   Perfil/recursos, pausa/drain e provedor ainda exigem suas fronteiras explícitas.
+   Perfil/recursos e pausa/retomada já passaram na fronteira operacional;
+   provedor e intake ainda exigem suas fronteiras explícitas.
    Atenção: `scheduled` volta a `ready`
    no upstream, portanto não usar esse caminho genericamente para revisores.
 3. A matriz já aceita suplentes explicitamente permitidos. O handoff TDD deriva
@@ -896,16 +899,18 @@ Próxima fatia após a prova offline S3:
    serviço, SPIKE em cópia descartável, orientação e retomada sem duplicar ações.
    O incidente só resolveu após evidência válida dos gates do trabalho original.
    Outbox/alertas já passaram com falhas de conexão e ACK/reinício, sem bloquear
-   o trabalho. Agora ligar esperas/publicação/deploy/QA ao serviço e a interface
-   do brief. Faltam classes sem run, como perfil/recursos indisponíveis. Não criar
+   o trabalho. A conexão de publicação/deploy/QA e a admissão básica de perfil/
+   recursos já passaram. Agora implementar a interface do brief e o plano de
+   trabalho com aceite da release. Não criar
    outro ciclo de vida, nem implementar toda S5 antes de tentar S4. CEO não é
    fallback para decisões técnicas.
 5. Só depois resolver a pausa do provedor pelo caminho autorizado e executar S4
    com Produto/brief aprovado, modelo e GitHub reais. Preservar o contador e teto;
    não considerar uma fixture ou tarefa `done` como release homologada.
-   Antes de liberar consumo, preparar também admissão de perfis/recursos, intake/
-   aprovação e pausa explícita de workers: parar o dispatcher para reinício não
-   significa interromper workers saudáveis. Manter uma fonte canônica de modelos
+   Antes de liberar consumo, concluir intake/aprovação e usar a pausa explícita
+   qualificada: parar o dispatcher para reinício não significa interromper workers
+   saudáveis. A admissão ainda não é monitoramento completo de capacidade nem
+   diagnóstico de todo problema de infraestrutura. Manter uma fonte canônica de modelos
    e nenhum fallback automático.
 
 Ao retomar com GPT 6.1 Sol:

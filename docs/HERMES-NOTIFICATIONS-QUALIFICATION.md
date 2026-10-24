@@ -117,8 +117,9 @@ O transporte HTTPS foi verificado com mock; o ensaio HTTP local não substitui
 uma validação futura do Telegram. As evidências completas continuam privadas.
 
 A [conexão posterior de publicação/CI/deploy/QA](HERMES-INTEGRATION-QUALIFICATION.md)
-passou pelo serviço sem ocupar workers em esperas de CI. Falta admissão de
-perfis/recursos, pausa/drain e a interface de brief/aprovação. Depois,
+passou pelo serviço sem ocupar workers em esperas de CI. A
+[pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md) passou depois.
+Falta a interface de brief/aprovação e o aceite integral da release. Depois,
 liberar o provedor pelo caminho autorizado e executar S4 com modelo/GitHub reais.
 Não expandir para toda falha S5 antes dessa primeira entrega.
 

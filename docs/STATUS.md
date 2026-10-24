@@ -46,9 +46,13 @@ fixture, dois builds, quatro atualizações Compose e QA independente reais. Um
 crash de inicialização SQLite foi recuperado nativamente; a primeira tentativa
 da prova permanece não aprovada por falha na auditoria de identidade. Não houve
 reparo/handoff do operador na segunda tentativa. Deploy temporário foi retirado
-com evidências preservadas. Faltam brief/planejamento/aceite de release, admissão,
-pausa/drain, provedor/GitHub reais e migração. Não houve produção.
-Checks atuais: 125 testes do caminho novo e 4.523 da suíte histórica, todos sem
+com evidências preservadas. A [pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md)
+passou depois: dois reclaims intencionais, reinício pausado sem rota, retorno do
+revisor sem gastar retry e TDD concluído em oito runs/19 respostas locais. Uma
+tentativa anterior foi interrompida por cache incorreto de perfil e permanece
+não aprovada. Faltam brief/planejamento/aceite de release, liberação autorizada do
+provedor/GitHub reais e migração. Não houve produção.
+Checks atuais: 139 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.
