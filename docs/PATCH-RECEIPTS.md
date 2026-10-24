@@ -9,6 +9,10 @@ path, not a newly demonstrated patch persistence failure. That guidance is now
 qualified and installed; its native successor also blocked, not approved.
 The qualified installed successor separates recommended order from genuinely
 pending pages; it still grants no new paths or write authority and needs native validation.
+The later native run exposed aggregate result spill: 37 previews did not qualify
+as complete reads. The bounded whole-page transport fix is now qualified and
+installed for immutable review only. It grants no access to spill files and
+does not convert historical previews or patch receipts into read evidence.
 The earlier execution completed with a structured stall diagnostic, not an accepted review verdict.
 No patch adapter can supply its missing inspection or turn it into approval.
 See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before

@@ -21,6 +21,9 @@ da qualificação ponta a ponta ainda necessária.
    com todas as páginas pendentes permitidas. A candidata seguinte separa os
    dois conceitos e permite offsets mistos verificáveis, sem reduzir os gates.
    O marco continua aberto até parecer nativo aceito.
+   O ensaio posterior chegou a 53/71 arquivos completos, mas 37 resultados
+   viraram prévias de spill. O transporte completo restrito à revisão foi
+   qualificado acima do limiar antigo e instalado; falta sua prova nativa.
 2. **Qualificação antes de novo ensaio:** fixtures com múltiplos arquivos e
    páginas, controles negativos e Hermes/handlers/ACP reais sem provedor.
    O caminho só de ferramentas já passou pela prova física de escala e

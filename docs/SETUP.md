@@ -71,10 +71,13 @@ custo nem uma permissão para elevar o teto de chamadas. Não há fallback de
 modelo automático. A qualificação específica deve anteceder um novo ensaio pago.
 
 O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
-O controlador `20261023.32` e o worker `20261023.8` já estão instalados nessa
+O controlador `20261023.33` e o worker `20261023.9` já estão instalados nessa
 referência; esses identificadores não constituem imagens publicadas para download.
 A sucessora liberada após a mudança qualificada também ficou bloqueada.
 O seletor atual inclui a correção de páginas pendentes, ainda sem aprovação nativa.
+Também preserva resultados completos em lotes grandes de revisão, sob o teto
+de 8 MiB do diário. Isso não aumenta o corpo de 2 MiB do proxy nem permite ler
+arquivos temporários de spill. Outros modos mantêm o orçamento original.
 Isso não autoriza iniciar o Truco ou repetir indefinidamente o ensaio.
 
 Manutenção, pausa do provedor e estado do contêiner do proxy são independentes.

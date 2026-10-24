@@ -22,6 +22,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
 | Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
 | Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
+| Transporte completo na revisão | `quality_review_budget.py`, hook fixo em `agent/tool_executor.py` |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
@@ -37,7 +38,8 @@ flowchart TD
     C --> A[Autor: testes novos no workspace atribuído]
     A --> S[Snapshot imutável e Red real]
     S --> R[Revisor independente: leitura e decisão]
-    R --> J[Diário de leituras reais antes da compactação]
+    R --> O[Executor da revisão: páginas completas sob teto de 8 MiB]
+    O --> J[Diário de leituras reais antes da compactação]
     J --> P[Fila desde a primeira chamada: schema e gate no handler]
     P -->|Prioridade aos testes novos; até 16 páginas por lote| R
     P --> N[Handler: ordem sugerida distinta das tuplas pendentes permitidas]
@@ -56,7 +58,7 @@ flowchart TD
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
 v2, não uma dispensa de execução. Feedback, planejador, diário e paradas estão
-instalados no controlador `20261023.32` e worker `20261023.8` da referência.
+instalados no controlador `20261023.33` e worker `20261023.9` da referência.
 `apply_request()` agora arma a orientação e o gate desde a primeira chamada,
 sem depender de uma resposta final prematura. Testes novos têm prioridade;
 uma rejeição fundamentada continua possível sem completar todo o escopo de
@@ -72,6 +74,14 @@ a tupla exata, não o produto cartesiano de caminhos e offsets. Cada página é
 consumida uma vez. Negativas de plano trazem orientação distinta de operações
 realmente proibidas; não concedem novos caminhos ou evidência de inspeção.
 A qualificação física passou; o parecer nativo da nova revisão continua necessário.
+
+O ensaio subsequente completou 53/71 arquivos, mas o orçamento agregado do
+executor substituiu 37 resultados por prévias de spill. A isenção de
+`read_file` por resultado não impedia esse segundo mecanismo. O novo hook
+`quality_review_budget.py` limita o agregado ao teto de 8 MiB já imposto pelo
+diário, somente para a revisão autenticada. Assim os resultados podem chegar
+inteiros à captura e à compactação; prévias não viram evidência. Outros modos,
+permissões, limite de corpo do proxy e orçamento de iterações permanecem iguais.
 
 O diário é limitado a 512 pares/8 MiB, vincula execução e manifesto, não descarta
 evidências para caber no limite e sugere até 16 páginas com um offset comum
@@ -90,11 +100,12 @@ real com sete respostas locais: ACP normal, negação de duplicatas, duas rodada
 sem progresso e saída no fim do orçamento. O controle desta última fronteira
 usa uma iteração sintética;
 a fábrica ACP permanece fixada em 40. A extensão de escala percorreu 219 páginas
-de 71 arquivos (563.066 bytes), com 16 chamadas principais, duas sumarizações
-locais e duas compactações reais. Elas removeram 190 pares da conversa sem
+de 71 arquivos (563.066 bytes), com seis chamadas principais, uma sumarização
+local e uma compactação real. Ela removeu 64 pares da conversa sem
 perder cobertura no diário. Essa extensão usa ferramentas desde a primeira
 resposta, sem inicializar estado de conclusão prematura. A candidata também
-exerceu 126 leituras fora da recomendação e 12 lotes com offsets mistos.
+exerceu 157 leituras fora da recomendação e quatro lotes com offsets mistos.
+O lote de 274.113 caracteres não gerou spill; o controle legado gerou, como esperado.
 A revisão nativa anterior terminou com sete chamadas, 16/71 arquivos
 completos e parada `read_progress_stalled` com 33 iterações restantes.
 A atestação bloqueou o diagnóstico como parecer inválido; não houve aprovação.

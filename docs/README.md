@@ -40,6 +40,11 @@ A correção seguinte separa ordem e permissão, já qualificada e instalada, ai
 sem aprovação nativa. Os bloqueios anteriores continuam preservados. Temporal
 não é motor do runtime instalado.
 
+O último ensaio expôs spill agregado: 37 prévias não puderam ser aceitas como
+inspeção. A correção de transporte completo, limitada à revisão e ao teto do
+diário, passou no canário de lotes grandes e foi instalada. Sua prova nativa
+continua necessária; o fluxo ainda não está homologado.
+
 ## Política de atualização
 
 Alterações de arquitetura devem atualizar o mapa e os diagramas; novas provas

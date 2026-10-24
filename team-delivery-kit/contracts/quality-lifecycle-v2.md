@@ -902,6 +902,32 @@ summary/compaction calls preserved complete byte-bound coverage after removing
 responses and zero external model calls. Native qualification and independent
 approval remain necessary; this control cannot repair or approve the previous run.
 
+#### Aggregate spill must not erase immutable review pages
+
+The next native execution accepted 121 full read pages and completed 53/71
+files, but 37 other results became upstream `<persisted-output>` previews.
+`read_file` is exempt from per-result spilling upstream, yet aggregate turn
+enforcement can still spill it. Those previews point outside the registered
+snapshot and cannot count as complete inspection. Page retries then encountered
+deduplication and page-plan denials; the controller preserved the block.
+
+`quality_review_budget.py` and the pinned `_budget_for_agent` build seam preserve
+whole results only for authenticated `test_review_v2` with immutable review
+context. The aggregate budget is bounded by the existing journal cap of 8 MiB,
+not infinity. Per-file/read limits, the 512-pair journal cap, context compression,
+the 2 MiB model-proxy request ceiling, 40 iterations and all approval gates remain
+unchanged. Other phases retain their original budget. No `/tmp` spill paths,
+terminal, writes or extra read permissions are granted; no preview is promoted
+into evidence and no old reads are inherited by a successor.
+
+The expanded real-Hermes control returned 219 pages in batches of up to 64,
+including a measured 274,113-character tool turn above the legacy 200,000 limit,
+with zero spill previews. A separate real upstream legacy control still spilled.
+One actual compaction removed 64 conversation read pairs while the journal kept
+complete byte-bound coverage. The fixed set used fourteen local responses,
+zero external model calls and no approval authority. This qualifies bounded
+transport, not native semantics, project memory or end-to-end delivery.
+
 An earlier capacity-bound native run reached 122 observed read pages over 60 files before
 the existing proxy rejected its accumulated request at the fixed 512 KiB
 transport ceiling. The 71-file snapshot alone is 552,750 bytes, excluding JSON,

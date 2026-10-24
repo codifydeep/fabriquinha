@@ -29,7 +29,7 @@ plans missing pages from the first model request and reports stalled progress
 or budget exhaustion structurally. Partial new coverage must count as progress; repeated calls,
 prose and cache responses without content must not. The bounded journal and
 pending-page planner, loop capture, handler enforcement and structured stops
-are installed in reference controller `20261023.32` and worker `20261023.8`.
+are installed in reference controller `20261023.33` and worker `20261023.9`.
 Dispatch checks without consuming; only the fenced handler claims the page
 atomically. The initial consuming check at both
 boundaries was rejected by the real registry canary and corrected without
@@ -37,11 +37,11 @@ rewriting that failure. The expanded canary passed with seven fixed local
 responses: normal ACP continuation, direct duplicate denial, stalled tool
 rounds and the budget boundary. The latter uses a one-iteration fixture loop;
 the ACP factory remains fixed at 40. No external model was called. The expanded
-next-candidate fixture also passed: 71 files, 563,066 bytes, 219 unique pages, 16 main local
-responses and two local summary responses. Two real compression commits removed
-190 read pairs from conversation while the journal retained full byte-bound
-coverage. It exercised 126 pending reads outside recommendations and twelve
-mixed-offset batches. The complete fixed suite used 25 local responses, no external model.
+next-candidate fixture also passed: 71 files, 563,066 bytes, 219 unique pages, six main local
+responses and one local summary response. One real compression removed
+64 read pairs from conversation while the journal retained full byte-bound
+coverage. It exercised 157 pending reads outside recommendations and four
+mixed-offset batches. The complete fixed suite used fourteen local responses, no external model.
 Installation, verified backup/restoration and host scheduler pin migration
 completed. The normal control retains a premature answer; the scale control
 uses tools from its first reply without initializing completion state. That
@@ -79,6 +79,16 @@ candidate was installed under maintenance; native validation remains required. A
 hold assigned to CTO is visible accountability, not proof that the team has
 autonomously diagnosed and recovered the workflow.
 
+The following native run completed 53/71 files and preserved 121 full pages,
+but 37 other results became persisted-output previews under the aggregate turn
+budget. The per-result read_file exemption did not cover that second mechanism.
+Previews cannot count as complete reads and their /tmp spill paths are not granted.
+The qualified installed executor hook raises only the authenticated immutable
+review aggregate to the journal's existing bounded 8 MiB cap. Other phases,
+per-read limits, context compression, proxy request ceiling and iterations remain
+unchanged. A real 274,113-character tool batch returned without spill; the real
+legacy counter-control still spilled. Native qualification is still required.
+
 ### Failed incomplete inspection, not an inferred transport fix
 
 The installed completion-recovery adapter can register a fresh read-only review
@@ -105,7 +115,7 @@ identity to repeat an unchanged worker. A new source-qualified condition and
 the matching recovery route must be verified under sealed maintenance.
 
 After that review terminated, maintenance was sealed/drained again and the proxy
-stopped. The counter is 6,260/10,000; no ceiling or history was reset.
+stopped. The counter before the next qualification is 6,266/10,000; no ceiling or history was reset.
 Maintenance, provider pause and container stop are separate controls; consult
 live state before any operation. This document grants no maintenance release,
 model calls or delivery approval.

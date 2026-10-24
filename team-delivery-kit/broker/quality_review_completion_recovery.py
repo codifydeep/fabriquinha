@@ -14,6 +14,7 @@ import quality_review_stop as stop
 import quality_phase_tools as phase
 import quality_review_verdict as verdict
 import quality_review_paging as paging
+import quality_review_budget as budget
 import install_quality_review_stop as installer
 from review_execution_evidence import validate as validate_execution_controls
 import review_execution_evidence as execution_evidence
@@ -114,7 +115,7 @@ def qualification(b,value,operation):
     require(image.get('Id')==value['worker_image'] and image.get('Config',{}).get('User')=='10000:10000'
         and not image.get('Config',{}).get('Volumes')
         and image.get('Config',{}).get('Labels',{}).get('delivery-kit.component')=='quality-author-worker')
-    modules={'feedback':stop,'phase':phase,'verdict':verdict,'installer':installer,'paging':paging}
+    modules={'feedback':stop,'phase':phase,'verdict':verdict,'installer':installer,'paging':paging,'budget':budget}
     guards={key:hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest() for key,module in modules.items()}
     guards['handler']=hashlib.sha256(Path(__file__).with_name('review_tool_policy.py').read_bytes()).hexdigest()
     require(value.get('guards')==guards)
@@ -126,13 +127,13 @@ def qualification(b,value,operation):
         and report.get('same_agent') is True and report.get('protected_files_unchanged') is True
         and report.get('tests_approved') is False and report.get('delivery_approval') is False
         and isinstance(report.get('guard_sources'),dict)
-        and set(report['guard_sources'])==set(guards)|{'loop','acp','session'}
+        and set(report['guard_sources'])==set(guards)|{'loop','acp','session','executor'}
         and all(report['guard_sources'][key]==sha for key,sha in guards.items())
         and all(re.fullmatch('[a-f0-9]{64}',str(v)) for v in report['guard_sources'].values()))
     validate_execution_controls(report.get('execution_controls'))
     execution_evidence.validate_scale(report.get('scale_controls'))
     require(type(report.get('total_fixed_provider_calls')) is int
-        and report['total_fixed_provider_calls']==23+report['scale_controls']['summary_provider_calls']
+        and report['total_fixed_provider_calls']==13+report['scale_controls']['summary_provider_calls']
         and report.get('fixture_source_sha256')==hashlib.sha256(Path(execution_evidence.__file__).read_bytes()).hexdigest())
     return quality.digest(report['guard_sources'])
 

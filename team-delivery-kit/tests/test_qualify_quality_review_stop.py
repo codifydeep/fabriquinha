@@ -14,7 +14,7 @@ from test_review_execution_evidence import evidence,scale_evidence
 class QualityReviewStopQualificationTests(unittest.TestCase):
     def report(self):
         return dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',provider='fixed_loopback_not_model',
-            model_calls=0,fixed_provider_calls=3,total_fixed_provider_calls=24,execution_controls=evidence(),
+            model_calls=0,fixed_provider_calls=3,total_fixed_provider_calls=14,execution_controls=evidence(),
             scale_controls=scale_evidence(),fixture_source_sha256=driver.sha((driver.ROOT/'review_execution_evidence.py').read_bytes()),
             feedback_rounds=1,same_agent=True,max_iterations=40,
             acp=True,protected_files_unchanged=True,tests_approved=False,delivery_approval=False,

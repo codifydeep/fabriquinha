@@ -27,12 +27,12 @@ capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, se
 credenciais nos testes. A recuperação da falha por tamanho foi registrada e o
 ensaio seguinte ultrapassou o limite antigo sem aquela rejeição, mas falhou ao
 esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
-O hardening de paginação já foi instalado: controlador `20261023.32` e worker
-`20261023.8`, com diário limitado, captura no loop e paradas estruturadas.
-O canário Hermes/ACP percorreu 219 páginas e 563 KB; duas compactações reais
-da candidata seguinte retiraram 190 pares da conversa sem perder cobertura no
-diário. Foram 25 respostas locais fixas, sem chamadas externas: 126 leituras
-fora da recomendação e 12 lotes mistos, ainda sem aprovação nativa.
+O hardening de paginação já foi instalado: controlador `20261023.33` e worker
+`20261023.9`, com diário limitado, captura no loop e paradas estruturadas.
+O canário Hermes/ACP percorreu 219 páginas e 563 KB; uma compactação real
+retirou 64 pares da conversa sem perder cobertura no diário. Foram 14 respostas
+locais fixas, sem chamadas externas: 157 leituras fora da recomendação,
+quatro lotes mistos e um lote de 274 mil caracteres preservado sem spill.
 Após uma recuperação anterior, o coordenador iniciou uma revisão real que parou
 por falta de progresso depois de sete chamadas, com 16/71 arquivos completos
 e 33 iterações restantes. A fila dependia de uma resposta final prematura.
@@ -47,6 +47,11 @@ interpretou isso como perda de acesso. A candidata seguinte separa ordem
 recomendada e tuplas pendentes permitidas, mantendo negação de repetição, EOF
 e caminhos estranhos. Ela foi qualificada e instalada. A instância voltou à manutenção
 selada, com proxy parado. Não houve aprovação, congelamento ou entrega nessa linhagem v2.
+O ensaio posterior completou 53/71 arquivos, mas 37 resultados viraram prévias
+de spill agregado. O executor qualificado agora preserva páginas completas só
+na revisão autenticada, sob o teto de 8 MiB do diário, mantendo o corpo de 2 MiB
+do proxy, a compactação e os demais gates. A correção está instalada; falta
+seu parecer nativo independente, sem promover prévias antigas a evidências.
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),
@@ -1495,6 +1500,8 @@ flowchart TD
     TR -->|Desde a primeira chamada| RS[Fila instalada: testes novos primeiro, páginas pendentes e formato]
     RS -->|Mesmo turno e orçamento de 40 iterações| TR
     TR -->|Leituras reais, inclusive fluxo só de ferramentas| RG[Monitor de progresso e diário resistente à compactação]
+    TR --> RT[Transporte completo apenas na revisão: teto do diário, sem liberar temporários]
+    RT --> RG
     RG -->|Falta de progresso| AD
     RS -.->|Duas tentativas sem progresso| AD
     TR -->|Solicita mudanças nos testes novos| F
@@ -1635,7 +1642,7 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 O estado vigente em **23 de outubro de 2026** está em
 [STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente terminou bloqueada
 sem leitura integral, não congelou os testes e não chegou à homologação. A suíte offline
-da candidata seguinte executou 4.380 testes: 4.372 aprovados e oito skips preexistentes,
+da candidata seguinte executou 4.384 testes: 4.376 aprovados e oito skips preexistentes,
 sem falhas. O canário Hermes/ACP, incluindo escala/compactação, passou com respostas fixas, sem modelo;
 a correção seguinte também está instalada, mas ainda exige
 qualificação nativa. A estimativa de prontidão

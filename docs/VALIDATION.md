@@ -13,12 +13,13 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa anterior | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Continua preservada, não aprovada. |
-| Instalação do hardening | Controlador `20261023.32` e worker `20261023.8`; orientação inicial e distinção entre ordem e páginas pendentes, backup/restauração verificados, pin do serviço host migrado, dados e contador preservados. |
-| Canário físico da candidata seguinte | Hermes/ACP normal, preflight/handler desde a primeira chamada, duplicata negada e paradas estruturadas. Extensão: 71 arquivos, 563.066 bytes, 219 páginas em 16 chamadas principais; 126 leituras fora da ordem recomendada, 12 lotes mistos e duas compactações removendo 190 pares sem perda de cobertura. Conjunto: 25 respostas locais, zero externas. Não é aprovação nativa. |
+| Instalação do hardening | Controlador `20261023.33` e worker `20261023.9`; preservação restrita de resultados completos, backup/restauração verificados, pin do serviço host migrado, dados e contador preservados. |
+| Canário físico da candidata seguinte | Hermes/ACP real, 219 páginas/71 arquivos/563.066 bytes; lote de 274.113 caracteres sem spill, controle legado com spill, 157 leituras fora da recomendação e quatro lotes mistos. Uma compactação retirou 64 pares sem perder cobertura. Conjunto: 14 respostas locais, zero externas. Não é aprovação nativa. |
 | Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
-| Última revisão nativa terminal | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Nativa `completed`, mas recibo e equipe `technical_blocked`, sem retry automático. Sem congelamento, Green ou homologação. |
+| Revisão com parada por falta de progresso | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Preservada, sem aprovação. |
 | Revisão nativa após a orientação inicial | Despachada pelo coordenador; terminou após seis chamadas, 36 páginas aceitas e 26/71 arquivos completos. Páginas pendentes fora do lote recomendado foram negadas; escalonamento do revisor não foi aceito como parecer completo. `technical_blocked`, sem aprovação. |
-| Última suíte completa registrada | 4.380 executados: 4.372 aprovados, oito skips preexistentes, sem falhas. Inclui páginas pendentes fora do lote sugerido, tuplas exatas, negativas de plano e proteção da rejeição fundamentada. Os 83 testes focados também passaram. |
+| Última revisão nativa terminal | 53/71 arquivos completos e 121 páginas aceitas; 37 prévias de spill não contam como inspeção. Seis chamadas; `completed` nativo, mas `technical_blocked` no controlador. Sem congelamento, Green ou homologação. |
+| Última suíte completa registrada | 4.384 executados: 4.376 aprovados, oito skips preexistentes, sem falhas. Inclui orçamento agregado restrito à revisão e rejeição de drift no executor. Os 44 testes focados também passaram. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
@@ -32,6 +33,14 @@ essas negações como falta de acesso. Uma candidata separa os dois conceitos,
 sem admitir repetição, EOF ou caminhos não registrados. Ela passou no canário
 físico e foi instalada; sua qualificação nativa ainda é obrigatória.
 
+O ensaio seguinte revelou spill por orçamento agregado, apesar da isenção de
+`read_file` por resultado. A nova prova usa lotes de até 64 páginas, superiores
+ao limiar de 200 mil caracteres; lotes de 16 páginas não exercitavam esse caso.
+O hook qualificado preserva páginas completas sob o teto já existente de 8 MiB
+do diário apenas na revisão autenticada. Outros modos, corpo do proxy, limites
+de leitura, permissões e número de iterações não mudaram. Nenhuma prévia antiga
+é promovida a recibo; a sucessora precisa produzir suas próprias leituras.
+
 Os testes focados e a suíte completa acima foram executados para esta correção. O controle
 físico do fim do orçamento usa uma iteração; a fábrica ACP continua em 40.
 Escala e compactação passaram no perfil de respostas fixas, não em toda
@@ -43,7 +52,7 @@ aprovação foi herdada da tentativa anterior. A equipe ainda precisa concluir
 a revisão e toda a cadeia posterior sob o contrato v2.
 
 Depois da revisão terminal, a manutenção foi selada e drenada novamente e o
-proxy foi parado. O contador permaneceu em 6.260/10.000 chamadas. São estados
+proxy foi parado. O contador permaneceu em 6.266/10.000 chamadas. São estados
 independentes: uma task `completed`, uma lease fechada e uma revisão aprovada
 não são equivalentes. Confirme o estado vivo antes de agir. Nenhum resultado
 histórico abaixo substitui esse diagnóstico.

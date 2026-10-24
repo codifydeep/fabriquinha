@@ -28,14 +28,14 @@ class QualityReviewCompletionRecoveryTests(unittest.TestCase):
         self.worker='sha256:'+'e'*64
         self.b.QUALITY_WORKER_IMAGE=self.worker;self.b.QUALITY_REVIEW_WORKER_IMAGE=self.worker
         guards={k:hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest() for k,m in
-            dict(feedback=recovery.stop,phase=recovery.phase,verdict=recovery.verdict,installer=recovery.installer,paging=recovery.paging).items()}
+            dict(feedback=recovery.stop,phase=recovery.phase,verdict=recovery.verdict,installer=recovery.installer,paging=recovery.paging,budget=recovery.budget).items()}
         guards['handler']=hashlib.sha256(Path(recovery.__file__).with_name('review_tool_policy.py').read_bytes()).hexdigest()
         report=dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',provider='fixed_loopback_not_model',
-            total_fixed_provider_calls=24,execution_controls=execution_evidence(),scale_controls=scale_evidence(),
+            total_fixed_provider_calls=14,execution_controls=execution_evidence(),scale_controls=scale_evidence(),
             fixture_source_sha256=hashlib.sha256(Path(recovery.execution_evidence.__file__).read_bytes()).hexdigest(),
             model_calls=0,fixed_provider_calls=3,feedback_rounds=1,max_iterations=40,acp=True,same_agent=True,
             protected_files_unchanged=True,tests_approved=False,delivery_approval=False,
-            guard_sources={**guards,'loop':'1'*64,'acp':'2'*64,'session':'3'*64})
+            guard_sources={**guards,'loop':'1'*64,'acp':'2'*64,'session':'3'*64,'executor':'4'*64})
         self.qualified=dict(operation='qualified_review_stop_worker_v1',namespace=self.b.PREFIX,
             maintenance_operation=self.operation,qualification_id='a0000000-0000-4000-8000-000000000005',
             worker_image=self.worker,guards=guards,report=report,container_retired=True,model_calls=0,

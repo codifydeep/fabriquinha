@@ -64,6 +64,15 @@ CAPTURE_ANCHOR='''    while (api_call_count < agent.max_iterations and agent.ite
 '''
 POST_TOOL_ANCHOR='''                # Reset per-turn retry counters after successful tool
 '''
+TOOL_BUDGET_ANCHOR='''    try:
+        ctx = getattr(getattr(agent, "context_compressor", None), "context_length", None)
+        # budget_for_context_window(None) (rather than DEFAULT_BUDGET) so the
+        # config-driven MCP threshold override still applies when the context
+        # length isn't resolvable.
+        return budget_for_context_window(int(ctx) if ctx else None)
+    except Exception:
+        return DEFAULT_BUDGET
+'''
 
 
 def checkpoint_hook(indent,*,after_tools=False):
@@ -119,12 +128,24 @@ def adapt_request(source):
     return source.replace(REQUEST_ANCHOR,REQUEST_HOOK+REQUEST_ANCHOR)
 
 
+def adapt_tool_budget(source):
+    if source.count(TOOL_BUDGET_ANCHOR)!=1 or '_quality_review_budget' in source:
+        raise ValueError('pinned Hermes tool-result budget seam changed')
+    changed=TOOL_BUDGET_ANCHOR.replace('return budget_for_context_window(', 'budget = budget_for_context_window(')
+    changed=changed.replace('return DEFAULT_BUDGET','budget = DEFAULT_BUDGET')
+    changed+='''    from quality_review_budget import for_review as _quality_review_budget
+    return _quality_review_budget(budget)
+'''
+    return source.replace(TOOL_BUDGET_ANCHOR,changed)
+
+
 if __name__=='__main__':
     loop=Path('/opt/hermes/agent/conversation_loop.py')
     acp=Path('/opt/hermes/acp_adapter/server.py')
     session=Path('/opt/hermes/acp_adapter/session.py')
+    executor=Path('/opt/hermes/agent/tool_executor.py')
     # Prepare/compile both before any write; no partial install on source drift.
     changed=[(loop,adapt_post_tools(adapt_capture(adapt_request(adapt_loop(loop.read_text()))))),(acp,adapt_acp(acp.read_text())),
-        (session,adapt_session(session.read_text()))]
+        (session,adapt_session(session.read_text())),(executor,adapt_tool_budget(executor.read_text()))]
     for path,source in changed:compile(source,str(path),'exec')
     for path,source in changed:path.write_text(source)

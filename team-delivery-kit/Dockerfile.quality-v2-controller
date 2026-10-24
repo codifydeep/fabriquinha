@@ -13,6 +13,8 @@
 # while first-request review guidance and its successor are being qualified.
 # Retain delivery-kit-quality-v2-controller:20261023.31 as the installed rollback
 # while the pending-page successor is qualified; do not overwrite its image tag.
+# Retain delivery-kit-quality-v2-controller:20261023.32 as the installed rollback
+# until whole-page aggregate transport qualifies; historical reviews stay blocked.
 FROM delivery-kit-execution-broker:20261021.512
 COPY broker/server.py /broker.py
 COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /
@@ -35,6 +37,7 @@ COPY broker/quality_review_capacity_recovery.py proxy_capacity_contract.py /
 COPY model_proxy.py /qualified_proxy_source.py
 COPY install_quality_review_stop.py /
 COPY quality_review_verdict.py quality_review_stop.py quality_review_paging.py /
+COPY quality_review_budget.py /
 COPY broker/review_tool_policy.py /
 COPY review_execution_evidence.py /
 COPY broker/quality_implementation_admission.py /

@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
                 'No tests or delivery have been approved. Follow the original operator fixture '
                 'and the controller notices for exact pending paths and offsets.')),'stop','summary')
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
-        maximum=16 if scenario=='scale' else 1 if scenario=='budget' else 3
+        maximum=6 if scenario=='scale' else 1 if scenario=='budget' else 3
         if index>=maximum:
             self.send_response(400);self.end_headers();self.wfile.write(b'{"error":"fixed fixture call ceiling"}');return
         if scenario=='normal' and index==1:
@@ -86,7 +86,9 @@ class Handler(BaseHTTPRequestHandler):
             assert note['request_id']=='60000000-0000-4000-8000-000000000005'
             if note['remaining_files']:
                 assert body.get('tool_choice')=='auto'
-                pages=note['pending_reads'][:16];assert 1<=len(pages)<=16
+                # Reproduce a real model's large parallel batch, not the
+                # smaller recommended cohort that hid aggregate spill.
+                pages=note['pending_reads'][:64];assert 1<=len(pages)<=64
                 outside_recommendations.extend(page for page in pages if page not in note['next_reads'])
                 if len({page['offset'] for page in pages})>1:mixed_offset_batches.append(True)
                 schema=body['tools'][0]['function']['parameters']['properties']
@@ -243,6 +245,10 @@ def scale_compaction_control():
     from run_agent import AIAgent
     import quality_review_stop as stop
     from review_execution_evidence import scale_files
+    import agent.tool_executor as executor
+    from tools.budget_config import BudgetConfig,budget_for_context_window
+    from tools.tool_result_storage import enforce_turn_budget,PERSISTED_OUTPUT_TAG
+    from quality_review_paging import MAX_BYTES
     scale_files_data=scale_files()
     assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in scale_files_data.items())
     inv={p:dict(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)) for p,raw in scale_files_data.items()}
@@ -256,7 +262,18 @@ def scale_compaction_control():
     scenario='scale';calls=[]
     local=ThreadingHTTPServer(('127.0.0.1',0),Handler)
     threading.Thread(target=local.serve_forever,daemon=True).start()
-    commits=[];triggered=[]
+    commits=[];triggered=[];transport=[]
+    original_budget_enforcer=executor.enforce_turn_budget
+    legacy=[dict(role='tool',tool_call_id='fixed-legacy-budget',content='x'*210000)]
+    enforce_turn_budget(legacy,config=BudgetConfig())
+    assert PERSISTED_OUTPUT_TAG in legacy[0]['content']  # Real upstream counter-control.
+    def observe_budget(messages,*args,**kwargs):
+        before=sum(len(m.get('content','')) for m in messages)
+        result=original_budget_enforcer(messages,*args,**kwargs)
+        transport.append(dict(chars=before,count=len(result),
+            spills=sum(PERSISTED_OUTPUT_TAG in m.get('content','') for m in result)))
+        return result
+    executor.enforce_turn_budget=observe_budget
     try:
         # The auxiliary resolver reads task configuration independently from
         # AIAgent's explicit base_url. Never inherit the earlier closed server.
@@ -270,8 +287,13 @@ def scale_compaction_control():
         os.environ['OPENAI_BASE_URL']=endpoint
         current=AIAgent(model='anthropic/claude-haiku-5.5',provider='openai',api_mode='chat_completions',
             base_url=endpoint,api_key='offline-not-a-credential',
-            max_iterations=40,enabled_toolsets=['hermes-acp'],quiet_mode=True,max_tokens=2048,
+            max_iterations=40,enabled_toolsets=['hermes-acp'],quiet_mode=True,max_tokens=8192,
             checkpoints_enabled=False)
+        actual_budget=executor._budget_for_agent(current)
+        base_budget=budget_for_context_window(current.context_compressor.context_length)
+        from dataclasses import replace
+        assert actual_budget.turn_budget==MAX_BYTES
+        assert replace(actual_budget,turn_budget=base_budget.turn_budget)==base_budget
         compressor=current.context_compressor
         compressor.protect_first_n=1;compressor.protect_last_n=2
         compressor.summary_model='fixture-summary'
@@ -296,33 +318,41 @@ def scale_compaction_control():
         compressor.should_compress=should_compress
         current._compress_context=compress
         result=current.run_conversation('Fixed operator scale fixture. Review all registered pages; do not authorize any native delivery.')
-    finally:local.shutdown();local.server_close()
+    finally:
+        executor.enforce_turn_budget=original_budget_enforcer
+        local.shutdown();local.server_close()
     assert result['final_response']==verdict,result
-    assert len(calls)==16 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert len(calls)==6 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
     assert outside_recommendations and mixed_offset_batches
     assert not hasattr(current,'_quality_review_completion')  # Tools from call zero, never a premature final.
     assert len(commits)==len(scale_summaries)==compressor.compression_count and all(n>0 for n in commits),commits
     assert current._quality_review_journal.plan()['complete_files']==71
+    largest=max(p['chars'] for p in transport)
+    assert 200000<largest<=MAX_BYTES and sum(p['count'] for p in transport)==219,transport
+    assert all(p['spills']==0 for p in transport),transport
     assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in scale_files_data.items())
     return dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=len(scale_reads),
         main_provider_calls=len(calls),summary_provider_calls=len(scale_summaries),max_iterations=40,
         complete_files=71,compactions=compressor.compression_count,dropped_read_pairs=sum(commits),
         duplicate_reads=0,eof_reads=0,tool_only_from_first_call=True,
         out_of_recommended_reads=len(outside_recommendations),mixed_offset_batches=len(mixed_offset_batches),
+        largest_batch_chars=largest,legacy_turn_budget_chars=200000,
+        review_turn_budget_chars=MAX_BYTES,spill_previews=0,legacy_spill_observed=True,
         snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
 
 
 normal_calls=list(calls)
 controls=execution_controls()
 scale=scale_compaction_control()
-import quality_review_stop,quality_phase_tools,quality_review_verdict,quality_review_paging,review_tool_policy
+import quality_review_stop,quality_phase_tools,quality_review_verdict,quality_review_paging,review_tool_policy,quality_review_budget
 guard_sources={key:hashlib.sha256(Path(path).read_bytes()).hexdigest() for key,path in {
     'feedback':quality_review_stop.__file__,'phase':quality_phase_tools.__file__,
     'verdict':quality_review_verdict.__file__,'installer':'/install_quality_review_stop.py',
     'paging':quality_review_paging.__file__,
+    'budget':quality_review_budget.__file__,
     'handler':review_tool_policy.__file__,
     'loop':'/opt/hermes/agent/conversation_loop.py','acp':'/opt/hermes/acp_adapter/server.py',
-    'session':'/opt/hermes/acp_adapter/session.py'}.items()}
+    'session':'/opt/hermes/acp_adapter/session.py','executor':'/opt/hermes/agent/tool_executor.py'}.items()}
 print(json.dumps(dict(operation='real_hermes_review_stop_loop_canary_v1',status='passed',
     provider='fixed_loopback_not_model',model_calls=0,fixed_provider_calls=len(normal_calls),
     total_fixed_provider_calls=len(normal_calls)+controls['stall']['provider_calls']+controls['budget']['provider_calls']

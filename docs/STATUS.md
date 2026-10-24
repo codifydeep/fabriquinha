@@ -59,14 +59,18 @@ Os critérios objetivos continuam em [ROADMAP.md](ROADMAP.md).
   despachou outra revisão. Ela terminou após seis chamadas e 36 páginas aceitas,
   com 26/71 arquivos completos. O revisor reportou negações de páginas pendentes
   fora do lote recomendado; o controlador manteve `technical_blocked`.
+- A revisão seguinte confirmou o uso de lotes, mas terminou com 53/71 arquivos
+  completos. O transporte preservou 121 páginas; 37 outros resultados viraram
+  prévias de spill. Essas prévias não foram aceitas como inspeção. Não houve
+  aprovação ou congelamento dos testes.
 - A última suíte offline registrada com captura, enforcement e paradas executou
-  **4.380 testes: 4.372 aprovados e oito skips preexistentes**, sem falhas.
-  Os 83 testes focados desta correção também passaram. Essas provas offline
+  **4.384 testes: 4.376 aprovados e oito skips preexistentes**, sem falhas.
+  Os 44 testes focados desta correção também passaram. Essas provas offline
   não substituem a qualificação nativa.
 
 Não houve congelamento dos testes, Green ou homologação nessa linhagem v2.
 
-## Orientação inicial corrigida; ordem recomendada ainda confunde permissões
+## Último bloqueio: spill agregado dos resultados de leitura
 
 A versão anterior só projetava a fila depois de uma tentativa prematura de
 resposta final. A versão instalada agora prepara fila, schema restrito e gate
@@ -98,6 +102,21 @@ EOF, caminhos estranhos e combinações inválidas continuam negados no handler.
 Uma negativa de página passa a indicar ajuste de plano, não uma falha de ACL.
 Essa correção foi qualificada e instalada; ainda falta o parecer nativo aceito.
 
+O ensaio posterior expôs um limite distinto: embora `read_file` seja isento de
+spill por resultado no Hermes, o orçamento agregado do turno ainda substituía
+páginas completas por prévias em `/tmp`. Ler esses temporários não é permitido
+pelo contrato, nem pode uma prévia contar como inspeção integral. O modelo
+tentou recuperar páginas e encontrou deduplicação e negativas de plano.
+
+A correção qualificada em `quality_review_budget.py` preserva os resultados
+completos somente na fase autenticada de revisão imutável. Seu limite agregado
+é o mesmo teto de 8 MiB do diário, não infinito. As 512 páginas/pares máximos,
+os limites por leitura, a compactação real, o corpo de 2 MiB do proxy e as 40
+iterações permanecem. Outros modos mantêm o orçamento original; não há nova
+permissão para ler `/tmp`, executar terminal ou escrever.
+Ela foi instalada sob manutenção com restauração verificada; ainda exige
+aprovação nativa independente e toda a cadeia posterior.
+
 A tentativa anterior, com 57/71 arquivos completos e 40 iterações consumidas,
 permanece preservada como falha distinta. A rejeição histórica por corpo acima
 de 512 KiB também não é a causa comprovada do bloqueio atual. Não se deve
@@ -109,10 +128,12 @@ O canário Hermes/ACP passou com respostas locais fixas: continuação após uma
 resposta prematura, handler restrito desde a primeira chamada, duplicata negada
 e paradas por ausência de progresso e fim do orçamento. A extensão começou por
 ferramentas, sem resposta prematura, e inspecionou 71 arquivos, 563.066 bytes e
-219 páginas em 16 chamadas principais e duas sumarizações locais. Ela exerceu
-126 páginas fora da ordem recomendada e 12 lotes com offsets mistos. Duas
-compactações reais removeram 190 pares da conversa sem perder a cobertura no
-diário. O conjunto usou 25 respostas locais, sem chamadas ao provedor.
+219 páginas em seis chamadas principais e uma sumarização local. O maior lote
+teve 274.113 caracteres, acima do limite agregado antigo de 200 mil, sem prévias
+de spill. O controle legado continuou produzindo spill. Foram 157 leituras fora
+da recomendação e quatro lotes mistos. Uma compactação real removeu 64 pares da
+conversa sem perder cobertura no diário. O conjunto usou 14 respostas locais,
+sem chamadas ao provedor.
 
 Essa prova cobre o caminho de ferramentas desde a primeira chamada com respostas
 fixas. Não comprova a decisão de um modelo real, aprovação nativa, memória entre
@@ -123,13 +144,13 @@ orçamento usa uma iteração sintética; a fábrica ACP mantém 40.
 
 | Item | Estado observado em 23 de outubro |
 |---|---|
-| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.32`, instalado para qualificação controlada |
-| Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.8` |
-| Correção mais recente | Ordem recomendada distinta das tuplas pendentes permitidas, qualificada e instalada |
+| Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.33`, instalado para qualificação controlada |
+| Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.9` |
+| Correção mais recente | Preservação limitada dos resultados completos antes da compactação, qualificada e instalada |
 | Manutenção na instalação | `sealed`, `drained=true`; liberação depende da recuperação e ativação verificadas |
-| Última revisão | Nativa `completed`; controlador `technical_blocked`, sem aprovação |
+| Última revisão terminal | Nativa `completed`, 53/71 arquivos completos; controlador `technical_blocked` |
 | Proxy na instalação | Parado; limite de corpo configurado em 2 MiB |
-| Contador antes da nova validação | 6.260/10.000 chamadas, sem reset; teto não é monetário |
+| Contador antes da nova validação | 6.266/10.000 chamadas, sem reset; teto não é monetário |
 
 Esta é uma fotografia, não monitoramento vivo: confirme tarefas, serviços e
 leases antes de agir. Manutenção, pausa do provedor e proxy desligado são
@@ -138,9 +159,9 @@ dados, outros serviços e fila do scheduler. O teto de chamadas não é monetár
 
 ## Próximos marcos, em ordem
 
-1. Validar nativamente a correção instalada de páginas pendentes, depois da
-   ativação e liberação controladas. A prova física já incluiu leituras fora
-   de ordem, offsets mistos, repetição e EOF; não substitui parecer independente.
+1. Validar nativamente a preservação de páginas em lotes grandes, após a
+   instalação/ativação e liberação controladas. A prova física passou acima
+   do limiar antigo de spill; não substitui parecer independente.
 2. Conferir o parecer da revisão seguinte no controlador, sem confundir turno
    concluído com aprovação. Não repetir o perfil anterior ou ampliar iterações.
 3. Exigir que a própria equipe conduza solicitações de mudanças, correção do
