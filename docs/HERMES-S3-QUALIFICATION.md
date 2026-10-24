@@ -82,14 +82,51 @@ workflows GitHub executados ou crédito de provedor consumido.
 | Conclusão nativa | `complete_task` processa e registra seu próprio evento `pr_acceptance` |
 | Isolamento | Mesmo job fixo S2: snapshot somente leitura, sem rede/socket/credenciais |
 
-Dezesseis testes unitários da publicação também passaram, usando Git real local e
+Dezoito testes unitários da publicação também passaram, usando Git real local e
 transporte GitHub simulado. Cobrem espera de CI com prazo persistente, revisão
 antiga/não aprovada, dependência inválida, avanço da base, conteúdo de merge
 diferente e bloqueio de escrita real no GitHub em modo de qualificação.
 
-Total do caminho novo: 57 testes sem falhas. Suíte histórica: 4.523 testes,
+Total do caminho novo: 64 testes sem falhas. Suíte histórica: 4.523 testes,
 oito skips preexistentes e nenhuma falha. Os registros completos ficam privados.
 Todos os auxiliares Docker desta prova foram arquivados e retirados por ID exato.
+
+## Retomada em outra claim e suplência
+
+Uma prova posterior repetiu Red, mudanças, congelamento, implementação, controles
+negativos, revisão e publicação integrada, com doze controles TDD. O autor dos
+testes foi separado do implementador; o primeiro candidato à revisão da entrega
+era o autor dos testes. O controlador derivou esse conflito do recibo congelado
+e encaminhou a revisão ao próximo perfil da matriz aprovada. Não aceitou um
+revisor indicado por prosa do worker, autorrevisão ou perfil fora da matriz.
+O pool é ordenado, imutável após parsing e pode continuar sendo uma string para
+compatibilidade. Sem candidato independente, há impedimento explícito; a criação
+do diagnóstico técnico executável ainda é trabalho pendente.
+
+Na fronteira de PR, o roteiro perdeu a confirmação de criação e de merge.
+Depois de cada perda, usou `schedule_task`, verificou o encerramento do run,
+acionou `unblock_task` e fez uma nova claim. Foram três runs distintos para um
+único PR e um único merge, com uma única branch. A autorização da claim anterior
+foi negada pelo board. O Git é real; transporte GitHub/CI continua simulado.
+
+`Run.binding()` mantém o número da execução nas aprovações e validações. Somente
+a chave dos efeitos da publicação usa o sujeito estável, complementado pelo
+recibo exato da revisão, projeto e contrato. O journal preserva a claim de origem;
+o recibo de publicação identifica também a claim atual que observou o resultado.
+Cada efeito exige autorização atual. Prazos de CI não são renovados porque outra
+claim foi criada. Não foi acrescentado banco ou ciclo de vida concorrente.
+
+Essa prova usou o mesmo upstream sem patches e oito jobs reais de suíte. O
+roteiro acordou os cards: **não existe wake loop automático instalado**. Também
+não repetiu build/deploy/QA; a prova completa anterior permanece separada. A
+retomada entre claims dessas etapas ainda não está qualificada, assim como a
+troca do perfil responsável pela integração. `Run.subject()` não autoriza nada
+por si só e não deve substituir os bindings de autoria/revisão.
+
+A primeira tentativa deste incremento parou numa asserção desatualizada do
+roteiro, que ainda esperava o antigo autor dos testes. Sua claim foi bloqueada
+pela API nativa e os arquivos preservados; não recebeu aprovação retroativa.
+O roteiro corrigido completou uma execução nova, sem reparo durante a prova.
 
 ## Build, rollback e QA reais
 
@@ -172,10 +209,11 @@ mais nova exige rebase, preservação dos testes atuais e nova revisão, antes d
   divergente ou prazo esgotado não produz merge. O adaptador contínuo ainda
   precisa transformar a espera em estado nativo sem ocupar worker e encaminhar
   diagnóstico ao Tech Lead/CTO; esse requisito de S2 não está concluído.
-  As confirmações perdidas foram retomadas no mesmo run. Outra claim, caso o
-  agendamento nativo gere um novo `run_id`, ainda precisa de identidade de entrega
-  estável para não duplicar PR/build/deploy. Isso é pré-condição de S4, não prova
-  coberta pelo canário de restart do mesmo run.
+  PR/merge já foram retomados em novas claims com identidade estável e origem
+  preservada. Build/deploy/QA entre claims ainda precisam dessa qualificação;
+  isso continua sendo pré-condição de S4. Revisão agendada exige cuidado adicional:
+  no upstream fixado, `unblock_task` de `scheduled` retorna a `ready`, não a
+  `review`. Não instalar um agendamento genérico que transforme revisor em autor.
 - Build, deploy, QA e rollback foram conectados na stack Python/HTTP sem estado.
   Isso não qualifica migrações de banco, outras stacks, mobile, 3D ou produção.
 - `HOMOLOGADA` continua indisponível nesta prova. Faltam ainda serviço contínuo,

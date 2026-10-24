@@ -11,6 +11,9 @@ com TDD real, testes congelados, revisão imutável e recuperação de timeout;
 os autores e pareceres ainda são fixtures sintéticas. A [fatia de integração S3](docs/HERMES-S3-QUALIFICATION.md)
 já conecta revisão, Git real, PR/CI simulados, suíte real no commit de merge,
 build, Compose, QA em Chromium e rollback, inclusive após confirmações perdidas.
+A publicação também passou por novas claims nativas sem duplicar PR/merge,
+e o handoff TDD selecionou um suplente aprovado para evitar conflito de autoria.
+Essas retomadas foram acionadas pelo roteiro, não por um serviço autônomo.
 A cadeia offline Python/HTTP passou; faltam serviço contínuo, modelos e GitHub
 reais, recuperação da equipe e instalação reproduzível.
 A instalação antiga descrita abaixo permanece como referência
@@ -21,7 +24,7 @@ ainda são sintéticos; Kanban, Git e jobs Docker são reais:
 
 ```mermaid
 flowchart LR
-    K[Hermes Kanban] --> T[TDD e revisão imutável]
+    K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]

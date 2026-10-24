@@ -242,11 +242,11 @@ class Publication:
         self.board.require_parent(run, author['task'])
         if (data['project'] != self.project.fingerprint() or author['release'] != run.release
                 or data['verdict']['decision'] != 'approve' or data['verdict']['findings']
-                or self.project.reviewer(author['author']) != author['actor']):
+                or author['actor'] not in self.project.reviewers_for(author['author'])):
             raise ValueError('independent approval of this exact project/release required')
         snapshot = data['snapshot']
         self.store.tree(snapshot)
-        key = digest(dict(run=run.binding(), review=review_id, project=self.project.fingerprint()))
+        key = digest(dict(subject=run.subject(), review=review_id, project=self.project.fingerprint()))
         with self.journal.lock(key+':publication'):
             return self._publish(run, review_id, snapshot, key)
 
@@ -279,7 +279,7 @@ class Publication:
         initial = folder/'inputs.json'
         if not initial.exists():
             write_json(initial, dict(base=self.repo.base(), branch='feat/fabriquinha-'+key[:20],
-                                     checks_deadline=time.time()+900))
+                                     checks_deadline=time.time()+900, origin=run.binding()))
         inputs = json.loads(initial.read_bytes())
         base, branch = inputs['base'], inputs['branch']
         review=self.store.receipt(review_id,kind='delivery_review')['payload']
@@ -288,7 +288,7 @@ class Publication:
         red=self.store.receipt(frozen['red'],kind='red')['payload']
         if self.repo.snapshot(base)!=red['baseline']:
             raise EffectBlocked('reviewed work uses an older baseline; rebase and preserve current regression tests')
-        identity = dict(binding=run.binding(), project=self.project.fingerprint(), review=review_id,
+        identity = dict(binding=inputs['origin'], project=self.project.fingerprint(), review=review_id,
                         snapshot=snapshot, base=base, branch=branch)
         body = self.description(run,review_id,snapshot)
 
@@ -330,7 +330,7 @@ class Publication:
         self.board.ensure(run)
         return self.store.record('publication', run.binding(), dict(project=self.project.fingerprint(),
             qualification=self.project.qualification, review=review_id, snapshot=snapshot, pr=pr['url'],
-            base_sha=base, head_sha=head, merge_sha=result['sha'], delivery_approval=False))
+            base_sha=base, head_sha=head, merge_sha=result['sha'], origin=inputs['origin'], delivery_approval=False))
 
     def validate_integrated(self, run, publication_id, quality):
         self.board.ensure(run)
@@ -342,7 +342,9 @@ class Publication:
         commit = sha(data['merge_sha'])
         if self.repo.remote_head(self.project.branch) != commit:
             raise EffectBlocked('integration branch advanced; qualify the new candidate')
-        wait = self.store.root/'publication'/('integrated-'+publication_id+'.json')
+        wait_key = digest(dict(subject=run.subject(), project=self.project.fingerprint(),
+                               review=data['review'], merge=commit))
+        wait = self.store.root/'publication'/('integrated-'+wait_key+'.json')
         if not wait.exists():
             write_json(wait,dict(deadline=time.time()+900))
         gate = self.github.accept(data['pr'], commit)

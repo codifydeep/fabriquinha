@@ -1,5 +1,6 @@
 """Publication uses real private Git, fake GitHub transport and no model/token."""
 import json
+from dataclasses import replace
 from pathlib import Path
 import subprocess
 import sys
@@ -91,6 +92,42 @@ class PublicationFlow(unittest.TestCase):
             self.publish()
         self.publish()
         self.assertEqual(self.github.calls['merge'], 1)
+
+    def test_new_claim_resumes_same_pr_without_repeating_accepted_effects(self):
+        self.github.lose_create = True
+        with self.assertRaises(Pending):
+            self.publish()
+        first_run = self.run
+        self.run = replace(first_run, number=first_run.number+1)
+        result = self.store.receipt(self.publish(), kind='publication')
+        self.assertEqual(result['binding'], self.run.binding())
+        self.assertEqual(result['payload']['origin'], first_run.binding())
+        self.assertEqual(self.github.calls, dict(create=1,merge=1))
+        self.assertEqual(self.repo.git('branch', '--list', 'feat/*').decode().count('feat/'), 1)
+
+    def test_new_claim_does_not_reset_pr_or_merge_ci_deadline(self):
+        first_run = self.run
+        self.github.ok = False
+        with patch('fabriquinha.publication.time.time', return_value=100):
+            with self.assertRaises(Pending): self.publish()
+        self.run = replace(first_run, number=first_run.number+1)
+        with patch('fabriquinha.publication.time.time', return_value=1001):
+            with self.assertRaises(EffectBlocked): self.publish()
+        self.github.ok = True
+        publication = self.publish()
+        quality = SimpleNamespace(observe=lambda *args:None)
+        self.github.ok = False
+        with patch('fabriquinha.publication.time.time', return_value=2000):
+            with self.assertRaises(Pending):
+                self.publisher.validate_integrated(self.run,publication,quality)
+        self.run = replace(first_run, number=first_run.number+2)
+        self.github.ok = True
+        publication = self.publish()
+        self.github.ok = False
+        with patch('fabriquinha.publication.time.time', return_value=2901):
+            with self.assertRaises(EffectBlocked):
+                self.publisher.validate_integrated(self.run,publication,quality)
+        self.assertEqual(self.github.calls, dict(create=1,merge=1))
 
     def test_pending_ci_never_merges(self):
         self.github.ok = False

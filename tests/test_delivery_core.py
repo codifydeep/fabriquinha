@@ -28,6 +28,18 @@ class ProjectBoundaries(unittest.TestCase):
         with self.assertRaises(ValueError):
             Project.parse({**configuration(), 'reviewers': {'backend': 'backend'}})
 
+    def test_ordered_substitutes_are_explicit_independent_and_immutable(self):
+        source = {**configuration(), 'reviewers': {'backend': ['lead', 'cto']}}
+        project = Project.parse(source)
+        source['reviewers']['backend'].append('backend')
+        self.assertEqual(project.reviewers_for('backend'), ('lead', 'cto'))
+        self.assertEqual(project.reviewer('backend', exclude=('lead',)), 'cto')
+        with self.assertRaises(ValueError):
+            project.reviewer('backend', exclude=('lead', 'cto'))
+        for candidates in ([], ['lead', 'lead'], ['backend', 'lead'], ['lead', None]):
+            with self.subTest(candidates=candidates), self.assertRaises(ValueError):
+                Project.parse({**configuration(), 'reviewers': {'backend': candidates}})
+
     def test_review_matrix_is_immutable_and_fixture_cannot_become_production(self):
         source = configuration()
         project = Project.parse(source)

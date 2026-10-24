@@ -857,15 +857,16 @@ Próxima fatia após a prova offline S3:
    primeiro com transporte de modelo local fixo, sem confundi-lo com julgamento real.
 2. Espera por CI/provedor/revisão deve liberar capacidade e preservar a fase.
    Não manter um processo ocupado só para observar, nem reiniciar efeito já aceito.
-   Conferir a semântica upstream: se uma retomada agendada cria outro `run_id`,
-   separar claim/autorização atual da identidade durável da entrega. Os efeitos
-   atuais usam `Run.binding()` com número do run; a prova de confirmação perdida
-   retomou o mesmo run e não qualifica uma nova claim. Antes de S4, provar que
-   outra claim retoma o mesmo PR/build/deploy, preservando recibos e proveniência,
-   sem criar outro ciclo de vida ou relaxar aprovação por revisão exata.
-3. Completar a matriz com suplentes explicitamente permitidos. Hoje a configuração
-   escolhe um revisor por autor e bloqueia conflito com autoria de testes; antes
-   de S4 deve encaminhar ao suplente válido, sem dispensar independência. A
+   A semântica upstream foi comprovada: espera agendada encerra o run e a retomada
+   cria outro. PR/merge já passaram com novas claims, um único efeito, origem
+   preservada e claims antigas sem autoridade. Aprovações continuam ligadas à
+   execução exata. Faltam build/deploy/QA entre claims e wake loop automático;
+   não criar outro ciclo de vida para isso. Atenção: `scheduled` volta a `ready`
+   no upstream, portanto não usar esse caminho genericamente para revisores.
+3. A matriz já aceita suplentes explicitamente permitidos. O handoff TDD deriva
+   exclusão do autor dos testes do recibo congelado e seleciona o próximo revisor.
+   Isso passou em fixture nativa; exaustão do pool ainda precisa gerar diagnóstico
+   técnico executável, não apenas lançar erro. A
    integração/deploy deve ser de DevOps, com QA independente, não revisão de
    implementação pelo próprio autor dos testes.
 4. Transformar falhas em diagnóstico executável de Tech Lead/CTO e implantar

@@ -19,6 +19,14 @@ class Run:
     def binding(self):
         return asdict(self)
 
+    def subject(self):
+        """Stable effect scope, NOT authorization or an approval binding.
+
+        The controller must still ensure the current claim before each effect.
+        An immutable review receipt further identifies the delivery revision.
+        """
+        return {key: value for key, value in self.binding().items() if key != 'number'}
+
 
 class Board:
     """Private controller API. Workers submit decisions, never Run identities."""
@@ -43,7 +51,7 @@ class Board:
                 if origin is None:
                     raise ValueError('review origin missing')
                 author = json.loads(origin[0])['implementer']
-                if self.project.reviewer(author) != task.assignee:
+                if task.assignee not in self.project.reviewers_for(author):
                     raise ValueError('reviewer outside independent matrix')
             else:
                 self.project.reviewer(author)
@@ -92,13 +100,13 @@ class Board:
             raise ValueError('resolved handoff evidence required')
         return value
 
-    def review(self, run, summary, evidence):
+    def review(self, run, summary, evidence, *, exclude=()):
         self.ensure(run)
         if run.reviewing:
             raise ValueError('implementation handoff required')
         kb, kbc, _ = native()
         with kbc.connect_closing() as conn:
-            if not kb.request_review(conn, run.task, reviewer=self.project.reviewer(run.author),
+            if not kb.request_review(conn, run.task, reviewer=self.project.reviewer(run.author, exclude=exclude),
                     summary=summary, metadata=evidence, expected_run_id=run.number):
                 raise ValueError('native review handoff refused')
 

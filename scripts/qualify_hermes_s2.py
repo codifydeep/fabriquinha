@@ -40,11 +40,12 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
     with kbc.connect_closing():
         pass
     from hermes_cli.profiles import create_profile
-    for name in ('s2-author', 's2-lead'):
+    for name in ('s2-author', 's2-tests', 's2-lead', 's2-devops', 's2-qa'):
         create_profile(name, no_skills=True, description='Deterministic S2 qualification')
     project = Project.parse(dict(version=1, namespace=namespace,
         repository='https://github.com/example/qualification', branch='release/qualification',
-        validation_image=image, tests_dir='tests', reviewers={'s2-author':'s2-lead'}, qualification=True,
+        validation_image=image, tests_dir='tests', reviewers={'s2-tests':'s2-lead',
+            's2-author':['s2-tests','s2-lead'], 's2-devops':'s2-qa'}, qualification=True,
         browser_image=browser_image))
     store = Store(root/'private')
     board = Board(project)
@@ -66,7 +67,8 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
     def task(kind, workspace, *, parents=(), inputs=None):
         body = dict(version=1, kind=kind, release='s2-fixture', inputs=inputs or {})
         with kbc.connect_closing() as conn:
-            return kb.create_task(conn, title='S2 '+kind, body=json.dumps(body), assignee='s2-author',
+            return kb.create_task(conn, title='S2 '+kind, body=json.dumps(body),
+                assignee='s2-tests' if kind=='tests' else 's2-author',
                 workspace_kind='dir', workspace_path=str(workspace), parents=parents,
                 completion_contract='local-only')
 
@@ -128,7 +130,7 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
     first = store.capture(author_work)
     red1 = observe(lambda: quality.red(author, baseline, first))
     checks['red_has_real_new_assertion_and_passing_baseline'] = True
-    board.review(author, 'Review the new test contract', {'red':red1})
+    quality.handoff(author, 'Review the new test contract', {'red':red1})
     reviewer = claim(tests, review=True)
     decision = dict(decision='changes', reason='The acceptance says Hello, not Hi',
                     findings=[dict(path='tests/test_greeting.py', line=25, detail='Use the approved greeting text')])
@@ -140,12 +142,12 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
         assert json.loads(json.loads(event[0])['reason'])['evidence']['review'] == change
     checks['change_request_retains_exact_review_evidence'] = True
     author = claim(tests)
-    assert author.actor == 's2-author'
+    assert author.actor == 's2-tests'
     feedback = activity(author, author_work, 'tests')
     assert feedback['local_feedback_exit'] == 1
     candidate = store.capture(author_work)
     red2 = observe(lambda: quality.red(author, baseline, candidate))
-    board.review(author, 'Review corrected test contract', {'red':red2})
+    quality.handoff(author, 'Review corrected test contract', {'red':red2})
     reviewer = claim(tests, review=True)
     approved = dict(decision='approve', reason='New test expresses the HTTP acceptance and preserves health', findings=[])
     checks['stale_test_review_rejected'] = rejected(lambda: quality.tests_review(reviewer, red1, approved))
@@ -176,8 +178,10 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
     mutant = store.capture(mutant_work)
     controls = observe(lambda: quality.controls(implementing, green, [mutant]))
     checks['post_green_negative_runs_full_suite_and_detects_regression'] = True
-    board.review(implementing, 'Review immutable delivery', {'green':green, 'controls':controls})
+    quality.handoff(implementing, 'Review immutable delivery', {'green':green, 'controls':controls})
     reviewer = claim(implementation, review=True)
+    assert reviewer.actor=='s2-lead' and store.receipt(frozen)['payload']['test_author']=='s2-tests'
+    checks['test_author_conflict_routes_to_approved_substitute'] = True
     activity(reviewer, store.tree(snapshot), 'review')
     receipt = observe(lambda: quality.delivery_review(reviewer, green, controls, approved))
     board.finish_review(reviewer, 'S2 fixture delivery reviewed; not homologated', {'delivery':receipt})

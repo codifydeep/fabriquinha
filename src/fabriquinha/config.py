@@ -37,10 +37,20 @@ class Project:
         if not isinstance(path, str) or str(PurePosixPath(path)) != path or path.startswith('/') or '..' in PurePosixPath(path).parts:
             raise ValueError('relative tests directory required')
         reviewers = value['reviewers']
-        if (not isinstance(reviewers, dict) or not reviewers or
-                any(not re.fullmatch('[a-z][a-z0-9_-]{0,63}', str(name)) for name in [*reviewers, *reviewers.values()])
-                or any(a == r for a, r in reviewers.items())):
+        if not isinstance(reviewers, dict) or not reviewers:
             raise ValueError('independent role matrix required')
+        matrix = {}
+        for author, configured in reviewers.items():
+            candidates = [configured] if isinstance(configured, str) else configured
+            if (not isinstance(author, str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}', author)
+                    or not isinstance(candidates, list) or not 1 <= len(candidates) <= 9
+                    or any(not isinstance(name, str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}', name)
+                           for name in candidates)
+                    or len(set(candidates)) != len(candidates) or author in candidates):
+                raise ValueError('independent role matrix required')
+            # Preserve existing single-reviewer fingerprints. Copy ordered pools
+            # so mutation of a parsed config cannot change review authority.
+            matrix[author] = configured if isinstance(configured, str) else tuple(candidates)
         workers, timeout = value.get('max_workers', 2), value.get('timeout_seconds', 120)
         if type(workers) is not int or not 1 <= workers <= 2 or type(timeout) is not int or not 1 <= timeout <= 3600:
             raise ValueError('bounded execution required')
@@ -48,7 +58,7 @@ class Project:
         browser=value.get('browser_image')
         if browser is not None and not re.fullmatch(r'sha256:[a-f0-9]{64}',str(browser)):
             raise ValueError('exact browser toolchain image required')
-        return cls(**fields, reviewers=MappingProxyType(dict(reviewers)), max_workers=workers,
+        return cls(**fields, reviewers=MappingProxyType(matrix), max_workers=workers,
                    timeout_seconds=timeout,browser_image=browser)
 
     def fingerprint(self):
@@ -56,8 +66,15 @@ class Project:
                        for name in self.__dataclass_fields__ for value in (getattr(self, name),)
                        if name!='browser_image' or value is not None})
 
-    def reviewer(self, author):
+    def reviewers_for(self, author):
         try:
-            return self.reviewers[author]
+            configured = self.reviewers[author]
         except KeyError:
             raise ValueError('author outside configured review matrix') from None
+        return (configured,) if isinstance(configured, str) else configured
+
+    def reviewer(self, author, *, exclude=()):
+        for candidate in self.reviewers_for(author):
+            if candidate not in exclude:
+                return candidate
+        raise ValueError('no independent reviewer available in approved matrix')

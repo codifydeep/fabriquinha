@@ -13,7 +13,11 @@ e passou também por build real, Compose, rollback/retorno e QA independente em
 Chromium, com captura preservada e URL de loopback conferida. Isso é prova
 offline com fixtures: ainda faltam serviço contínuo, modelos e GitHub reais,
 incidentes executáveis e portabilidade. Nenhuma release autônoma foi qualificada.
-Checks atuais: 57 testes do caminho novo e 4.523 da suíte histórica, todos sem
+Uma prova posterior retomou PR/merge em novas claims nativas, liberou o slot
+durante espera e recusou a autoridade das claims antigas, sem duplicar efeitos.
+A suplência TDD foi exercitada com autor de testes separado do implementador.
+O roteiro acordou os cards explicitamente; ainda não existe wake loop instalado.
+Checks atuais: 64 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

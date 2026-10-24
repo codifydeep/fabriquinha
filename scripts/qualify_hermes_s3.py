@@ -42,7 +42,7 @@ def integrate(project, store, board, quality, implementation, review, frozen):
         task = kb.create_task(conn, title='S3 integration simulator; not a release',
             body=json.dumps(dict(version=1,kind='integration',release='s2-fixture',
                 inputs={'delivery':'parent:'+implementation+':delivery'})),
-            assignee='s2-author', parents=[implementation], completion_contract=project.repository.removeprefix('https://github.com/'))
+            assignee='s2-devops', parents=[implementation], completion_contract=project.repository.removeprefix('https://github.com/'))
         claimed = kb.claim_task(conn,task)
         assert claimed is not None
     run = board.current(task,claimed.current_run_id)
@@ -52,6 +52,24 @@ def integrate(project, store, board, quality, implementation, review, frozen):
     def publisher():
         return Publication(project,store,board,Repository(project,store,remote=remote),github)
 
+    resumed = []
+    def reclaim(previous):
+        # Native waiting closes the old run and frees capacity. This test driver
+        # explicitly wakes it; an installed timed wake loop is NOT claimed here.
+        with kbc.connect_closing() as conn:
+            assert kb.schedule_task(conn,task,reason='S3 external effect observation',expected_run_id=previous.number)
+            assert kb.get_task(conn,task).status=='scheduled'
+            assert not conn.execute('SELECT 1 FROM task_runs WHERE task_id=? AND ended_at IS NULL',(task,)).fetchone()
+            assert kb.unblock_task(conn,task)
+            claim=kb.claim_task(conn,task)
+        current=board.current(task,claim.current_run_id)
+        assert current.number!=previous.number
+        try: board.ensure(previous)
+        except ValueError: pass
+        else: raise AssertionError('obsolete claim retained authority')
+        resumed.append(dict(previous=previous.number,current=current.number))
+        return current
+
     github.lose_create = True
     try:
         publisher().publish(run,review)
@@ -59,6 +77,7 @@ def integrate(project, store, board, quality, implementation, review, frozen):
         pass
     else:
         raise AssertionError('lost PR response was not observed as pending')
+    run=reclaim(run)
     github.lose_merge = True
     try:
         publisher().publish(run,review)
@@ -66,6 +85,7 @@ def integrate(project, store, board, quality, implementation, review, frozen):
         pass
     else:
         raise AssertionError('lost merge response was not observed as pending')
+    run=reclaim(run)
     published = publisher().publish(run,review)
     publication = store.receipt(published,kind='publication')['payload']
     # Native policy and exact-merge SHA checks also receive misleading inputs.
@@ -95,6 +115,8 @@ def integrate(project, store, board, quality, implementation, review, frozen):
     integrated = observe(lambda: publisher().validate_integrated(run,published,quality))
     value = store.receipt(integrated,kind='integrated')['payload']
     assert github.calls == dict(create=1,merge=1)
+    assert len(resumed)==2 and publication['origin']['number']==resumed[0]['previous']
+    assert repo.git('branch','--list','feat/*').decode().count('feat/')==1
     assert publication['head_sha'] != publication['merge_sha'] == value['commit']
     assert publication['snapshot'] == value['snapshot']
     assert value['ci']['source_pr_head_sha'] == publication['head_sha']
@@ -110,6 +132,7 @@ def integrate(project, store, board, quality, implementation, review, frozen):
             claimed=kb.claim_review_task(conn,task)
             assert claimed is not None
         qa_run=board.current(task,claimed.current_run_id)
+        assert run.actor=='s2-devops' and qa_run.actor=='s2-qa'
         release=observe(lambda:delivery.qa(qa_run,rollout))
         proof=store.receipt(release,kind='release_evidence')['payload']
         deployment=dict(candidate=candidate,baseline=baseline,rollout=rollout,release_evidence=release,
@@ -130,6 +153,8 @@ def integrate(project, store, board, quality, implementation, review, frozen):
     return dict(qualification=True, real_git=True, github_effects_simulated=True,
         native_required_checks_processed=github.api_calls, complete_integrated_suite=True,
         lost_create_ack_did_not_duplicate=True,lost_merge_ack_did_not_duplicate=True,
+        resumed_native_claims=resumed,scheduled_wait_freed_slot=True,obsolete_claim_rejected=True,
+        automatic_wake_loop=False,
         merge_sha_differs_from_head=True, misleading_ci_refused=refused, publication=published,integrated=integrated,
         deployment=deployment,real_github_ci=False,delivery_approval=False,model_calls=0)
 

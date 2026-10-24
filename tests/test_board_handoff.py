@@ -9,9 +9,51 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.board import Board
+from fabriquinha.config import Project
+from test_delivery_core import configuration
 
 
 class ClosedParentHandoff(unittest.TestCase):
+    def test_current_review_accepts_configured_substitute_not_an_unlisted_role(self):
+        project = Project.parse({**configuration(), 'reviewers': {'backend':['lead','cto']}})
+        conn = sqlite3.connect(':memory:'); self.addCleanup(conn.close)
+        conn.execute('CREATE TABLE task_events(task_id,run_id,kind,payload,id INTEGER PRIMARY KEY)')
+        conn.execute('INSERT INTO task_events VALUES(?,?,?,?,?)',
+                     ('task',4,'review_requested',json.dumps({'implementer':'backend'}),1))
+        conn.execute('INSERT INTO task_events VALUES(?,?,?,?,?)',
+                     ('task',5,'claimed',json.dumps({'source_status':'review'}),2))
+        task = SimpleNamespace(status='running',current_run_id=5,assignee='cto',
+            body=json.dumps(dict(version=1,kind='implementation',release='v1')))
+        kb = SimpleNamespace(get_task=lambda *args:task)
+        kbc = SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(conn))
+        with patch('fabriquinha.board.native',return_value=(kb,kbc,None)):
+            current = Board(project).current('task',5)
+            self.assertEqual((current.author,current.actor),('backend','cto'))
+            for denied in ('backend','unlisted'):
+                task.assignee=denied
+                with self.subTest(actor=denied), self.assertRaises(ValueError):
+                    Board(project).current('task',5)
+
+    def test_handoff_selects_only_an_approved_non_conflicting_substitute(self):
+        project = Project.parse({**configuration(), 'reviewers': {'backend': ['lead', 'cto']}})
+        captured = {}
+        def request_review(_, task, **values):
+            captured.update(values)
+            return True
+        kb = SimpleNamespace(request_review=request_review)
+        kbc = SimpleNamespace(connect_closing=lambda: contextlib.nullcontext(None))
+        board = Board(project)
+        run = SimpleNamespace(task='task', number=4, author='backend', reviewing=False)
+        with patch.object(board, 'ensure'), patch('fabriquinha.board.native', return_value=(kb,kbc,None)):
+            board.review(run, 'Review delivery', {'green':'receipt'}, exclude=('lead',))
+        self.assertEqual(captured['reviewer'], 'cto')
+        self.assertEqual(captured['expected_run_id'], 4)
+        captured.clear()
+        with patch.object(board, 'ensure'), patch('fabriquinha.board.native', return_value=(kb,kbc,None)):
+            with self.assertRaises(ValueError):
+                board.review(run, 'Review delivery', {}, exclude=('lead','cto'))
+        self.assertEqual(captured, {})
+
     def test_change_request_persists_its_exact_review_receipt(self):
         captured = {}
         def request_changes(_, task, *, reason, expected_run_id):

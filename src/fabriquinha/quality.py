@@ -91,6 +91,30 @@ class Quality:
         return self.store.record(kind, run.binding(),
             {**payload, 'project': self.project.fingerprint(), 'qualification': self.project.qualification})
 
+    def handoff(self, run, summary, evidence):
+        """Derive conflicts from trusted receipts before assigning native review.
+
+        No reviewer identity or exemption is accepted from worker prose. An
+        exhausted approved pool remains an explicit technical impediment.
+        """
+        if run.kind not in ('tests', 'implementation'):
+            raise ValueError('TDD handoff phase required')
+        self.check(run, run.kind)
+        required = {'red'} if run.kind == 'tests' else {'green', 'controls'}
+        if not isinstance(evidence, dict) or set(evidence) != required:
+            raise ValueError('exact TDD handoff evidence required')
+        records = {key:self.store.receipt(value,kind=key) for key,value in evidence.items()}
+        if any(record['binding'] != run.binding()
+               or record['payload']['project'] != self.project.fingerprint() for record in records.values()):
+            raise ValueError('handoff must belong to the current execution')
+        exclude = ()
+        if run.kind == 'implementation':
+            if records['controls']['payload']['green'] != evidence['green']:
+                raise ValueError('controls for the exact Green required')
+            frozen = self.freeze(run, records['green']['payload']['freeze'])
+            exclude = (frozen['test_author'],)
+        self.board.review(run, summary, evidence, exclude=exclude)
+
     def red(self, run, baseline, candidate):
         self.check(run, 'tests')
         self.protect(baseline, candidate)

@@ -11,6 +11,9 @@ A [primeira integração S3](HERMES-S3-QUALIFICATION.md) passou com Git e suíte
 integrada reais, mas PR/CI simulados. Depois passou por build, Compose, QA em
 Chromium e rollback. Próximo incremento: serviço contínuo Hermes, incidentes e
 notificações persistentes, antes da entrega real S4.
+Novas claims já retomam a mesma publicação sem duplicar PR/merge; a suplência
+independente também passou no Kanban real. Ainda faltam wake loop e retomada
+entre claims nas etapas de build/deploy; não considerar o serviço contínuo pronto.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 
