@@ -121,7 +121,7 @@ class Runner:
         return self._execute(run,expected,command)
 
     def run(self, run, snapshot, phase):
-        if phase not in {'baseline', 'red', 'green', 'control', 'delivery', 'integrated'}:
+        if phase not in {'baseline', 'red', 'green', 'control', 'delivery', 'integrated', 'diagnostic'}:
             raise ValueError('fixed suite operation required')
         expected = dict(binding=run.binding(), project=self.project.fingerprint(),
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)

@@ -5,8 +5,8 @@ A fronteira Hermes + Kanban passou na prova nativa/Docker sem modelo e sem
 patches upstream. A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) passou com
 Red, mudanças, congelamento, Green, controle negativo e revisão imutável em
 Docker real, mas com autoria e decisões sintéticas. Timeout foi comprovado com
-falha preservada e job retirado. S2 permanece parcial; faltam operação completa e
-incidentes executáveis. A [primeira fatia S3](HERMES-S3-QUALIFICATION.md) conectou
+falha preservada e job retirado. S2 permanece parcial; faltam operação completa,
+notificações/alertas e conexão de toda a entrega. A [primeira fatia S3](HERMES-S3-QUALIFICATION.md) conectou
 revisão, Git real, gate nativo de PR/CI com transporte simulado e suíte real do
 SHA de merge. Confirmações perdidas não duplicaram PR/merge. A cadeia foi ampliada
 e passou também por build real, Compose, rollback/retorno e QA independente em
@@ -32,9 +32,12 @@ julgamento de um modelo. O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICA
 passou com reinício preservando worker vivo, crash/retomada, arquivo/sessão
 preservados e sandbox órfã retirada antes da substituta: sete runs, dois cards,
 18 respostas locais. Outra prova recusou um segundo processo na mesma claim,
-sem bloquear o dono. Faltam cadeia integral no serviço, provedor/GitHub reais,
-incidentes executáveis e notificações. Não houve ativação de produção.
-Checks atuais: 89 testes do caminho novo e 4.523 da suíte histórica, todos sem
+sem bloquear o dono. O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md)
+passou com Lead → CTO → SPIKE real → orientação ao autor → gates TDD: nove runs,
+27 respostas locais e uma única retomada, mesmo após reinício. Incidente resolveu
+somente com evidência válida, não por existir um worker. Faltam cadeia integral
+no serviço, notificações/alertas e provedor/GitHub reais. Não houve produção.
+Checks atuais: 99 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

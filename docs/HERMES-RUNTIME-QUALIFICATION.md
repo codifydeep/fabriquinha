@@ -131,8 +131,9 @@ o serviço recusa alteração silenciosa do contrato.
 
 ## Pendências para autonomia
 
-- Incidente → diagnóstico/SPIKE real de Tech Lead/CTO → ação e revalidação;
-  um bloqueio com causa explícita ainda não executa essa recuperação.
+- O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) já qualificou a
+  recuperação de falha do autor com Lead/CTO, SPIKE e revalidação. Ainda faltam
+  classes sem run, como admissão de perfil/recursos indisponíveis.
 - Outbox/status/notificações duráveis; esperas CI/provedor sem ocupar slots ou
   perder a fase. Falha de Telegram não deve parar o trabalho.
 - Conectar publicação/deploy/QA qualificados separadamente a este serviço,
@@ -143,7 +144,7 @@ o serviço recusa alteração silenciosa do contrato.
 - Segunda release, memória entre perfis, browser público, instalação reproduzível
   e migração comprovada. Truco continua sem reinício de produto.
 
-São 13 arquivos Python de módulos, cerca de 2.600 linhas físicas, incluindo a
+No checkpoint desta prova eram 13 módulos, cerca de 2.600 linhas físicas, incluindo a
 lane S1 de qualificação. O módulo adicional é a entrada operacional que substitui
 o loop de teste, não outro scheduler. Mantém-se a meta de código pequeno, sem
 broker legado; contagens não medem autonomia.

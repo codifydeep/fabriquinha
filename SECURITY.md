@@ -31,5 +31,9 @@ run e identidade do processo morto. Isso não restaura a autoridade da claim.
 Uma segunda invocação de worker sobre o mesmo run é recusada sem bloquear o dono.
 O arquivo privado da rota não pode ser público ou symlink; a entrada operacional
 atual recusa projeto de produção, sem levantar automaticamente a pausa do provedor.
+Diagnósticos técnicos leem snapshots imutáveis e executam experimentos somente
+em cópias descartáveis, com os mesmos testes protegidos e isolamento dos jobs.
+O técnico não escreve no autor, aprova produto ou dispensa gates. Sua decisão
+tipada pode orientar uma retomada, que precisa passar novamente pela qualidade.
 
 Ao encontrar uma vulnerabilidade com segredo, não abra issue pública com o valor. Use o canal privado de segurança do GitHub, se habilitado, ou contate o proprietário sem anexar credenciais. Revogue segredos antes de limpar o histórico; não reescreva histórico sem autorização.

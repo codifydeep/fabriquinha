@@ -51,6 +51,7 @@ class Board:
             if event is None:
                 raise ValueError('native claim required')
             reviewing = json.loads(event[0]).get('source_status') == 'review'
+            card = json.loads(task.body)
             author = task.assignee
             if reviewing:
                 origin = conn.execute('SELECT payload FROM task_events WHERE task_id=? AND kind=? '
@@ -60,10 +61,13 @@ class Board:
                 author = json.loads(origin[0])['implementer']
                 if task.assignee not in self.project.reviewers_for(author):
                     raise ValueError('reviewer outside independent matrix')
+            elif card.get('kind')=='diagnostic':
+                if (not self.project.technical_roles or card.get('stage') not in self.project.technical_roles
+                        or task.assignee!=self.project.technical_roles[card['stage']]):
+                    raise ValueError('controller-assigned technical role required')
             else:
                 self.project.reviewer(author)
-        card = json.loads(task.body)
-        if (card.get('version') != 1 or card.get('kind') not in ('tests', 'implementation', 'integration')
+        if (card.get('version') != 1 or card.get('kind') not in ('tests', 'implementation', 'integration', 'diagnostic')
                 or not isinstance(card.get('release'), str) or not card['release']):
             raise ValueError('versioned delivery card required')
         return Run(task_id, run_id, task.assignee, card['kind'], reviewing, author,

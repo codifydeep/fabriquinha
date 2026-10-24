@@ -17,6 +17,9 @@ O [serviço contínuo TDD](HERMES-RUNTIME-QUALIFICATION.md) já passou em isolam
 com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
 as rotas de fixture expiram e não devem ser reutilizadas como produção. A entrada
 operacional ainda recusa provedores reais, preservando a pausa anterior.
+O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
+explícita de Lead/CTO e cards nativos de recuperação com SPIKE. Sua prova também
+usa respostas locais; não constitui ativação dos nove perfis em produção.
 
 ## 1. Testes offline primeiro
 

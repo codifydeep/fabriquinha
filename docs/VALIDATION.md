@@ -2,6 +2,13 @@
 
 ## Caminho novo Hermes
 
+O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) passou para bloqueio
+de protocolo do autor: cards Lead/CTO materializados pelo serviço, SPIKE Docker
+descartável, orientação, retomada uma vez após reinício e revalidação TDD. Nove
+runs, 27 respostas locais e nenhuma chamada paga. Testes recusaram retomada sem
+experimento, enfraquecimento dos testes, escrita pelo diagnóstico e classificação
+de um respawn como resolução. Nenhum gate de entrega foi dispensado.
+
 O [serviço contínuo isolado](HERMES-RUNTIME-QUALIFICATION.md) percorreu TDD com
 reinício do dispatcher sem matar/duplicar o worker, crash real, retirada da
 sandbox órfã antes da substituta e retomada de arquivo/sessão. Dois cards, sete
@@ -18,7 +25,7 @@ Na suíte histórica atual: 4.523 testes, oito skips preexistentes, nenhuma falh
 A [fatia S3](HERMES-S3-QUALIFICATION.md) passou com Git real, PR/CI simulados,
 gate nativo e oitavo job Docker no SHA de merge. PR/merge não foram duplicados
 após confirmações perdidas; quatro entradas de CI enganosa foram recusadas.
-O total do caminho novo passou a 89 testes. A [ponte nativa de agente](HERMES-AGENT-QUALIFICATION.md)
+O total do caminho novo passou a 99 testes. A [ponte nativa de agente](HERMES-AGENT-QUALIFICATION.md)
 executou o `AIAgent` real com nove respostas HTTP locais: ferramentas nativas,
 escrita limitada por mounts, Red independente, leitura do snapshot de revisão,
 negação de handlers de escrita/terminal/admin e retomada de sessão em outro

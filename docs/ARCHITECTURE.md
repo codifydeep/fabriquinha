@@ -23,6 +23,9 @@ flowchart LR
     A --> E[executor.py: validação fixa em Docker]
     E --> Q[quality.py: Red, freeze, Green e controles]
     Q --> B
+    B --> I[recovery.py: DIAG nativo Lead/CTO]
+    I --> X[SPIKE descartável; orientação validada]
+    X -->|Retomada nativa; gates mantidos| B
     E --> J[effects.py: intenção e observação]
     Q --> P[publication.py: Git e PR/CI]
     P --> M[Suíte do commit integrado]
@@ -36,8 +39,8 @@ O journal não mantém tarefas ou releases. O store não é montado nos workers;
 somente o snapshot necessário atravessa a fronteira. Não há import do broker
 histórico, ACP ou um segundo scheduler no caminho novo. A [prova S3](HERMES-S3-QUALIFICATION.md)
 usa Git real e transporte GitHub simulado, com checks processados pelo Hermes
-upstream. Não foi exercitada publicação GitHub real. Incidentes executáveis,
-conexão integral ao serviço e os agentes reais continuam pendentes.
+upstream. Não foi exercitada publicação GitHub real. Conexão integral ao serviço,
+notificações/alertas e os agentes reais continuam pendentes.
 Build/deploy/rollback e QA em Chromium já passaram na stack Python/HTTP local.
 O navegador tem rede interna própria; só o web publica porta em loopback e
 pode ter egress pela bridge. Não se afirma airgap do produto; ver
@@ -55,6 +58,11 @@ O [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md), em `runtime.py`, passou
 depois com TDD nativo, reinício preservando worker vivo e recuperação de crash.
 Retira a sandbox órfã por identidade antes da substituta; retoma arquivo/sessão.
 Não instala gateway nem outro banco de tarefas; a rota de produção segue bloqueada.
+A [recuperação técnica](HERMES-RECOVERY-QUALIFICATION.md) também passou em
+isolamento: o serviço cria DIAGs nativos, Lead escala, CTO executa SPIKE sem tocar
+o autor, orientação idempotente retoma o trabalho e os gates são revalidados.
+Incidente só resolve com evidência válida. Isso ainda usa decisões programadas
+e não cobre toda classe de impedimento ou publicação/GitHub reais.
 
 Publicação e build/deploy separam autorização atual da identidade do efeito:
 nova claim não renova CI nem repete build/Compose já aceitos. Artefatos e etapas

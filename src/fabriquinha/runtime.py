@@ -1,7 +1,7 @@
 """Single continuous dispatcher, detached SDK workers, native lifecycle only.
 
-Initial operational slice: TDD activities. Product publication/deployment and
-technical incident execution are not yet attached. Paid providers stay paused.
+Operational slice: TDD and native technical diagnostics. Product publication/
+deployment are not yet attached. Paid providers stay paused.
 """
 import argparse
 from contextlib import contextmanager
@@ -23,6 +23,7 @@ from .executor import Runner
 from .hermes import Sandbox, run_activity
 from .kanban_lane import native, UPSTREAM_COMMIT
 from .quality import Quality
+from .recovery import Recovery
 
 
 def bind(root,upstream):
@@ -81,7 +82,8 @@ class Runtime:
             raise ValueError('installation contract changed; explicit reconfiguration required')
         if not installation.exists():write_json(installation,binding)
         self.store=Store(self.root/'private');self.board=Board(self.project)
-        self.children=[];self.settlement={}
+        self.children=[];self.settlement={};self.recovery_issues={}
+        self.recovery=Recovery(self.project,self.store,self.board)
 
     def settle(self,task=None,*,conn=None):
         """Retire only stale SDK sandboxes; no process is killed here.
@@ -138,6 +140,7 @@ class Runtime:
         _,kbc,dispatch=native()
         with kbc.connect_closing() as conn:
             self.settle(conn=conn)
+            self.recovery_issues=self.recovery.reconcile(conn,self.settle)
             return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers,
                 max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)
 
@@ -147,8 +150,9 @@ class Runtime:
             cards=[dict(row) for row in conn.execute('SELECT id,title,status,assignee,current_run_id,last_heartbeat_at, '
                 '(SELECT MAX(created_at) FROM task_events WHERE task_id=tasks.id) AS last_event_at '
                 'FROM tasks ORDER BY created_at')]
-        return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,
-                    qualification=self.project.qualification,delivery_approval=False)
+            incidents=self.recovery.status(conn)
+        return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
+                    incidents=incidents,qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
         if not 0.1<=interval<=60:raise ValueError('bounded dispatch interval required')
@@ -183,8 +187,10 @@ class Runtime:
             result=run_activity(sandbox,quality,route,prompt)
             write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
         except BaseException as error:
+            failure=self.store.record('worker_failure',run.binding(),dict(project=self.project.fingerprint(),
+                category=type(error).__name__,message=str(error)[:2000]))
             with kbc.connect_closing() as conn:
-                kb.block_task(conn,task,reason='Delivery worker failure: '+type(error).__name__,
+                kb.block_task(conn,task,reason=json.dumps(dict(category=type(error).__name__,failure=failure)),
                               kind='capability',expected_run_id=number)
             raise
         finally:

@@ -14,6 +14,8 @@ pelo dispatcher nativo. Essa prova não instala serviço operacional nem migra e
 Uma prova posterior do [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md) passou
 com reinício, crash, retirada da sandbox órfã e retomada de arquivo/sessão.
 O serviço completo da equipe e a instalação de produção continuam pendentes.
+O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) passou depois com
+Lead/CTO, SPIKE real, orientação idempotente e revalidação do trabalho original.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
@@ -849,7 +851,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
 | S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
 | S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
-| S2 Executor/qualidade pequenos | Parcial: TDD, ferramentas/sessões e serviço contínuo isolado com reinício/crash/retomada | Faltam incidentes executáveis, notificações e conexão integral da entrega ao serviço |
+| S2 Executor/qualidade pequenos | Parcial: serviço TDD, reinício/crash e diagnóstico executável Lead/CTO/SPIKE passaram em isolamento | Faltam notificações/alertas, esperas CI/provedor e conexão integral da entrega ao serviço |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP passou: TDD, Git, build, deploy/QA/rollback reais; GitHub simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
@@ -882,9 +884,13 @@ Próxima fatia após a prova offline S3:
    técnico executável, não apenas lançar erro. A
    integração/deploy deve ser de DevOps, com QA independente, não revisão de
    implementação pelo próprio autor dos testes.
-4. Transformar falhas em diagnóstico executável de Tech Lead/CTO e implantar
-   outbox/status persistentes, sem outro ciclo de vida. Registrar decisão técnica
-   não equivale a despachar sua execução. CEO não é o fallback técnico.
+4. O diagnóstico executável já passou para falha de worker: Lead/CTO criados pelo
+   serviço, SPIKE em cópia descartável, orientação e retomada sem duplicar ações.
+   O incidente só resolveu após evidência válida dos gates do trabalho original.
+   Agora implantar outbox/alertas e ligar também as esperas/publicação/deploy ao
+   serviço. Faltam classes sem run, como perfil/recursos indisponíveis. Não criar
+   outro ciclo de vida, nem implementar toda S5 antes de tentar S4. CEO não é
+   fallback para decisões técnicas.
 5. Só depois resolver a pausa do provedor pelo caminho autorizado e executar S4
    com Produto/brief aprovado, modelo e GitHub reais. Preservar o contador e teto;
    não considerar uma fixture ou tarefa `done` como release homologada.

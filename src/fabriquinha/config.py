@@ -18,13 +18,14 @@ class Project:
     max_workers: int = 2
     timeout_seconds: int = 120
     browser_image: str | None = None
+    technical_roles: dict | None = None
 
     @classmethod
     def parse(cls, value):
         required = {'version', 'namespace', 'repository', 'branch', 'validation_image',
                     'tests_dir', 'reviewers', 'qualification'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image'}
+                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles'}
                 or type(value['version']) is not int or value['version'] != 1):
             raise ValueError('versioned project contract required')
         if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}', str(value['namespace']))
@@ -58,13 +59,19 @@ class Project:
         browser=value.get('browser_image')
         if browser is not None and not re.fullmatch(r'sha256:[a-f0-9]{64}',str(browser)):
             raise ValueError('exact browser toolchain image required')
+        roles=value.get('technical_roles')
+        if roles is not None and (not isinstance(roles,dict) or set(roles)!={'lead','cto'}
+                or any(not isinstance(role,str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}',role) for role in roles.values())
+                or roles['lead']==roles['cto']):
+            raise ValueError('independent technical lead and CTO roles required')
         return cls(**fields, reviewers=MappingProxyType(matrix), max_workers=workers,
-                   timeout_seconds=timeout,browser_image=browser)
+                   timeout_seconds=timeout,browser_image=browser,
+                   technical_roles=MappingProxyType(dict(roles)) if roles else None)
 
     def fingerprint(self):
-        return digest({name: dict(value) if name == 'reviewers' else value
+        return digest({name: dict(value) if name in ('reviewers','technical_roles') and value is not None else value
                        for name in self.__dataclass_fields__ for value in (getattr(self, name),)
-                       if name!='browser_image' or value is not None})
+                       if name not in ('browser_image','technical_roles') or value is not None})
 
     def reviewers_for(self, author):
         try:

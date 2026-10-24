@@ -31,12 +31,17 @@ def command(project, expected):
 class Sandbox:
     def __init__(self,project,store,board,run):
         board.ensure(run)
-        if run.kind not in ('tests','implementation'):
+        if run.kind not in ('tests','implementation','diagnostic'):
             raise ValueError('author or review phase required')
         self.project,self.store,self.board,self.run=project,store,board,run
-        self.phase='review' if run.reviewing else run.kind
+        self.phase='review' if run.reviewing or run.kind=='diagnostic' else run.kind
         baseline=[]
-        if run.reviewing:
+        if run.kind=='diagnostic':
+            record=store.receipt(board.input(run,'incident'),kind='incident')
+            if record['payload']['project']!=project.fingerprint() or record['binding']['release']!=run.release:
+                raise ValueError('diagnostic belongs to another project or release')
+            self.workspace=store.tree(record['payload']['snapshot'])
+        elif run.reviewing:
             kind='red' if run.kind=='tests' else 'green'
             record=store.receipt(board.input(run,kind,review_handoff=True),kind=kind)
             binding=record['binding']
@@ -70,8 +75,8 @@ class Sandbox:
                 or expected['project']!=project.fingerprint() or expected['image']!=project.validation_image):
             raise ValueError('exact controller-owned sandbox intent required')
         run=Run(**expected['binding'])
-        phase='review' if run.reviewing else run.kind
-        if (run.kind not in ('tests','implementation') or expected['phase']!=phase
+        phase='review' if run.reviewing or run.kind=='diagnostic' else run.kind
+        if (run.kind not in ('tests','implementation','diagnostic') or expected['phase']!=phase
                 or not Path(expected['workspace']).is_absolute()):
             raise ValueError('known sandbox phase and absolute workspace required')
         sandbox=cls.__new__(cls)
@@ -85,7 +90,7 @@ class Sandbox:
     def ensure(self):
         if self.closed or self.closing:raise ValueError('sandbox lease closed')
         self.board.ensure(self.run)
-        if not self.run.reviewing and self.board.workspace(self.run)!=self.workspace:
+        if not self.run.reviewing and self.run.kind!='diagnostic' and self.board.workspace(self.run)!=self.workspace:
             raise ValueError('assigned workspace changed')
         if self.cid and not self.inspect(self.cid)['State']['Running']:
             raise EffectBlocked('owned sandbox stopped; controller diagnosis required')
@@ -201,7 +206,7 @@ def install_backend(sandbox):
 
 def tool_names(sandbox):
     names={'read_file','search_files'}
-    if not sandbox.run.reviewing:names.update({'write_file','patch','terminal','process_manage'})
+    if not sandbox.run.reviewing and sandbox.run.kind!='diagnostic':names.update({'write_file','patch','terminal','process_manage'})
     return names
 
 
@@ -219,7 +224,7 @@ def restrict_handlers(sandbox,allowed):
         def guard(handler,entry_name):
             @wraps(handler)
             def guarded(*args,**kwargs):
-                if entry_name in {'delivery_submit','delivery_review'}:sandbox.board.ensure(sandbox.run)
+                if entry_name in {'delivery_submit','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
                 else:sandbox.ensure()
                 return handler(*args,**kwargs)
             return guarded
@@ -229,6 +234,9 @@ def restrict_handlers(sandbox,allowed):
 
 
 def register_delivery_tools(sandbox,quality,*,on_terminal=None):
+    if sandbox.run.kind=='diagnostic':
+        from .recovery import register_diagnostic
+        return register_diagnostic(sandbox,quality,on_terminal)
     from .quality import DeliveryTools
     from tools.registry import registry
     operations=DeliveryTools(sandbox,quality)
@@ -296,7 +304,10 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600):
         if previous:
             if previous['profile_name']!=sandbox.run.actor:raise ValueError('session belongs to another profile')
             db.assert_resume_safe(session);history,_=db.get_resume_conversations(session)
-        phase=('Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
+        phase=('Diagnose the recorded technical incident. Read immutable evidence; run diagnostic_validate for a real SPIKE. '
+               'Use diagnostic_decide with concrete findings: lead may escalate to CTO; resume needs a real experiment. '
+               'Never edit the author, approve delivery, bypass tests or send technical choices to the CEO.'
+               if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
         agent=AIAgent(**route,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
@@ -305,8 +316,9 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600):
             fallback_model=None,ephemeral_system_prompt=phase)
         if agent.valid_tool_names!=allowed:raise ValueError('native tool surface diverged from phase policy')
         restrict_handlers(sandbox,allowed)
-        if sandbox.run.reviewing:
-            prompt+='\nController-recorded TDD evidence (historical Red is not to be reproduced):\n'+json.dumps(operations.evidence())
+        if sandbox.run.reviewing or sandbox.run.kind=='diagnostic':
+            label='Incident context' if sandbox.run.kind=='diagnostic' else 'TDD evidence (historical Red is not to be reproduced)'
+            prompt+='\nController-recorded '+label+':\n'+json.dumps(operations.evidence())
         result=agent.run_conversation(prompt,conversation_history=history,
                                      system_message=previous.get('system_prompt') if previous else None)
         if not terminal:raise ValueError('activity ended without a controller-validated native handoff')

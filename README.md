@@ -21,9 +21,11 @@ As ferramentas de submissão/parecer já percorreram o ciclo TDD pelo dispatcher
 nativo: dois cards, seis atividades, mudanças/correção e testes congelados.
 O [serviço contínuo](docs/HERMES-RUNTIME-QUALIFICATION.md) passou depois em ambiente
 isolado: reinício preservando worker saudável e recuperação de crash com sessão/
-arquivo preservados e sandbox órfã retirada antes da substituta. Faltam conexão
-integral ao serviço, incidentes executáveis, modelos/GitHub reais e instalação
-reproduzível.
+arquivo preservados e sandbox órfã retirada antes da substituta. O
+[diagnóstico executável](docs/HERMES-RECOVERY-QUALIFICATION.md) também passou:
+Lead → CTO → SPIKE real → orientação → autor → gates TDD, sem duplicar a retomada.
+Faltam conexão integral ao serviço, notificações/alertas, modelos/GitHub reais e
+instalação reproduzível.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -35,6 +37,8 @@ flowchart LR
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
     C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
     K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
+    K --> L[Diagnóstico Lead/CTO: SPIKE e orientação]
+    L -->|Retomada nativa; gates preservados| T
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]

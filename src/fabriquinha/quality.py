@@ -224,6 +224,30 @@ class Quality:
             merge_authorized=False, delivery_approval=False))
 
 
+def product_mutations(quality,snapshot,proposals):
+    """Disposable experiments; never modify the author or protected tests."""
+    store=quality.store
+    if not isinstance(proposals,list) or not 1<=len(proposals)<=8:
+        raise ValueError('one to eight bounded product mutations required')
+    manifest=store.manifest(snapshot);result=[];total=0
+    for proposal in proposals:
+        if not isinstance(proposal,dict) or not 1<=len(proposal)<=16:
+            raise ValueError('bounded product-file replacements required')
+        for path,content in proposal.items():
+            if path not in manifest or not isinstance(content,str) or len(content)>131072:
+                raise ValueError('mutation may replace only a bounded existing product file')
+            total+=len(content)
+            if total>1024*1024:raise ValueError('mutation proposals exceed total bound')
+        with tempfile.TemporaryDirectory(prefix='.delivery-mutant-',dir=store.root.parent) as folder:
+            work=Path(folder);store.checkout(snapshot,work)
+            for path,content in proposal.items():(work/path).write_text(content)
+            mutant=store.capture(work)
+        quality.protect(snapshot,mutant,exact_tests=True)
+        if mutant==snapshot or mutant in result:raise ValueError('distinct behavior-changing controls required')
+        result.append(mutant)
+    return result
+
+
 class DeliveryTools:
     """Fixed model-facing operations. IDs, phase and authority are server-owned."""
     def __init__(self,sandbox,quality):
@@ -246,25 +270,7 @@ class DeliveryTools:
                 time.sleep(0.1)
 
     def mutants(self,snapshot,proposals):
-        if not isinstance(proposals,list) or not 1<=len(proposals)<=8:
-            raise ValueError('one to eight bounded product mutations required')
-        manifest=self.store.manifest(snapshot);result=[];total=0
-        for proposal in proposals:
-            if not isinstance(proposal,dict) or not 1<=len(proposal)<=16:
-                raise ValueError('bounded product-file replacements required')
-            for path,content in proposal.items():
-                if path not in manifest or not isinstance(content,str) or len(content)>131072:
-                    raise ValueError('mutation may replace only a bounded existing product file')
-                total+=len(content)
-                if total>1024*1024:raise ValueError('mutation proposals exceed total bound')
-            with tempfile.TemporaryDirectory(prefix='.delivery-mutant-',dir=self.store.root.parent) as folder:
-                work=Path(folder);self.store.checkout(snapshot,work)
-                for path,content in proposal.items():(work/path).write_text(content)
-                mutant=self.store.capture(work)
-            self.quality.protect(snapshot,mutant,exact_tests=True)
-            if mutant==snapshot or mutant in result:raise ValueError('distinct behavior-changing controls required')
-            result.append(mutant)
-        return result
+        return product_mutations(self.quality,snapshot,proposals)
 
     def submit(self,args):
         q,run=self.quality,self.run

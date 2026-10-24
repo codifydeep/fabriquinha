@@ -13,14 +13,16 @@ Chromium e rollback. Próximo incremento: serviço contínuo Hermes, incidentes 
 notificações persistentes, antes da entrega real S4.
 Novas claims já retomam publicação e build/deploy sem duplicar efeitos; rollback,
 QA e suplência independente também passaram no Kanban/Docker reais. Ainda faltam
-conexão das esperas CI/provedor e escalonamento executável; não considerar
+conexão das esperas CI/provedor e notificações/alertas; não considerar
 a operação completa pronta.
 A [ponte nativa de ferramentas/sessões](HERMES-AGENT-QUALIFICATION.md) passou
 com respostas locais fixas. As ferramentas de submissão/parecer passaram depois
 no dispatcher nativo, com dois cards e seis atividades. O [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md)
 passou depois em isolamento: reinício, crash, retirada da sandbox órfã e retomada.
-Próximo trabalho: incidentes/notificações e conexão integral ao serviço, sem
-promover o roteiro sintético a autoria autônoma.
+O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) passou com Lead/CTO,
+SPIKE real e retomada idempotente seguida pelos gates TDD. Próximo trabalho:
+notificações/alertas e conexão integral ao serviço, sem promover decisões
+programadas a autoria autônoma.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 

@@ -1,0 +1,131 @@
+# Diagnóstico técnico executável pelo Kanban
+
+Data: 24/10/2026. Continuação do [serviço nativo](HERMES-RUNTIME-QUALIFICATION.md)
+e do [plano aprovado](SIMPLIFICATION-REVIEW-2026-10-24.md).
+
+**Passou em ambiente isolado:** um bloqueio de protocolo criou cards nativos de
+diagnóstico, houve escalonamento Tech Lead → CTO, SPIKE real em Docker, orientação
+ao autor e nova passagem pelos gates TDD. Foram nove runs e 27 respostas HTTP
+locais programadas. Zero chamadas pagas, GitHub real, migração ou homologação.
+Isso qualifica o mecanismo, não o raciocínio de um modelo real.
+
+## Fluxo implementado
+
+```mermaid
+flowchart LR
+    F[Worker terminou sem handoff válido] --> B[Card original blocked; falha preservada]
+    B --> L[DIAG nativo do Tech Lead]
+    L -->|escalate| C[DIAG nativo do CTO]
+    C --> S[SPIKE em cópia descartável; suíte completa]
+    S --> D[Decisão técnica tipada e evidência imutável]
+    D --> G[Comentário idempotente de orientação]
+    G --> U[unblock_task nativo: preserva a fase]
+    U --> A[Mesmo autor/revisor retoma o trabalho]
+    A --> T[Red, revisão, freeze, Green e controles]
+    T --> R[Incidente resolvido somente com evidência válida]
+```
+
+O código fica em `recovery.py`. O serviço existente descobre bloqueios de workers,
+materializa um card por incidente/estágio e despacha pelo mesmo `dispatch_once`.
+Não existe outro banco de tasks, scheduler ou fila de agentes. O diagnóstico não
+depende da conclusão do card que precisa destravar; não cria esse ciclo lógico.
+
+Papéis técnicos são configuração explícita e imutável do projeto:
+
+```json
+{"technical_roles":{"lead":"techlead","cto":"cto"}}
+```
+
+O campo é opcional para as provas anteriores; sua ausência não altera fingerprints
+antigos nem transforma bloqueio em recuperação. Sua inclusão muda o contrato do
+projeto e exige preparação explícita da instalação, não edição silenciosa em voo.
+Problemas de autor vão ao Lead; falha do Lead ou da revisão vai ao CTO. Diagnóstico
+técnico não é aprovação de código; a matriz de revisão independente continua
+obrigatória quando o trabalho original retorna aos gates.
+
+## Ferramentas e limites
+
+- Diagnóstico recebe leitura/busca do snapshot imutável, sem escrita, patches ou
+  terminal genérico. Não monta o workspace mutável do autor para editar.
+- `diagnostic_validate` aceita hipótese e substituições limitadas de arquivos do
+  produto. O controlador cria a cópia, protege testes/configuração e executa a
+  suíte completa no contêiner fixo, somente leitura, sem rede, chave ou socket.
+- A experiência nunca copia código de volta ao autor. Um SPIKE pode produzir
+  evidência e orientação; não se converte automaticamente em implementação.
+- `diagnostic_decide` aceita apenas `resume`, `escalate` ou `hold`, com motivo e
+  achados concretos vinculados ao snapshot. Retomar exige experimento real do
+  run atual. O Lead pode escalar; o CTO não cria uma recursão de CTOs nem envia
+  decisões técnicas ao CEO. Não há ação de aprovar produto ou dispensar testes.
+- A ferramenta conclui **o diagnóstico**, não o trabalho original. Depois o
+  controlador valida recibo/run/role/projeto, entrega a orientação e retoma pela
+  API nativa. Claim, impedimento, contrato, assignee ou workspace divergentes
+  recusam uma decisão obsoleta. Revisão não é retomada como implementação.
+- Comentário e desbloqueio têm efeitos separados com intenção anterior ao envio
+  e observação após confirmação incerta. Reiniciar não renova autoridade de uma
+  claim antiga nem duplica a ação já observada.
+- Duas retomadas com a mesma causa/conteúdo e sem evidência nova impedem uma
+  terceira repetição automática. O impedimento continua visível; não conclui a
+  release. A identidade da causa inclui contrato, fase, snapshot e falha.
+
+O status deriva incidentes dos cards/recibos nativos. Worker ativo é
+`revalidating`, não `resolved`. Até `done` sem recibo de qualidade resulta em
+`evidence_missing`. A resolução depende do recibo exato de testes congelados ou
+revisão da entrega do card original. Isso não é `HOMOLOGADA` da release.
+
+## Evidência do ensaio
+
+1. O autor leu o produto e encerrou em prosa, sem ferramenta terminal válida.
+   A tentativa ficou bloqueada e a falha foi preservada; a promessa não foi
+   interpretada como entrega.
+2. O serviço criou o DIAG do Lead. Uma tentativa de retomada sem experimento
+   foi negada. O Lead executou a suíte e escalou ao CTO com achados concretos.
+3. O CTO teve tentativa de escrita recusada e não conseguiu alterar testes em
+   um experimento. Depois mudou somente o produto em cópia descartável e
+   observou que a suíte antiga não verificava aquele comportamento.
+4. A orientação validada mandou o autor produzir o teste de comportamento e
+   executar Red. O controlador comentou e desbloqueou uma vez; o status ainda
+   informou `revalidating`, sem encerrar o incidente.
+5. O dispatcher reiniciou durante essa retomada. Permaneceram exatamente dois
+   cards DIAG, um comentário de orientação e um evento de desbloqueio.
+6. O autor passou por pedido de mudanças, correção, revisão/congelamento dos
+   testes. O dependente passou por implementação, Green, controle negativo e
+   revisão independente. Só então o incidente apareceu `resolved`.
+
+Resultado: dois cards de trabalho e dois diagnósticos `done`, nove runs, nenhum
+run aberto e nenhum auxiliar próprio restante. O produto do autor não foi
+alterado pelo CTO; a implementação final veio do implementador. Serviços,
+snapshots e volumes de outros projetos foram preservados.
+
+Dez testes novos cobrem papéis, evidência real, isolamento do experimento,
+autoridade, limite de repetição, classificação do status e roteamento de falhas
+de revisão ao CTO. Total atual: **99 testes do caminho novo**, sem falhas.
+O roteamento de revisão é teste unitário; esta prova física recuperou falha do
+autor. Não apresentar esse escopo como prova de todas as classes de incidente.
+
+## Reprodução e pendências
+
+Use o mesmo checkout/venv fixados do [agente nativo](HERMES-AGENT-QUALIFICATION.md),
+validador canônico S2 e raiz nova, após as prévias de limpeza do `AGENTS.md`:
+
+```bash
+.local-hermes-agent/venv/bin/python scripts/qualify_hermes_recovery.py \
+  --upstream .local-hermes-s1/upstream --root .local-hermes-recovery/trial-new \
+  --image sha256:ID_EXATO_DO_VALIDADOR
+```
+
+O script não desbloqueia o card nem despacha diagnósticos. Ele configura o grafo,
+fornece respostas locais e verifica as operações do serviço real. Há um único
+modelo de fixture na rota local; não é fallback de produção. Recibos, conversas,
+sessões e bancos permanecem privados, fora do Git.
+
+Ainda faltam outbox/Telegram, alertas por idade/progresso, admissão de perfis e
+recursos indisponíveis antes de haver um run, esperas CI/provedor e ligação da
+publicação/deploy/QA ao serviço. Faltam também modelo/GitHub reais, segunda
+release/memória e instalação reproduzível. A pausa do provedor segue intacta.
+Não ampliar para toda falha S5 antes de conectar a primeira entrega real S4.
+
+O caminho novo tem 14 módulos físicos (inclui lane S1) e cerca de 2.900 linhas,
+sem contar testes/upstream. Dois módulos além do alvo orientativo inicial são a
+entrada operacional e a recuperação comum, não novos bancos/workflows nem um
+adaptador por causa de erro. A contagem continua sendo limite de revisão de
+complexidade, não medida de autonomia.
