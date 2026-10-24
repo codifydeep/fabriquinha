@@ -29,9 +29,9 @@ def scale_files():
 
 def validate_scale(value):
     expected=dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=219,
-        main_provider_calls=23,max_iterations=40,complete_files=71,
+        main_provider_calls=22,max_iterations=40,complete_files=71,
         duplicate_reads=0,eof_reads=0,snapshot_unchanged=True,
-        model_calls=0,tests_approved=False,delivery_approval=False)
+        tool_only_from_first_call=True,model_calls=0,tests_approved=False,delivery_approval=False)
     if not isinstance(value,dict) or set(value)!=set(expected)|{'dropped_read_pairs','summary_provider_calls','compactions'}:
         raise ValueError('exact real-Hermes scale and compaction evidence required')
     for key,item in expected.items():

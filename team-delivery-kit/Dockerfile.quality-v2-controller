@@ -9,6 +9,8 @@
 # successor is natively qualified; build tags alone do not prove installed age.
 # Retain delivery-kit-quality-v2-controller:20261023.29 as the installed rollback
 # until the paging/failed-inspection successor is qualified in the native flow.
+# Retain delivery-kit-quality-v2-controller:20261023.30 as the installed rollback
+# while first-request review guidance and its successor are being qualified.
 FROM delivery-kit-execution-broker:20261021.512
 COPY broker/server.py /broker.py
 COPY broker/acp_startup.py broker/acp_transport.py broker/validation_job.py /

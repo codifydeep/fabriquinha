@@ -60,6 +60,51 @@ class QualityReviewStopTests(unittest.TestCase):
             tools=[dict(type='function',function=dict(name='read_file',parameters=dict(type='object'))),
                 dict(type='function',function=dict(name='terminal',parameters=dict(type='object')))])
 
+    def test_first_request_plans_and_fences_reads_without_a_premature_answer(self):
+        agent=SimpleNamespace();request=self.api_request();before=copy.deepcopy(request)
+        result=stop.apply_request(agent,request,[],40,self.env)
+        self.assertEqual(request,before)
+        self.assertFalse(hasattr(agent,'_quality_review_completion'))
+        self.assertEqual(result['tool_choice'],'auto')
+        self.assertEqual([t['function']['name'] for t in result['tools']],['read_file'])
+        paths=result['tools'][0]['function']['parameters']['properties']['path']['enum']
+        self.assertEqual(paths,['/delivery/tests/test_new.py','/delivery/app.py'])
+        self.assertIn('controller_review_continuation_v1',result['messages'][0]['content'])
+        self.assertNotIn('previous answer',result['messages'][0]['content'])
+        import quality_review_paging as paging
+        allowed=dict(path=paths[0],offset=1,limit=100)
+        self.assertTrue(paging.allowed(self.config,allowed))
+        self.assertFalse(paging.allowed(self.config,{**allowed,'offset':401}))
+        self.assertTrue(paging.allowed(self.config,allowed,consume=True))
+        self.assertFalse(paging.allowed(self.config,allowed,consume=True))
+
+    def test_tool_only_progress_survives_context_drop_before_any_final_answer(self):
+        agent=SimpleNamespace();request=self.api_request()
+        stop.apply_request(agent,request,[],40,self.env)
+        stop.checkpoint(agent,self.messages()[2:4],39,after_tools=True,environment=self.env)
+        result=stop.apply_request(agent,request,[],39,self.env)
+        props=result['tools'][0]['function']['parameters']['properties']
+        self.assertEqual(props['path']['enum'],['/delivery/tests/test_new.py'])
+        self.assertEqual(props['offset']['enum'],[3])
+        self.assertFalse(hasattr(agent,'_quality_review_completion'))
+        stop.checkpoint(agent,self.messages()[4:],38,after_tools=True,environment=self.env)
+        result=stop.apply_request(agent,request,[],38,self.env)
+        self.assertEqual(result['tool_choice'],'auto')
+        self.assertIn('/delivery/app.py',result['messages'][0]['content'])
+        self.assertNotIn('snapshot_read_evidence_invalid',result['messages'][0]['content'])
+
+    def test_early_rejection_remains_available_after_initial_premature_approval(self):
+        agent=SimpleNamespace();request=self.api_request()
+        stop.apply_request(agent,request,[],40,self.env)
+        stop.guard(agent,[],json.dumps(self.verdict),39,self.env)
+        result=stop.apply_request(agent,request,self.messages()[2:],38,self.env)
+        self.assertEqual(result['tool_choice'],'auto')
+        choice={**self.verdict,'action':'request_changes','findings':[dict(path='tests/test_new.py')]}
+        self.assertIsNone(stop.guard(agent,[],json.dumps(choice),38,self.env))
+        # Same reads never suffice for approval of the full snapshot.
+        incomplete=stop.guard(agent,[],json.dumps(self.verdict),37,self.env)
+        self.assertIsNotNone(incomplete);self.assertEqual(incomplete['remaining_files'],1)
+
     def test_premature_stop_requires_real_read_tool_without_expanding_its_schema(self):
         agent=SimpleNamespace();request=self.api_request();before=copy.deepcopy(request)
         stop.guard(agent,self.messages()[:-2],json.dumps(self.verdict),36,self.env)
@@ -76,7 +121,11 @@ class QualityReviewStopTests(unittest.TestCase):
 
     def test_completion_policy_never_fakes_reads_or_approves_after_inspection(self):
         agent=SimpleNamespace();request=self.api_request()
-        self.assertIs(stop.apply_request(agent,request,[],39,self.env),request)
+        first=stop.apply_request(agent,request,[],39,self.env)
+        self.assertIsNot(first,request)
+        self.assertEqual(first['tool_choice'],'auto')
+        self.assertIn('"remaining_files": 2',first['messages'][0]['content'])
+        self.assertFalse(agent._quality_review_journal.messages())
         stop.guard(agent,[],'not a verdict',38,self.env)
         completed=stop.apply_request(agent,request,self.messages(),37,self.env)
         self.assertEqual(completed['tools'],request['tools']);self.assertEqual(completed['tool_choice'],'auto')
@@ -117,7 +166,7 @@ class QualityReviewStopTests(unittest.TestCase):
         second=stop.guard(agent,self.page('tests/test_new.py','c',2,3,'2|two'),json.dumps(self.verdict),38,self.env)
         self.assertNotEqual(first['progress_sha256'],second['progress_sha256'])
         self.assertEqual(second['repeated_without_progress'],1);self.assertFalse(second['blocked'])
-        self.assertEqual(second['next_reads'],[dict(path='/delivery/app.py',offset=1,limit=100)])
+        self.assertEqual(second['next_reads'],[dict(path='/delivery/tests/test_new.py',offset=3,limit=100)])
 
     def test_same_review_journal_survives_dropped_context_without_granting_approval(self):
         agent=SimpleNamespace()

@@ -14,9 +14,9 @@ def evidence():
 
 def scale_evidence():
     return dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=219,
-        main_provider_calls=23,summary_provider_calls=1,max_iterations=40,complete_files=71,
+        main_provider_calls=22,summary_provider_calls=1,max_iterations=40,complete_files=71,
         compactions=1,dropped_read_pairs=16,duplicate_reads=0,eof_reads=0,
-        snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
+        tool_only_from_first_call=True,snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
 
 
 class ReviewExecutionEvidenceTests(unittest.TestCase):
@@ -46,5 +46,6 @@ class ReviewExecutionEvidenceTests(unittest.TestCase):
         for change in (dict(compactions=0),dict(dropped_read_pairs=0),dict(dropped_read_pairs=True),
                 dict(summary_provider_calls=0),dict(complete_files=70),dict(main_provider_calls=24),
                 dict(compactions=5,summary_provider_calls=5),dict(summary_provider_calls=2),
+                dict(tool_only_from_first_call=False),dict(tool_only_from_first_call=1),dict(main_provider_calls=23),
                 dict(duplicate_reads=1),dict(eof_reads=1),dict(tests_approved=True),dict(model_calls=False)):
             with self.subTest(change=change),self.assertRaises(ValueError):contract.validate_scale({**scale_evidence(),**change})

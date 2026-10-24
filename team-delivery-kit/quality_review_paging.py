@@ -37,8 +37,8 @@ class PageGate:
         self.pending={(p['path'],p['offset'],p['limit']) for p in plan['pages']}
 
 
-def arm(agent,journal,*,required_paths=None):
-    plan=journal.plan(required_paths=required_paths)
+def arm(agent,journal,*,required_paths=None,priority_paths=None):
+    plan=journal.plan(required_paths=required_paths,priority_paths=priority_paths)
     with _GATE_LOCK:
         old=_GATES.get(journal.request_id)
         require(old is None or old is getattr(agent,'_quality_review_page_gate',None))
@@ -51,7 +51,7 @@ def arm(agent,journal,*,required_paths=None):
 def allowed(config,args,*,consume=False):
     """Check a planned tuple; consume atomically only at actual handler entry.
 
-    Before continuation is armed, the registered read-only phase remains in
+    Before the first outbound request arms the gate, the registered read-only phase remains in
     force. After arming, even direct/parallel handler calls cannot repeat a
     consumed page or substitute an offset. Dispatch preflight never consumes a
     page, because Hermes checks again in the fenced handler. No tool is run here.
@@ -162,11 +162,15 @@ class Journal:
             found[path]=dict(total_lines=0,lines=0,line_content={},next_offset=None)
         return found
 
-    def plan(self,*,required_paths=None):
+    def plan(self,*,required_paths=None,priority_paths=None):
         required=list(self._paths) if required_paths is None else required_paths
         require(isinstance(required,list) and bool(required)
             and all(isinstance(path,str) for path in required)
             and len(required)==len(set(required)) and set(required)<=set(self._paths))
+        priority=[] if priority_paths is None else priority_paths
+        require(isinstance(priority,list) and all(isinstance(path,str) for path in priority)
+            and len(priority)==len(set(priority)) and set(priority)<=set(required))
+        ranks={path:n for n,path in enumerate(priority)}
         observed=self._coverage();cohorts={};complete=[]
         messages=self.messages()
         # Check every complete file, including those outside a rejection's
@@ -185,9 +189,14 @@ class Journal:
         pages=[]
         if cohorts:
             # One exact offset permits a simple bounded schema/handler plan.
-            # Finish the largest independent cohort; ties prefer earlier pages.
-            offset=min(cohorts,key=lambda n:(-len(cohorts[n]),n))
-            pages=[dict(path=path,offset=offset,limit=100) for path in cohorts[offset][:MAX_BATCH]]
+            # Finish mandatory new tests first so a grounded rejection does not
+            # wait for the approval-only scope. Keep independent same-offset
+            # pages in that cohort; priority never reduces required coverage.
+            pending={path:offset for offset,paths in cohorts.items() for path in paths}
+            first=next((path for path in priority if path in pending),None)
+            offset=pending[first] if first is not None else min(cohorts,key=lambda n:(-len(cohorts[n]),n))
+            ordered=sorted(cohorts[offset],key=lambda path:(ranks.get(path,len(ranks)),path))
+            pages=[dict(path=path,offset=offset,limit=100) for path in ordered[:MAX_BATCH]]
         progress={path:dict(total_lines=page['total_lines'],line_content=page['line_content'])
             for path,page in sorted(observed.items())}
         return dict(request_id=self.request_id,manifest_sha256=self.manifest_sha256,

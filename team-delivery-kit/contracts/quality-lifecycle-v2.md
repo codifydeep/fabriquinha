@@ -847,6 +847,37 @@ verdict in three fixed loopback calls within the original budget. It used no
 model calls and granted no test/delivery approval. Native qualification remains
 pending; historical verdicts and manifests are unchanged.
 
+#### First-request pending-page guidance — qualified, native result pending
+
+The later native reviewer used tools without a premature final answer. Its
+completion state never initialized the pending-page projection, and the installed
+stall monitor stopped the incomplete inspection. The controller retained that
+structured diagnostic as a technical block, not an accepted verdict.
+
+`apply_request()` now projects the registered read tool, trusted page plan and
+handler gate from the first model request, without creating completion state or
+resetting the budget. The journal prioritizes mandatory new tests and retains
+same-offset independent pages in a batch of at most sixteen. Priority changes
+ordering, never the approval scope or evidence requirements. Real paired reads
+still supply progress; no queue entry is an inspection receipt.
+
+The first request permits an exact decision or tool use. After a premature
+answer, a named read is forced only while new-test inspection is incomplete;
+once it is complete, a substantiated `request_changes` may finish after the
+required citation reads. Approval and escalation still require the full
+registered scope. Format, findings, native identity and bytes remain independently
+checked by the controller; the worker never approves its own evidence.
+
+The new real-Hermes scale control starts with tool calls, not premature prose:
+71 files, 563,066 bytes and 219 unique pages in 22 main loopback calls. Two real
+compactions removed 196 read pairs from the conversation while the journal
+preserved complete coverage. It passed without duplicate/EOF reads or snapshot
+changes. The full fixed control set used 31 local responses and zero external
+model calls. These source-bound facts qualify that fixture, not native review,
+cross-restart memory, product correctness or autonomous delivery. Older failed
+runs and qualification receipts remain immutable; recovery requires the actual
+changed qualified profile and fresh successor reads.
+
 The subsequent native run reached 122 observed read pages over 60 files before
 the existing proxy rejected its accumulated request at the fixed 512 KiB
 transport ceiling. The 71-file snapshot alone is 552,750 bytes, excluding JSON,

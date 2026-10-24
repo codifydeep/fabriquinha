@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
                 'No tests or delivery have been approved. Follow the original operator fixture '
                 'and the controller notices for exact pending paths and offsets.')),'stop','summary')
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
-        maximum=23 if scenario=='scale' else 1 if scenario=='budget' else 3
+        maximum=22 if scenario=='scale' else 1 if scenario=='budget' else 3
         if index>=maximum:
             self.send_response(400);self.end_headers();self.wfile.write(b'{"error":"fixed fixture call ceiling"}');return
         if scenario=='normal' and index==1:
@@ -78,14 +78,14 @@ class Handler(BaseHTTPRequestHandler):
             message=dict(role='assistant',content=None,tool_calls=[dict(id='control-'+str(index),type='function',
                 function=dict(name='read_file',arguments=json.dumps(args)))])
             finish='tool_calls'
-        elif scenario=='scale' and index>0:
+        elif scenario=='scale':
             notices=[m['content'] for m in body['messages'] if m.get('role')=='system'
                 and 'controller_review_continuation_v1' in str(m.get('content'))]
             assert len(notices)==1
             note=json.loads(notices[0][notices[0].index('{'):])
             assert note['request_id']=='60000000-0000-4000-8000-000000000005'
             if note['remaining_files']:
-                assert body.get('tool_choice')==dict(type='function',function=dict(name='read_file'))
+                assert body.get('tool_choice')=='auto'
                 pages=note['next_reads'];assert 1<=len(pages)<=16
                 schema=body['tools'][0]['function']['parameters']['properties']
                 assert schema['path']['enum']==[p['path'] for p in pages]
@@ -194,10 +194,12 @@ def execution_controls():
     probe_config={**config,'request_id':'60000000-0000-4000-8000-000000000004'}
     os.environ.update(DELIVERY_QUALITY_PHASE_JSON=json.dumps(probe_config),DELIVERY_MODEL_EXECUTION_ID=probe_config['request_id'])
     probe_agent=SimpleNamespace()
-    stop.guard(probe_agent,[],verdict,39)
     request=dict(messages=[],tools=[dict(type='function',function=dict(name='read_file',parameters=dict(type='object')))])
-    stop.apply_request(probe_agent,request,[],38)
+    stop.apply_request(probe_agent,request,[],40)
+    assert not hasattr(probe_agent,'_quality_review_completion')
     args=dict(path='/delivery/app.py',offset=1,limit=100)
+    denied=json.loads(registry.get_entry('read_file').handler({**args,'offset':401}))
+    assert denied.get('error')=='operation_forbidden_in_test_review_v2',denied
     read=json.loads(registry.dispatch('read_file',args))
     assert not read.get('error') and read.get('content_returned') is not False,read
     repeated=json.loads(registry.get_entry('read_file').handler(args))
@@ -294,14 +296,16 @@ def scale_compaction_control():
         result=current.run_conversation('Fixed operator scale fixture. Review all registered pages; do not authorize any native delivery.')
     finally:local.shutdown();local.server_close()
     assert result['final_response']==verdict,result
-    assert len(calls)==23 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert len(calls)==22 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert not hasattr(current,'_quality_review_completion')  # Tools from call zero, never a premature final.
     assert len(commits)==len(scale_summaries)==compressor.compression_count and all(n>0 for n in commits),commits
     assert current._quality_review_journal.plan()['complete_files']==71
     assert all((Path('/delivery')/p).read_bytes()==raw for p,raw in scale_files_data.items())
     return dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=len(scale_reads),
         main_provider_calls=len(calls),summary_provider_calls=len(scale_summaries),max_iterations=40,
         complete_files=71,compactions=compressor.compression_count,dropped_read_pairs=sum(commits),
-        duplicate_reads=0,eof_reads=0,snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
+        duplicate_reads=0,eof_reads=0,tool_only_from_first_call=True,
+        snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
 
 
 normal_calls=list(calls)

@@ -27,6 +27,23 @@ class QualityReviewPagingTests(unittest.TestCase):
         self.journal.add(self.page('a.py','c',3,3,'3|c'))
         self.assertEqual(self.journal.plan()['pages'],[])
 
+    def test_priority_finishes_new_test_before_larger_unrelated_cohort(self):
+        self.journal.add(self.page('a.py','a',1,3,'1|a'))
+        plan=self.journal.plan(priority_paths=['/delivery/a.py'])
+        self.assertEqual(plan['pages'],[dict(path='/delivery/a.py',offset=2,limit=100)])
+        self.journal.add(self.page('a.py','b',2,3,'2|b\n3|c'))
+        self.assertEqual(self.journal.plan(priority_paths=['/delivery/a.py'])['pages'],[
+            dict(path='/delivery/b.py',offset=1,limit=100),dict(path='/delivery/empty.py',offset=1,limit=100)])
+
+    def test_priority_orders_but_does_not_shrink_same_offset_cohort(self):
+        plan=self.journal.plan(priority_paths=['/delivery/empty.py'])
+        self.assertEqual([p['path'] for p in plan['pages']],
+            ['/delivery/empty.py','/delivery/a.py','/delivery/b.py'])
+        for paths in ('/delivery/a.py',['/delivery/unknown.py'],['/delivery/a.py']*2):
+            with self.assertRaises(ValueError):self.journal.plan(priority_paths=paths)
+        with self.assertRaises(ValueError):
+            self.journal.plan(required_paths=['/delivery/b.py'],priority_paths=['/delivery/a.py'])
+
     def test_journal_survives_context_drop_and_does_not_alias_mutable_messages(self):
         messages=self.page('a.py','a',1,3,'1|a\n2|b');self.journal.add(messages)
         messages[1]['output']='changed conversation';saved=self.journal.messages();saved.clear()
