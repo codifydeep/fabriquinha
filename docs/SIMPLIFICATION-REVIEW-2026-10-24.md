@@ -853,8 +853,8 @@ o protocolo indefinidamente para compensar julgamento fraco.
 |---|---|---|
 | Análise e plano | Concluídos em documento | Fontes e código citados acima |
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
-| S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
-| S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
+| S0 Referência e ADR | Concluída; referência e arquivo comprimido reconferidos | Referência Git, hashes e restauração íntegra original do backup |
+| S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream; 117 testes atuais passaram |
 | S2 Executor/qualidade pequenos | Parcial: serviço TDD, recuperação Lead/CTO/SPIKE e outbox/alertas passaram em isolamento | Faltam admissão/esperas e conexão integral da entrega ao serviço; Telegram real não testado |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP passou: TDD, Git, build, deploy/QA/rollback reais; GitHub simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |

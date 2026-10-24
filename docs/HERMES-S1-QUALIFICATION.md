@@ -77,6 +77,28 @@ depois de o card já estar `done`. No teste de reinício, o primeiro dispatcher
 terminou enquanto seu worker estava ativo; um segundo processo executou o tick
 e o histórico terminou com exatamente um run para aquele card.
 
+## Revalidação da fronteira após a aprovação
+
+A prova S1 foi repetida em outro home/board vazio, usando o código de
+`508319be`, o mesmo upstream fixado e a imagem local por ID exato. Os onze
+controles passaram novamente, incluindo as três superfícies nativas do gate de
+PR. O recibo continua privado; registra zero chamadas ao modelo, zero patches
+upstream, nenhuma migração e nenhuma aprovação de entrega. Os 117 testes
+unitários atuais do caminho novo também passaram, sem falhas ou skips.
+
+Em S0, a tag de referência foi reconferida e o hash do backup comprimido continua
+igual ao recibo original; `gzip -t` passou. A restauração SQLite íntegra descrita
+acima pertence à validação original, não foi repetida nesta revalidação para
+evitar outra cópia grande no disco. Nenhum backup foi substituído ou removido.
+
+Ao término, não restou contêiner no grupo temporário S1 e o proxy de modelo
+antigo continuava parado. Não foram instalados gateways, alterados boards de
+produto nem conectada a interface Desktop a esse home descartável. A leitura do
+dashboard foi comprovada pela API oficial, não por inspeção visual da interface.
+As provas posteriores descritas nos outros documentos não mudam esses limites:
+S1 demonstra viabilidade da fronteira, não autonomia completa ou autorização
+para o corte de migração.
+
 ## Código e limites
 
 - [`kanban_lane.py`](../src/fabriquinha/kanban_lane.py): adaptador da fronteira,
