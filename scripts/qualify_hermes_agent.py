@@ -143,6 +143,7 @@ def qualify(root,upstream,image):
     for name in ('tool-author','tool-reviewer'):
         create_profile(name,no_skills=True,description='Native SDK qualification only')
         write_json(home/'profiles'/name/'config.yaml',dict(model={'streaming':False,'context_length':65536},
+            auxiliary={'title_generation':{'enabled':False}},
             tools={'tool_search':{'enabled':'off'}},terminal={'backend':'fabriquinha','cwd':'/workspace'}))
     write_json(root/'project.json',config(image));project=Project.parse(config(image))
     store=Store(root/'private');board=Board(project);quality=Quality(project,store,Runner(project,store),board)

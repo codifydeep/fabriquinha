@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+from urllib.parse import urlsplit
 from .artifacts import digest
 from .effects import Journal, EffectBlocked, write_json
 from .executor import docker, grouping, phase_mounts
@@ -191,12 +192,102 @@ def restrict_handlers(sandbox,allowed):
         if entry.name not in allowed:
             registry.deregister(entry.name)
             continue
-        def guard(handler):
+        def guard(handler,entry_name):
             @wraps(handler)
             def guarded(*args,**kwargs):
-                sandbox.ensure()
+                if entry_name in {'delivery_submit','delivery_review'}:sandbox.board.ensure(sandbox.run)
+                else:sandbox.ensure()
                 return handler(*args,**kwargs)
             return guarded
         fields={name:getattr(entry,name) for name in entry.__dataclass_fields__}
-        fields['handler']=guard(entry.handler)
+        fields['handler']=guard(entry.handler,entry.name)
         registry.register(**fields,override=True)
+
+
+def register_delivery_tools(sandbox,quality,*,on_terminal=None):
+    from .quality import DeliveryTools
+    from tools.registry import registry
+    operations=DeliveryTools(sandbox,quality)
+    if sandbox.run.reviewing:
+        name='delivery_review'
+        schema=dict(type='object',additionalProperties=False,required=['decision','reason','findings'],properties=dict(
+            decision={'type':'string','enum':['approve','changes']},reason={'type':'string','minLength':1,'maxLength':2000},
+            findings=dict(type='array',maxItems=8,items=dict(type='object',additionalProperties=False,
+                required=['path','line','detail'],properties=dict(path={'type':'string'},
+                    line={'type':'integer','minimum':1},detail={'type':'string','minLength':1,'maxLength':2000})))))
+        operation=operations.review
+        description='Submit independent review of the existing immutable delivery. Never recreate Red or edit the author work.'
+    else:
+        name='delivery_submit'
+        schema=dict(type='object',additionalProperties=False,properties={})
+        if sandbox.run.kind=='implementation':
+            schema.update(required=['mutations'],properties=dict(mutations=dict(type='array',minItems=1,maxItems=8,
+                items=dict(type='object',minProperties=1,maxProperties=16,
+                           additionalProperties=dict(type='string',maxLength=131072)))))
+        operation=operations.submit
+        description=('Validate the actual workspace and request independent review. '
+            'Tests phase: real Red. Implementation: Green and behavior-changing product mutations. '
+            'On validation error correct the work; never remove or weaken tests. No pass flags, commands or receipt IDs accepted.')
+    def handler(args,**kwargs):
+        result=operation(args)
+        if on_terminal:on_terminal(result)
+        return json.dumps(result)
+    registry.register(name=name,toolset='fabriquinha_delivery',
+        schema=dict(name=name,description=description,parameters=schema),handler=handler)
+    return {name},operations
+
+
+def run_activity(sandbox,quality,route,prompt,*,run_seconds=600):
+    """Trusted SDK adapter; no lifecycle inference from the assistant's prose.
+
+    Route comes from controller configuration, not a model tool argument.
+    Qualification is loopback-only. Production provider release remains a
+    separate installation/authorization step; no fallback route is configured.
+    """
+    if (not isinstance(route,dict) or set(route)!={'base_url','api_key','provider','api_mode','model'}
+            or any(not isinstance(v,str) or not v for v in route.values())
+            or type(run_seconds) is not int or not 1<=run_seconds<=3600):
+        raise ValueError('explicit bounded controller model route required')
+    url=urlsplit(route['base_url'])
+    if url.username or url.password or sandbox.project.qualification and (url.scheme!='http' or url.hostname!='127.0.0.1'):
+        raise ValueError('qualification model route must be loopback only')
+    from hermes_cli.profiles import get_active_profile_name
+    if get_active_profile_name()!=sandbox.run.actor:raise ValueError('worker must bind the assigned profile')
+    install_backend(sandbox)
+    from run_agent import AIAgent
+    from hermes_state import SessionDB
+    from toolsets import create_custom_toolset
+    db=SessionDB();agent=None;terminal={}
+    def finished(result):
+        terminal.update(result)
+        agent.interrupt(tool_reason='delivery_handoff')
+    gates,operations=register_delivery_tools(sandbox,quality,on_terminal=finished)
+    allowed=tool_names(sandbox)|gates
+    create_custom_toolset('fabriquinha_activity','Controller-selected delivery activity',tools=sorted(allowed))
+    anchor='fabriquinha-'+digest(dict(project=sandbox.project.fingerprint(),subject=sandbox.run.subject(),
+        model=route['model'],provider=route['provider'],api_mode=route['api_mode']))[:32]
+    session=db.resolve_resume_session_id(anchor);previous=db.get_session(session)
+    try:
+        history=None
+        if previous:
+            if previous['profile_name']!=sandbox.run.actor:raise ValueError('session belongs to another profile')
+            db.assert_resume_safe(session);history,_=db.get_resume_conversations(session)
+        phase=('Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
+               if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
+               'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
+        agent=AIAgent(**route,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
+            quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
+            session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,
+            fallback_model=None,ephemeral_system_prompt=phase)
+        if agent.valid_tool_names!=allowed:raise ValueError('native tool surface diverged from phase policy')
+        restrict_handlers(sandbox,allowed)
+        if sandbox.run.reviewing:
+            prompt+='\nController-recorded TDD evidence (historical Red is not to be reproduced):\n'+json.dumps(operations.evidence())
+        result=agent.run_conversation(prompt,conversation_history=history,
+                                     system_message=previous.get('system_prompt') if previous else None)
+        if not terminal:raise ValueError('activity ended without a controller-validated native handoff')
+        return dict(transition=terminal,session=agent.session_id,resumed=bool(previous),
+                    sdk_exit=result.get('exit_reason'),delivery_approval=False)
+    finally:
+        if agent:agent.close()
+        db.close();sandbox.close()

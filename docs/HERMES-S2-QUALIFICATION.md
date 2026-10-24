@@ -12,7 +12,9 @@ esta fatia ao Git e à fronteira PR/CI simulada. As pendências abaixo retratam 
 checkpoint S2; a qualificação integrada continua sem modelo e sem homologação.
 A [ponte nativa de ferramentas/sessões](HERMES-AGENT-QUALIFICATION.md) passou
 posteriormente com `AIAgent`, respostas HTTP locais e retomada em outro processo.
-Ainda faltam as ferramentas de submissão/parecer e o worker contínuo.
+A prova seguinte conectou submissão/parecer ao dispatcher nativo: dois cards,
+seis atividades, devolução/correção e retomada de sessões, com 16 respostas locais.
+Faltam o serviço contínuo e o trabalho com decisões de um modelo real.
 
 ## O que efetivamente foi executado
 

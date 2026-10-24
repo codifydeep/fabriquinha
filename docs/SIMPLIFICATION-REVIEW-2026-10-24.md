@@ -8,6 +8,9 @@ S2 parcial: [mecanismos TDD qualificados sem modelo](HERMES-S2-QUALIFICATION.md)
 [S3 passou no escopo offline Python/HTTP](HERMES-S3-QUALIFICATION.md), incluindo
 build, Compose, QA em Chromium e rollback reais. GitHub e decisões permanecem
 simulados; serviço contínuo e entrega por agentes reais ainda não qualificados.
+A ponte `AIAgent`/ferramentas/sessões passou depois com respostas locais; as
+operações fixas de submissão/parecer percorreram dois cards e seis atividades
+pelo dispatcher nativo. Essa prova não instala serviço operacional nem migra estado.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada

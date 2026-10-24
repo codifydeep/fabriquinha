@@ -45,7 +45,10 @@ pode ter egress pela bridge. Não se afirma airgap do produto; ver
 O toolchain de navegador ainda usa cache local e precisa de base pública em S6.
 A [ponte de ferramentas e sessões](HERMES-AGENT-QUALIFICATION.md) já passou com
 `AIAgent`, ferramentas nativas, SQLite e Docker reais, usando respostas HTTP locais.
-Isso não conecta ainda o serviço contínuo a toda a cadeia. `hermes.py` registra um
+Submissão e parecer também passaram no dispatcher nativo, com dois cards e seis
+atividades, incluindo devolução/correção e retomada de sessões. Essa prova não
+instala um serviço contínuo nem conecta toda a cadeia com decisões reais.
+`hermes.py` registra um
 backend pela API de plugins, sem patch upstream; sua política de registry exige
 processo isolado por claim e nunca deve ser instalada num gateway compartilhado.
 

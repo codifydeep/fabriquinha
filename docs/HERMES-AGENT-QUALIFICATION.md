@@ -3,12 +3,14 @@
 Data: 24/10/2026. Parte de [S2](HERMES-S2-QUALIFICATION.md), após a
 [cadeia mecânica S3](HERMES-S3-QUALIFICATION.md).
 
-**Passou com `AIAgent`, ferramentas nativas, SQLite e Docker reais; as nove
-respostas HTTP foram locais e determinísticas.** Nenhuma chamada à OpenRouter,
-alteração de modelo instalado, aprovação de teste/release ou migração.
+**Passaram duas provas com `AIAgent`, ferramentas nativas, SQLite e Docker reais.**
+A primeira usou nove respostas HTTP locais; a segunda conectou as ferramentas
+de entrega ao dispatcher e usou 16 respostas locais. Todas são determinísticas.
+Nenhuma chamada à OpenRouter, alteração de modelo instalado ou migração.
+Na segunda houve aprovação sintética dos testes e da entrega isolada, nunca de release.
 Esta prova não representa autoria/julgamento por um LLM ou serviço autônomo.
 
-## O que foi executado
+## Primeira prova: ferramentas e retomada
 
 ```mermaid
 flowchart LR
@@ -81,6 +83,62 @@ Código e comandos do produto rodam apenas no contêiner; ele não recebe esses
 privilégios nem dados privados. O Hermes fixado e as extensões carregadas pelo
 adaptador pertencem à base confiável, não podem vir do código gerado do produto.
 
+## Segunda prova: ciclo TDD pelo dispatcher nativo
+
+`scripts/qualify_hermes_delivery.py` fornece apenas o grafo inicial e respostas
+HTTP fixas. O `dispatch_once(spawn_fn=...)` nativo reivindica e despacha cada
+atividade em processo próprio. O modelo simulado chama ferramentas reais:
+
+```mermaid
+flowchart LR
+    K[Dispatcher Hermes: claim e perfil] --> A[AIAgent em processo isolado]
+    A -->|delivery_submit| T[Validação fixa: baseline e Red]
+    T --> R[Revisão nativa somente leitura]
+    R -->|delivery_review: mudanças| C[Mesmo autor corrige o teste]
+    C --> T
+    R -->|delivery_review: aprovar| F[Testes congelados; dependência liberada]
+    F --> I[Implementação; Green e controle negativo]
+    I --> V[Revisão independente e nova suíte]
+    V --> D[Card concluído; não é homologação]
+```
+
+- O primeiro `delivery_submit` sem teste novo foi recusado por ausência de Red;
+  o autor permaneceu capaz de corrigir o trabalho na mesma atividade.
+- O primeiro Red válido recebeu pedido de mudança concreto. O mesmo autor
+  corrigiu o teste; outra revisão aprovou e congelou a nova revisão exata.
+- O card dependente foi liberado sem intervenção no handoff. O implementador
+  recebeu o snapshot com testes protegidos, produziu Green e propôs uma mutação
+  de produto. A suíte completa detectou a regressão, sem mudar os testes.
+- O revisor reexecutou a suíte sobre a entrega imutável e aprovou. Os seis
+  runs terminaram, na ordem: `review_requested`, `changes_requested`,
+  `review_requested`, `completed`, `review_requested`, `completed`.
+- Autor e revisor retomaram suas sessões no novo processo da correção, usando
+  `resolve_resume_session_id`, `assert_resume_safe` e `get_resume_conversations`.
+  Os resultados terminais das ferramentas foram conferidos no SQLite nativo.
+- O callback pede interrupção pela API pública do SDK somente depois de o gate
+  efetivar a transição. Não há chamada extra ao modelo para explicar que terminou.
+  Resposta textual final sem handoff validado é falha de protocolo, não conclusão.
+
+Foram **dois cards, seis atividades e 16 requisições HTTP locais**, com zero
+chamadas ao provedor. Todos os processos terminaram sem erro e não restaram
+contêineres auxiliares próprios ou runs abertos. Não houve PR, implantação ou QA
+nessa prova: a cadeia S3 foi qualificada separadamente com fixtures.
+
+Uma tentativa anterior percorreu as transições, mas falhou na auditoria de
+requisições: a geração auxiliar de títulos acrescentou chamadas ao transporte
+local. Ela permanece registrada como não aprovada. O ensaio seguinte desabilitou
+`auxiliary.title_generation.enabled` na configuração isolada; não alterou o SDK.
+O script também recusa erro do worker após o handoff. Se a observação expirar,
+preserva o estado: timeout do observador não autoriza apagar workers ainda vivos.
+
+As operações fixas derivam identidade, fase e recibos do controlador. Não aceitam
+`passed=true`, identidade fornecida pelo agente, comando de validação arbitrário
+ou ID de evidência escolhido pelo chamador. As mutações são substituições
+limitadas de arquivos existentes do produto, executadas sem rede; alterar testes
+ou configurações protegidas continua proibido. O veredito exige achados ligados
+ao snapshot para pedir mudanças. Esses controles não provam qualidade semântica
+da revisão: a decisão da fixture continua programada.
+
 ## Dependências e reprodução
 
 Mesmo upstream `v0.22.0`, SHA `e06df9c2eae6901f4c88f464e0ae6e753c0428b8`,
@@ -101,6 +159,9 @@ uv pip install --python .local-hermes-agent/venv/bin/python \
 .local-hermes-agent/venv/bin/python scripts/qualify_hermes_agent.py \
   --upstream .local-hermes-s1/upstream --root .local-hermes-agent/trial-new \
   --image sha256:ID_EXATO_DO_VALIDADOR
+.local-hermes-agent/venv/bin/python scripts/qualify_hermes_delivery.py \
+  --upstream .local-hermes-s1/upstream --root .local-hermes-agent/delivery-new \
+  --image sha256:ID_EXATO_DO_VALIDADOR
 ```
 
 Execute as prévias de limpeza do `AGENTS.md` antes/depois e uma prova por vez.
@@ -119,10 +180,8 @@ foram arquivados e retirados. Workspace, snapshots e sessões foram preservados.
 
 ## O que falta para autonomia
 
-- Registrar as operações fixas de submissão/parecer no worker: o modelo deve
-  acionar o gate, não o operador interpretar sua mensagem final.
-- Ligar esse worker ao `dispatch_once` nativo para executar a cadeia TDD completa
-  com sessões, não apenas esta atividade de testes e leitura de revisão.
+- Transformar a integração qualificada no serviço operacional contínuo, incluindo
+  publicação/deploy: o loop de observação da fixture não é um daemon instalado.
 - Persistir a referência de continuação no contexto nativo, liberar slots em
   esperas, preservar o modo do revisor e despachar diagnóstico técnico real.
 - Conectar status/notificações duráveis e, depois, qualificar modelo/GitHub reais
@@ -130,6 +189,6 @@ foram arquivados e retirados. Workspace, snapshots e sessões foram preservados.
 - Validar memória de projeto entre perfis/releases; retomar a sessão de um autor
   não prova memória agentica de toda a equipe ou resistência à compactação.
 
-A suíte do caminho novo totaliza 75 testes sem falhas. A prova física acima
+A suíte do caminho novo totaliza 81 testes sem falhas. As provas físicas acima
 complementa testes unitários; não é substituída por eles. A configuração nova
 permanece separada do runtime legado pausado e do Truco.

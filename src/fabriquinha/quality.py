@@ -4,7 +4,13 @@ No worker-supplied pass flags or receipt imports. Store and Runner live only in
 the controller; model output is limited to a review decision with findings.
 """
 import json
+import difflib
+from itertools import islice
+from pathlib import Path
+import tempfile
+import time
 from .artifacts import protected_unchanged
+from .effects import Pending, EffectBlocked
 
 PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
@@ -216,3 +222,128 @@ class Quality:
         return self.record(run, 'delivery_review', dict(green=green_id, controls=controls_id,
             snapshot=data['snapshot'], validation_job=job, verdict=decision,
             merge_authorized=False, delivery_approval=False))
+
+
+class DeliveryTools:
+    """Fixed model-facing operations. IDs, phase and authority are server-owned."""
+    def __init__(self,sandbox,quality):
+        if (quality.store is not sandbox.store or quality.board is not sandbox.board
+                or quality.project.fingerprint()!=sandbox.project.fingerprint()
+                or sandbox.run.kind not in ('tests','implementation')):
+            raise ValueError('same controller and current TDD activity required')
+        self.sandbox,self.quality,self.run=sandbox,quality,sandbox.run
+        self.store,self.board=quality.store,quality.board
+        self.submission=None;self.verdict=None
+
+    def wait(self,call,*,jobs=1):
+        # These are actual local validation jobs, not model polling or CI waits.
+        # Runner owns the per-job deadline/retirement; this is a composite backstop.
+        deadline=time.monotonic()+jobs*(self.quality.project.timeout_seconds+15)
+        while True:
+            try:return call()
+            except Pending:
+                if time.monotonic()>=deadline:raise EffectBlocked('local gate observation deadline exhausted')
+                time.sleep(0.1)
+
+    def mutants(self,snapshot,proposals):
+        if not isinstance(proposals,list) or not 1<=len(proposals)<=8:
+            raise ValueError('one to eight bounded product mutations required')
+        manifest=self.store.manifest(snapshot);result=[];total=0
+        for proposal in proposals:
+            if not isinstance(proposal,dict) or not 1<=len(proposal)<=16:
+                raise ValueError('bounded product-file replacements required')
+            for path,content in proposal.items():
+                if path not in manifest or not isinstance(content,str) or len(content)>131072:
+                    raise ValueError('mutation may replace only a bounded existing product file')
+                total+=len(content)
+                if total>1024*1024:raise ValueError('mutation proposals exceed total bound')
+            with tempfile.TemporaryDirectory(prefix='.delivery-mutant-',dir=self.store.root.parent) as folder:
+                work=Path(folder);self.store.checkout(snapshot,work)
+                for path,content in proposal.items():(work/path).write_text(content)
+                mutant=self.store.capture(work)
+            self.quality.protect(snapshot,mutant,exact_tests=True)
+            if mutant==snapshot or mutant in result:raise ValueError('distinct behavior-changing controls required')
+            result.append(mutant)
+        return result
+
+    def submit(self,args):
+        q,run=self.quality,self.run
+        q.check(run,run.kind)
+        required=set() if run.kind=='tests' else {'mutations'}
+        if not isinstance(args,dict) or set(args)!=required:
+            raise ValueError('submit accepts only the phase-specific evidence proposal')
+        if self.submission is None:
+            snapshot=self.store.capture(self.sandbox.workspace)
+            exclude=()
+            if run.kind=='tests':
+                baseline=self.board.input(run,'baseline')
+                evidence={'red':self.wait(lambda:q.red(run,baseline,snapshot),jobs=2)}
+            else:
+                frozen_id=self.board.input(run,'tests')
+                green=self.wait(lambda:q.green(run,frozen_id,snapshot))
+                mutants=self.mutants(snapshot,args['mutations'])
+                controls=self.wait(lambda:q.controls(run,green,mutants),jobs=len(mutants))
+                exclude=(q.freeze(run,frozen_id)['test_author'],)
+                evidence={'green':green,'controls':controls}
+            q.project.reviewer(run.author,exclude=exclude)
+            self.submission=evidence
+        self.sandbox.close()
+        q.handoff(run,'Controller-validated immutable '+run.kind+' submission',self.submission)
+        return dict(status='review_requested',task=run.task,evidence=self.submission,delivery_approval=False)
+
+    def review(self,decision):
+        q,run=self.quality,self.run
+        q.check(run,run.kind,reviewing=True)
+        if self.verdict is None:
+            if run.kind=='tests':
+                red=self.board.input(run,'red',review_handoff=True)
+                receipt=q.tests_review(run,red,decision)
+                result=self.store.receipt(receipt)
+                changes=result['kind']=='test_review'
+                if changes:verdict=result['payload']['verdict']
+                else:verdict=self.store.receipt(result['payload']['review'])['payload']['verdict']
+                evidence={'review' if changes else 'tests':receipt}
+            else:
+                green=self.board.input(run,'green',review_handoff=True)
+                controls=self.board.input(run,'controls',review_handoff=True)
+                receipt=self.wait(lambda:q.delivery_review(run,green,controls,decision))
+                verdict=self.store.receipt(receipt)['payload']['verdict']
+                changes=verdict['decision']=='changes'
+                evidence={'review' if changes else 'delivery':receipt}
+            self.verdict=(verdict,evidence,changes)
+        verdict,evidence,changes=self.verdict
+        if decision!=verdict:raise ValueError('pending review decision cannot change during retirement')
+        self.sandbox.close()
+        self.board.finish_review(run,verdict['reason'],evidence,changes=changes)
+        return dict(status='changes_requested' if changes else 'completed',task=run.task,
+                    evidence=evidence,delivery_approval=False)
+
+    def evidence(self):
+        """Trusted initial review context; no arbitrary receipt/path read API."""
+        q,run=self.quality,self.run;q.check(run,run.kind,reviewing=True)
+        def payload(key,kind):return self.store.receipt(key,kind=kind)['payload']
+        def report(key):return payload(key,'suite_job')['report']
+        context=dict(phase=run.kind,mutations=[])
+        if run.kind=='tests':
+            red=payload(self.board.input(run,'red',review_handoff=True),'red')
+        else:
+            green=payload(self.board.input(run,'green',review_handoff=True),'green')
+            frozen=payload(green['freeze'],'tests_frozen');red=payload(frozen['red'],'red')
+            controls=payload(self.board.input(run,'controls',review_handoff=True),'controls')
+            context['green']=report(green['job'])
+            before=self.store.manifest(green['snapshot'])
+            for job in controls['jobs']:
+                data=payload(job,'suite_job');snapshot=data['identity']['snapshot']
+                after=self.store.manifest(snapshot);changes=[]
+                for path in before:
+                    if before[path]==after.get(path):continue
+                    change=dict(path=path,before=before[path],after=after.get(path),diff=None,truncated=True)
+                    if max(before[path]['bytes'],after.get(path,{}).get('bytes',0))<=131072 and path in after:
+                        left=(self.store.tree(green['snapshot'])/path).read_text(errors='replace').splitlines(True)
+                        right=(self.store.tree(snapshot)/path).read_text(errors='replace').splitlines(True)
+                        lines=list(islice(difflib.unified_diff(left,right,fromfile=path,tofile=path),301))
+                        change.update(diff=''.join(lines[:300]),truncated=len(lines)>300)
+                    changes.append(change)
+                context['mutations'].append(dict(report=data['report'],changes=changes))
+        context.update(baseline=report(red['baseline_job']),red=report(red['red_job']))
+        return context

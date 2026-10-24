@@ -24,8 +24,13 @@ da branch antes/durante QA ou depois do build bloqueia o candidato antigo.
 A [ponte nativa](HERMES-AGENT-QUALIFICATION.md) passou com `AIAgent`, ferramentas,
 SQLite e Docker reais: nove respostas HTTP locais, retomada em outro processo sem
 duplicar histórico, Red independente e revisão sem handlers de escrita/admin.
-Faltam ligar submissão/parecer ao modelo e conectar toda a cadeia ao dispatcher.
-Checks atuais: 75 testes do caminho novo e 4.523 da suíte histórica, todos sem
+Uma segunda prova conectou submissão/parecer ao dispatcher nativo: dois cards,
+seis atividades e 16 respostas locais, com devolução, correção, congelamento,
+Green, controle negativo e revisão final. Autor e revisor retomaram sessões;
+resultados das ferramentas ficaram persistidos. Decisões são programadas, não
+julgamento de um modelo. Faltam serviço contínuo e cadeia integral com provedor
+e GitHub reais, incidentes executáveis e notificações.
+Checks atuais: 81 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.
