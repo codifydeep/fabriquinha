@@ -133,8 +133,8 @@ instalados nem conectados ao loop. Faltam os seguintes componentes e provas:
 - Qualificação nativa do adaptador de worker/transporte final já existente em
   fonte, instalação e roteamento da admissão;
   a revisão dos testes não pode ser reutilizada como parecer da entrega.
-- Leituras próprias e validação vinculadas à mesma execução; parser tipado e
-  atestação independente no snapshot/SHA exatos.
+- Qualificação nativa das leituras próprias, parser tipado e atestação
+  independente já implementados em fonte, no snapshot/SHA exatos.
 - Solicitações de mudanças ao implementador original, mantendo testes congelados
   e invalidando a aprovação/validação anterior após nova entrega.
 - Continuação persistente do coordenador, PR/CI e deploy/QA/rollback no mesmo SHA.

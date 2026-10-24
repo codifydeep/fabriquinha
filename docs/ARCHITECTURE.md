@@ -27,6 +27,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Revisão final: componentes ainda não conectados ao despacho | `quality_delivery_review_policy.py`, `quality_delivery_review_job.py`, `Dockerfile.quality-delivery-review-job` |
 | Admissão e validação final em fonte, não instaladas | `broker/quality_delivery_review_handoff.py`, `broker/quality_delivery_review_validation.py` |
 | Worker/transporte final em fonte, não roteado | `broker/quality_delivery_review_launch.py`, fase de handlers `delivery_review_v2`; exige recibo original e snapshot somente leitura |
+| Parecer e atestação final em fonte, não roteados | `quality_delivery_review_verdict.py`, `broker/quality_delivery_review_attestation.py`; só o stream do controlador prova leitura |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
@@ -176,8 +177,11 @@ Confirmação perdida, capacidade e prazos têm estado persistente; não renovam
 direito de repetir uma intervenção. Os testes usam native/SQLite/jobs de fixture,
 não o Multica e um revisor reais. O flag dedicado é desligado por padrão.
 
-Ainda faltam o worker somente leitura dessa fase, roteamento de transporte,
-recibos de inspeção e aceitação da decisão independente, retorno de mudanças
+O worker somente leitura, parser do parecer e atestação da decisão já existem
+em fonte. A atestação confere conclusão nativa, execução fechada, política
+inspecionada, sessão ACP, stream próprio e citações byte a byte. Mudanças apontam
+para o autor original; incidentes técnicos apontam para o CTO, sem autorizar
+execução. Ainda faltam qualificação nativa, roteamento e despacho das mudanças
 ao implementador e continuidade do coordenador. Os adaptadores não foram
 adicionados ao despacho instalado: uma capability criada em fixture não prova
 que um worker real foi lançado ou que o produto foi aprovado.

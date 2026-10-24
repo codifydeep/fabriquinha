@@ -33,11 +33,12 @@ def store(con,binding,notifications,mode):
     if not binding or mode not in ('planning','review'):return
     initialize(con)
     from artifact_read_evidence import coverage
-    quality=False
+    quality=False;phase=None
     if mode=='review' and con.execute("SELECT 1 FROM sqlite_master WHERE name='quality_native_scopes'").fetchone():
-        quality=bool(con.execute("SELECT 1 FROM quality_native_scopes WHERE request_id=? AND task_id=? "
-            "AND phase='test_review_v2'",(binding['request_id'],binding['task_id'])).fetchone())
-    if quality:
+        row=con.execute("SELECT phase FROM quality_native_scopes WHERE request_id=? AND task_id=? "
+            "AND phase IN ('test_review_v2','delivery_review_v2')",(binding['request_id'],binding['task_id'])).fetchone()
+        phase=row[0] if row else None;quality=phase is not None
+    if phase=='test_review_v2':
         try:from . import quality_review_completion_receipts as completion
         except ImportError:import quality_review_completion_receipts as completion
         completion.store(con,binding,notifications)

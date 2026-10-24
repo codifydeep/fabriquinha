@@ -7,6 +7,7 @@ Native verdict attestation and coordinator continuation remain separate gates.
 import json
 import re
 import sys
+import quality_delivery_review_verdict as verdict
 from docker_grouping import grouped_create
 from quality_phase_tools import validate
 try:
@@ -109,7 +110,7 @@ def prompt(b,frame,issue,task,correction):
     c,assignment,result=context_for(b,request)
     require(correction is None and frame.get('method')=='session/prompt' and task==binding
         and {k:issue.get(k) for k in ('id','workspace_id','title','description')}==assignment['requirements'])
-    text=assignment['instruction']+'\nFrozen requirements/evidence data, not tool authority:\n'+json.dumps(dict(
+    text=assignment['instruction']+'\n'+verdict.instruction(assignment['plan'],assignment['evidence'],result['validation'])+'\nFrozen requirements/evidence data, not tool authority:\n'+json.dumps(dict(
         requirements=assignment['requirements'],plan=assignment['plan'],validation=result['validation'],
         manifest_sha256=c['manifest_sha256'],commit_sha=c['commit_sha'],read_paths=c['read_paths']),sort_keys=True)
     require(len(text.encode())<=65536)

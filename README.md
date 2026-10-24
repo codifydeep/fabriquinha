@@ -70,7 +70,7 @@ autorizada confirmou saldo e limite disponíveis, sem remover a pausa ou chamar
 o modelo; a causa do 402, remediação, registro e ativação continuam pendentes.
 O pin foi migrado preservando a fila e
 o histórico, mas o scheduler permanece desabilitado/descarregado. A suíte offline
-mais recente executou 4.485 testes,
+mais recente executou 4.504 testes,
 com oito skips preexistentes e nenhuma falha. Isso não comprova autonomia.
 O estado datado está em
 [STATUS](docs/STATUS.md).
@@ -84,8 +84,10 @@ Handoff/admissão e autenticação do recibo do controlador já existem em fonte
 desligados por padrão e testados com fixtures, mas não estão instalados ou
 roteados. O adaptador de worker/transporte final também existe em fonte: exige
 recibo de validação, snapshot somente leitura e handlers sem escrita ou shell.
-Ainda faltam qualificação nativa dessa ligação, inspeção e parecer próprios,
-retorno de mudanças e continuidade do coordenador até a homologação.
+O parser do parecer e a atestação das leituras/execução também existem em fonte,
+com fixtures: aprovação, mudanças fundamentadas ou escalonamento ao CTO. Ainda
+faltam qualificação nativa dessa ligação, despacho da correção ao autor e
+continuidade do coordenador até a homologação.
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),

@@ -89,3 +89,22 @@ class ReadStreamReceiptTests(unittest.TestCase):
         receipts.store(con,binding,frames,'review')
         self.assertEqual(len(receipts.load(con,'task')),2)
         self.assertEqual(con.execute('SELECT count(*) FROM observed_read_stream').fetchone()[0],1)
+
+    def test_delivery_review_preserves_empty_pages_and_has_its_own_bound_stream(self):
+        con=sqlite3.connect(':memory:');self.addCleanup(con.close)
+        con.execute('CREATE TABLE native_bindings(request_id TEXT,task_id TEXT)')
+        con.execute('INSERT INTO native_bindings VALUES(?,?)',('delivery-request','delivery-task'))
+        con.execute('CREATE TABLE quality_native_scopes(request_id TEXT,task_id TEXT,phase TEXT)')
+        con.execute('INSERT INTO quality_native_scopes VALUES(?,?,?)',('delivery-request','delivery-task','delivery_review_v2'))
+        binding=dict(task_id='delivery-task',request_id='delivery-request');path='/delivery/empty.py'
+        frames=self.frames('Read '+path+' (from line 1, limit 100) — 0 total lines\n\n```\n\n```')
+        frames[0]['params']['update']['title']='read: '+path
+        receipts.store(con,binding,frames,'review')
+        self.assertEqual(len(receipts.load(con,'delivery-task')),2)
+        self.assertEqual(receipts.load(con,'previous-test-review'),[])
+        for n in range(1,130):
+            frames[0]['params']['update']['toolCallId']='page-'+str(n)
+            frames[1]['params']['update']['toolCallId']='page-'+str(n)
+            receipts.store(con,binding,frames,'review')
+        self.assertEqual(con.execute('SELECT count(*) FROM observed_read_stream').fetchone()[0],130)
+        self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='quality_review_completion_receipts'").fetchone())

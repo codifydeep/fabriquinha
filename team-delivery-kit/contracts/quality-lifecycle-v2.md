@@ -272,10 +272,23 @@ output hash and completed receipt. Source authority is checked before and after
 the job. Complete frozen suite/hash/count checks produce review-owned validation
 facts with a controller-bound receipt hash, not a verdict or merge grant.
 
+`quality_delivery_review_verdict.py` decodes only the exact final-review schema,
+same plan/evidence/validation/snapshot/SHA, all criteria and byte-bound citations.
+`quality_delivery_review_attestation.py` reads only the controller's ACP journal
+after authenticating native completion, closed lease, used grant, worker creation
+policy and inspected running worker, opened transport and successful session.
+The 512-page quality read bound applies to the separate delivery-review scope,
+including genuine empty files; no prior test-review completion is imported.
+Durable approval facts never authorize merge or release. Changes address the
+original implementer; technical failures retain CTO ownership and a persistent
+deadline, without identical retries. These modules remain source-only; change
+dispatch, native qualification and coordinator continuation are not implemented.
+
 Both adapters are source-only, opt-in and disabled by default. They are not
 installed, exposed as worker tools or routed from the coordinator/launch layer.
-The new worker phase, native transport/read provenance, typed delivery verdict,
-change-request recovery and persistent post-review continuation remain required.
+The source worker, native transport/read provenance and typed delivery verdict
+still require installed/native qualification. Change-request recovery and
+persistent post-review continuation remain unimplemented.
 SQLite/native/job fixtures passing are not proof of a real independent review,
 complete autonomous recovery or the PR/CI/deploy/QA/rollback chain.
 

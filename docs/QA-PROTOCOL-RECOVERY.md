@@ -199,7 +199,7 @@ It exercised confirmation, zero-balance rejection, unlimited-key handling,
 counter preservation, locking, readback and partial completion without repeated
 HTTP. A lost final qualification receipt was recovered from the same saved
 output, without launching another helper. The latest complete offline suite ran
-4,485 tests: 4,477 passed and eight preexisting skips. Earlier focused recovery
+4,504 tests: 4,496 passed and eight preexisting skips. Earlier focused recovery
 and executor/network suites passed; the new handoff/validation/lineage and
 related regression set passed 60 tests.
 
@@ -242,8 +242,11 @@ These tests use native/SQLite/job fixtures, not real agent execution. The featur
 is default-off and not installed/routed. A readonly worker/transport adapter now
 exists in source, requiring the original full-suite receipt and a separate
 read-only phase without shell or legacy capabilities. Its native qualification,
-complete-read attestation, typed final verdict, change requests and coordinator
-continuation remain pending.
+complete-read attestation and typed final verdict now exist in source, not in
+the installed router. They require terminal native identity, closed lease,
+inspected immutable worker policy, successful ACP session and the exact bound
+read stream; concrete findings must quote actual snapshot lines. Native
+qualification, change-request dispatch and coordinator continuation remain pending.
 
 Source delivery capture also now applies the authenticated prior-author revision
 filter already used at implementation admission. Raw task count previously

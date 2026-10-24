@@ -71,7 +71,7 @@ válida nem autonomia ponta a ponta.
   comprovou **71/71 arquivos** no transporte do controlador. Terminou nativamente
   em `completed`, mas o controlador manteve `technical_blocked` por parecer
   inválido. Leitura completa não foi convertida em aprovação.
-- A última suíte offline registrada executou **4.485 testes: 4.477 aprovados e
+- A última suíte offline registrada executou **4.504 testes: 4.496 aprovados e
   oito skips preexistentes**, sem falhas. O conjunto focado de recuperação
   executou 50 testes, também sem falhas. Aos 27 testes novos de recuperação
   somaram-se dez do executor final/rede, sem retirar ou enfraquecer os anteriores.
@@ -80,6 +80,8 @@ válida nem autonomia ponta a ponta.
   testes, sem falhas.
   Mais 12 testes cobrem diagnóstico somente leitura, fase de ferramentas e
   adaptador final; o conjunto focado dessas três áreas executou 24, sem falhas.
+  Outros 19 cobrem parser/atestação final e a regressão do diário; o conjunto
+  focado de parecer, atestação, worker e leituras executou 34, sem falhas.
   Essas provas não substituem a qualificação nativa.
 - A tentativa após o ajuste da fase terminou com 46/71 arquivos completos,
   80 páginas preservadas e duas respostas prematuras em prosa. Restavam 35
@@ -321,8 +323,17 @@ Os testes não foram removidos ou tornados permissivos. O adaptador de worker/
 transporte final agora existe em fonte, exigindo o recibo original da suíte e
 montando somente a candidata imutável. A fase `delivery_review_v2` tem handlers
 de leitura paginada, sem escrita, shell ou capacidades legadas. Não foi instalada
-ou ligada ao roteador. Ainda faltam sua qualificação nativa, parecer tipado e sua atestação, recuperação de mudanças
-e ligação do coordenador. Estes resultados são de fixtures, não de agentes reais.
+ou ligada ao roteador. O parecer tipado e sua atestação agora existem em fonte:
+exigem execução nativa concluída/fechada, inspeção do contêiner, sessão ACP e
+leituras próprias de todos os arquivos no snapshot exato. Rejeição exige citação
+real e aponta ao autor original; falhas técnicas ficam com o CTO. Não despacham
+correção ou liberam merge. Ainda faltam qualificação nativa, recuperação de
+mudanças e ligação do coordenador. São resultados de fixtures, não de agentes reais.
+
+Outra regressão foi reproduzida e corrigida no diário: a fase final caía no
+caminho legado, que descartava arquivos vazios e limitava a 128 páginas. Agora
+tem o mesmo limite de 512 páginas autenticadas, sem importar recibos da fase de
+revisão dos testes ou criar um parecer por declaração textual.
 
 A consulta diagnóstica autorizada aos endpoints oficiais de créditos e chave
 retornou HTTP 200 e disponibilidade em ambos. Não explicou o HTTP 402 anterior.
