@@ -2,6 +2,11 @@
 
 Uma equipe de agentes de IA para transformar um brief de produto em software revisado, testado e entregue em homologação, usando GitHub e infraestrutura própria.
 
+**Revisão estratégica — 24/10/2026:** a [análise e o plano de simplificação](docs/SIMPLIFICATION-REVIEW-2026-10-24.md)
+avaliam o custo do desenho atual e propõem uma retomada com Hermes + Kanban,
+condicionada à validação de uma integração pequena e isolada. O plano aguarda
+aprovação; a instalação e os contratos descritos abaixo continuam vigentes.
+
 O detector de navegador para o feedback mais recente foi calibrado em Chromium
 isolado e sem rede: aceitou uma referência sintética correta e rejeitou 16 defeitos
 conhecidos, incluindo filtros, Unicode, mutação indevida, schema, resposta obsoleta

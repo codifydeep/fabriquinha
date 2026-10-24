@@ -2,6 +2,11 @@
 
 Não usamos quantidade de código, workers ativos ou percentual subjetivo como comprovação.
 
+Uma [revisão estratégica com plano de simplificação](SIMPLIFICATION-REVIEW-2026-10-24.md)
+foi documentada em 24/10/2026. Sua sequência S0–S7 é proposta para aprovação,
+não uma migração já aplicada. Antes de ampliar a ponte v2, decidir sobre essa
+mudança de estratégia. Os marcos abaixo descrevem o caminho vigente/histórico.
+
 ## Prioridades atuais — 24 de outubro de 2026
 
 Consulte [STATUS.md](STATUS.md) para a estimativa de prontidão e

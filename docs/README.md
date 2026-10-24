@@ -7,6 +7,12 @@ snapshots e recibos operacionais completos permanecem privados.
 
 ## Por onde começar
 
+**Revisão estratégica de 24/10:** [análise e plano de simplificação](SIMPLIFICATION-REVIEW-2026-10-24.md).
+Propõe Hermes + Kanban com uma camada pequena de entrega, condicionado à prova
+de isolamento. É uma proposta para aprovação; não altera o runtime nem substitui
+automaticamente os contratos vigentes. Deve ser lida antes de planejar nova
+expansão dos adaptadores atuais.
+
 | Documento | Quando consultar |
 |---|---|
 | [STATUS](STATUS.md) | Estado datado, estimativas de prontidão, bloqueio atual e próximos marcos |
