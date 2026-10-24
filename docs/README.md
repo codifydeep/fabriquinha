@@ -17,6 +17,9 @@ A [fatia S3](HERMES-S3-QUALIFICATION.md) passou também por build, Compose,
 QA real em Chromium e rollback. GitHub e pareceres continuam simulados; não
 comprova autonomia. O [ADR 0002](ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md) delimita
 a publicação local do web e a rede interna do QA.
+A [ponte de ferramentas e sessões](HERMES-AGENT-QUALIFICATION.md) qualificou
+`AIAgent` e SQLite reais com respostas locais fixas. Submissão/parecer e despacho
+contínuo ainda precisam ser conectados; não é uma entrega autônoma.
 O [ADR 0001](ADR-0001-HERMES-FIRST.md) rege o caminho novo. A referência antiga
 permanece pausada e não deve receber nova expansão como pré-requisito da simplificação.
 

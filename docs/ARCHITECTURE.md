@@ -17,7 +17,8 @@ sem instalar um novo gateway nem migrar o Multica. Autores/revisores são fixtur
 ```mermaid
 flowchart LR
     K[Hermes Kanban: único ciclo de vida] --> B[board.py: run autenticado]
-    B --> W[Sandbox do autor ou revisor]
+    B --> N[hermes.py: backend nativo em worker isolado]
+    N --> W[Sandbox do autor ou revisor]
     W --> A[artifacts.py: snapshot e recibos privados]
     A --> E[executor.py: validação fixa em Docker]
     E --> Q[quality.py: Red, freeze, Green e controles]
@@ -42,6 +43,11 @@ O navegador tem rede interna própria; só o web publica porta em loopback e
 pode ter egress pela bridge. Não se afirma airgap do produto; ver
 [ADR 0002](ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md).
 O toolchain de navegador ainda usa cache local e precisa de base pública em S6.
+A [ponte de ferramentas e sessões](HERMES-AGENT-QUALIFICATION.md) já passou com
+`AIAgent`, ferramentas nativas, SQLite e Docker reais, usando respostas HTTP locais.
+Isso não conecta ainda o serviço contínuo a toda a cadeia. `hermes.py` registra um
+backend pela API de plugins, sem patch upstream; sua política de registry exige
+processo isolado por claim e nunca deve ser instalada num gateway compartilhado.
 
 Publicação e build/deploy separam autorização atual da identidade do efeito:
 nova claim não renova CI nem repete build/Compose já aceitos. Artefatos e etapas

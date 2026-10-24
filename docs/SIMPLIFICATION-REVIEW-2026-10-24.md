@@ -843,7 +843,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
 | S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
 | S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
-| S2 Executor/qualidade pequenos | Parcial: TDD, sandbox e recibos qualificados com fixtures | Faltam serviço contínuo, sessões reais e incidentes executáveis |
+| S2 Executor/qualidade pequenos | Parcial: TDD, sandbox e ponte AIAgent/ferramentas/sessões reais com respostas locais | Faltam submissão/parecer no modelo, serviço contínuo e incidentes executáveis |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP passou: TDD, Git, build, deploy/QA/rollback reais; GitHub simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
@@ -852,9 +852,12 @@ o protocolo indefinidamente para compensar julgamento fraco.
 
 Próxima fatia após a prova offline S3:
 
-1. Integrar sessões e ferramentas reais Hermes ao mesmo `dispatch_once`, com
-   terminal/edição na sandbox e submissão/parecer pelo controlador. Qualificar
-   primeiro com transporte de modelo local fixo, sem confundi-lo com julgamento real.
+1. A ponte de sessões/ferramentas reais passou com transporte local fixo, sem patch
+   no loop Hermes: escrita/terminal na sandbox, revisão sem handlers proibidos,
+   Red real e sessão retomada em outro processo sem duplicação. Agora registrar
+   submissão/parecer como ferramentas fixas do controlador e conectar os workers
+   ao mesmo `dispatch_once`. Não confundir o canário com julgamento real. A
+   política de registry pertence ao processo isolado, nunca ao gateway multiplexado.
 2. Espera por CI/provedor/revisão deve liberar capacidade e preservar a fase.
    Não manter um processo ocupado só para observar, nem reiniciar efeito já aceito.
    A semântica upstream foi comprovada: espera agendada encerra o run e a retomada

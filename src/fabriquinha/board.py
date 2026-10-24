@@ -1,6 +1,7 @@
 """Authenticate a current Hermes run at the controller edge; no extra board DB."""
 from dataclasses import dataclass, asdict
 import json
+from pathlib import Path
 from .artifacts import digest
 from .kanban_lane import native
 
@@ -71,6 +72,18 @@ class Board:
     def ensure(self, run):
         if self.current(run.task, run.number) != run:
             raise ValueError('assignment or contract changed')
+
+    def workspace(self, run):
+        self.ensure(run)
+        kb, kbc, _ = native()
+        with kbc.connect_closing() as conn:
+            task = kb.get_task(conn, run.task)
+        if task.workspace_kind != 'dir' or not task.workspace_path:
+            raise ValueError('assigned directory workspace required by the initial adapter')
+        path = Path(task.workspace_path)
+        if not path.is_absolute() or not path.is_dir():
+            raise ValueError('prepared absolute workspace required')
+        return path.resolve()
 
     def input(self, run, name, *, review_handoff=False):
         self.ensure(run)

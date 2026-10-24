@@ -20,4 +20,11 @@ recebe socket, banco do controlador ou credenciais de infraestrutura por mounts.
 Essa prova usa autores/GitHub sintéticos e não constitui certificação de segurança
 ou autonomia. Consulte os limites e o [ADR 0002](docs/ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md).
 
+A ponte nativa executa o SDK no processo confiável do adaptador; não há isolamento
+de SO entre esse SDK e o controlador. Apenas código/comandos gerados rodam na
+sandbox Docker, sem socket, banco ou credenciais por mounts. A política que limita
+handlers do registry exige um processo dedicado por claim: nunca habilitá-la em
+gateway multiplexado. O Hermes fixado e os plugins aprovados do adaptador são
+parte da base confiável; não carregar plugins fornecidos pelo produto gerado.
+
 Ao encontrar uma vulnerabilidade com segredo, não abra issue pública com o valor. Use o canal privado de segurança do GitHub, se habilitado, ou contate o proprietário sem anexar credenciais. Revogue segredos antes de limpar o histórico; não reescreva histórico sem autorização.

@@ -15,6 +15,9 @@ Novas claims já retomam publicação e build/deploy sem duplicar efeitos; rollb
 QA e suplência independente também passaram no Kanban/Docker reais. Ainda faltam
 wake loop automático, sessões de agentes e escalonamento executável; não considerar
 o serviço contínuo pronto.
+A [ponte nativa de ferramentas/sessões](HERMES-AGENT-QUALIFICATION.md) passou
+com respostas locais fixas. Próximo trabalho: ferramentas de submissão/parecer
+e worker contínuo, sem promover o roteiro sintético a autoria autônoma.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 

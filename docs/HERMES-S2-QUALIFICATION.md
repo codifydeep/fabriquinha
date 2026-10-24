@@ -10,6 +10,9 @@ foi aplicada, nenhum serviço antigo foi reativado e nenhuma release foi homolog
 Avanço posterior da mesma data: [S3 parcial](HERMES-S3-QUALIFICATION.md) conecta
 esta fatia ao Git e à fronteira PR/CI simulada. As pendências abaixo retratam o
 checkpoint S2; a qualificação integrada continua sem modelo e sem homologação.
+A [ponte nativa de ferramentas/sessões](HERMES-AGENT-QUALIFICATION.md) passou
+posteriormente com `AIAgent`, respostas HTTP locais e retomada em outro processo.
+Ainda faltam as ferramentas de submissão/parecer e o worker contínuo.
 
 ## O que efetivamente foi executado
 

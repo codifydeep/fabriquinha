@@ -15,6 +15,8 @@ A publicação e o build/deploy também passaram por novas claims nativas sem
 duplicar efeitos, e o handoff TDD selecionou um suplente aprovado para evitar
 conflito de autoria. Rollback e QA aceitaram a proveniência preservada das etapas.
 Essas retomadas foram acionadas pelo roteiro, não por um serviço autônomo.
+A [ponte de ferramentas/sessões nativas](docs/HERMES-AGENT-QUALIFICATION.md)
+também passou com `AIAgent` real, respostas locais fixas e retomada em outro processo.
 A cadeia offline Python/HTTP passou; faltam serviço contínuo, modelos e GitHub
 reais, recuperação da equipe e instalação reproduzível.
 A instalação antiga descrita abaixo permanece como referência
@@ -25,6 +27,7 @@ ainda são sintéticos; Kanban, Git e jobs Docker são reais:
 
 ```mermaid
 flowchart LR
+    N[AIAgent real: ponte qualificada com respostas locais] -. Serviço contínuo pendente .-> K
     K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
