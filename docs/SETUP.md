@@ -175,8 +175,14 @@ sem seleção de comandos ou testes pelo agente. Seu input é
 commit, perfil revisor e identidades distintas da autoria, revisão de testes e
 implementação. O processo reexecuta a suíte; não aceita Green como substituto.
 
-O controlador futuro deverá autenticar esses dados antes de invocá-lo e ligar
-o resultado ao recibo próprio do job e à execução nativa do revisor. O executor
+Os novos adaptadores `quality_delivery_review_handoff.py` e
+`quality_delivery_review_validation.py`, em `broker/`, implementam em fonte a
+admissão e o vínculo do recibo à execução. O flag `QUALITY_DELIVERY_REVIEW_ENABLED`
+é desligado por padrão; ainda não existe configuração de ativação qualificada
+para o fluxo completo. O adaptador `quality_delivery_review_launch.py` também
+existe em fonte e exige o recibo original antes do worker somente leitura.
+Não habilite o flag manualmente: faltam qualificação nativa, roteamento,
+parecer e integração com o coordenador. O executor
 isolado não faz essa autenticação nem aceita parecer. Na qualificação, a imagem
 rodou como UID 10000, sem rede externa, credenciais, socket ou mounts graváveis
 da entrega. Somente `/tmp` era gravável. Não habilite um workflow de produto

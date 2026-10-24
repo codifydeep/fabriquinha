@@ -231,6 +231,54 @@ adapter must authenticate native identities, independent decisions, complete
 reads, fixed-job isolation, immutable manifests and actual execution receipts
 before persisting a qualified transition. Caller-supplied booleans are not proof.
 
+### Independent delivery-review admission and validation — source only
+
+The source-only `quality_delivery_review_launch.py` adapter authenticates the
+original fixed-job receipt before preparing the reviewer. It mounts only the
+candidate snapshot read-only, with an internal model-proxy network, no real key,
+host bind or Docker socket. Controller transport selects `delivery_review_v2`;
+handlers accept only registered bounded read pages, never writes or shell.
+Test-review stop context and legacy suite authority cannot be imported into this
+phase. This adapter is not installed/routed and does not attest a final verdict.
+
+`quality_delivery_review_handoff.py` prepares a separate handoff only after
+reauthenticating enrollment, native implementation completion/closed lease,
+copy, Green and sensitivity fixed-job records, exact volume incarnation,
+requirements, full file inventory and commit. It freezes its own context and
+marker. Dispatch persists intent before a native wakeup; uncertain replies may
+only observe the same marker. Capacity is bounded to two workers and one per
+profile. Pending native intents reserve capacity before grants exist, and intent
+creation rechecks these reservations under the shared transaction lock. This
+source proof does not qualify cross-phase scheduling or live concurrency.
+Persistent capacity/ack deadlines escalate to CTO without cancelling
+the release, issuing another POST or declaring delivery.
+
+Admission requires the exact running native reviewer, workspace/runtime, issue,
+wakeup and handoff note. The task differs from test authorship, test review and
+implementation. One transactional review capability binds the delivery snapshot,
+commit, read-only inventory and `delivery_review_v2` phase. It does not approve
+the delivery. Rehashed records cannot substitute another phase, SHA or writable
+inventory. Historical task filtering is limited to authenticated revision
+lineage; native state/identity changes and unknown extra tasks remain blockers.
+Delivery capture now applies the same exact prior-author filter as implementation
+admission; raw task counts must not reject a legitimate registered correction.
+
+`quality_delivery_review_validation.py` binds the admitted native task to the
+fixed `validate_delivery_review_v2` job. It verifies the pinned image/entrypoint,
+unprivileged user, absence of image credentials/volumes, network none and read-only
+base/candidate mounts. The existing durable job journal reconciles uncertain
+Docker effects; the result must match its exact task, kind, payload, container,
+output hash and completed receipt. Source authority is checked before and after
+the job. Complete frozen suite/hash/count checks produce review-owned validation
+facts with a controller-bound receipt hash, not a verdict or merge grant.
+
+Both adapters are source-only, opt-in and disabled by default. They are not
+installed, exposed as worker tools or routed from the coordinator/launch layer.
+The new worker phase, native transport/read provenance, typed delivery verdict,
+change-request recovery and persistent post-review continuation remain required.
+SQLite/native/job fixtures passing are not proof of a real independent review,
+complete autonomous recovery or the PR/CI/deploy/QA/rollback chain.
+
 ### Local candidate authority and preview installation
 
 `quality_candidate_authority.py` uses fixed operator-local Docker-exec verbs

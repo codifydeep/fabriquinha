@@ -16,7 +16,7 @@ class Pending(TimeoutError):
 
 
 def run(b, task, kind, payload, *, now=None):
-    if str(uuid.UUID(task)) != task or kind not in ('structure', 'suite', 'green', 'sensitivity', 'scope_materialize','scope_base_verify','scope_base_read','candidate_inventory','bootstrap_fence'):
+    if str(uuid.UUID(task)) != task or kind not in ('structure', 'suite', 'green', 'sensitivity', 'delivery_review', 'scope_materialize','scope_base_verify','scope_base_read','candidate_inventory','bootstrap_fence'):
         raise ValueError('fixed validation identity required')
     now = time.time() if now is None else now
     payload = grouped_create('POST', '/containers/create?name=validation', payload, b.PREFIX)

@@ -65,10 +65,12 @@ aceito, congelamento ou homologação. A revisão após essa correção comprovo
 continuação. A instância está selada e o proxy parado após pausa persistente
 por pagamento, sem reset de contador ou aprovação fictícia. A nova recuperação
 específica passou em canário Linux com oito consultas HTTP locais, nenhuma ao
-provedor real, e está instalada com execução desligada. Crédito real, registro
-e ativação ainda precisam ser conferidos; o pin foi migrado preservando a fila e
+provedor real, e está instalada com execução desligada. Uma consulta diagnóstica
+autorizada confirmou saldo e limite disponíveis, sem remover a pausa ou chamar
+o modelo; a causa do 402, remediação, registro e ativação continuam pendentes.
+O pin foi migrado preservando a fila e
 o histórico, mas o scheduler permanece desabilitado/descarregado. A suíte offline
-mais recente executou 4.442 testes,
+mais recente executou 4.485 testes,
 com oito skips preexistentes e nenhuma falha. Isso não comprova autonomia.
 O estado datado está em
 [STATUS](docs/STATUS.md).
@@ -78,6 +80,12 @@ a suíte da fixture com snapshots somente leitura, escrita negada e cinco pedido
 inválidos recusados, sem chave, socket ou provedor. Ele não está conectado à
 admissão nativa do revisor nem concede aprovação; a ponte após Green permanece
 em desenvolvimento. Consulte o [mapa atualizado](docs/ARCHITECTURE.md).
+Handoff/admissão e autenticação do recibo do controlador já existem em fonte,
+desligados por padrão e testados com fixtures, mas não estão instalados ou
+roteados. O adaptador de worker/transporte final também existe em fonte: exige
+recibo de validação, snapshot somente leitura e handlers sem escrita ou shell.
+Ainda faltam qualificação nativa dessa ligação, inspeção e parecer próprios,
+retorno de mudanças e continuidade do coordenador até a homologação.
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),

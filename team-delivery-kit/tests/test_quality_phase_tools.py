@@ -136,5 +136,33 @@ class QualityPhaseToolsTests(unittest.TestCase):
                 ('terminal',dict(command='python -m unittest')),('patch',{}),('python',{})]:
             with self.subTest(name=name):self.assertIn('error',json.loads(self.control(name,args,env)))
 
+    def test_delivery_review_has_its_own_readonly_handler_and_transport_phase(self):
+        config,env=self.review();config['phase']='delivery_review_v2';env[phase.KEY]=json.dumps(config)
+        self.assertEqual(phase.validate(config,self.request),config)
+        values=acp.worker_env('review',False,execution_id=self.request,quality_phase_config=config)
+        self.assertIn(phase.KEY+'='+json.dumps(config,sort_keys=True),values)
+        self.assertIsNone(self.control('read_file',dict(path='/delivery/app.py',offset=1,limit=100),env))
+        with patch.dict(os.environ,env,clear=True):
+            for name,args in [('write_file',dict(path='/delivery/app.py',content='changed')),
+                    ('terminal',dict(command='python -m unittest')),('patch',{}),('python',{}),
+                    ('read_file',dict(path='/delivery/app.py',offset=1,limit=101)),
+                    ('read_file',dict(path='/delivery/app.py'))]:
+                original=Mock(side_effect=AssertionError('delivery review bypass'))
+                result=handlers.fence(name,original)(args)
+                self.assertIn('error',json.loads(result));original.assert_not_called()
+
+    def test_delivery_review_cannot_reuse_test_review_stop_context_or_legacy_authority(self):
+        config,_=self.review();config['phase']='delivery_review_v2'
+        with self.assertRaises(ValueError):phase.validate({**config,'review_context':{}},self.request)
+        for change in (dict(mode='implementation'),dict(persistent=True),dict(test_commands=['pytest']),
+                dict(review_suite_capability='a'*64),dict(author_feedback_config={}),dict(editable_paths=['/delivery/app.py'])):
+            options=dict(mode='review',persistent=False,execution_id=self.request,quality_phase_config=config)
+            options.update(change)
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                if 'editable_paths' in change:
+                    options.pop('execution_id')
+                    acp.Transport(Mock(side_effect=AssertionError('no Docker')), 'delivery-kit-job-'+self.request, **options)
+                else:acp.worker_env(**options)
+
 
 if __name__=='__main__':unittest.main()

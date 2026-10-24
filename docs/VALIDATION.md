@@ -22,7 +22,7 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Revisão terminal com inspeção completa | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
 | Revisão sucessora terminal | 46/71 arquivos, 80 páginas, seis chamadas; duas promessas em prosa, sem novas leituras, com 35 iterações restantes. `technical_blocked`, sem aprovação. |
 | Último ensaio após controle de continuação | **71/71 arquivos e 171 páginas** comprovados no controlador. Primeiro parecer `invalid_json`, feedback com 33 iterações restantes; chamada seguinte HTTP 402. Nativo `failed`, equipe `technical_blocked`, sem congelamento ou aprovação. |
-| Última suíte completa registrada | **4.442 executados: 4.434 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de recuperação: 50 testes; executor final/rede: dez. Os novos testes não substituem nem removem os anteriores. |
+| Última suíte completa registrada | **4.485 executados: 4.477 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de handoff/validação/linhagem: 60 testes; diagnóstico/handlers/worker final: 24. Os novos testes não substituem nem removem os anteriores. |
 | Recuperação de pagamento em fixture Linux | Oito consultas HTTP locais, zero ao provedor real e zero ao modelo. Confirmação obrigatória, saldo zero recusado, chave sem limite explícito, contador preservado, locks, leitura do resultado sem repetição e conclusão parcial sem repetir HTTP. Não comprova crédito real ou retomada nativa. |
 | Isolamento do canário de pagamento | UID 10000, rede externa indisponível, raiz somente leitura, sem chave real ou socket Docker; `/opt/data` temporário explícito para não criar volume anônimo herdado da imagem. Auxiliar retirado após preservar o recibo. |
 | Recuperação de confirmação perdida | Um erro ao salvar o recibo final do qualificador foi reproduzido por regressão e corrigido. A observação do mesmo resultado preservado concluiu o recibo sem executar outro canário. Não é prova de recuperação completa da equipe. |
@@ -30,7 +30,13 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Política final da entrega | Implementação em fonte e seis testes sintéticos, não instalada nem conectada ao despacho. Não qualifica a ponte após Green ou a publicação. |
 | Executor da revisão final | Suíte da fixture reexecutada no contêiner dedicado, com tarefa distinta e mesmos testes, manifesto e commit. Dez testes focados; cinco pedidos inválidos recusados no canário físico. Não autentica task nativa ou recibo de job e não aceita parecer. Ainda não conectado ao controlador. |
 | Isolamento do executor final | UID 10000, rede none, sem credenciais ou socket; base/snapshot somente leitura e tentativas de escrita negadas. Auxiliar retirado. Duas falhas anteriores da fixture de rede foram preservadas e corrigidas sem alterar o isolamento exigido. |
+| Handoff/admissão final em fonte | Registros de copy/Green/sensibilidade e contexto conferidos; intenção persistida, capacidade/prazos fixos, confirmação perdida observada sem novo POST. Tarefa/revisor/workspace/runtime/wakeup/SHA divergentes recusados. Fixtures nativas/SQLite; não instalado ou despachado. |
+| Validação final vinculada ao controlador em fonte | Job fixo ligado à admissão e ao recibo persistente exatos; resultados parciais, de outro pedido/SHA ou sem registro recusados. Verificação da origem antes/depois; prazos e incidentes persistentes. Não é revisão nativa ou autorização de merge. |
+| Histórico de correções do autor | Regressão reproduzida: a captura rejeitava execuções legítimas já reconhecidas pela admissão. O filtro de linhagem autenticada foi aplicado; registros ausentes/divergentes e tarefas desconhecidas continuam bloqueados. Correção em fonte, ainda não instalada. |
+| Reserva antes da admissão | Duas regressões reproduzidas: intenção nativa pendente não reservava o perfil, e a transição não reconferia capacidade sob o lock compartilhado. Corrigidas com reservas e checagem transacional; ainda não qualificam concorrência ponta a ponta entre todas as fases. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
+| Diagnóstico real de crédito/chave | Somente metadados oficiais, ambos HTTP 200 e disponíveis. Contador/pausa bit a bit preservados; proxy desligado ao final, zero chamadas ao modelo. Não estabelece a causa do 402 ou autoriza retomada. |
+| Adaptador final em fonte | Recibo da suíte reautenticado antes do worker; snapshot único somente leitura, rede interna do proxy e nenhuma chave de infraestrutura. Handlers negam escrita e shell. Fixtures offline; sem instalação, roteamento ou parecer nativo. |
 
 A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
 inicializasse a fila. A versão atual cobre esse caminho desde a primeira chamada.
@@ -135,9 +141,10 @@ e nenhuma rota por outra interface, além de manter a configuração Docker none
 Os controles negativos recusam interface externa ativa ou rota não local.
 Esse diagnóstico não alterou as permissões da entrega ou do contêiner.
 
-Faltam admissão nativa do revisor, autenticação do recibo durável do job no
-controlador, leituras/parecer próprios e continuidade após a decisão. Não há
-revisão da entrega aprovada, PR/CI ou homologação a partir dessa fixture.
+Admissão e autenticação do recibo no controlador foram implementadas depois em
+fonte, mas sua prova atual usa fixtures nativas/SQLite/jobs. Ainda faltam worker,
+transporte, leituras/parecer próprios, integração do coordenador e qualificação
+nativa. Não há revisão da entrega aprovada, PR/CI ou homologação a partir dessas fixtures.
 
 ## Evidências históricas — não representam o estado vivo
 

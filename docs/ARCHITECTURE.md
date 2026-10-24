@@ -25,6 +25,8 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
 | Transporte completo na revisão | `quality_review_budget.py`, hook fixo em `agent/tool_executor.py` |
 | Revisão final: componentes ainda não conectados ao despacho | `quality_delivery_review_policy.py`, `quality_delivery_review_job.py`, `Dockerfile.quality-delivery-review-job` |
+| Admissão e validação final em fonte, não instaladas | `broker/quality_delivery_review_handoff.py`, `broker/quality_delivery_review_validation.py` |
+| Worker/transporte final em fonte, não roteado | `broker/quality_delivery_review_launch.py`, fase de handlers `delivery_review_v2`; exige recibo original e snapshot somente leitura |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
@@ -154,7 +156,7 @@ O resultado contém fatos de execução, sem se declarar autenticado ou aprovado
 flowchart LR
     Q[Snapshot Green e evidências anteriores] --> J[Executor fixo em sandbox somente leitura]
     J --> F[Suíte reexecutada; fatos sem autoridade]
-    F -.-> C[Adaptador controlador: recibo e identidade nativa ainda pendentes]
+    F -.-> C[Admissão e recibo no controlador: em fonte, não instalados]
     C -.-> R[Inspeção e decisão independente do revisor]
     R -.-> P[Gates de PR, CI e homologação]
 ```
@@ -165,6 +167,20 @@ fornecer seu próprio recibo confiável ou provar sua admissão nativa. Esses
 controles pertencem ao controlador e não podem ser substituídos por campos do
 input ou declarações do agente. O coordenador instalado continua no checkpoint
 `awaiting_independent_delivery_review`, sem aprovação da release.
+
+O adaptador em fonte já prepara contexto imutável, confere a linhagem dos jobs
+anteriores, registra intenção antes do wakeup e admite uma única tarefa nativa
+com fase `delivery_review_v2`. O segundo módulo liga essa admissão ao job fixo
+de suíte, confere seu recibo durável e revalida a origem antes/depois da execução.
+Confirmação perdida, capacidade e prazos têm estado persistente; não renovam o
+direito de repetir uma intervenção. Os testes usam native/SQLite/jobs de fixture,
+não o Multica e um revisor reais. O flag dedicado é desligado por padrão.
+
+Ainda faltam o worker somente leitura dessa fase, roteamento de transporte,
+recibos de inspeção e aceitação da decisão independente, retorno de mudanças
+ao implementador e continuidade do coordenador. Os adaptadores não foram
+adicionados ao despacho instalado: uma capability criada em fixture não prova
+que um worker real foi lançado ou que o produto foi aprovado.
 
 ### Fronteiras entre as decisões de qualidade
 

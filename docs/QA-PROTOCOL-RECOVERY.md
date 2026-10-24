@@ -199,8 +199,9 @@ It exercised confirmation, zero-balance rejection, unlimited-key handling,
 counter preservation, locking, readback and partial completion without repeated
 HTTP. A lost final qualification receipt was recovered from the same saved
 output, without launching another helper. The latest complete offline suite ran
-4,442 tests: 4,434 passed and eight preexisting skips; 50 focused recovery tests
-and ten delivery-review/network tests also passed.
+4,485 tests: 4,477 passed and eight preexisting skips. Earlier focused recovery
+and executor/network suites passed; the new handoff/validation/lineage and
+related regression set passed 60 tests.
 
 An uncertain acknowledgement permits `observe-resolution` or
 `observe-registration`, not resubmission. `finish-resolution` requires an observed
@@ -227,6 +228,28 @@ and network checks. Inactive default kernel tunnels are not treated as egress:
 only loopback may be UP and all routes must remain local. Earlier canary failures
 are preserved. The job returns unprivileged facts, not native authentication,
 a trusted job receipt or review approval. The controller bridge remains pending.
+
+The source-only handoff/admission and validation adapters now reauthenticate
+copy/Green/sensitivity receipts, enrollment, immutable volume and exact native
+review identities. Intent precedes wakeup; unknown replies only observe the
+same marker. Fixed capacity/observation deadlines retain a CTO-owned incident.
+Unadmitted native intents also reserve the profile within this phase; intent
+creation rechecks capacity under the shared transaction lock. Cross-phase
+concurrency and native fault recovery still require end-to-end qualification.
+The controller binds fresh full-suite facts to a separate admitted review task
+and exact durable job receipt; partial, stale or unjournaled success is rejected.
+These tests use native/SQLite/job fixtures, not real agent execution. The feature
+is default-off and not installed/routed. A readonly worker/transport adapter now
+exists in source, requiring the original full-suite receipt and a separate
+read-only phase without shell or legacy capabilities. Its native qualification,
+complete-read attestation, typed final verdict, change requests and coordinator
+continuation remain pending.
+
+Source delivery capture also now applies the authenticated prior-author revision
+filter already used at implementation admission. Raw task count previously
+rejected legitimate registered correction history. The regression is reproduced
+and fixed without ignoring unknown runs, missing history or changed terminal
+identities; no historical review or product delivery is approved by this fix.
 
 ## Bounded recovery
 

@@ -87,7 +87,7 @@ def payload(b,context):
 
 
 def fixed_receipt(b,task,kind,payload,result):
-    require(kind in ('green','sensitivity'))
+    require(kind in ('green','sensitivity','delivery_review'))
     p=grouped_create('POST','/containers/create?name=validation',payload,b.PREFIX)
     key=digest(dict(task=task,kind=kind,payload=p))
     expected={**p,'Labels':{**p['Labels'],'delivery-kit.owner':b.OWNER,

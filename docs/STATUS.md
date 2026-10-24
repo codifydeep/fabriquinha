@@ -71,10 +71,15 @@ válida nem autonomia ponta a ponta.
   comprovou **71/71 arquivos** no transporte do controlador. Terminou nativamente
   em `completed`, mas o controlador manteve `technical_blocked` por parecer
   inválido. Leitura completa não foi convertida em aprovação.
-- A última suíte offline registrada executou **4.442 testes: 4.434 aprovados e
+- A última suíte offline registrada executou **4.485 testes: 4.477 aprovados e
   oito skips preexistentes**, sem falhas. O conjunto focado de recuperação
   executou 50 testes, também sem falhas. Aos 27 testes novos de recuperação
   somaram-se dez do executor final/rede, sem retirar ou enfraquecer os anteriores.
+  Foram acrescentados depois 31 testes de handoff, admissão, vínculo do job,
+  reservas de capacidade e linhagem; o conjunto focado relacionado executou 60
+  testes, sem falhas.
+  Mais 12 testes cobrem diagnóstico somente leitura, fase de ferramentas e
+  adaptador final; o conjunto focado dessas três áreas executou 24, sem falhas.
   Essas provas não substituem a qualificação nativa.
 - A tentativa após o ajuste da fase terminou com 46/71 arquivos completos,
   80 páginas preservadas e duas respostas prematuras em prosa. Restavam 35
@@ -295,10 +300,34 @@ auxiliar foi retirado; dois resultados anteriores de falha da fixture foram
 preservados. Dez testes focados cobrem o executor e as verificações de rede.
 
 O coordenador atual termina em `awaiting_independent_delivery_review`. Faltam
-admissão e proveniência nativas, vínculo do recibo durável do job à execução
-do revisor, inspeção própria, decisão independente e continuidade até
-PR/CI/deploy/QA/rollback. A política e o executor não conferem autoridade,
-aprovação da entrega ou permissão de publicação.
+qualificação nativa, inspeção própria, decisão independente e continuidade até
+PR/CI/deploy/QA/rollback. A política e o executor não conferem aprovação da entrega
+ou permissão de publicação.
+
+Os adaptadores de handoff/admissão e validação do controlador agora existem em
+fonte, com feature gate desligado por padrão e sem instalação ou roteamento.
+Conferem registros anteriores e identidades nativas, persistem o despacho antes
+do efeito e ligam o recibo do job ao pedido e à tarefa exatos do revisor. Uma
+confirmação perdida não reenvia o wakeup; capacidade e observação têm prazos
+persistentes e proprietário técnico. Capabilities não são aprovação.
+Intenções nativas ainda sem grant também reservam o perfil nessa fase; a
+transição para `dispatch_intent` reconfere a reserva sob o lock transacional.
+
+A revisão do código encontrou e reproduziu outro impedimento: a captura da
+entrega contava execuções antigas do autor, mesmo quando a admissão já reconhecia
+uma linhagem de correção legítima. O filtro agora é o mesmo, autenticado e
+restrito; tarefas desconhecidas ou histórico divergente continuam recusados.
+Os testes não foram removidos ou tornados permissivos. O adaptador de worker/
+transporte final agora existe em fonte, exigindo o recibo original da suíte e
+montando somente a candidata imutável. A fase `delivery_review_v2` tem handlers
+de leitura paginada, sem escrita, shell ou capacidades legadas. Não foi instalada
+ou ligada ao roteador. Ainda faltam sua qualificação nativa, parecer tipado e sua atestação, recuperação de mudanças
+e ligação do coordenador. Estes resultados são de fixtures, não de agentes reais.
+
+A consulta diagnóstica autorizada aos endpoints oficiais de créditos e chave
+retornou HTTP 200 e disponibilidade em ambos. Não explicou o HTTP 402 anterior.
+Nenhuma chamada ao modelo foi feita: hashes do contador e da pausa permaneceram
+iguais, e o mesmo proxy foi desligado ao final. Não houve remediação ou retomada.
 
 Uma execução intermediária da suíte falhou no probe de processo órfão. Um novo
 teste reproduziu que a fixture contava reconciliação tardia de trabalho concluído

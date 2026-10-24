@@ -7,16 +7,17 @@ from portable_contract import MAX_FILE_BYTES
 KEY='DELIVERY_QUALITY_PHASE_JSON'
 CONFLICTS=('DELIVERY_AUTHOR_FEEDBACK_JSON','DELIVERY_ADDITIVE_TEST_JSON',
     'DELIVERY_SURGICAL_TEST_JSON','DELIVERY_REVIEW_SUITE_CAPABILITY')
+REVIEW_PHASES=('test_review_v2','delivery_review_v2')
 
 
 def validate(config,execution):
     keys={'version','phase','request_id','editable_paths','read_paths'}
     if (not isinstance(config,dict) or set(config) not in (keys,keys|{'review_context'})
             or type(config['version']) is not int or config['version']!=2
-            or config['phase'] not in ('tests_only_v2','test_review_v2','implementation_v2')
+            or config['phase'] not in ('tests_only_v2','implementation_v2')+REVIEW_PHASES
             or not isinstance(execution,str) or str(uuid.UUID(execution))!=execution
             or config['request_id']!=execution):raise ValueError('exact tests-only execution contract required')
-    reviewing=config['phase']=='test_review_v2'
+    reviewing=config['phase'] in REVIEW_PHASES
     root='/delivery/' if reviewing else '/workspace/'
     for key in ('editable_paths','read_paths'):
         paths=config[key]
@@ -29,7 +30,7 @@ def validate(config,execution):
         raise ValueError('test review has no editable files')
     if not set(config['editable_paths'])<=set(config['read_paths']):raise ValueError('editable files must be readable')
     if 'review_context' in config:
-        if not reviewing:raise ValueError('review-stop context only belongs to immutable review')
+        if config['phase']!='test_review_v2':raise ValueError('test-review stop context belongs only to test review')
         from quality_review_stop import validate_context
         validate_context(config['review_context'],config['read_paths'])
     return config
@@ -42,14 +43,14 @@ def controlled(name,args,environment,*,handler_entry=False):
     try:
         config=validate(json.loads(environment[KEY]),environment.get('DELIVERY_MODEL_EXECUTION_ID'))
         current_phase=config['phase']
-        expected='review' if config['phase']=='test_review_v2' else 'implementation'
+        expected='review' if config['phase'] in REVIEW_PHASES else 'implementation'
         if environment.get('DELIVERY_EXECUTION_MODE')!=expected or any(k in environment for k in CONFLICTS):
             return deny()
         if not isinstance(args,dict):return deny()
         path=args.get('path')
         if name=='read_file' and path in config['read_paths'] and not set(args)-{'path','offset','limit'}:
             if any(type(args[k]) is not int or not 1<=args[k]<=65536 for k in ('offset','limit') if k in args):return deny()
-            if config['phase']=='test_review_v2' and (set(args)!={'path','offset','limit'}
+            if config['phase'] in REVIEW_PHASES and (set(args)!={'path','offset','limit'}
                     or not 1<=args['limit']<=100):return deny()
             if config['phase']=='test_review_v2' and 'review_context' in config:
                 from quality_review_paging import allowed,rejection

@@ -52,10 +52,12 @@ parado após pausa por pagamento, sem aprovação fictícia. O controlador novo 
 instalado com execução desligada; o serviço host está desabilitado e descarregado.
 A recuperação específica de pagamento passou por qualificação Linux isolada,
 com oito consultas HTTP a uma fixture local e nenhuma chamada ao provedor real.
-Isso não comprova crédito disponível: faltam confirmação humana, prova real e
-registro da recuperação e ativação separada. A migração do pin foi concluída,
+Uma consulta diagnóstica posterior confirmou crédito e limite disponíveis, sem
+chamadas ao modelo ou alteração da pausa. A causa do 402, confirmação de
+remediação, registro da recuperação e ativação separada permanecem pendentes.
+A migração do pin foi concluída,
 preservando fila e histórico, sem iniciar o serviço.
-A última suíte offline executou 4.442 testes, com oito skips preexistentes e
+A última suíte offline executou 4.485 testes, com oito skips preexistentes e
 nenhuma falha. A estimativa consolidada permanece em 70%; não é medição de autonomia.
 Faltam congelamento, Green, controles negativos e a cadeia v2 de revisão da
 entrega até homologação.
@@ -63,6 +65,9 @@ O executor fixo para reexecutar a suíte na revisão da entrega já passou em
 canário Docker, com snapshots somente leitura e cinco controles negativos.
 Ainda não está conectado à admissão e ao despacho nativos do revisor; o canário
 não equivale a revisão independente aceita ou homologação.
+As partes de admissão e vínculo do recibo já existem em fonte com testes de
+fixtures, mas não estão instaladas. Worker, transporte, parecer e integração
+do coordenador continuam pendentes; não habilitar manualmente a nova fase.
 Os bloqueios anteriores permanecem preservados. Temporal não é motor do
 runtime instalado. Consulte [STATUS](STATUS.md) antes de qualquer retomada;
 esta atualização documental não inicia testes ou libera manutenção.

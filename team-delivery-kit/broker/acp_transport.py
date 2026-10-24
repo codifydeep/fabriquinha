@@ -84,9 +84,9 @@ def worker_env(mode, persistent, test_commands=(), review_suite_capability=None,
         worker_config(author_feedback_config,execution_id)
         values.append('DELIVERY_AUTHOR_FEEDBACK_JSON='+json.dumps(author_feedback_config,sort_keys=True))
     if quality_phase_config is not None:
-        from quality_phase_tools import validate,KEY
+        from quality_phase_tools import validate,KEY,REVIEW_PHASES
         validate(quality_phase_config,execution_id)
-        expected='review' if quality_phase_config['phase']=='test_review_v2' else 'implementation'
+        expected='review' if quality_phase_config['phase'] in REVIEW_PHASES else 'implementation'
         if mode!=expected or persistent or test_commands or review_suite_capability or author_feedback_config is not None:
             raise ValueError('quality phase transport cannot combine legacy capabilities or sessions')
         values.append(KEY+'='+json.dumps(quality_phase_config,sort_keys=True))

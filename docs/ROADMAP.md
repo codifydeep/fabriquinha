@@ -126,9 +126,24 @@ Uma política de fatos da revisão final existe em fonte, com seis testes
 sintéticos e sem instalação. O executor de revalidação da suíte foi acrescentado
 e passou em canário Linux: mounts somente leitura, escrita negada e cinco pedidos
 inválidos recusados, sem provedor. Dez testes focados cobrem executor e rede.
-Ainda faltam o adaptador controlador, admissão/proveniência nativa, recibo do job
-autenticado, inspeção/decisão próprias do revisor e despacho persistente. A prova
-do executor não supre esses controles nem autoriza publicação.
+O handoff/admissão e o vínculo do job ao recibo do controlador foram implementados
+em fonte e testados com registros nativos/SQLite de fixture. São opt-in, não
+instalados nem conectados ao loop. Faltam os seguintes componentes e provas:
+
+- Qualificação nativa do adaptador de worker/transporte final já existente em
+  fonte, instalação e roteamento da admissão;
+  a revisão dos testes não pode ser reutilizada como parecer da entrega.
+- Leituras próprias e validação vinculadas à mesma execução; parser tipado e
+  atestação independente no snapshot/SHA exatos.
+- Solicitações de mudanças ao implementador original, mantendo testes congelados
+  e invalidando a aprovação/validação anterior após nova entrega.
+- Continuação persistente do coordenador, PR/CI e deploy/QA/rollback no mesmo SHA.
+- Qualificação nativa e recuperação de falhas sem o operador conduzir cada etapa.
+
+A prova isolada do executor ou dos novos adaptadores não supre esses controles
+nem autoriza publicação. A captura da entrega também foi corrigida em fonte
+para reconhecer somente o histórico autenticado das revisões anteriores do
+autor; uma tarefa desconhecida não passa a ser ignorada por estar concluída.
 
 ## Entrega
 

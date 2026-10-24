@@ -181,6 +181,9 @@ def completed_source(b,context):
         raise validation_job.Pending('observe original implementing task, not a replacement')
     require(task.get('status')=='completed')
     runs=[r for r in native.issue_task_runs(settings,c['issue_id']) if r.get('agent_id')==c['agent_id']]
+    try:from . import quality_test_revision as revision
+    except ImportError:import quality_test_revision as revision
+    runs=revision.exclude_prior_authors(b,c['source_task'],runs)
     require(len(runs)==2 and {r['id'] for r in runs}=={c['source_task'],c['task_id']}
         and max(runs,key=lambda r:(r.get('created_at') or '',r['id']))['id']==c['task_id'])
     issue=native.issue_record(settings,c['issue_id'])
