@@ -1,6 +1,6 @@
 # Documentação da Fabriquinha
 
-Referência revisada em **23 de outubro de 2026**. A plataforma é experimental;
+Referência revisada em **24 de outubro de 2026**. A plataforma é experimental;
 autonomia completa ainda não foi qualificada. Os documentos públicos descrevem
 contratos, limites e resultados agregados. Credenciais, transcrições, bancos,
 snapshots e recibos operacionais completos permanecem privados.
@@ -53,11 +53,16 @@ instalado com execução desligada; o serviço host está desabilitado e descarr
 A recuperação específica de pagamento passou por qualificação Linux isolada,
 com oito consultas HTTP a uma fixture local e nenhuma chamada ao provedor real.
 Isso não comprova crédito disponível: faltam confirmação humana, prova real e
-registro da recuperação, além de migração do pin e ativação separada.
-A última suíte offline executou 4.432 testes, com oito skips preexistentes e
+registro da recuperação e ativação separada. A migração do pin foi concluída,
+preservando fila e histórico, sem iniciar o serviço.
+A última suíte offline executou 4.442 testes, com oito skips preexistentes e
 nenhuma falha. A estimativa consolidada permanece em 70%; não é medição de autonomia.
 Faltam congelamento, Green, controles negativos e a cadeia v2 de revisão da
 entrega até homologação.
+O executor fixo para reexecutar a suíte na revisão da entrega já passou em
+canário Docker, com snapshots somente leitura e cinco controles negativos.
+Ainda não está conectado à admissão e ao despacho nativos do revisor; o canário
+não equivale a revisão independente aceita ou homologação.
 Os bloqueios anteriores permanecem preservados. Temporal não é motor do
 runtime instalado. Consulte [STATUS](STATUS.md) antes de qualquer retomada;
 esta atualização documental não inicia testes ou libera manutenção.

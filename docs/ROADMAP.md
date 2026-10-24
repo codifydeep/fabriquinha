@@ -2,7 +2,7 @@
 
 Não usamos quantidade de código, workers ativos ou percentual subjetivo como comprovação.
 
-## Prioridades atuais — 23 de outubro de 2026
+## Prioridades atuais — 24 de outubro de 2026
 
 Consulte [STATUS.md](STATUS.md) para a estimativa de prontidão e
 [VALIDATION.md](VALIDATION.md) para a distinção entre provas atuais e históricas.
@@ -95,7 +95,7 @@ A revisão após a continuação comprovou 71/71 arquivos. O primeiro parecer fo
 rejeitado; o provedor respondeu HTTP 402 à continuação, que terminou como
 falha nativa e bloqueio técnico. A recuperação específica já passou em fixture
 Linux e foi instalada com execução desligada no controlador `20261023.36`.
-Antes de novo consumo, concluir a migração do pin, obter confirmação humana e
+O pin já foi migrado sem ativar o serviço. Antes de novo consumo, obter confirmação humana e
 prova real de remediação, registrar a condição modificada e avaliar ativação
 separada, mantendo contador, incidente e independência da próxima decisão.
 Não usar a rota de inspeção incompleta para uma revisão que completou sua leitura.
@@ -123,9 +123,12 @@ a release. A ponte seguinte precisa ser implementada e qualificada até revisão
 independente da entrega, publicação por PR/CI e deploy/QA/rollback no mesmo SHA.
 Não apresentar esse checkpoint como entrega autônoma completa.
 Uma política de fatos da revisão final existe em fonte, com seis testes
-sintéticos e sem instalação. Ainda faltam
-o adaptador controlador, proveniência nativa, validação própria do revisor e
-despacho persistente; um teste de política pura não comprova essas etapas.
+sintéticos e sem instalação. O executor de revalidação da suíte foi acrescentado
+e passou em canário Linux: mounts somente leitura, escrita negada e cinco pedidos
+inválidos recusados, sem provedor. Dez testes focados cobrem executor e rede.
+Ainda faltam o adaptador controlador, admissão/proveniência nativa, recibo do job
+autenticado, inspeção/decisão próprias do revisor e despacho persistente. A prova
+do executor não supre esses controles nem autoriza publicação.
 
 ## Entrega
 

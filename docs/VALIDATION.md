@@ -1,4 +1,4 @@
-# Estado de validação — 2026-10-23
+# Estado de validação — 2026-10-24
 
 ## Referência atual
 
@@ -13,7 +13,7 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa anterior | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Continua preservada, não aprovada. |
-| Instalação de referência | Controlador `20261023.36` instalado com execução desligada; worker `20261023.11` preservado. Backup/restauração e dados verificados. Manutenção selada/drenada, proxy parado, serviço host desabilitado/descarregado; migração do novo pin e ativação pendentes. |
+| Instalação de referência | Controlador `20261023.36` instalado com execução desligada; worker `20261023.11` preservado. Backup/restauração e dados verificados. Pin migrado com fila/histórico preservados; manutenção selada/drenada, proxy parado e serviço host desabilitado/descarregado. Ativação pendente. |
 | Canário físico da candidata de continuação | Hermes/ACP real, 219 páginas/71 arquivos/563.066 bytes; lote de 274.113 caracteres sem spill, controle legado com spill, 157 leituras fora da recomendação e quatro lotes mistos. Uma compactação retirou 64 pares sem perder cobertura. Rejeição sem findings recusada com diagnóstico específico; contrato e hashes preservados. Controle separado obrigou leitura real após promessa prematura com testes novos já lidos. Conjunto: 16 respostas locais, zero externas. Não é aprovação nativa. |
 | Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
 | Revisão com parada por falta de progresso | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Preservada, sem aprovação. |
@@ -22,12 +22,14 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Revisão terminal com inspeção completa | **71/71 arquivos completos**, comprovados no controlador. Parecer rejeitado: tentativa de `request_changes` sem findings concretos e dependência circular com gates posteriores. `completed` nativo, `technical_blocked` no controlador; sem congelamento, Green ou homologação. |
 | Revisão sucessora terminal | 46/71 arquivos, 80 páginas, seis chamadas; duas promessas em prosa, sem novas leituras, com 35 iterações restantes. `technical_blocked`, sem aprovação. |
 | Último ensaio após controle de continuação | **71/71 arquivos e 171 páginas** comprovados no controlador. Primeiro parecer `invalid_json`, feedback com 33 iterações restantes; chamada seguinte HTTP 402. Nativo `failed`, equipe `technical_blocked`, sem congelamento ou aprovação. |
-| Última suíte completa registrada | **4.432 executados: 4.424 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de recuperação: 50 testes aprovados. Os 27 novos testes não substituem nem removem os anteriores. |
+| Última suíte completa registrada | **4.442 executados: 4.434 aprovados, oito skips preexistentes, sem falhas.** Conjunto focado de recuperação: 50 testes; executor final/rede: dez. Os novos testes não substituem nem removem os anteriores. |
 | Recuperação de pagamento em fixture Linux | Oito consultas HTTP locais, zero ao provedor real e zero ao modelo. Confirmação obrigatória, saldo zero recusado, chave sem limite explícito, contador preservado, locks, leitura do resultado sem repetição e conclusão parcial sem repetir HTTP. Não comprova crédito real ou retomada nativa. |
 | Isolamento do canário de pagamento | UID 10000, rede externa indisponível, raiz somente leitura, sem chave real ou socket Docker; `/opt/data` temporário explícito para não criar volume anônimo herdado da imagem. Auxiliar retirado após preservar o recibo. |
 | Recuperação de confirmação perdida | Um erro ao salvar o recibo final do qualificador foi reproduzido por regressão e corrigido. A observação do mesmo resultado preservado concluiu o recibo sem executar outro canário. Não é prova de recuperação completa da equipe. |
 | Remediação real do provedor | Não executada; confirmação humana, consulta real e registro da recuperação ainda pendentes. A pausa e o contador 6.291/10.000 permanecem preservados. |
 | Política final da entrega | Implementação em fonte e seis testes sintéticos, não instalada nem conectada ao despacho. Não qualifica a ponte após Green ou a publicação. |
+| Executor da revisão final | Suíte da fixture reexecutada no contêiner dedicado, com tarefa distinta e mesmos testes, manifesto e commit. Dez testes focados; cinco pedidos inválidos recusados no canário físico. Não autentica task nativa ou recibo de job e não aceita parecer. Ainda não conectado ao controlador. |
+| Isolamento do executor final | UID 10000, rede none, sem credenciais ou socket; base/snapshot somente leitura e tentativas de escrita negadas. Auxiliar retirado. Duas falhas anteriores da fixture de rede foram preservadas e corrigidas sem alterar o isolamento exigido. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
 A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
@@ -116,7 +118,26 @@ posterior exige o mesmo proxy parado e mantém a falha histórica.
 Nada disso foi executado com crédito real nesta qualificação. Também não
 comprova escalonamento financeiro autônomo, um novo parecer aceito, Green,
 PR/CI, implantação, QA ou rollback. O serviço host continua descarregado e a
-nova imagem ainda requer migração de pin e ativação separada.
+o pin da nova imagem foi migrado sem iniciar o serviço. A ativação continua separada e pendente.
+
+### Executor final: prova física não é parecer independente
+
+O novo job não recicla Green: executa novamente a suíte completa contra o mesmo
+snapshot e confere contagem, hashes congelados e SHA. Rejeita perfil do autor,
+tarefa de uma fase anterior, manifesto obsoleto, evidência faltante e pedidos
+de comandos ou seleção de testes. Sua saída mantém explicitamente falsas a
+autenticação nativa, a verificação do recibo e as autorizações de testes/merge/entrega.
+
+O canário inicial assumia que `network=none` implicava somente um nome de
+interface. O kernel também expôs túneis padrão inativos; a consulta comprovou
+ausência de rotas externas. A fixture corrigida exige somente loopback ativo
+e nenhuma rota por outra interface, além de manter a configuração Docker none.
+Os controles negativos recusam interface externa ativa ou rota não local.
+Esse diagnóstico não alterou as permissões da entrega ou do contêiner.
+
+Faltam admissão nativa do revisor, autenticação do recibo durável do job no
+controlador, leituras/parecer próprios e continuidade após a decisão. Não há
+revisão da entrega aprovada, PR/CI ou homologação a partir dessa fixture.
 
 ## Evidências históricas — não representam o estado vivo
 

@@ -4,7 +4,7 @@ Provider transport failures and product failures are different incidents. A
 transport fix does not approve the product, invalidate historical failures or
 authorize an implementer to modify an independently reviewed snapshot.
 
-## Current v2 boundary — 23 October 2026
+## Current v2 boundary — 24 October 2026
 
 See [STATUS.md](STATUS.md) for the dated project summary. Historical mechanisms
 below apply only to their registered contracts and incident signatures. They
@@ -31,8 +31,9 @@ prose and cache responses without content must not. The bounded journal and
 pending-page planner, loop capture, handler enforcement and structured stops
 are installed in reference controller `20261023.36` and worker `20261023.11`.
 The latest controller installation is execution-disabled under sealed/drained
-maintenance. The host scheduler is disabled/unloaded; its new pin migration and
-activation remain pending. Installed code is not an active native recovery.
+maintenance. The host scheduler pin has been migrated with queue/history intact;
+the service is still disabled/unloaded and activation remains pending.
+Installed code is not an active native recovery.
 Dispatch checks without consuming; only the fenced handler claims the page
 atomically. The initial consuming check at both
 boundaries was rejected by the real registry canary and corrected without
@@ -48,8 +49,8 @@ mixed-offset batches. A separate four-call real ACP control reads the new tests,
 returns premature prose, is forced to read a pending file and then decides.
 The complete fixed suite used sixteen local responses, no external model.
 The earlier installation, verified backup/restoration and host scheduler pin
-migration completed. The latest controller replacement still requires its own
-pin migration. The normal control retains a premature answer; the scale control
+migration completed. The latest controller pin was also migrated without starting
+the service or changing its work history. The normal control retains a premature answer; the scale control
 uses tools from its first reply without initializing completion state. That
 qualifies the fixed tool-only path, not every strategy of a real model.
 Approval still requires independent, byte-bound
@@ -197,8 +198,9 @@ and explicit temporary `/opt/data` instead of an inherited anonymous volume.
 It exercised confirmation, zero-balance rejection, unlimited-key handling,
 counter preservation, locking, readback and partial completion without repeated
 HTTP. A lost final qualification receipt was recovered from the same saved
-output, without launching another helper. The complete offline suite ran 4,432
-tests: 4,424 passed and eight preexisting skips; 50 focused tests also passed.
+output, without launching another helper. The latest complete offline suite ran
+4,442 tests: 4,434 passed and eight preexisting skips; 50 focused recovery tests
+and ten delivery-review/network tests also passed.
 
 An uncertain acknowledgement permits `observe-resolution` or
 `observe-registration`, not resubmission. `finish-resolution` requires an observed
@@ -216,6 +218,15 @@ separate. Fresh review evidence and a valid independent verdict are still requir
 The current v2 coordinator still stops at
 `awaiting_independent_delivery_review`; the source-only final-review policy is not
 an installed adapter or proof of the downstream PR/CI/deploy/QA/rollback chain.
+
+The new fixed delivery-review job separately reexecutes the frozen suite against
+the candidate under a distinct review task. Its Docker fixture passed with
+read-only mounts, denied writes, five invalid-input controls, no network egress,
+credentials, socket or provider/model calls. Ten focused tests cover execution
+and network checks. Inactive default kernel tunnels are not treated as egress:
+only loopback may be UP and all routes must remain local. Earlier canary failures
+are preserved. The job returns unprivileged facts, not native authentication,
+a trusted job receipt or review approval. The controller bridge remains pending.
 
 ## Bounded recovery
 

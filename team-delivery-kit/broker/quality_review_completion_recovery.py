@@ -80,7 +80,8 @@ def exclude_completed(b,context,state,runs):
         output=(task.get('result') or {}).get('output')
         require({k:task.get(k) for k in FIELDS}==record['previous_identity']
             and attestation.load(b,context['source_task'],request_id=record['previous_request'])==record['previous_attestation'])
-        if 'transport' in record['request'] or record['request'].get('failed_review') is True:
+        if ('transport' in record['request'] or 'provider_resolution' in record['request']
+                or record['request'].get('failed_review') is True):
             try:from . import quality_review_capacity_recovery as capacity
             except ImportError:import quality_review_capacity_recovery as capacity
             require(capacity.failure_sha256(task)==record['native_failure_sha256'])
@@ -139,9 +140,12 @@ def qualification(b,value,operation):
     return quality.digest(report['guard_sources'])
 
 
-def register(b,source,previous_task,operation,*,qualified,installation,transport=None,failed_review=False):
-    require(type(failed_review) is bool and not (failed_review and transport is not None))
-    native_failed=failed_review or transport is not None
+def register(b,source,previous_task,operation,*,qualified,installation=None,transport=None,failed_review=False,
+        provider_resolution=None,runtime_identity=None):
+    require(type(failed_review) is bool and sum((failed_review,transport is not None,provider_resolution is not None))<=1)
+    financial=provider_resolution is not None
+    require((financial and installation is None) or (not financial and runtime_identity is None))
+    native_failed=failed_review or transport is not None or financial
     for value in (source,previous_task,operation):review.capture.enrollment.canonical(value)
     condition=qualification(b,qualified,operation)
     capacity_request=None
@@ -151,14 +155,29 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
         require(isinstance(transport,dict) and isinstance(transport.get('rejection'),dict))
         capacity_request=transport['rejection'].get('execution_id');review.capture.enrollment.canonical(capacity_request)
         condition=quality.digest(dict(worker=condition,transport=capacity.validate(b,transport,operation,capacity_request)))
-    require(isinstance(installation,dict) and set(installation)=={'install_operation','previous_image','current_image','previous_container','current_container'}
-        and installation['previous_image']!=installation['current_image']
-        and all(re.fullmatch('sha256:[a-f0-9]{64}',str(installation[k])) for k in ('previous_image','current_image'))
-        and all(re.fullmatch('[a-f0-9]{64}',str(installation[k])) for k in ('previous_container','current_container'))
-        and installation['previous_container']!=installation['current_container'])
-    review.capture.enrollment.canonical(installation['install_operation'])
+    payment_request=None
+    if financial:
+        try:from . import quality_review_payment_recovery as payment
+        except ImportError:import quality_review_payment_recovery as payment
+        payment_request=provider_resolution.get('request_id') if isinstance(provider_resolution,dict) else None
+        review.capture.enrollment.canonical(payment_request)
+        condition=quality.digest(dict(worker=condition,payment=payment.validate(b,provider_resolution,operation,payment_request)))
+        require(isinstance(runtime_identity,dict) and set(runtime_identity)=={'image','container_id'}
+            and re.fullmatch('sha256:[a-f0-9]{64}',str(runtime_identity['image']))
+            and re.fullmatch('[a-f0-9]{64}',str(runtime_identity['container_id'])))
+        current_image,current_container=runtime_identity['image'],runtime_identity['container_id']
+    else:
+        require(isinstance(installation,dict) and set(installation)=={'install_operation','previous_image','current_image','previous_container','current_container'}
+            and installation['previous_image']!=installation['current_image']
+            and all(re.fullmatch('sha256:[a-f0-9]{64}',str(installation[k])) for k in ('previous_image','current_image'))
+            and all(re.fullmatch('[a-f0-9]{64}',str(installation[k])) for k in ('previous_container','current_container'))
+            and installation['previous_container']!=installation['current_container'])
+        review.capture.enrollment.canonical(installation['install_operation'])
+        current_image,current_container=installation['current_image'],installation['current_container']
     request=dict(source_task=source,previous_task=previous_task,maintenance_operation=operation,
-        qualification=qualified,installation=installation)
+        qualification=qualified)
+    if financial:request.update(provider_resolution=provider_resolution,runtime_identity=runtime_identity)
+    else:request['installation']=installation
     if transport is not None:request['transport']=transport
     if failed_review:request['failed_review']=True
     previous=records(b,source)
@@ -167,7 +186,7 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
         require(len(same)==1 and same[0]['request']==request);return same[0]
     require(condition not in {r['condition_sha256'] for r in previous})
     controller=b.docker('GET','/containers/'+b.PREFIX+'-execution-broker-1/json')
-    require(controller and controller['Id']==installation['current_container'] and controller['Image']==installation['current_image']
+    require(controller and controller['Id']==current_container and controller['Image']==current_image
         and controller['State']['Running'] is True and controller['Config']['Labels'].get('com.docker.compose.project')==b.PREFIX
         and controller['Config']['Labels'].get('com.docker.compose.service')=='execution-broker')
     with review.capture.observation_lock(b,source):
@@ -192,7 +211,8 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
         if not native_failed:require(isinstance(output,str))
         else:
             if transport is not None:require(previous_request==capacity_request)
-            else:
+            elif financial:require(previous_request==payment_request)
+            if transport is None:
                 try:from . import quality_review_capacity_recovery as capacity
                 except ImportError:import quality_review_capacity_recovery as capacity
             failure_sha=capacity.failure_sha256(task)
@@ -207,19 +227,24 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
                 events=con.execute('SELECT method,success FROM acp_events WHERE request_id=?',(previous_request,)).fetchall()
                 require(all(any(r[0]==method and r[1]==success for r in events)
                     for method,success in (('initialize',1),('session/new',1),('session/prompt',0))))
-                if failed_review:
+                if failed_review or financial:
                     require(all(len([r for r in events if r[0]==method])==1
                         for method in ('initialize','session/new','session/prompt')))
         if not native_failed:
             diagnostic=attestation.completion_diagnostic(output,context['packet'],capture['copy']['prepared']['file_inventory'],context['read_paths'],messages)
             require(diagnostic['verdict_format']=='invalid' or diagnostic['reads']['rejected_files'])
         else:
-            diagnostic=dict(operation='review_failed_inspection_diagnostic_v1' if failed_review else 'review_transport_failure_diagnostic_v1',
-                verdict_format='absent_due_to_native_failure' if failed_review else 'absent_due_to_transport',
+            diagnostic=dict(operation='review_payment_failure_diagnostic_v1' if financial else
+                'review_failed_inspection_diagnostic_v1' if failed_review else 'review_transport_failure_diagnostic_v1',
+                verdict_format='absent_due_to_payment_failure' if financial else
+                    'absent_due_to_native_failure' if failed_review else 'absent_due_to_transport',
                 manifest_sha256=context['packet']['manifest_sha256'],
                 reads=attestation.reads.assessment(capture['copy']['prepared']['file_inventory'],
                     context['packet']['manifest_sha256'],context['read_paths'],messages),
                 native_failure_sha256=failure_sha,execution_authorized=False,tests_approved=False,delivery_approval=False)
+            if financial:
+                require(all(r['category']=='file_read_incomplete' for r in diagnostic['reads']['rejected_files']))
+                diagnostic['native_failure_cause']='bound_upstream_payment_event'
             if failed_review:
                 assessment=diagnostic['reads']
                 require(0<assessment['complete_files']<assessment['required_files']
@@ -233,7 +258,7 @@ def register(b,source,previous_task,operation,*,qualified,installation,transport
         require(proofs and len({p['container_id'] for p in proofs})==1 and retirement is not None)
         cid=proofs[-1]['container_id']
         require(tuple(retirement)==(cid,b.PREFIX+'-job-'+previous_request,'gone')
-            and ((payload['Image']!=qualified['worker_image']) if transport is None else
+            and ((payload['Image']!=qualified['worker_image']) if transport is None and not financial else
                 (payload['Image']==qualified['worker_image']))
             and b.docker('GET','/containers/'+cid+'/json') is None
             and b.docker('GET','/containers/'+b.PREFIX+'-job-'+previous_request+'/json') is None)
@@ -293,6 +318,12 @@ def activation_ready(b,issue,operation):
         except ImportError:import quality_review_capacity_recovery as capacity
         condition=quality.digest(dict(worker=qualification(b,record['request']['qualification'],operation),
             transport=capacity.validate(b,record['request']['transport'],operation,record['previous_request'])))
+        require(condition==record['condition_sha256'])
+    elif 'provider_resolution' in record['request']:
+        try:from . import quality_review_payment_recovery as payment
+        except ImportError:import quality_review_payment_recovery as payment
+        condition=quality.digest(dict(worker=qualification(b,record['request']['qualification'],operation),
+            payment=payment.validate(b,record['request']['provider_resolution'],operation,record['previous_request'])))
         require(condition==record['condition_sha256'])
     else:require(qualification(b,record['request']['qualification'],operation)==record['condition_sha256'])
     require(attestation.load(b,record['source_task'],request_id=record['previous_request'])==record['previous_attestation'])

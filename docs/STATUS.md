@@ -1,4 +1,4 @@
-# Status do projeto — 23 de outubro de 2026
+# Status do projeto — 24 de outubro de 2026
 
 **Experimental. Autonomia completa ainda não qualificada.** Este é um resumo
 datado da instalação de referência, não uma consulta de estado vivo nem uma
@@ -54,7 +54,7 @@ válida nem autonomia ponta a ponta.
   estruturadas foram qualificados e instalados. A troca preservou dados e
   configurações, com backup compactado e restauração verificados. O serviço
   host foi migrado naquele ciclo sem resetar fila ou histórico. A troca mais
-  recente exige outra migração, ainda pendente na fotografia abaixo.
+  recente também teve seu pin migrado, mantendo o serviço parado.
 - A revisão anterior consumiu sete chamadas e terminou com diagnóstico `read_progress_stalled`:
   16 dos 71 arquivos tiveram leitura integral comprovada. O controlador manteve
   `technical_blocked`, sem aceitar o diagnóstico como parecer ou aprovação.
@@ -71,10 +71,11 @@ válida nem autonomia ponta a ponta.
   comprovou **71/71 arquivos** no transporte do controlador. Terminou nativamente
   em `completed`, mas o controlador manteve `technical_blocked` por parecer
   inválido. Leitura completa não foi convertida em aprovação.
-- A última suíte offline registrada executou **4.432 testes: 4.424 aprovados e
+- A última suíte offline registrada executou **4.442 testes: 4.434 aprovados e
   oito skips preexistentes**, sem falhas. O conjunto focado de recuperação
-  executou 50 testes, também sem falhas. Foram acrescentados 27 testes sem
-  retirar ou enfraquecer os anteriores. Essas provas não substituem a qualificação nativa.
+  executou 50 testes, também sem falhas. Aos 27 testes novos de recuperação
+  somaram-se dez do executor final/rede, sem retirar ou enfraquecer os anteriores.
+  Essas provas não substituem a qualificação nativa.
 - A tentativa após o ajuste da fase terminou com 46/71 arquivos completos,
   80 páginas preservadas e duas respostas prematuras em prosa. Restavam 35
   iterações; o agente prometeu ler depois em vez de executar as páginas. O
@@ -90,6 +91,13 @@ válida nem autonomia ponta a ponta.
   contador, locks e observação de efeito incerto, incluindo conclusão parcial
   sem repetir consultas. Usou oito requisições HTTP à fixture local, zero ao
   provedor real e zero ao modelo. Não verificou o crédito da instalação.
+- O pin do scheduler foi migrado para o controlador instalado, preservando
+  fila, estado de falhas e históricos dos candidatos. O serviço continua
+  desabilitado/descarregado; a manutenção permanece selada e drenada.
+- O executor fixo da revisão da entrega reexecutou a suíte de uma fixture em
+  Docker sem rede externa, chave ou socket, com base e snapshot somente leitura.
+  As tentativas de escrita foram negadas e cinco pedidos inválidos recusados.
+  Essa prova ainda não contém admissão nativa, parecer ou autorização de merge.
 
 Não houve congelamento dos testes, Green ou homologação nessa linhagem v2.
 
@@ -235,13 +243,13 @@ orçamento usa uma iteração sintética; a fábrica ACP mantém 40.
 
 ## Instalação de referência consultada
 
-| Item | Estado observado em 23 de outubro |
+| Item | Estado observado em 24 de outubro |
 |---|---|
 | Controlador de qualidade | `delivery-kit-quality-v2-controller:20261023.36`, instalação concluída com execução desligada |
 | Worker de autoria/revisão | Seletor `delivery-kit-quality-author-worker:20261023.11` |
 | Correção instalada | Controles de revisão anteriores e registro restrito de recuperação por pagamento; sem remediação real comprovada |
 | Instalação/ativação | Backup/restauração e preservação dos dados verificados; nova imagem ainda não ativada |
-| Serviço host | Desabilitado e descarregado; migração do pin para a nova imagem ainda pendente |
+| Serviço host | Pin migrado para a nova imagem, fila/históricos preservados; desabilitado e descarregado |
 | Manutenção na instalação | Selada e drenada após o encerramento com falha por pagamento |
 | Revisão anterior terminal | Nativa `completed`, 71/71 arquivos completos; parecer inválido preservado, sem aprovação |
 | Revisão intermediária terminal | 46/71 arquivos completos, duas respostas em prosa; sem aprovação |
@@ -256,8 +264,7 @@ dados, outros serviços e fila do scheduler. O teto de chamadas não é monetár
 
 ## Próximos marcos, em ordem
 
-1. Concluir a migração do pin sob manutenção. Após confirmação humana de
-   pagamento resolvido, obter prova real vinculada à falha e registrar a
+1. Após confirmação humana de pagamento resolvido, obter prova real vinculada à falha e registrar a
    recuperação. Só então avaliar ativação separada; não repetir efeitos incertos.
 2. Conferir parecer, independência e evidências no controlador; somente uma
    decisão válida pode avançar. Não herdar leituras ou ampliar iterações.
@@ -280,13 +287,18 @@ obrigatório. O registro e o despacho funcionaram; a tentativa anterior voltou
 a bloquear, assim como a sucessora. Isso não comprova recuperação integral nem diagnóstico ou
 replanejamento universalmente autônomos pelo CTO.
 
-Uma política de revisão final da entrega foi adicionada em fonte, mas não
-constitui adaptador instalado ou despacho nativo. O coordenador atual termina
-em `awaiting_independent_delivery_review`; faltam autenticação das evidências
-reais, validação própria do revisor e continuidade até PR/CI/deploy/QA/rollback.
-Seus seis testes de política pura integram a suíte completa acima; não são uma
-revisão nativa nem autorização de publicação. O módulo não está instalado ou
-conectado ao despacho.
+Uma política de revisão final e um executor fixo de revalidação existem em
+fonte; ainda não constituem adaptador instalado ou despacho nativo. O executor
+rodou a suíte completa da fixture novamente sob tarefa distinta, sem copiar
+Green do autor nem fornecer terminal genérico. O canário Docker passou e o
+auxiliar foi retirado; dois resultados anteriores de falha da fixture foram
+preservados. Dez testes focados cobrem o executor e as verificações de rede.
+
+O coordenador atual termina em `awaiting_independent_delivery_review`. Faltam
+admissão e proveniência nativas, vínculo do recibo durável do job à execução
+do revisor, inspeção própria, decisão independente e continuidade até
+PR/CI/deploy/QA/rollback. A política e o executor não conferem autoridade,
+aprovação da entrega ou permissão de publicação.
 
 Uma execução intermediária da suíte falhou no probe de processo órfão. Um novo
 teste reproduziu que a fixture contava reconciliação tardia de trabalho concluído

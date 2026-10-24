@@ -11,7 +11,7 @@ import subprocess
 import uuid
 
 PROGRAM = r'''
-import sys,json,os,time,uuid,urllib.request
+import sys,json,os,time,uuid,math,urllib.request
 from pathlib import Path
 import model_proxy as m
 operation=sys.argv[1]
@@ -20,7 +20,12 @@ def official(endpoint):
  r=urllib.request.Request('https://openrouter.ai/api/v1/'+endpoint,headers={'Authorization':'Bearer '+key})
  with urllib.request.urlopen(r,timeout=20) as response:return json.load(response)['data']
 credits=official('credits');info=official('key')
-if not credits['total_credits']>credits['total_usage'] or not isinstance(info.get('limit_remaining'),(int,float)) or not info['limit_remaining']>0:
+def nonnegative(value):return type(value) in (int,float) and math.isfinite(value) and value>=0
+remaining=info.get('limit_remaining')
+unlimited=all(k in info and info[k] is None for k in ('limit','limit_remaining'))
+if (not all(nonnegative(credits.get(k)) for k in ('total_credits','total_usage'))
+ or not credits['total_credits']>credits['total_usage']
+ or not (unlimited or nonnegative(remaining) and remaining>0)):
  raise ValueError('provider account balance and key allowance must both be positive')
 pause=m.provider_pause();calls=m.load_calls();directory=Path(m.COUNTER_PATH).parent
 resolved=directory/('provider-resolution-'+operation+'.json')

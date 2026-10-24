@@ -1,6 +1,6 @@
 # Instalação segura e limites
 
-Estado de referência: **23 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
+Estado de referência: **24 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
 antes de ativar agentes. O kit continua experimental; não há instalação completa
 e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
@@ -74,8 +74,8 @@ O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
 O controlador `20261023.36` e o worker `20261023.11` já estão instalados nessa
 referência; esses identificadores não constituem imagens publicadas para download.
 O controlador novo está com execução desligada, manutenção selada/drenada e
-serviço host desabilitado/descarregado. A migração do pin e a ativação da nova
-imagem ainda estão pendentes. Não inicie o serviço host com o pin antigo.
+serviço host desabilitado/descarregado. O pin foi migrado, com fila e histórico
+preservados; a ativação da nova imagem continua pendente. Não use o pin antigo.
 A sucessora liberada após a mudança qualificada também ficou bloqueada,
 agora com 71/71 arquivos integralmente comprovados e parecer inválido. A
 revisão dos testes não depende de Green ou dos controles negativos posteriores;
@@ -129,8 +129,8 @@ autorização anterior. A edição desta documentação não autoriza nova execu
 
 Esta é uma operação assistida pelo operador, não parte da instalação genérica.
 Os utilitários `quality_review_provider_access.py` e
-`qualify_quality_provider_access.py` estão na implementação local em qualificação;
-confira sua presença, versão e `--help` antes de usar um checkout publicado.
+`qualify_quality_provider_access.py` fazem parte do código de qualificação;
+confira versão, proveniência e `--help` antes de usá-los em outra instalação.
 A qualificação isolada já passou, mas não verificou o crédito real da chave.
 Saldo informado e teto de chamadas não substituem a prova exigida pelo contrato.
 
@@ -166,6 +166,21 @@ Nenhuma credencial ou resposta integral do provedor deve ir ao Git ou ao chat.
 Os logs/recibos ficam em armazenamento privado restrito. Não use o resolver
 legado diretamente para contornar o registro da recuperação v2. Não substitua
 essa rota por recuperação de capacidade ou de inspeção incompleta.
+
+### Executor experimental da revisão da entrega
+
+`Dockerfile.quality-delivery-review-job` constrói um executor de operação fixa,
+sem seleção de comandos ou testes pelo agente. Seu input é
+`QUALITY_DELIVERY_REVIEW_JOB_JSON`, com plano e evidências completos, snapshot,
+commit, perfil revisor e identidades distintas da autoria, revisão de testes e
+implementação. O processo reexecuta a suíte; não aceita Green como substituto.
+
+O controlador futuro deverá autenticar esses dados antes de invocá-lo e ligar
+o resultado ao recibo próprio do job e à execução nativa do revisor. O executor
+isolado não faz essa autenticação nem aceita parecer. Na qualificação, a imagem
+rodou como UID 10000, sem rede externa, credenciais, socket ou mounts graváveis
+da entrega. Somente `/tmp` era gravável. Não habilite um workflow de produto
+com base no resultado desse canário: a integração nativa ainda falta.
 
 ### Organização e retirada de testes
 

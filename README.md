@@ -65,12 +65,19 @@ aceito, congelamento ou homologação. A revisão após essa correção comprovo
 continuação. A instância está selada e o proxy parado após pausa persistente
 por pagamento, sem reset de contador ou aprovação fictícia. A nova recuperação
 específica passou em canário Linux com oito consultas HTTP locais, nenhuma ao
-provedor real, e está instalada com execução desligada. Crédito real, registro,
-migração do pin e ativação ainda precisam ser conferidos; o scheduler permanece
-desabilitado/descarregado. A suíte offline mais recente executou 4.432 testes,
+provedor real, e está instalada com execução desligada. Crédito real, registro
+e ativação ainda precisam ser conferidos; o pin foi migrado preservando a fila e
+o histórico, mas o scheduler permanece desabilitado/descarregado. A suíte offline
+mais recente executou 4.442 testes,
 com oito skips preexistentes e nenhuma falha. Isso não comprova autonomia.
 O estado datado está em
 [STATUS](docs/STATUS.md).
+
+O executor fixo da revisão final também passou em canário Docker, reexecutando
+a suíte da fixture com snapshots somente leitura, escrita negada e cinco pedidos
+inválidos recusados, sem chave, socket ou provedor. Ele não está conectado à
+admissão nativa do revisor nem concede aprovação; a ponte após Green permanece
+em desenvolvimento. Consulte o [mapa atualizado](docs/ARCHITECTURE.md).
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),
@@ -1661,7 +1668,7 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 
 ## Situação das validações
 
-O estado vigente em **23 de outubro de 2026** está em
+O estado vigente em **24 de outubro de 2026** está em
 [STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente terminou bloqueada
 sem leitura integral, não congelou os testes e não chegou à homologação. A suíte offline
 da candidata seguinte executou 4.384 testes: 4.376 aprovados e oito skips preexistentes,

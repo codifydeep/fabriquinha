@@ -1,6 +1,6 @@
 # Patch observability boundary
 
-Scope note, **23 October 2026**: this document describes patch adapters and
+Scope note, **24 October 2026**: this document describes patch adapters and
 historical qualification boundaries, not the current deployment inventory.
 The current v2 review is read-only; patch receipts cannot satisfy missing
 inspection or authorize a reviewer to edit tests or implementation. Earlier

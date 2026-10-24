@@ -5,7 +5,7 @@ das etapas ainda não qualificadas. A presença de um módulo não comprova sua
 ativação no runtime. Não descreve uma arquitetura futura como se Temporal já
 estivesse instalado.
 
-Estado de referência: **23 de outubro de 2026**. Componentes existentes não
+Estado de referência: **24 de outubro de 2026**. Componentes existentes não
 significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 
 | Área | Entradas principais |
@@ -24,6 +24,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | Recuperação de pagamento assistida pelo operador | `quality_provider_resolution.py`, `quality_review_provider_access.py`, `broker/quality_review_payment_recovery.py`, `qualify_quality_provider_access.py` |
 | Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
 | Transporte completo na revisão | `quality_review_budget.py`, hook fixo em `agent/tool_executor.py` |
+| Revisão final: componentes ainda não conectados ao despacho | `quality_delivery_review_policy.py`, `quality_delivery_review_job.py`, `Dockerfile.quality-delivery-review-job` |
 | CI, publicação e QA | `portable_delivery.py`, `publication_access.py`, `portable_qualification.py`, `portable_browser_qa.py`, `browser_feedback_acceptance.py`, `deploy/` |
 | Memória e contexto | `generated_context.py`, `broker/session_resume.py`, módulos de recuperação contextual no broker |
 | Supervisão host | `register_brief_delivery_service.py`, `register_portable_host_service.py`, `host_awake_guard.py` |
@@ -137,9 +138,33 @@ Isso não concede ao worker ferramentas financeiras ou administrativas.
 
 O canário Linux usa uma fixture HTTP loopback e chave falsa, sem rede externa,
 credencial real ou socket Docker. Seus oito pedidos locais não comprovam saldo
-disponível. O adaptador foi instalado desligado; remediação real, migração do
-pin, registro e ativação continuam pendentes. O caminho é assistido pelo operador,
+disponível. O adaptador foi instalado desligado e o pin migrado com histórico
+preservado; remediação real, registro e ativação continuam pendentes. O caminho é assistido pelo operador,
 não uma recuperação financeira autônoma já demonstrada.
+
+### Revalidação própria na revisão da entrega
+
+`quality_delivery_review_job.py` oferece uma operação fixa para executar a suíte
+congelada novamente sobre o candidato Green e ligar os fatos à tarefa do revisor.
+Exige Red, revisão dos testes, Green e sensibilidade completos e correspondentes;
+não aceita comando, caminhos alternativos, seleção parcial de testes ou edição.
+O resultado contém fatos de execução, sem se declarar autenticado ou aprovado.
+
+```mermaid
+flowchart LR
+    Q[Snapshot Green e evidências anteriores] --> J[Executor fixo em sandbox somente leitura]
+    J --> F[Suíte reexecutada; fatos sem autoridade]
+    F -.-> C[Adaptador controlador: recibo e identidade nativa ainda pendentes]
+    C -.-> R[Inspeção e decisão independente do revisor]
+    R -.-> P[Gates de PR, CI e homologação]
+```
+
+Somente o executor passou na qualificação física com fixture; as setas
+tracejadas não estão implementadas como ponte nativa completa. O job não pode
+fornecer seu próprio recibo confiável ou provar sua admissão nativa. Esses
+controles pertencem ao controlador e não podem ser substituídos por campos do
+input ou declarações do agente. O coordenador instalado continua no checkpoint
+`awaiting_independent_delivery_review`, sem aprovação da release.
 
 ### Fronteiras entre as decisões de qualidade
 
