@@ -1,7 +1,8 @@
 """Single continuous dispatcher, detached SDK workers, native lifecycle only.
 
-Operational slice: TDD and native technical diagnostics. Product publication/
-deployment are not yet attached. Paid providers stay paused.
+TDD/technical diagnostics use isolated SDK workers. Integration uses fixed
+publication/deployment/QA operations, never a host shell exposed to a model.
+Paid providers stay paused.
 """
 import argparse
 from contextlib import contextmanager
@@ -25,6 +26,19 @@ from .kanban_lane import native, UPSTREAM_COMMIT
 from .quality import Quality
 from .recovery import Recovery
 from .notifications import Outbox, alerts, validation_progress
+from .publication import Repository, GitHub, Publication
+from .deployment import Deployment
+
+
+class IntegrationRunner(Runner):
+    """Wait for bounded local computation, not for external CI or model replies."""
+    def _execute(self,*args,**kwargs):
+        deadline=time.monotonic()+self.project.timeout_seconds+15
+        while True:
+            try:return super()._execute(*args,**kwargs)
+            except Pending:
+                if time.monotonic()>=deadline:raise EffectBlocked('local integration job observation expired')
+                time.sleep(0.1)
 
 
 def bind(root,upstream):
@@ -72,6 +86,18 @@ def worker_alive(row):
     return dispatch._worker_alive(row['worker_pid'],row['worker_started_at'])
 
 
+def recorded_worker(conn,row):
+    """Upstream may reap terminal PID fields; its spawn event retains identity."""
+    if row['worker_pid'] and row['worker_started_at']:return row
+    event=conn.execute("SELECT payload FROM task_events WHERE task_id=? AND run_id=? AND kind IN ('spawned','worker_registered') ORDER BY id DESC LIMIT 1",
+                       (row['task_id'],row['id'])).fetchone()
+    data=json.loads(event[0]) if event else {}
+    if (not isinstance(data,dict) or type(data.get('pid')) is not int or data['pid']<1 or not data.get('started_at')
+            or row['worker_pid'] not in (None,data['pid']) or row['worker_started_at'] not in (None,data['started_at'])):
+        raise EffectBlocked('native worker spawn identity unavailable or changed')
+    return {**dict(row),'worker_pid':data['pid'],'worker_started_at':data['started_at']}
+
+
 class Runtime:
     def __init__(self,root,upstream):
         self.root,self.upstream=Path(root).resolve(),Path(upstream).resolve()
@@ -83,7 +109,7 @@ class Runtime:
             raise ValueError('installation contract changed; explicit reconfiguration required')
         if not installation.exists():write_json(installation,binding)
         self.store=Store(self.root/'private');self.board=Board(self.project)
-        self.children=[];self.settlement={};self.recovery_issues={}
+        self.children=[];self.settlement={};self.recovery_issues={};self.integration_issues={}
         self.recovery=Recovery(self.project,self.store,self.board)
         self.outbox=Outbox(self.project,self.store)
 
@@ -112,7 +138,7 @@ class Runtime:
                 if row['ended_at'] is None:
                     if task:raise EffectBlocked('prior sandbox still belongs to an open native run')
                     continue
-                if worker_alive(row):
+                if worker_alive(recorded_worker(conn,row)):
                     raise EffectBlocked('prior SDK worker still alive; preserve its sandbox')
                 Sandbox.recover(self.project,self.store,identity).close()
             except (Pending,EffectBlocked,ValueError,subprocess.SubprocessError) as error:
@@ -142,9 +168,95 @@ class Runtime:
         _,kbc,dispatch=native()
         with kbc.connect_closing() as conn:
             self.settle(conn=conn)
+            self.integration_issues=self.wake_integrations(conn)
             self.recovery_issues=self.recovery.reconcile(conn,self.settle)
             return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers,
                 max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)
+
+    def park_integration(self,run,*,now=None):
+        if run.kind!='integration' or run.reviewing:
+            raise ValueError('only integration implementation waits may use scheduled')
+        self.board.ensure(run)
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            row=conn.execute('SELECT worker_pid,worker_started_at,claim_lock FROM task_runs WHERE id=? AND task_id=?',
+                             (run.number,run.task)).fetchone()
+            if not row or row['worker_pid']!=os.getpid() or not row['worker_started_at'] or not row['claim_lock']:
+                raise ValueError('only the verified native integration worker may park its claim')
+            receipt=self.store.record('integration_wait',run.binding(),dict(
+                project=self.project.fingerprint(),wake_at=(time.time() if now is None else now)+15))
+            if not kb.schedule_task(conn,run.task,reason=json.dumps({'integration_wait':receipt}),
+                                    expected_run_id=run.number):
+                raise ValueError('native integration wait refused')
+        return dict(status='scheduled',wait=receipt,delivery_approval=False)
+
+    def wake_integrations(self,conn,*,now=None):
+        """Only our exact scheduled effect waits; no general auto-unblock policy."""
+        kb,_,_=native();issues={};now=time.time() if now is None else now
+        for task in conn.execute("SELECT id,body,assignee FROM tasks WHERE status='scheduled'").fetchall():
+            try:
+                row=conn.execute('SELECT * FROM task_runs WHERE task_id=? ORDER BY id DESC LIMIT 1',(task['id'],)).fetchone()
+                if not row or row['outcome']!='scheduled' or row['ended_at'] is None:continue
+                event=conn.execute("SELECT payload FROM task_events WHERE task_id=? AND run_id=? AND kind='scheduled' ORDER BY id DESC LIMIT 1",
+                                   (task['id'],row['id'])).fetchone()
+                if not event:continue
+                reason=json.loads(event[0]).get('reason')
+                try:values=json.loads(reason) if isinstance(reason,str) else {}
+                except ValueError:continue
+                if not isinstance(values,dict) or set(values)!={'integration_wait'}:continue
+                receipt=self.store.receipt(values['integration_wait'],kind='integration_wait')
+                data,binding=receipt['payload'],receipt['binding'];body=json.loads(task['body'])
+                if not all(isinstance(value,dict) for value in (data,binding,body)):
+                    raise ValueError('structured integration wait required')
+                if (data['project']!=self.project.fingerprint() or binding['task']!=task['id']
+                        or binding['number']!=row['id'] or binding['actor']!=row['profile']
+                        or binding['actor']!=task['assignee'] or binding['author']!=task['assignee']
+                        or binding['kind']!='integration' or binding['reviewing'] is not False
+                        or binding['contract']!=digest(body) or binding['release']!=body.get('release')
+                        or body.get('version')!=1 or body.get('kind')!='integration'):
+                    raise ValueError('integration wait contract or owner changed')
+                if now<data['wake_at'] or worker_alive(recorded_worker(conn,row)):continue
+                if not kb.unblock_task(conn,task['id']):raise ValueError('native integration wake refused')
+            except (ValueError,KeyError,TypeError,OSError,EffectBlocked) as error:
+                issues[task['id']]=type(error).__name__
+        return issues
+
+    def integration_services(self,run):
+        # Real production transport only. Qualification fixtures replace this
+        # factory in their own process; no test endpoint/config bypass is shipped.
+        return Repository(self.project,self.store,assignee=run.actor),GitHub(self.project,run.actor)
+
+    def integrate(self,run,quality):
+        self.board.ensure(run)
+        if run.kind!='integration':raise ValueError('native integration activity required')
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:task=kb.get_task(conn,run.task)
+        expected=self.project.repository.removeprefix('https://github.com/')
+        if task.completion_contract in (None,'local-only'):
+            raise ValueError('native PR completion contract required')
+        if task.completion_contract!=expected:
+            GitHub(self.project,run.actor).url(task.completion_contract)  # exact previously bound PR only
+        repo,github=self.integration_services(run)
+        publication=Publication(self.project,self.store,self.board,repo,github)
+        deployment=Deployment(self.project,self.store,self.board,quality.runner)
+        if run.reviewing:
+            rollout=self.board.input(run,'rollout',review_handoff=True)
+            artifact=self.store.receipt(self.store.receipt(rollout,kind='rollout')['payload']['candidate'],kind='artifact')['payload']
+            integrated=artifact['integrated']
+            published=self.store.receipt(self.store.receipt(integrated,kind='integrated')['payload']['publication'],kind='publication')['payload']
+            publication.require_ci(github.accept(published['pr'],artifact['commit']),artifact['commit'],time.time())
+            evidence=deployment.qa(run,rollout,repo)
+            self.board.finish_review(run,'Independent deployed QA; release acceptance remains separate',
+                dict(published_pr=published['pr'],integrated=integrated,release_evidence=evidence))
+            return dict(status='qa_completed',release_evidence=evidence,delivery_approval=False)
+        published=publication.publish(run,self.board.input(run,'delivery'))
+        integrated=publication.validate_integrated(run,published,quality)
+        previous=deployment.artifact(run,integrated,repo,baseline=True)
+        candidate=deployment.artifact(run,integrated,repo)
+        rollout=deployment.rollout(run,candidate,previous,repo)
+        self.board.review(run,'Independent deployed QA after rollback and restoration',
+            dict(rollout=rollout,integrated=integrated,published_pr=self.store.receipt(published,kind='publication')['payload']['pr']))
+        return dict(status='qa_requested',rollout=rollout,delivery_approval=False)
 
     def status(self):
         _,kbc,_=native()
@@ -161,6 +273,7 @@ class Runtime:
                 except (ValueError,OSError):card['last_validation']={'error':'EvidenceUnavailable'}
             incidents=self.recovery.status(conn)
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
+                    integration_issues=self.integration_issues,
                     incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
@@ -205,9 +318,17 @@ class Runtime:
             prompt=kb.build_worker_context(conn,task)
         run=self.board.current(task,number)
         try:
-            route=model_route(self.project,self.root/'route.json')
             os.environ['HERMES_HOME']=str(self.root/'home/profiles'/run.actor)
-            quality=Quality(self.project,self.store,Runner(self.project,self.store),self.board)
+            runner=IntegrationRunner if run.kind=='integration' else Runner
+            quality=Quality(self.project,self.store,runner(self.project,self.store),self.board)
+            if run.kind=='integration':
+                try:result=self.integrate(run,quality)
+                except Pending:
+                    if run.reviewing:raise  # never lose a review's phase through schedule_task
+                    result=self.park_integration(run)
+                write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
+                return
+            route=model_route(self.project,self.root/'route.json')
             if run.kind=='implementation' and not run.reviewing:
                 work=self.board.workspace(run);frozen=quality.freeze(run,self.board.input(run,'tests'))
                 if not any(work.iterdir()):self.store.checkout(frozen['snapshot'],work)

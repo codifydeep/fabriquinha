@@ -116,8 +116,9 @@ shutdown, além da recusa de deixar erro de escopo da fila parar o dispatcher:
 O transporte HTTPS foi verificado com mock; o ensaio HTTP local não substitui
 uma validação futura do Telegram. As evidências completas continuam privadas.
 
-Próximo marco: conectar publicação/CI/deploy/QA ao serviço, sem ocupar workers em
-esperas. Falta admissão de perfis/recursos e a interface de brief/aprovação. Depois,
+A [conexão posterior de publicação/CI/deploy/QA](HERMES-INTEGRATION-QUALIFICATION.md)
+passou pelo serviço sem ocupar workers em esperas de CI. Falta admissão de
+perfis/recursos, pausa/drain e a interface de brief/aprovação. Depois,
 liberar o provedor pelo caminho autorizado e executar S4 com modelo/GitHub reais.
 Não expandir para toda falha S5 antes dessa primeira entrega.
 

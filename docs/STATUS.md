@@ -40,8 +40,15 @@ somente com evidência válida, não por existir um worker. A
 recusada, reinício e ACK perdido: 21 mensagens locais, uma notificação de início
 e término por run, sem duplicar envio aceito ou parar o trabalho. Status acompanha
 validações reais e fila; heartbeat não renova progresso. Telegram real não testado.
-Faltam cadeia integral no serviço e provedor/GitHub reais. Não houve produção.
-Checks atuais: 117 testes do caminho novo e 4.523 da suíte histórica, todos sem
+A [integração pelo serviço](HERMES-INTEGRATION-QUALIFICATION.md) passou depois:
+nove runs, espera de CI e reinício com capacidade liberada, PR/merge únicos pela
+fixture, dois builds, quatro atualizações Compose e QA independente reais. Um
+crash de inicialização SQLite foi recuperado nativamente; a primeira tentativa
+da prova permanece não aprovada por falha na auditoria de identidade. Não houve
+reparo/handoff do operador na segunda tentativa. Deploy temporário foi retirado
+com evidências preservadas. Faltam brief/planejamento/aceite de release, admissão,
+pausa/drain, provedor/GitHub reais e migração. Não houve produção.
+Checks atuais: 125 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

@@ -10,6 +10,7 @@ from .artifacts import digest
 from .effects import Journal, write_json
 
 EVENTS=dict(created='Assignment registered',spawned='Activity started',worker_registered='Activity started',
+    scheduled='Waiting for an external effect; worker released',
     review_requested='Submitted for independent review',changes_requested='Review finished: changes requested',
     completed='Activity completed (not release homologation)',blocked='Activity blocked; technical diagnosis required',
     crashed='Worker crashed; recovery pending',timed_out='Worker timed out; recovery pending',

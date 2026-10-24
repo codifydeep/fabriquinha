@@ -134,10 +134,12 @@ o serviço recusa alteração silenciosa do contrato.
 - O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) já qualificou a
   recuperação de falha do autor com Lead/CTO, SPIKE e revalidação. Ainda faltam
   classes sem run, como admissão de perfil/recursos indisponíveis.
-- Outbox/status/notificações duráveis; esperas CI/provedor sem ocupar slots ou
-  perder a fase. Falha de Telegram não deve parar o trabalho.
-- Conectar publicação/deploy/QA qualificados separadamente a este serviço,
-  preservando claim e evidências do commit integrado exatos.
+- [Outbox/status/notificações](HERMES-NOTIFICATIONS-QUALIFICATION.md) passaram
+  depois; Telegram real permanece pendente.
+- [Publicação/deploy/QA no serviço](HERMES-INTEGRATION-QUALIFICATION.md) passaram
+  depois com esperas nativas de CI, reinício, claims/evidências do commit
+  integrado preservadas. GitHub ainda simulado; incidentes dessa etapa e
+  admissão/pausa continuam incompletos.
 - Provedor liberado pelo caminho autorizado e S4 com Produto, brief, planejamento,
   autoria e GitHub reais. `model_route` recusa projeto não marcado como qualificação:
   esta entrada não levanta a pausa financeira anterior.

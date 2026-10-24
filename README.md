@@ -26,8 +26,12 @@ arquivo preservados e sandbox órfã retirada antes da substituta. O
 Lead → CTO → SPIKE real → orientação → autor → gates TDD, sem duplicar a retomada.
 A [outbox e observabilidade](docs/HERMES-NOTIFICATIONS-QUALIFICATION.md) passou
 com indisponibilidade de conexão, ACK perdido e reinício: 21 mensagens locais,
-sem duplicação dos envios aceitos ou bloqueio do TDD. Faltam conexão integral ao
-serviço, Telegram/modelos/GitHub reais e instalação reproduzível.
+sem duplicação dos envios aceitos ou bloqueio do TDD. A
+[integração pelo serviço](docs/HERMES-INTEGRATION-QUALIFICATION.md) passou depois:
+espera nativa de CI libera claims, reinício retoma o mesmo PR e build/deploy/
+rollback/QA reais terminam por handoff independente. Houve um crash de partida
+recuperado nativamente; autores/CI continuam sintéticos. Faltam entrada de brief,
+aceite integral da release, Telegram/modelos/GitHub reais e instalação reproduzível.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -46,10 +50,13 @@ flowchart LR
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]
+    P -->|Pendente: encerra claim| W[scheduled; retomada automática pelo serviço]
+    W --> K
     P --> M[Merge e suíte no SHA integrado]
     M --> D[Build e deploy retomáveis; rollback e retorno]
     D --> Q[QA real em Chromium; evidência preservada]
-    Q -. Conexão integral ao serviço pendente .-> A[Fluxo com agentes e GitHub reais]
+    Q --> E[Recibo de QA; não declara release homologada]
+    E -. Brief, aceite integral e S4 pendentes .-> A[Fluxo com agentes e GitHub reais]
 ```
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium
