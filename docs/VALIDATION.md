@@ -2,6 +2,14 @@
 
 ## Caminho novo Hermes
 
+A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou com socket
+inicialmente sem listener, recuperação após reinício e um ACK perdido após o sink
+aceitar. Foram 21 mensagens, início/término únicos dos nove runs e ator igual ao
+registro nativo. O trabalho continuou durante a indisponibilidade. A consulta
+por chave é capacidade do sink de qualificação, não do Telegram real, que não
+foi chamado. Os 18 novos testes não substituem a prova física nem um futuro envio
+real. Status final após parada foi reconferido sem despacho/modelo.
+
 O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) passou para bloqueio
 de protocolo do autor: cards Lead/CTO materializados pelo serviço, SPIKE Docker
 descartável, orientação, retomada uma vez após reinício e revalidação TDD. Nove
@@ -25,7 +33,7 @@ Na suíte histórica atual: 4.523 testes, oito skips preexistentes, nenhuma falh
 A [fatia S3](HERMES-S3-QUALIFICATION.md) passou com Git real, PR/CI simulados,
 gate nativo e oitavo job Docker no SHA de merge. PR/merge não foram duplicados
 após confirmações perdidas; quatro entradas de CI enganosa foram recusadas.
-O total do caminho novo passou a 99 testes. A [ponte nativa de agente](HERMES-AGENT-QUALIFICATION.md)
+O total do caminho novo passou a 117 testes. A [ponte nativa de agente](HERMES-AGENT-QUALIFICATION.md)
 executou o `AIAgent` real com nove respostas HTTP locais: ferramentas nativas,
 escrita limitada por mounts, Red independente, leitura do snapshot de revisão,
 negação de handlers de escrita/terminal/admin e retomada de sessão em outro

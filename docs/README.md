@@ -25,7 +25,9 @@ reinício, crash, retirada da sandbox órfã e retomada de arquivo/sessão. Oper
 completa ainda não instalada; não é uma entrega autônoma.
 O [diagnóstico técnico executável](HERMES-RECOVERY-QUALIFICATION.md) qualificou
 Lead/CTO, SPIKE real, orientação idempotente e revalidação do autor. Autoria e
-decisões continuam programadas; notificações e cadeia integral permanecem pendentes.
+decisões continuam programadas. A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md)
+passou com conexão recusada, ACK perdido e reinício; Telegram real e a cadeia
+integral permanecem pendentes.
 O [ADR 0001](ADR-0001-HERMES-FIRST.md) rege o caminho novo. A referência antiga
 permanece pausada e não deve receber nova expansão como pré-requisito da simplificação.
 

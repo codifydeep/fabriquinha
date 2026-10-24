@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 import time
 from .artifacts import protected_unchanged
-from .effects import Pending, EffectBlocked
+from .effects import Pending, EffectBlocked, Journal, write_json
 
 PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
@@ -47,6 +47,7 @@ def review_decision(value, manifest, tree):
 class Quality:
     def __init__(self, project, store, runner, board):
         self.project, self.store, self.runner, self.board = project, store, runner, board
+        self.observed_jobs=set()
 
     def check(self, run, kind, *, reviewing=False):
         self.board.ensure(run)
@@ -90,12 +91,24 @@ class Quality:
             raise ValueError('suite exit and assertion facts disagree')
         self.board.ensure(run)
         self.store.tree(snapshot)
+        self.observed_jobs.add(key)
         return key, report
 
     def record(self, run, kind, payload):
         self.board.ensure(run)
-        return self.store.record(kind, run.binding(),
+        receipt=self.store.record(kind, run.binding(),
             {**payload, 'project': self.project.fingerprint(), 'qualification': self.project.qualification})
+        jobs={payload[field] for field in ('job','baseline_job','red_job','validation_job') if isinstance(payload.get(field),str)}
+        jobs.update(payload.get('jobs',[]));jobs&=self.observed_jobs
+        if jobs:
+            path=self.store.root/'progress'/(run.task+'-'+str(run.number)+'.json')
+            try:
+                with Journal(self.store.root/'effects').lock(['validation-progress',run.binding()]):
+                    previous=json.loads(path.read_bytes()) if path.exists() else {}
+                    seen=set(previous.get('jobs',[]))
+                    if jobs-seen:write_json(path,dict(binding=run.binding(),receipt=receipt,jobs=sorted(jobs|seen),at=time.time()))
+            except OSError:pass  # Optional monitor projection is not a quality gate; the receipt is already durable.
+        return receipt
 
     def handoff(self, run, summary, evidence):
         """Derive conflicts from trusted receipts before assigning native review.

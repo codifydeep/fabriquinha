@@ -24,6 +24,7 @@ from .hermes import Sandbox, run_activity
 from .kanban_lane import native, UPSTREAM_COMMIT
 from .quality import Quality
 from .recovery import Recovery
+from .notifications import Outbox, alerts, validation_progress
 
 
 def bind(root,upstream):
@@ -84,6 +85,7 @@ class Runtime:
         self.store=Store(self.root/'private');self.board=Board(self.project)
         self.children=[];self.settlement={};self.recovery_issues={}
         self.recovery=Recovery(self.project,self.store,self.board)
+        self.outbox=Outbox(self.project,self.store)
 
     def settle(self,task=None,*,conn=None):
         """Retire only stale SDK sandboxes; no process is killed here.
@@ -147,21 +149,49 @@ class Runtime:
     def status(self):
         _,kbc,_=native()
         with kbc.connect_closing() as conn:
-            cards=[dict(row) for row in conn.execute('SELECT id,title,status,assignee,current_run_id,last_heartbeat_at, '
+            cards=[dict(row) for row in conn.execute('SELECT id,title,status,assignee,current_run_id,last_heartbeat_at,created_at,body, '
+                '(SELECT started_at FROM task_runs WHERE id=tasks.current_run_id) AS run_started_at, '
                 '(SELECT MAX(created_at) FROM task_events WHERE task_id=tasks.id) AS last_event_at '
                 'FROM tasks ORDER BY created_at')]
+            for card in cards:
+                raw=card.pop('body')
+                try:card['contract']=digest(json.loads(raw or '{}'))
+                except ValueError:card['contract']=None
+                try:card['last_validation']=validation_progress(card,self.store,self.project)
+                except (ValueError,OSError):card['last_validation']={'error':'EvidenceUnavailable'}
             incidents=self.recovery.status(conn)
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
-                    incidents=incidents,qualification=self.project.qualification,delivery_approval=False)
+                    incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
         if not 0.1<=interval<=60:raise ValueError('bounded dispatch interval required')
         model_route(self.project,self.root/'route.json')
         self.status()  # Validate the read surface before any worker is spawned.
-        while not stop.is_set():
-            self.tick()
-            write_json(self.root/'status.json',dict(dispatcher_pid=os.getpid(),observed_at=time.time(),board=self.status()))
-            stop.wait(interval)
+        _,kbc,_=native()
+        enabled=threading.Event()
+        def capture():
+            try:
+                with kbc.connect_closing() as conn:self.outbox.capture(conn)
+                enabled.set()
+            except Exception as error:
+                enabled.clear()
+                self.outbox.save(self.outbox.root/'error.json',dict(category=type(error).__name__,at=time.time()))
+        capture()
+        sender=threading.Thread(target=self.outbox.loop,args=(stop,self.root/'notifications.json',enabled),daemon=True)
+        sender.start()
+        try:
+            while not stop.is_set():
+                self.tick()
+                capture()
+                try:
+                    alerts(self.outbox,self.status()['cards'],self.store,now=time.time())
+                except Exception as error:
+                    self.outbox.save(self.outbox.root/'error.json',dict(category=type(error).__name__,at=time.time()))
+                write_json(self.root/'status.json',dict(dispatcher_pid=os.getpid(),dispatcher_state='running',observed_at=time.time(),board=self.status()))
+                stop.wait(interval)
+        finally:
+            stop.set();sender.join(timeout=4)
+            write_json(self.root/'status.json',dict(dispatcher_pid=os.getpid(),dispatcher_state='stopped',observed_at=time.time(),board=self.status()))
         # Do not terminate healthy detached workers on dispatcher shutdown.
 
     def worker(self,task,number):

@@ -35,5 +35,9 @@ Diagnósticos técnicos leem snapshots imutáveis e executam experimentos soment
 em cópias descartáveis, com os mesmos testes protegidos e isolamento dos jobs.
 O técnico não escreve no autor, aprova produto ou dispensa gates. Sua decisão
 tipada pode orientar uma retomada, que precisa passar novamente pela qualidade.
+Notificações usam apenas identidades e textos fixos, não código/erros brutos.
+A rota privada não é montada nos workers. Telegram usa host HTTPS fixo, não segue
+redirects e não habilita broadcasts pagos. ACK incerto fica visível, sem reenvio
+cego; a consulta por chave do sink de teste não é atribuída ao Telegram real.
 
 Ao encontrar uma vulnerabilidade com segredo, não abra issue pública com o valor. Use o canal privado de segurança do GitHub, se habilitado, ou contate o proprietário sem anexar credenciais. Revogue segredos antes de limpar o histórico; não reescreva histórico sem autorização.

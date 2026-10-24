@@ -24,8 +24,10 @@ isolado: reinício preservando worker saudável e recuperação de crash com ses
 arquivo preservados e sandbox órfã retirada antes da substituta. O
 [diagnóstico executável](docs/HERMES-RECOVERY-QUALIFICATION.md) também passou:
 Lead → CTO → SPIKE real → orientação → autor → gates TDD, sem duplicar a retomada.
-Faltam conexão integral ao serviço, notificações/alertas, modelos/GitHub reais e
-instalação reproduzível.
+A [outbox e observabilidade](docs/HERMES-NOTIFICATIONS-QUALIFICATION.md) passou
+com indisponibilidade de conexão, ACK perdido e reinício: 21 mensagens locais,
+sem duplicação dos envios aceitos ou bloqueio do TDD. Faltam conexão integral ao
+serviço, Telegram/modelos/GitHub reais e instalação reproduzível.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -39,6 +41,8 @@ flowchart LR
     K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
     K --> L[Diagnóstico Lead/CTO: SPIKE e orientação]
     L -->|Retomada nativa; gates preservados| T
+    K --> O[Outbox durável; sender sem modelo]
+    O --> B[Transporte local qualificado; Telegram real pendente]
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]

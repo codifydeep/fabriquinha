@@ -26,6 +26,8 @@ flowchart LR
     B --> I[recovery.py: DIAG nativo Lead/CTO]
     I --> X[SPIKE descartável; orientação validada]
     X -->|Retomada nativa; gates mantidos| B
+    B --> O[notifications.py: eventos e outbox privados]
+    O --> S[Sender sem modelo; falha de envio não bloqueia tasks]
     E --> J[effects.py: intenção e observação]
     Q --> P[publication.py: Git e PR/CI]
     P --> M[Suíte do commit integrado]
@@ -40,7 +42,7 @@ somente o snapshot necessário atravessa a fronteira. Não há import do broker
 histórico, ACP ou um segundo scheduler no caminho novo. A [prova S3](HERMES-S3-QUALIFICATION.md)
 usa Git real e transporte GitHub simulado, com checks processados pelo Hermes
 upstream. Não foi exercitada publicação GitHub real. Conexão integral ao serviço,
-notificações/alertas e os agentes reais continuam pendentes.
+Telegram real e os agentes reais continuam pendentes.
 Build/deploy/rollback e QA em Chromium já passaram na stack Python/HTTP local.
 O navegador tem rede interna própria; só o web publica porta em loopback e
 pode ter egress pela bridge. Não se afirma airgap do produto; ver
@@ -63,6 +65,11 @@ isolamento: o serviço cria DIAGs nativos, Lead escala, CTO executa SPIKE sem to
 o autor, orientação idempotente retoma o trabalho e os gates são revalidados.
 Incidente só resolve com evidência válida. Isso ainda usa decisões programadas
 e não cobre toda classe de impedimento ou publicação/GitHub reais.
+A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou depois
+com conexão recusada, ACK perdido e reinício: 21 mensagens locais, com ator do run
+e início/término únicos. O sender é independente dos slots; o status separa
+validação real de heartbeat. Telegram não oferece a consulta por chave do sink
+de teste; confirmação incerta não observável não autoriza reenvio cego.
 
 Publicação e build/deploy separam autorização atual da identidade do efeito:
 nova claim não renova CI nem repete build/Compose já aceitos. Artefatos e etapas

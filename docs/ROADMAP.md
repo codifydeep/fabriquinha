@@ -20,9 +20,11 @@ com respostas locais fixas. As ferramentas de submissão/parecer passaram depois
 no dispatcher nativo, com dois cards e seis atividades. O [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md)
 passou depois em isolamento: reinício, crash, retirada da sandbox órfã e retomada.
 O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) passou com Lead/CTO,
-SPIKE real e retomada idempotente seguida pelos gates TDD. Próximo trabalho:
-notificações/alertas e conexão integral ao serviço, sem promover decisões
-programadas a autoria autônoma.
+SPIKE real e retomada idempotente seguida pelos gates TDD. A
+[outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou com conexão
+recusada, ACK perdido e reinício, sem bloquear o trabalho. Próximo trabalho:
+conexão de publicação/esperas/deploy/QA ao serviço e interface do brief, sem
+promover decisões programadas a autoria autônoma.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 

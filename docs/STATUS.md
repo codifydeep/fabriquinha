@@ -35,9 +35,13 @@ preservados e sandbox órfã retirada antes da substituta: sete runs, dois cards
 sem bloquear o dono. O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md)
 passou com Lead → CTO → SPIKE real → orientação ao autor → gates TDD: nove runs,
 27 respostas locais e uma única retomada, mesmo após reinício. Incidente resolveu
-somente com evidência válida, não por existir um worker. Faltam cadeia integral
-no serviço, notificações/alertas e provedor/GitHub reais. Não houve produção.
-Checks atuais: 99 testes do caminho novo e 4.523 da suíte histórica, todos sem
+somente com evidência válida, não por existir um worker. A
+[outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou com conexão
+recusada, reinício e ACK perdido: 21 mensagens locais, uma notificação de início
+e término por run, sem duplicar envio aceito ou parar o trabalho. Status acompanha
+validações reais e fila; heartbeat não renova progresso. Telegram real não testado.
+Faltam cadeia integral no serviço e provedor/GitHub reais. Não houve produção.
+Checks atuais: 117 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

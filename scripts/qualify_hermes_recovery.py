@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -24,7 +25,7 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive
 
 
-def qualify(root,upstream,image):
+def qualify(root,upstream,image,*,notifications=False):
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
     kb,kbc,_=native()
     from hermes_cli.profiles import create_profile
@@ -36,6 +37,34 @@ def qualify(root,upstream,image):
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[]
+    sink=None;sink_thread=None;sink_data=dict(accepted={},attempts={},accepted_at={},lookups=0,lost=None)
+    if notifications:
+        class Sink(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def respond(self,status,result):
+                data=json.dumps(dict(ok=status==200,result=result)).encode();self.send_response(status)
+                self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)))
+                self.end_headers();self.wfile.write(data)
+            def do_POST(self):
+                value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                assert self.path=='/notifications'
+                key=value['key'];sink_data['attempts'][key]=sink_data['attempts'].get(key,0)+1
+                if key not in sink_data['accepted']:
+                    sink_data['accepted'][key]=dict(message_id=len(sink_data['accepted'])+1,message=value['message'])
+                    sink_data['accepted_at'][key]=sink_data['attempts'][key]
+                    write_json(root/'sink.json',sink_data)
+                if sink_data['lost'] is None:
+                    sink_data['lost']=key;write_json(root/'sink.json',sink_data)
+                    self.close_connection=True;self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
+                self.respond(200,dict(message_id=sink_data['accepted'][key]['message_id']))
+            def do_GET(self):
+                key=self.path.removeprefix('/notifications/');sink_data['lookups']+=1
+                value=sink_data['accepted'].get(key)
+                self.respond(200 if value else 404,dict(message_id=value['message_id']) if value else {})
+        # Bound but not listening: connect() is refused before any HTTP bytes.
+        # The model server below remains available while notifications are down.
+        sink=ThreadingHTTPServer(('127.0.0.1',0),Sink,bind_and_activate=False);sink.server_bind()
+        write_json(root/'notifications.json',dict(transport='local',endpoint='http://127.0.0.1:'+str(sink.server_port)))
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_POST(self):
@@ -114,6 +143,8 @@ def qualify(root,upstream,image):
             time.sleep(0.1)
     try:
         service=start();wait_for(resumed.is_set,service)
+        if notifications:
+            assert runtime.outbox.summary()['queued']>0 and not sink_data['accepted']
         with kbc.connect_closing() as conn:
             diagnostic_cards=[task for task in runtime.recovery.cards(conn) if json.loads(task.body).get('kind')=='diagnostic']
             incidents=runtime.recovery.status(conn)
@@ -122,6 +153,8 @@ def qualify(root,upstream,image):
             assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='unblocked'",(source,)).fetchone()[0]==1
         stop(service);service=start()
         wait_for(lambda:json.loads((root/'status.json').read_bytes())['dispatcher_pid']==service.pid,service)
+        if notifications:
+            sink.server_activate();sink_thread=threading.Thread(target=sink.serve_forever,daemon=True);sink_thread.start()
         release.set();print('Lead and CTO completed real diagnostics; author resumed once, incident still revalidating.',flush=True)
         def finished():
             with kbc.connect_closing() as conn:
@@ -129,7 +162,15 @@ def qualify(root,upstream,image):
                 if not all(task.status=='done' for task in tasks):return False
                 rows=conn.execute('SELECT * FROM task_runs').fetchall()
                 return all(not worker_alive(row) for row in rows)
-        wait_for(finished,service);stop(service)
+        wait_for(finished,service)
+        if notifications:
+            def drained():
+                summary=runtime.outbox.summary()
+                with kbc.connect_closing() as conn:last=conn.execute('SELECT MAX(id) FROM task_events').fetchone()[0]
+                cursor=json.loads((runtime.outbox.root/'cursor.json').read_bytes())['cursor']
+                return cursor>=last and not any(summary[state] for state in ('queued','sending','uncertain','rejected','corrupt'))
+            wait_for(drained,service)
+        stop(service)
         with kbc.connect_closing() as conn:
             runs=[dict(row) for row in conn.execute('SELECT * FROM task_runs ORDER BY id')]
             assert len(runs)==9 and runs[0]['outcome']=='blocked'
@@ -149,6 +190,21 @@ def qualify(root,upstream,image):
             source_unchanged_by_diagnosticians=True,author_resumed_with_guidance=True,restart_did_not_duplicate_actions=True,
             incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=2,runs=9,
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
+        if notifications:
+            messages=[value['message'] for value in sink_data['accepted'].values()]
+            for row in runs:
+                starts=[message for message in messages if message['run']==row['id'] and message['event']=='started']
+                ends=[message for message in messages if message['run']==row['id'] and message['event'] in
+                    ('completed','blocked','review_requested','changes_requested','crashed','timed_out','gave_up')]
+                assert len(starts)==len(ends)==1,(row['id'],starts,ends)
+                assert starts[0]['actor']==ends[0]['actor']==row['profile']
+            lost=sink_data['lost']
+            assert lost and sink_data['lookups']>0
+            assert sink_data['attempts'][lost]==sink_data['accepted_at'][lost]
+            assert len(sink_data['accepted'])==runtime.outbox.summary()['delivered']
+            proof['notifications']=dict(work_continued_during_connection_refusal=True,restart_preserved_outbox=True,
+                lost_ack_observed_without_resend=True,every_run_started_and_ended_once=True,
+                actor_matches_native_run=True,delivered=len(messages),actual_telegram=False)
         write_json(root/'receipt.json',proof);print(json.dumps(proof,indent=2))
     finally:
         release.set()
@@ -160,15 +216,17 @@ def qualify(root,upstream,image):
         deadline=time.monotonic()+15
         while any(worker_alive(row) for row in rows) and time.monotonic()<deadline:time.sleep(0.1)
         if not any(worker_alive(row) for row in rows):runtime.settle()
+        if sink_thread:sink.shutdown();sink_thread.join(timeout=5)
+        if sink:sink.server_close()
         server.shutdown();server.server_close();thread.join(timeout=5)
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    parser.add_argument('--image',required=True);args=parser.parse_args()
+    parser.add_argument('--image',required=True);parser.add_argument('--notifications',action='store_true');args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
-    try:qualify(root,args.upstream.resolve(),args.image)
+    try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

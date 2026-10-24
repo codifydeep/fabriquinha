@@ -20,6 +20,11 @@ operacional ainda recusa provedores reais, preservando a pausa anterior.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
 explícita de Lead/CTO e cards nativos de recuperação com SPIKE. Sua prova também
 usa respostas locais; não constitui ativação dos nove perfis em produção.
+A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) também foi
+qualificada com transporte local. `notifications.json` pertence à raiz privada
+da instalação, nunca ao Git; não copie tokens para SOULs, cards ou testes. O modo
+de qualificação recusa Telegram real. A futura ativação depende do destino
+explicitamente configurado, sem reativar os gateways antigos por consequência.
 
 ## 1. Testes offline primeiro
 

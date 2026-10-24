@@ -5,6 +5,8 @@ from contextlib import closing
 from pathlib import Path
 import sys
 import sqlite3
+import threading
+from contextlib import nullcontext
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -35,11 +37,36 @@ class NativeRuntime(unittest.TestCase):
         with Owner(self.root):pass
         self.assertEqual(self.runtime.children,[])
 
+    def test_graceful_shutdown_refreshes_final_notification_status(self):
+        stop=threading.Event();stop.set()
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()))
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch('fabriquinha.runtime.model_route'),patch.object(self.runtime.outbox,'capture'), \
+             patch.object(self.runtime,'status',return_value={'notifications':{'delivered':21,'queued':0}}):
+            self.runtime.serve(stop,interval=0.1)
+        result=json.loads((self.root/'status.json').read_bytes())
+        self.assertEqual(result['dispatcher_state'],'stopped')
+        self.assertEqual(result['board']['notifications'],{'delivered':21,'queued':0})
+
+    def test_outbox_scope_error_disables_sender_not_native_dispatch(self):
+        stop=threading.Event();api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()))
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch('fabriquinha.runtime.model_route'), \
+             patch.object(self.runtime.outbox,'capture',side_effect=ValueError('board history changed')), \
+             patch.object(self.runtime,'status',return_value={'cards':[]}), \
+             patch.object(self.runtime,'tick',side_effect=lambda:stop.set()) as tick:
+            self.runtime.serve(stop,interval=0.1)
+        tick.assert_called_once()
+        error=json.loads((self.runtime.outbox.root/'error.json').read_bytes())
+        self.assertEqual(error['category'],'ValueError')
+
     def test_status_uses_native_event_and_heartbeat_fields_not_an_invented_updated_column(self):
         conn=sqlite3.connect(':memory:');conn.row_factory=sqlite3.Row
-        conn.executescript('CREATE TABLE tasks(id,title,status,assignee,current_run_id,last_heartbeat_at,created_at);'
+        conn.executescript('CREATE TABLE tasks(id,title,status,assignee,current_run_id,last_heartbeat_at,created_at,body);'
+            'CREATE TABLE task_runs(id,started_at);'
             'CREATE TABLE task_events(task_id,created_at);'
-            "INSERT INTO tasks VALUES('t1','Work','running','backend',7,300,100);"
+            "INSERT INTO tasks VALUES('t1','Work','running','backend',7,300,100,'{}');"
+            "INSERT INTO task_runs VALUES(7,150);"
             "INSERT INTO task_events VALUES('t1',200);")
         api=SimpleNamespace(connect_closing=lambda:closing(conn))
         with patch('fabriquinha.runtime.native',return_value=(None,api,None)):
