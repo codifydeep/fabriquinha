@@ -17,7 +17,11 @@ Uma prova posterior retomou PR/merge em novas claims nativas, liberou o slot
 durante espera e recusou a autoridade das claims antigas, sem duplicar efeitos.
 A suplência TDD foi exercitada com autor de testes separado do implementador.
 O roteiro acordou os cards explicitamente; ainda não existe wake loop instalado.
-Checks atuais: 64 testes do caminho novo e 4.523 da suíte histórica, todos sem
+Build e deploy também foram retomados em novas claims após perdas de confirmação
+simuladas, sem repetir os dois builds e quatro atualizações Compose esperados.
+Rollback e QA real em Chromium passaram com recibos de origem preservados. Avanço
+da branch antes/durante QA ou depois do build bloqueia o candidato antigo.
+Checks atuais: 71 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

@@ -4,13 +4,14 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'src'))
 sys.path.insert(0, str(ROOT/'tests'))
 from fixtures.github_transport import FakeGitHub
-from fabriquinha.effects import Pending
+from fabriquinha.effects import Pending, write_json
 from fabriquinha.kanban_lane import native
 from fabriquinha.publication import GitHub, Publication, Repository
 from fabriquinha.deployment import Deployment
@@ -123,9 +124,40 @@ def integrate(project, store, board, quality, implementation, review, frozen):
     deployment=None
     if project.browser_image:
         delivery=Deployment(project,store,board,quality.runner)
-        baseline=observe(lambda:delivery.artifact(run,integrated,repo,baseline=True))
-        candidate=observe(lambda:delivery.artifact(run,integrated,repo))
-        rollout=observe(lambda:delivery.rollout(run,candidate,baseline))
+        original_command=Deployment._command
+        faults=[];commands=[];handled=0
+        def command_with_lost_ack(instance,output_folder,name,*args,**kwargs):
+            result=original_command(instance,output_folder,name,*args,**kwargs)
+            commands.append(dict(command=args[0],run=run.number))
+            fault=None
+            if args[0]=='build' and 'SOURCE_SHA='+value['commit'] in args and 'build' not in faults:
+                fault='build'
+            elif args[0]=='compose' and 'compose' not in faults:
+                spec=json.loads((output_folder/'compose.json').read_bytes())
+                if spec['services']['web']['labels']['fabriquinha.artifact']==candidate:fault='compose'
+            if fault:
+                faults.append(fault)
+                write_json(folder/'injected-docker-ack-loss.json',dict(faults=faults,commands=commands,
+                    synthetic_ack_loss=True,real_docker_effects=True))
+                raise subprocess.TimeoutExpired(['docker',*args],kwargs['timeout'])
+            return result
+        def delivered(call):
+            nonlocal run,delivery,handled
+            while True:
+                try:return call()
+                except Pending:
+                    if len(faults)>handled:
+                        handled=len(faults)
+                        run=reclaim(run)
+                        delivery=Deployment(project,store,board,quality.runner)
+                    else:time.sleep(0.1)
+        with patch.object(Deployment,'_command',new=command_with_lost_ack):
+            baseline=delivered(lambda:delivery.artifact(run,integrated,repo,baseline=True))
+            candidate=delivered(lambda:delivery.artifact(run,integrated,repo))
+            rollout=delivered(lambda:delivery.rollout(run,candidate,baseline,repo))
+        assert faults==['build','compose'] and len(resumed)==4
+        assert [entry['command'] for entry in commands].count('build')==2
+        assert [entry['command'] for entry in commands].count('compose')==4
         board.review(run,'Independent deployed browser QA after real rollback and restoration',
                      {'rollout':rollout,'integrated':integrated,'published_pr':publication['pr']})
         with kbc.connect_closing() as conn:
@@ -133,11 +165,13 @@ def integrate(project, store, board, quality, implementation, review, frozen):
             assert claimed is not None
         qa_run=board.current(task,claimed.current_run_id)
         assert run.actor=='s2-devops' and qa_run.actor=='s2-qa'
-        release=observe(lambda:delivery.qa(qa_run,rollout))
+        release=observe(lambda:delivery.qa(qa_run,rollout,repo))
         proof=store.receipt(release,kind='release_evidence')['payload']
         deployment=dict(candidate=candidate,baseline=baseline,rollout=rollout,release_evidence=release,
             image=proof['image'],commit=proof['commit'],url=proof['url'],checks=proof['checks'],
-            real_compose=True,real_browser=True,real_rollback=True,delivery_approval=False)
+            real_compose=True,real_browser=True,real_rollback=True,delivery_approval=False,
+            simulated_docker_ack_loss=faults,physical_builds=2,physical_compose_updates=4,
+            artifact_origin_preserved=store.receipt(candidate)['binding']['number']!=run.number)
         with patch('hermes_cli.kanban_pr_acceptance._api',github.api):
             board.finish_review(qa_run,'Synthetic S3 infrastructure proof; not product homologation',
                 {'published_pr':publication['pr'],'integrated':integrated,'release_evidence':release})

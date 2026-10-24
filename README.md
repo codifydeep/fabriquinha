@@ -11,8 +11,9 @@ com TDD real, testes congelados, revisão imutável e recuperação de timeout;
 os autores e pareceres ainda são fixtures sintéticas. A [fatia de integração S3](docs/HERMES-S3-QUALIFICATION.md)
 já conecta revisão, Git real, PR/CI simulados, suíte real no commit de merge,
 build, Compose, QA em Chromium e rollback, inclusive após confirmações perdidas.
-A publicação também passou por novas claims nativas sem duplicar PR/merge,
-e o handoff TDD selecionou um suplente aprovado para evitar conflito de autoria.
+A publicação e o build/deploy também passaram por novas claims nativas sem
+duplicar efeitos, e o handoff TDD selecionou um suplente aprovado para evitar
+conflito de autoria. Rollback e QA aceitaram a proveniência preservada das etapas.
 Essas retomadas foram acionadas pelo roteiro, não por um serviço autônomo.
 A cadeia offline Python/HTTP passou; faltam serviço contínuo, modelos e GitHub
 reais, recuperação da equipe e instalação reproduzível.
@@ -29,7 +30,7 @@ flowchart LR
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]
     P --> M[Merge e suíte no SHA integrado]
-    M --> D[Build, deploy, rollback e retorno]
+    M --> D[Build e deploy retomáveis; rollback e retorno]
     D --> Q[QA real em Chromium; evidência preservada]
     Q -. Pendente .-> A[Fluxo com agentes e GitHub reais]
 ```

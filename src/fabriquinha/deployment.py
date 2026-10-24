@@ -56,15 +56,25 @@ class Deployment:
         result.check_returncode()
         return result.stdout
 
-    def artifact(self,run,integrated_id,repository,*,baseline=False):
+    def integrated(self,run,integrated_id,repository):
         self.current(run)
         record=self.store.receipt(integrated_id,kind='integrated')
         data=record['payload']
-        if (record['binding']!=run.binding() or data['project']!=self.project.fingerprint()
-                or not data['ci']['ok'] or data['ci']['head_sha']!=data['commit']):
+        publication=self.store.receipt(data['publication'],kind='publication')
+        published=publication['payload']
+        if (not run.same_subject(record['binding']) or data['project']!=self.project.fingerprint()
+                or not data['ci']['ok'] or data['ci']['head_sha']!=data['commit']
+                or not run.same_subject(publication['binding'])
+                or published['project']!=self.project.fingerprint()
+                or published['merge_sha']!=data['commit'] or published['snapshot']!=data['snapshot']
+                or self.board.input(run,'delivery')!=published['review']):
             raise ValueError('current independently validated integrated candidate required')
         if repository.remote_head(self.project.branch)!=data['commit']:
-            raise EffectBlocked('integration branch advanced before build')
+            raise EffectBlocked('integration branch advanced; qualify the new candidate')
+        return data,published['review']
+
+    def artifact(self,run,integrated_id,repository,*,baseline=False):
+        data,review_id=self.integrated(run,integrated_id,repository)
         commit,snapshot,role=data['commit'],data['snapshot'],'candidate'
         if baseline:
             pub=self.store.receipt(data['publication'],kind='publication')['payload']
@@ -81,15 +91,25 @@ class Deployment:
                 raise ValueError('passing exact Git baseline required for bootstrap rollback')
         else:
             contract(json.loads((self.store.tree(snapshot)/self.project.tests_dir/'qa.json').read_bytes()))
-        source=self.store.tree(snapshot)
         recipe=ROOT/'Dockerfile.web'
-        identity=dict(binding=run.binding(),project=self.project.fingerprint(),integrated=integrated_id,
+        scope=dict(subject=run.subject(),project=self.project.fingerprint(),review=review_id,
                       commit=sha(commit),snapshot=snapshot,role=role,recipe=hashlib.sha256(recipe.read_bytes()).hexdigest())
-        key=digest(identity);folder=self.store.root/'builds'/key
+        key=digest(scope)
+        with self.journal.lock(key+':artifact'):
+            return self._build(run,integrated_id,scope,key)
+
+    def _build(self,run,integrated_id,scope,key):
+        source=self.store.tree(scope['snapshot'])
+        snapshot,commit=scope['snapshot'],scope['commit']
+        recipe=ROOT/'Dockerfile.web'
+        folder=self.store.root/'builds'/key
         folder.mkdir(mode=0o700,parents=True,exist_ok=True)
         inputs=folder/'inputs.json'
-        if not inputs.exists():write_json(inputs,dict(tag=self.project.namespace+'-app:'+str(time.time_ns())))
-        tag=json.loads(inputs.read_bytes())['tag']
+        if not inputs.exists():write_json(inputs,dict(tag=self.project.namespace+'-app:'+str(time.time_ns()),
+                                                     origin=run.binding(),integrated=integrated_id))
+        initial=json.loads(inputs.read_bytes())
+        tag=initial['tag']
+        identity={**scope,'binding':initial['origin'],'integrated':initial['integrated']}
         product=folder/'context/product';product.mkdir(mode=0o700,parents=True,exist_ok=True)
         for relative in self.store.manifest(snapshot):
             target=product/relative;target.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -108,6 +128,8 @@ class Deployment:
             return dict(image=info['Id'],tag=tag)
         def build():
             self.board.ensure(run)
+            if hashlib.sha256(recipe.read_bytes()).hexdigest()!=scope['recipe']:
+                raise EffectBlocked('canonical build recipe changed during execution')
             self._command(folder,'build-output','build','--network=none','--pull=false','-f',str(recipe),
                 '--build-arg','SOURCE_SHA='+commit,'--label','fabriquinha.build='+key,
                 '--label','fabriquinha.snapshot='+snapshot,'--label','org.opencontainers.image.revision='+commit,
@@ -115,7 +137,7 @@ class Deployment:
             return observe()
         image=self.journal.do(key+':build',identity,build,observe)
         self.board.ensure(run)
-        return self.store.record('artifact',run.binding(),{**identity,**image,'qualification':self.project.qualification})
+        return self.store.record('artifact',initial['origin'],{**identity,**image,'qualification':self.project.qualification})
 
     def read_artifact(self,key):
         value=self.store.receipt(key,kind='artifact')['payload']
@@ -149,10 +171,15 @@ class Deployment:
                     network=self.group+'_qa')
 
     def _up(self,run,artifact,operation):
-        identity=dict(binding=run.binding(),artifact=artifact['receipt'],operation=operation,
+        self.current(run)
+        scope=dict(subject=run.subject(),artifact=artifact['receipt'],operation=operation,
                       policy=digest(web_spec(self.project,artifact,'pending')))
-        key=digest(identity);folder=self.store.root/'deployments'/key
+        key=digest(scope);folder=self.store.root/'deployments'/key
         folder.mkdir(mode=0o700,parents=True,exist_ok=True)
+        inputs=folder/'inputs.json'
+        if not inputs.exists():write_json(inputs,dict(origin=run.binding()))
+        origin=json.loads(inputs.read_bytes())['origin']
+        identity={**scope,'binding':origin}
         compose=folder/'compose.json'
         write_json(compose,web_spec(self.project,artifact,key))
         def observe():
@@ -174,14 +201,18 @@ class Deployment:
                           'up','-d','--no-deps','--pull','never','web',timeout=60)
             return observe()
         current=self.journal.do(key+':compose',identity,send,observe)
-        return self.store.record('deployment',run.binding(),{**identity,**current})
+        self.board.ensure(run)
+        return self.store.record('deployment',origin,{**identity,**current})
 
-    def rollout(self,run,candidate_id,previous_id):
+    def rollout(self,run,candidate_id,previous_id,repository):
         self.current(run)
         candidate,previous=self.read_artifact(candidate_id),self.read_artifact(previous_id)
-        if (self.store.receipt(candidate_id)['binding']!=run.binding()
+        if (not run.same_subject(self.store.receipt(candidate_id)['binding'])
                 or candidate['role']!='candidate' or candidate['image']==previous['image']):
             raise ValueError('distinct candidate and rollback artifacts required')
+        integrated,_=self.integrated(run,candidate['integrated'],repository)
+        if integrated['commit']!=candidate['commit'] or integrated['snapshot']!=candidate['snapshot']:
+            raise ValueError('artifact must match its integrated result')
         with self.journal.lock('rollout:'+self.group):
             current=self.service()
             if current and current['artifact'] not in (candidate_id,previous_id):
@@ -189,15 +220,17 @@ class Deployment:
             steps=[]
             if current is None or previous['role']=='bootstrap':steps.append(self._up(run,previous,'bootstrap'))
             for artifact,operation in ((candidate,'candidate'),(previous,'rollback'),(candidate,'restore')):
+                if operation!='rollback':self.integrated(run,candidate['integrated'],repository)
                 steps.append(self._up(run,artifact,operation))
             final=self.service(candidate)
             if not final or not final['healthy']:raise EffectBlocked('restored candidate is not the healthy current image')
             self.board.ensure(run)
+            self.integrated(run,candidate['integrated'],repository)
             return self.store.record('rollout',run.binding(),dict(project=self.project.fingerprint(),
                 qualification=self.project.qualification,candidate=candidate_id,previous=previous_id,
                 steps=steps,final=final,delivery_approval=False))
 
-    def qa(self,run,rollout_id):
+    def qa(self,run,rollout_id,repository):
         self.current(run,review=True)
         if self.board.input(run,'rollout',review_handoff=True)!=rollout_id:
             raise ValueError('exact current QA handoff required')
@@ -207,8 +240,15 @@ class Deployment:
                 or rollout['binding']['task']!=run.task or rollout['binding']['contract']!=run.contract):
             raise ValueError('independent QA of this rollout required')
         artifact=self.read_artifact(data['candidate'])
+        if self.board.input(run,'delivery')!=artifact['review']:
+            raise ValueError('deployed QA must retain the current approved delivery')
+        if repository.remote_head(self.project.branch)!=artifact['commit']:
+            raise EffectBlocked('integration branch advanced before deployed QA')
+        from .board import Run
+        owner=Run(**rollout['binding'])
         steps=[self.store.receipt(key,kind='deployment') for key in data['steps']]
-        if (len(steps)<3 or any(step['binding']!=rollout['binding'] or not step['payload']['healthy'] for step in steps)
+        if (not owner.same_subject(self.store.receipt(data['candidate'])['binding'])
+                or len(steps)<3 or any(not owner.same_subject(step['binding']) or not step['payload']['healthy'] for step in steps)
                 or [s['payload']['operation'] for s in steps[-3:]]!=['candidate','rollback','restore']
                 or steps[-2]['payload']['artifact']!=data['previous']
                 or steps[-1]['payload']['artifact']!=data['candidate']):
@@ -235,6 +275,8 @@ class Deployment:
             raise ValueError('complete independent deployed browser QA required')
         after=self.service(artifact)
         if after!=before:raise EffectBlocked('deployment changed during QA')
+        if repository.remote_head(self.project.branch)!=artifact['commit']:
+            raise EffectBlocked('integration branch advanced during deployed QA')
         self.board.ensure(run)
         return self.store.record('release_evidence',run.binding(),dict(project=self.project.fingerprint(),
             qualification=self.project.qualification,rollout=rollout_id,artifact=data['candidate'],

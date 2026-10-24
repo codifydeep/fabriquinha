@@ -43,6 +43,14 @@ pode ter egress pela bridge. Não se afirma airgap do produto; ver
 [ADR 0002](ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md).
 O toolchain de navegador ainda usa cache local e precisa de base pública em S6.
 
+Publicação e build/deploy separam autorização atual da identidade do efeito:
+nova claim não renova CI nem repete build/Compose já aceitos. Artefatos e etapas
+preservam seus recibos de origem; o QA independente aceita proveniência de várias
+claims do mesmo card/contrato/entrega, não de outros autores ou revisões. A branch
+é revalidada antes do rollout, antes da restauração e antes/depois do QA. Essa
+retomada passou no Kanban/Docker reais com perda de confirmação simulada; o
+roteiro acionou os wakeups, portanto ainda não é serviço contínuo autônomo.
+
 ## Instalação de referência antiga, preservada e pausada
 
 | Área | Entradas principais |

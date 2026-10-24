@@ -27,6 +27,12 @@ class Run:
         """
         return {key: value for key, value in self.binding().items() if key != 'number'}
 
+    def same_subject(self, binding):
+        """Compare trusted receipt scope, never authorize an old claim."""
+        return (isinstance(binding, dict) and set(binding) == set(self.binding())
+                and type(binding.get('number')) is int and binding['number'] > 0
+                and {**binding, 'number': self.number} == self.binding())
+
 
 class Board:
     """Private controller API. Workers submit decisions, never Run identities."""

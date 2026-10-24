@@ -87,7 +87,7 @@ transporte GitHub simulado. Cobrem espera de CI com prazo persistente, revisão
 antiga/não aprovada, dependência inválida, avanço da base, conteúdo de merge
 diferente e bloqueio de escrita real no GitHub em modo de qualificação.
 
-Total do caminho novo: 64 testes sem falhas. Suíte histórica: 4.523 testes,
+Total do caminho novo: 71 testes sem falhas. Suíte histórica: 4.523 testes,
 oito skips preexistentes e nenhuma falha. Os registros completos ficam privados.
 Todos os auxiliares Docker desta prova foram arquivados e retirados por ID exato.
 
@@ -119,14 +119,55 @@ claim foi criada. Não foi acrescentado banco ou ciclo de vida concorrente.
 Essa prova usou o mesmo upstream sem patches e oito jobs reais de suíte. O
 roteiro acordou os cards: **não existe wake loop automático instalado**. Também
 não repetiu build/deploy/QA; a prova completa anterior permanece separada. A
-retomada entre claims dessas etapas ainda não está qualificada, assim como a
-troca do perfil responsável pela integração. `Run.subject()` não autoriza nada
+retomada entre claims dessas etapas foi qualificada na prova seguinte descrita
+abaixo; a troca do perfil responsável pela integração ainda não foi qualificada.
+`Run.subject()` não autoriza nada
 por si só e não deve substituir os bindings de autoria/revisão.
 
 A primeira tentativa deste incremento parou numa asserção desatualizada do
 roteiro, que ainda esperava o antigo autor dos testes. Sua claim foi bloqueada
 pela API nativa e os arquivos preservados; não recebeu aprovação retroativa.
 O roteiro corrigido completou uma execução nova, sem reparo durante a prova.
+
+### Build/deploy retomados e proveniência do QA
+
+Uma nova execução completa repetiu a cadeia com Docker/Chromium reais e perda de
+confirmação simulada **depois** de o Docker aceitar o build da candidata e o
+primeiro deploy dela. Cada perda encerrou a claim, liberou capacidade e acionou
+nova claim pela API nativa. O integrador passou por cinco runs, enquanto o
+controlador executou somente os dois builds esperados e quatro atualizações
+Compose: bootstrap, candidata, rollback, retorno. Não repetiu efeitos aceitos.
+
+A chave de build inclui card/contrato, autor responsável, projeto, revisão exata,
+commit, snapshot, papel do artefato e receita canônica. O recibo do artefato
+preserva a execução e o resultado integrado que iniciaram o build. Revalidar o
+mesmo candidato em outro run não fabrica outra imagem; uma revisão, contrato ou
+responsável diferente não herda essa autorização. A claim atual continua sendo
+conferida antes dos efeitos. Não se substituiu binding de aprovação por sujeito.
+
+Cada etapa Compose também conserva a execução de origem e seu prazo. O QA,
+assumido pelo perfil independente de qualidade após o DevOps, verificou as etapas
+de várias claims do mesmo sujeito, a restauração da mesma imagem e o resultado
+real do navegador. A captura PNG foi preservada e conferida. O controlador
+reconfere a branch antes do rollout, antes da restauração e antes/depois do QA;
+um avanço não autoriza qualificar silenciosamente uma candidata antiga.
+
+Sete regressões de continuidade cobrem confirmação de build perdida, identidade
+de imagem/recibo estável, revalidação equivalente, escopo/revisão divergentes,
+retomada dos passos sem redeploy, prazo de deploy persistente e branch avançada
+antes/durante QA ou após o build. Usam transporte Docker determinístico, não
+substituem a prova física acima. A suíte nova totaliza 71 testes.
+
+O contêiner descartável dessa prova foi retirado por ID exato após conclusão dos
+cards e ausência de runs/efeitos pendentes, com logs e metadados privados. Foram
+retiradas também suas duas redes vazias, com propriedade reconferida; imagens,
+snapshots e volumes ficaram preservados. A demonstração anterior permaneceu
+saudável. A URL da prova retirada não é uma homologação disponível ao CEO.
+
+Continua sendo infraestrutura com autores/GitHub simulados e wakeups explícitos
+do roteiro, sem modelo ou migração. Ainda faltam o loop contínuo e a preservação
+de fase do revisor ao liberar capacidade; `scheduled` não serve genericamente
+para revisão no upstream fixado.
 
 ## Build, rollback e QA reais
 
@@ -209,9 +250,9 @@ mais nova exige rebase, preservação dos testes atuais e nova revisão, antes d
   divergente ou prazo esgotado não produz merge. O adaptador contínuo ainda
   precisa transformar a espera em estado nativo sem ocupar worker e encaminhar
   diagnóstico ao Tech Lead/CTO; esse requisito de S2 não está concluído.
-  PR/merge já foram retomados em novas claims com identidade estável e origem
-  preservada. Build/deploy/QA entre claims ainda precisam dessa qualificação;
-  isso continua sendo pré-condição de S4. Revisão agendada exige cuidado adicional:
+  PR/merge e build/deploy já foram retomados em novas claims com identidade
+  estável, origem preservada e QA independente. O loop contínuo ainda é
+  pré-condição de S4. Revisão agendada exige cuidado adicional:
   no upstream fixado, `unblock_task` de `scheduled` retorna a `ready`, não a
   `review`. Não instalar um agendamento genérico que transforme revisor em autor.
 - Build, deploy, QA e rollback foram conectados na stack Python/HTTP sem estado.

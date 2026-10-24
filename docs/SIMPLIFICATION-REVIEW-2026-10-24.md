@@ -860,8 +860,10 @@ Próxima fatia após a prova offline S3:
    A semântica upstream foi comprovada: espera agendada encerra o run e a retomada
    cria outro. PR/merge já passaram com novas claims, um único efeito, origem
    preservada e claims antigas sem autoridade. Aprovações continuam ligadas à
-   execução exata. Faltam build/deploy/QA entre claims e wake loop automático;
-   não criar outro ciclo de vida para isso. Atenção: `scheduled` volta a `ready`
+   execução exata. Build/deploy também passaram entre claims, com artefato e
+   etapas de origem preservados, rollback e QA independente no mesmo candidato.
+   Faltam wake loop automático e sessões reais; não criar outro ciclo de vida
+   para isso. Atenção: `scheduled` volta a `ready`
    no upstream, portanto não usar esse caminho genericamente para revisores.
 3. A matriz já aceita suplentes explicitamente permitidos. O handoff TDD deriva
    exclusão do autor dos testes do recibo congelado e seleciona o próximo revisor.
