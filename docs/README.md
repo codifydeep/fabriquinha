@@ -13,6 +13,8 @@ de isolamento. Plano e mudanças de contrato foram aprovados;
 [S0/S1 estão concluídos](HERMES-S1-QUALIFICATION.md) no escopo da prova sem modelo.
 A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) qualificou os mecanismos TDD
 e timeout com fixtures, ainda sem autonomia, serviço contínuo ou publicação.
+A [fatia S3](HERMES-S3-QUALIFICATION.md) conectou Git e PR/CI simulados à suíte
+integrada real; não comprova publicação GitHub real nem deploy/QA/rollback.
 O [ADR 0001](ADR-0001-HERMES-FIRST.md) rege o caminho novo. A referência antiga
 permanece pausada e não deve receber nova expansão como pré-requisito da simplificação.
 

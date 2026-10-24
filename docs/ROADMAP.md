@@ -7,6 +7,8 @@ foi aprovada em 24/10/2026. [S0/S1 passaram](HERMES-S1-QUALIFICATION.md) no esco
 sem modelo. A [fatia mecânica S2](HERMES-S2-QUALIFICATION.md) também passou;
 S2 continua parcial e deve ser conectada à publicação/deploy em S3, sem outra
 campanha de gates pré-Red. Nenhuma migração foi aplicada.
+A [primeira integração S3](HERMES-S3-QUALIFICATION.md) passou com Git e suíte
+integrada reais, mas PR/CI simulados. Próximo incremento: build/deploy/QA/rollback.
 Os marcos abaixo inventariam o caminho anterior; não são instrução para continuar
 ampliando a ponte v2 antes de implementar a estratégia aprovada.
 

@@ -8,10 +8,25 @@ condicionada à validação de uma integração pequena e isolada. O plano e as
 mudanças de contrato foram aprovados; [S0/S1 passaram](docs/HERMES-S1-QUALIFICATION.md)
 na prova sem modelo. A [primeira fatia S2](docs/HERMES-S2-QUALIFICATION.md) passou
 com TDD real, testes congelados, revisão imutável e recuperação de timeout;
-os autores e pareceres ainda são fixtures sintéticas. S2 permanece parcial e
-PR/CI/deploy do caminho novo ainda não estão conectados.
+os autores e pareceres ainda são fixtures sintéticas. A [fatia de integração S3](docs/HERMES-S3-QUALIFICATION.md)
+já conecta revisão, Git real, PR/CI simulados e suíte real no commit de merge,
+inclusive após confirmações perdidas. S2/S3 permanecem parciais; faltam serviço
+contínuo, publicação real e deploy/QA/rollback no caminho novo.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
+
+Fluxo qualificado em ambiente isolado — autores/revisores e transporte GitHub
+ainda são sintéticos; Kanban, Git e jobs Docker são reais:
+
+```mermaid
+flowchart LR
+    K[Hermes Kanban] --> T[TDD e revisão imutável]
+    T --> S[Snapshots e recibos privados]
+    S --> G[Git: commit da entrega]
+    G --> P[PR/CI simulados; gate nativo]
+    P --> M[Merge e suíte no SHA integrado]
+    M -. Pendente .-> D[Build, deploy, QA e rollback]
+```
 
 O detector de navegador para o feedback mais recente foi calibrado em Chromium
 isolado e sem rede: aceitou uma referência sintética correta e rejeitou 16 defeitos

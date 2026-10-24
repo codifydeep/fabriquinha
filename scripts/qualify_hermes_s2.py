@@ -31,7 +31,7 @@ def observe(call):
             time.sleep(0.1)
 
 
-def qualify(root, upstream, image):
+def qualify(root, upstream, image, *, after_review=None):
     if root.exists():
         raise ValueError('fresh isolated S2 root required')
     root.mkdir(parents=True, mode=0o700)
@@ -187,8 +187,12 @@ def qualify(root, upstream, image):
     result = dict(version=1, checks=checks, synthetic_workers=True, native_manual_claim_fixture=True,
                   model_calls=0, migration=False, delivery_approval=False, delivery_review=receipt,
                   next_stage='PR/CI and exact-commit deploy/QA/rollback')
+    if after_review:
+        result['integration'] = after_review(project, store, board, quality, implementation, receipt, frozen)
+        result['next_stage'] = 'exact-image deploy/QA/rollback and real agent execution'
     write_json(root/'receipt.json', result)
     print(json.dumps(result, indent=2))
+    return result
 
 
 if __name__ == '__main__':

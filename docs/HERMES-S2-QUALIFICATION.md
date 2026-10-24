@@ -7,6 +7,10 @@ Data: 24/10/2026. Referências: [plano aprovado](SIMPLIFICATION-REVIEW-2026-10-2
 S3 e a autoria/revisão reais com modelo não estão concluídas.** Nenhuma migração
 foi aplicada, nenhum serviço antigo foi reativado e nenhuma release foi homologada.
 
+Avanço posterior da mesma data: [S3 parcial](HERMES-S3-QUALIFICATION.md) conecta
+esta fatia ao Git e à fronteira PR/CI simulada. As pendências abaixo retratam o
+checkpoint S2; a qualificação integrada continua sem modelo e sem homologação.
+
 ## O que efetivamente foi executado
 
 Hermes v0.22.0, no mesmo commit sem patches da prova S1. O roteiro usa banco,

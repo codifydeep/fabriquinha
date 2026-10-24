@@ -8,7 +8,11 @@ com Docker/HTTP reais e participantes sintéticos; uma prova adicional confirmou
 timeout, evidência preservada, retirada e rejeição após reinício. Trinta e um testes
 unitários novos passaram. Nenhuma chamada de modelo, instalação ou homologação.
 Na suíte histórica atual: 4.523 testes, oito skips preexistentes, nenhuma falha.
-Publicação/CI/deploy/QA/rollback pelo caminho novo continuam pendentes.
+A [fatia S3](HERMES-S3-QUALIFICATION.md) passou com Git real, PR/CI simulados,
+gate nativo e oitavo job Docker no SHA de merge. PR/merge não foram duplicados
+após confirmações perdidas; quatro entradas de CI enganosa foram recusadas.
+O total do caminho novo passou a 46 testes. Publicação GitHub real e
+build/deploy/QA/rollback pelo caminho novo continuam pendentes.
 
 ## Referência atual
 

@@ -5,6 +5,8 @@ Destinatários: proprietário do projeto e GPT 6.1 Sol, responsável pela futura
 Estado: **plano e mudanças de contrato aprovados pelo proprietário em 24/10/2026**.
 S0/S1 concluídos; [resultado e limites da prova](HERMES-S1-QUALIFICATION.md).
 S2 parcial: [mecanismos TDD qualificados sem modelo](HERMES-S2-QUALIFICATION.md).
+S3 parcial: [Git e fronteira PR/CI conectados ao TDD no ensaio](HERMES-S3-QUALIFICATION.md);
+GitHub permanece simulado; deploy/QA/rollback ainda não implementados no caminho novo.
 A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
 
 ## 1. Decisão recomendada
@@ -841,7 +843,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | S0 Referência e ADR | Concluída | Referência Git, hashes e restauração íntegra do backup |
 | S1 Viabilidade Hermes isolado | Concluída com limites documentados | Onze controles físicos/nativos, zero modelo e zero patches upstream |
 | S2 Executor/qualidade pequenos | Parcial: TDD, sandbox e recibos qualificados com fixtures | Faltam serviço contínuo, sessões reais e incidentes executáveis |
-| S3 Publicação/deploy conectados | Não iniciado | Cadeia determinística completa |
+| S3 Publicação/deploy conectados | Parcial: Git e PR/CI simulados conectados ao TDD e suíte integrada real | Faltam build/deploy/QA/rollback e GitHub real na S4 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
 | S6 Instalação/segundo repo/cutover | Não iniciado | Reprodução limpa e caminho único |
@@ -850,7 +852,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 Ao retomar com GPT 6.1 Sol:
 
 1. Ler este documento, `AGENTS.md` e a última linha de progresso registrada.
-2. Considerar a aprovação registrada no ADR 0001 e ler os resultados S0/S1 e S2.
+2. Considerar a aprovação registrada no ADR 0001 e ler os resultados S0/S1, S2 e S3.
 3. Conferir estado vivo e autorização de consumo sem iniciar o legado por hábito.
 4. Começar pela primeira etapa incompleta. Não retomar automaticamente a antiga
    tarefa de adicionar outra admissão/recuperação à ponte v2.

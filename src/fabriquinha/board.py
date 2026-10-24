@@ -48,7 +48,7 @@ class Board:
             else:
                 self.project.reviewer(author)
         card = json.loads(task.body)
-        if (card.get('version') != 1 or card.get('kind') not in ('tests', 'implementation')
+        if (card.get('version') != 1 or card.get('kind') not in ('tests', 'implementation', 'integration')
                 or not isinstance(card.get('release'), str) or not card['release']):
             raise ValueError('versioned delivery card required')
         return Run(task_id, run_id, task.assignee, card['kind'], reviewing, author,
@@ -101,6 +101,16 @@ class Board:
             if not kb.request_review(conn, run.task, reviewer=self.project.reviewer(run.author),
                     summary=summary, metadata=evidence, expected_run_id=run.number):
                 raise ValueError('native review handoff refused')
+
+    def require_parent(self, run, task_id):
+        self.ensure(run)
+        kb, kbc, _ = native()
+        with kbc.connect_closing() as conn:
+            link = conn.execute('SELECT 1 FROM task_links WHERE parent_id=? AND child_id=?',
+                                (task_id, run.task)).fetchone()
+            task = kb.get_task(conn, task_id)
+            if not link or not task or task.status != 'done':
+                raise ValueError('completed delivery must be a direct dependency')
 
     def finish_review(self, run, summary, evidence, *, changes=False):
         self.ensure(run)

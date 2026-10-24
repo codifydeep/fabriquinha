@@ -6,8 +6,11 @@ patches upstream. A [primeira fatia S2](HERMES-S2-QUALIFICATION.md) passou com
 Red, mudanças, congelamento, Green, controle negativo e revisão imutável em
 Docker real, mas com autoria e decisões sintéticas. Timeout foi comprovado com
 falha preservada e job retirado. S2 permanece parcial; faltam serviço contínuo,
-incidentes executáveis e S3 (PR/CI/deploy/QA/rollback), antes de S4 com modelo real.
-Checks atuais: 31 testes do caminho novo e 4.523 da suíte histórica, todos sem
+incidentes executáveis. A [primeira fatia S3](HERMES-S3-QUALIFICATION.md) conectou
+revisão, Git real, gate nativo de PR/CI com transporte simulado e suíte real do
+SHA de merge. Confirmações perdidas não duplicaram PR/merge. Faltam build,
+deploy/QA/rollback e GitHub real, antes da qualificação de autonomia com modelo.
+Checks atuais: 46 testes do caminho novo e 4.523 da suíte histórica, todos sem
 falhas; a histórica mantém oito skips preexistentes. Guard de publicação sem achados.
 O runtime anterior continua pausado. As estimativas e detalhes abaixo descrevem
 esse investimento anterior, não uma porcentagem de conclusão da nova arquitetura.

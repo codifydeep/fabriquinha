@@ -23,13 +23,17 @@ flowchart LR
     E --> Q[quality.py: Red, freeze, Green e controles]
     Q --> B
     E --> J[effects.py: intenção e observação]
-    Q -. S3 pendente .-> P[GitHub PR e CI; deploy, QA e rollback]
+    Q --> P[publication.py: Git e PR/CI]
+    P --> M[Suíte do commit integrado]
+    M -. Pendente .-> D[Deploy, QA e rollback]
 ```
 
 O journal não mantém tarefas ou releases. O store não é montado nos workers;
 somente o snapshot necessário atravessa a fronteira. Não há import do broker
-histórico, ACP ou um segundo scheduler no caminho novo. O adaptador contínuo,
-incidentes executáveis e a publicação ainda precisam ser implementados.
+histórico, ACP ou um segundo scheduler no caminho novo. A [prova S3](HERMES-S3-QUALIFICATION.md)
+usa Git real e transporte GitHub simulado, com checks processados pelo Hermes
+upstream. Não foi exercitada publicação GitHub real. O adaptador contínuo,
+incidentes executáveis e build/deploy/QA/rollback continuam pendentes.
 
 ## Instalação de referência antiga, preservada e pausada
 
