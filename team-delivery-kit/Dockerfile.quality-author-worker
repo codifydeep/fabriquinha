@@ -9,6 +9,8 @@
 # installed version and must not displace this rollback during image cleanup.
 # Retain delivery-kit-quality-author-worker:20261023.6 as the current installed
 # worker until first-request guidance and the changed native lineage qualify.
+# Retain delivery-kit-quality-author-worker:20261023.7 as the installed rollback
+# while the pending-page/recommended-order distinction is qualified.
 FROM delivery-kit-generic-calibration:20261011.7
 USER root
 COPY quality_phase_tools.py portable_contract.py test_runner_policy.py broker/review_tool_policy.py /opt/hermes/

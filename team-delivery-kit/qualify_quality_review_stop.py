@@ -41,7 +41,7 @@ def validate_report(report,guards):
     validate_execution_controls(report.get('execution_controls'))
     validate_scale(report.get('scale_controls'))
     require(type(report.get('total_fixed_provider_calls')) is int
-        and report['total_fixed_provider_calls']==29+report['scale_controls']['summary_provider_calls']
+        and report['total_fixed_provider_calls']==23+report['scale_controls']['summary_provider_calls']
         and report.get('fixture_source_sha256')==sha((ROOT/'review_execution_evidence.py').read_bytes()))
     return report
 

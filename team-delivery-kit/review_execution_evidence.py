@@ -29,10 +29,11 @@ def scale_files():
 
 def validate_scale(value):
     expected=dict(operation='real_hermes_review_scale_compaction_v1',files=71,pages=219,
-        main_provider_calls=22,max_iterations=40,complete_files=71,
+        main_provider_calls=16,max_iterations=40,complete_files=71,
         duplicate_reads=0,eof_reads=0,snapshot_unchanged=True,
         tool_only_from_first_call=True,model_calls=0,tests_approved=False,delivery_approval=False)
-    if not isinstance(value,dict) or set(value)!=set(expected)|{'dropped_read_pairs','summary_provider_calls','compactions'}:
+    if not isinstance(value,dict) or set(value)!=set(expected)|{'dropped_read_pairs','summary_provider_calls','compactions',
+            'out_of_recommended_reads','mixed_offset_batches'}:
         raise ValueError('exact real-Hermes scale and compaction evidence required')
     for key,item in expected.items():
         if type(value[key]) is not type(item) or value[key]!=item:
@@ -42,4 +43,7 @@ def validate_scale(value):
     if (type(value['compactions']) is not int or not 1<=value['compactions']<=4
             or type(value['summary_provider_calls']) is not int or value['summary_provider_calls']!=value['compactions']):
         raise ValueError('each bounded compaction requires one successful fixed summary')
+    if (type(value['out_of_recommended_reads']) is not int or not 1<=value['out_of_recommended_reads']<=219
+            or type(value['mixed_offset_batches']) is not int or not 1<=value['mixed_offset_batches']<=15):
+        raise ValueError('genuine pending pages outside a recommendation and mixed offsets required')
     return value

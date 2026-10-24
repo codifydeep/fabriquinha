@@ -44,6 +44,37 @@ class QualityReviewPagingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.journal.plan(required_paths=['/delivery/b.py'],priority_paths=['/delivery/a.py'])
 
+    def test_recommended_batch_does_not_deny_other_genuinely_pending_pages(self):
+        from types import SimpleNamespace
+        files={f'file-{n:02}.py':b'x\n'*(205 if n==0 else 1) for n in range(18)}
+        inventory={p:dict(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest()) for p,raw in files.items()}
+        manifest=paging.digest(dict(files=inventory));paths=['/delivery/'+p for p in files]
+        journal=paging.Journal(self.request,inventory,manifest,paths)
+        journal.add(self.page('file-00.py','initial',1,205,'\n'.join(f'{n}|x' for n in range(1,101))))
+        agent=SimpleNamespace();plan=paging.arm(agent,journal)
+        self.assertEqual(len(plan['pages']),16)
+        config=dict(request_id=self.request,review_context=dict(packet=dict(manifest_sha256=manifest)))
+        for args in (dict(path='/delivery/file-00.py',offset=101,limit=100),
+                dict(path='/delivery/file-00.py',offset=201,limit=100),
+                dict(path='/delivery/file-17.py',offset=1,limit=100)):
+            self.assertNotIn(args,plan['pages'])
+            self.assertIn(args,plan['pending_pages'])
+            self.assertTrue(paging.allowed(config,args,consume=True))
+            self.assertFalse(paging.allowed(config,args,consume=True))
+        self.assertFalse(paging.allowed(config,dict(path='/delivery/file-00.py',offset=301,limit=100)))
+        self.assertFalse(paging.allowed(config,dict(path='/delivery/file-17.py',offset=101,limit=100)))
+
+    def test_pending_schema_alternatives_do_not_authorize_cross_product_tuples(self):
+        from types import SimpleNamespace
+        self.journal.add(self.page('a.py','a',1,3,'1|a'))
+        agent=SimpleNamespace();plan=paging.arm(agent,self.journal)
+        schema=paging.project(dict(type='object'),plan)['properties']
+        self.assertEqual(schema['offset']['enum'],[1,2])
+        self.assertIn('/delivery/a.py',schema['path']['enum'])
+        config=dict(request_id=self.request,review_context=dict(packet=dict(manifest_sha256=self.manifest)))
+        self.assertFalse(paging.allowed(config,dict(path='/delivery/b.py',offset=2,limit=100)))
+        self.assertTrue(paging.allowed(config,dict(path='/delivery/a.py',offset=2,limit=100)))
+
     def test_journal_survives_context_drop_and_does_not_alias_mutable_messages(self):
         messages=self.page('a.py','a',1,3,'1|a\n2|b');self.journal.add(messages)
         messages[1]['output']='changed conversation';saved=self.journal.messages();saved.clear()

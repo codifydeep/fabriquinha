@@ -4,9 +4,12 @@ Scope note, **23 October 2026**: this document describes patch adapters and
 historical qualification boundaries, not the current deployment inventory.
 The current v2 review is read-only; patch receipts cannot satisfy missing
 inspection or authorize a reviewer to edit tests or implementation. The current
-blocker is missing initial pending-page guidance in a tool-only review path,
-not a newly demonstrated patch persistence failure. The latest native execution
-completed with a structured stall diagnostic, not an accepted review verdict.
+previous blocker was missing initial pending-page guidance in a tool-only review
+path, not a newly demonstrated patch persistence failure. That guidance is now
+qualified and installed; its native successor also blocked, not approved.
+The qualified installed successor separates recommended order from genuinely
+pending pages; it still grants no new paths or write authority and needs native validation.
+The earlier execution completed with a structured stall diagnostic, not an accepted review verdict.
 No patch adapter can supply its missing inspection or turn it into approval.
 See [STATUS.md](STATUS.md) and [VALIDATION.md](VALIDATION.md) before
 using any historical recovery mechanism below.

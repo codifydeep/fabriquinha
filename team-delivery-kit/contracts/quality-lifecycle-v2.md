@@ -878,7 +878,31 @@ cross-restart memory, product correctness or autonomous delivery. Older failed
 runs and qualification receipts remain immutable; recovery requires the actual
 changed qualified profile and fresh successor reads.
 
-The subsequent native run reached 122 observed read pages over 60 files before
+#### Recommended order is not a read-permission boundary
+
+The native successor then read 36 pages and completed 26/71 files, but its
+requests for legitimate pending pages outside the recommended cohort were
+denied with a generic forbidden-operation error. It interpreted that scheduling
+restriction as lost access and escalated without complete inspection. The
+controller preserved the block, not an approval or a demonstrated product defect.
+
+The next candidate separates `next_reads` recommendations from bounded
+`pending_reads` tuples. A previously observed total permits missing chunks of
+the same file to be read independently; an unknown file exposes offset 1 only.
+The finite schema lists path/offset alternatives, while the handler checks exact
+tuples and atomically consumes each once. The schema's cross product never
+authorizes an invalid tuple. Old pages, EOF, writes and unregistered paths remain
+denied. Page-plan errors explicitly say not to infer loss of access; no data,
+tool execution or inspection evidence is manufactured by that hint.
+
+The isolated fixed Hermes control passed 219 pages with 126 reads outside the
+recommendation and twelve mixed-offset batches. Sixteen main calls and two real
+summary/compaction calls preserved complete byte-bound coverage after removing
+190 conversation read pairs. The entire fixed control set used 25 local
+responses and zero external model calls. Native qualification and independent
+approval remain necessary; this control cannot repair or approve the previous run.
+
+An earlier capacity-bound native run reached 122 observed read pages over 60 files before
 the existing proxy rejected its accumulated request at the fixed 512 KiB
 transport ceiling. The 71-file snapshot alone is 552,750 bytes, excluding JSON,
 line numbers, tools and conversation history. This failure is infrastructure

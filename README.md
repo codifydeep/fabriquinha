@@ -27,19 +27,26 @@ capacidade de requisição de 2 MiB, contador e teto de chamadas preservados, se
 credenciais nos testes. A recuperação da falha por tamanho foi registrada e o
 ensaio seguinte ultrapassou o limite antigo sem aquela rejeição, mas falhou ao
 esgotar as iterações: 57 dos 71 arquivos tiveram leitura integral comprovada.
-O hardening de paginação já foi instalado: controlador `20261023.30` e worker
-`20261023.6`, com diário limitado, captura no loop e paradas estruturadas.
+O hardening de paginação já foi instalado: controlador `20261023.32` e worker
+`20261023.8`, com diário limitado, captura no loop e paradas estruturadas.
 O canário Hermes/ACP percorreu 219 páginas e 563 KB; duas compactações reais
-retiraram 197 pares da conversa sem perder cobertura no diário. Foram 32
-respostas locais fixas, sem chamadas externas nessa qualificação.
-Após recuperação restrita, o coordenador iniciou outra revisão real. Ela parou
+da candidata seguinte retiraram 190 pares da conversa sem perder cobertura no
+diário. Foram 25 respostas locais fixas, sem chamadas externas: 126 leituras
+fora da recomendação e 12 lotes mistos, ainda sem aprovação nativa.
+Após uma recuperação anterior, o coordenador iniciou uma revisão real que parou
 por falta de progresso depois de sete chamadas, com 16/71 arquivos completos
-e 33 iterações restantes. A lacuna agora identificada é que a fila, o schema
-restrito e o gate por página só são armados após uma resposta final prematura;
-o caminho só de ferramentas desde o início ainda precisa ser corrigido e
-qualificado. Não houve aprovação, congelamento dos testes ou entrega.
-Na consulta de 23 de outubro, a manutenção está selada e drenada, mas o proxy
-permanece ligado. A consulta documental não altera esse estado.
+e 33 iterações restantes. A fila dependia de uma resposta final prematura.
+A versão atual projeta fila, schema e gate desde a primeira chamada, prioriza
+testes novos e preserva a rejeição fundamentada sem leitura do escopo inteiro
+de aprovação. O canário extenso agora começa por ferramentas, sem prosa prematura.
+A instalação verificou backup/restauração e preservou dados, fila e contador.
+Após recuperação específica e liberação da manutenção, o coordenador despachou
+a sucessora. Ela terminou após seis chamadas, 36 páginas aceitas e 26/71 arquivos
+completos: o handler negou páginas pendentes fora do lote recomendado e o modelo
+interpretou isso como perda de acesso. A candidata seguinte separa ordem
+recomendada e tuplas pendentes permitidas, mantendo negação de repetição, EOF
+e caminhos estranhos. Ela foi qualificada e instalada. A instância voltou à manutenção
+selada, com proxy parado. Não houve aprovação, congelamento ou entrega nessa linhagem v2.
 
 **Documentação:** [índice de leitura](docs/README.md),
 [status e estimativas de prontidão](docs/STATUS.md),
@@ -1485,9 +1492,9 @@ flowchart TD
     F --> CG{Contrato de qualidade ativo validado?}
     CG -->|Sim| G[TDD: Red real registrado]
     G --> TR[Revisão independente e congelamento dos testes]
-    TR -->|Após resposta final prematura| RS[Fila instalada: formato e páginas faltantes]
+    TR -->|Desde a primeira chamada| RS[Fila instalada: testes novos primeiro, páginas pendentes e formato]
     RS -->|Mesmo turno e orçamento de 40 iterações| TR
-    TR -->|Só ferramentas: orientação inicial ainda incompleta| RG[Monitor de progresso ativo; correção pendente]
+    TR -->|Leituras reais, inclusive fluxo só de ferramentas| RG[Monitor de progresso e diário resistente à compactação]
     RG -->|Falta de progresso| AD
     RS -.->|Duas tentativas sem progresso| AD
     TR -->|Solicita mudanças nos testes novos| F
@@ -1626,11 +1633,12 @@ Esses testes não precisam de chaves, não disparam agentes e não demonstram au
 ## Situação das validações
 
 O estado vigente em **23 de outubro de 2026** está em
-[STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente falhou sem leitura
-integral, não congelou os testes e não chegou à homologação. A suíte offline
-da candidata executou 4.372 testes: 4.364 aprovados e oito skips preexistentes,
+[STATUS.md](docs/STATUS.md). A revisão nativa v2 mais recente terminou bloqueada
+sem leitura integral, não congelou os testes e não chegou à homologação. A suíte offline
+da candidata seguinte executou 4.380 testes: 4.372 aprovados e oito skips preexistentes,
 sem falhas. O canário Hermes/ACP, incluindo escala/compactação, passou com respostas fixas, sem modelo;
-instalação e qualificação nativa ainda estão pendentes. A estimativa de prontidão
+a correção seguinte também está instalada, mas ainda exige
+qualificação nativa. A estimativa de prontidão
 não substitui um novo ciclo sem intervenções nem uma instalação limpa.
 
 **Resultados históricos, referência em 8 de outubro de 2026:**

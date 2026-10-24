@@ -13,32 +13,37 @@ controles negativos obrigatórios → revisão da entrega e gates de publicaçã
 | Retorno de revisão ao autor | Correção dos testes pelo mesmo autor acionada pelo coordenador. Não qualifica todos os handoffs. |
 | Capacidade do proxy | HTTP isolado e ensaio real confirmaram requisição acima de 512 KiB sob o novo limite de 2 MiB. Não aprova revisão. |
 | Revisão nativa anterior | Falhou após 40 iterações; 57/71 arquivos integralmente comprovados. Continua preservada, não aprovada. |
-| Instalação do hardening | Controlador `20261023.30` e worker `20261023.6`; backup/restauração verificados, pin do serviço host migrado, dados e contador preservados. |
-| Canário físico que qualificou a instalação | Hermes/ACP normal, preflight/handler, duplicata negada e paradas estruturadas por falta de progresso/orçamento. Extensão: 71 arquivos, 563.066 bytes, 219 páginas, duas compactações e cobertura preservada após remover 197 pares da conversa. Conjunto: 32 respostas locais, zero chamadas externas. O caminho começa com resposta final prematura. |
+| Instalação do hardening | Controlador `20261023.32` e worker `20261023.8`; orientação inicial e distinção entre ordem e páginas pendentes, backup/restauração verificados, pin do serviço host migrado, dados e contador preservados. |
+| Canário físico da candidata seguinte | Hermes/ACP normal, preflight/handler desde a primeira chamada, duplicata negada e paradas estruturadas. Extensão: 71 arquivos, 563.066 bytes, 219 páginas em 16 chamadas principais; 126 leituras fora da ordem recomendada, 12 lotes mistos e duas compactações removendo 190 pares sem perda de cobertura. Conjunto: 25 respostas locais, zero externas. Não é aprovação nativa. |
 | Recuperação restrita | Registro da condição modificada e despacho de outra revisão pelo coordenador. Não é recuperação integral nem aprovação. |
-| Revisão nativa mais recente | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Nativa `completed`, mas recibo e equipe `technical_blocked`, sem retry automático. Sem congelamento, Green ou homologação. |
-| Última suíte completa registrada | 4.372 executados: 4.364 aprovados, oito skips preexistentes, sem falhas. Inclui captura, enforcement, escala, compactação e recuperação restrita de inspeção falha. |
+| Última revisão nativa terminal | Sete chamadas; parada `read_progress_stalled` com 33 iterações restantes; 16/71 arquivos completos. Nativa `completed`, mas recibo e equipe `technical_blocked`, sem retry automático. Sem congelamento, Green ou homologação. |
+| Revisão nativa após a orientação inicial | Despachada pelo coordenador; terminou após seis chamadas, 36 páginas aceitas e 26/71 arquivos completos. Páginas pendentes fora do lote recomendado foram negadas; escalonamento do revisor não foi aceito como parecer completo. `technical_blocked`, sem aprovação. |
+| Última suíte completa registrada | 4.380 executados: 4.372 aprovados, oito skips preexistentes, sem falhas. Inclui páginas pendentes fora do lote sugerido, tuplas exatas, negativas de plano e proteção da rejeição fundamentada. Os 83 testes focados também passaram. |
 | Recuperação e autonomia completas | Ainda não qualificadas sob o contrato v2. |
 
-O bloqueio atual expõe um caminho não coberto pelo canário: o modelo usa
-ferramentas desde o início, enquanto a fila confiável só é projetada depois de
-uma resposta final prematura. A captura e o detector de falta de progresso
-funcionaram; a orientação inicial permanece incompleta. Isso não é outra falha
-comprovada de capacidade do proxy ou defeito funcional demonstrado do produto.
+A falha anterior expôs o caminho só de ferramentas, sem resposta prematura que
+inicializasse a fila. A versão atual cobre esse caminho desde a primeira chamada.
+A nova fixture mede leituras reais e compactação real, preservando os controles
+de aprovação integral e rejeição fundamentada. A prova nativa permanece pendente;
+o bloqueio anterior não foi convertido em sucesso ou defeito funcional do produto.
+A prova nativa subsequente expôs outra fronteira: o lote recomendado também
+restringia indevidamente páginas legítimas ainda pendentes. O modelo interpretou
+essas negações como falta de acesso. Uma candidata separa os dois conceitos,
+sem admitir repetição, EOF ou caminhos não registrados. Ela passou no canário
+físico e foi instalada; sua qualificação nativa ainda é obrigatória.
 
-Os 91 testes focados e a suíte completa acima são os últimos resultados
-registrados, não testes repetidos para esta atualização documental. O controle
+Os testes focados e a suíte completa acima foram executados para esta correção. O controle
 físico do fim do orçamento usa uma iteração; a fábrica ACP continua em 40.
 Escala e compactação passaram no perfil de respostas fixas, não em toda
 estratégia possível do modelo. A memória desse diário é local à execução.
 
-Antes de nova tentativa, acrescentar o fluxo só de ferramentas desde a primeira
-resposta, manter os controles de aprovação integral e de rejeição fundamentada,
-qualificar a mudança e registrar recuperação específica. Nenhuma leitura ou
-aprovação será herdada da tentativa anterior.
+A mudança foi instalada com execução desligada, recuperada por condição
+modificada e ativada sob manutenção antes da liberação. Nenhuma leitura ou
+aprovação foi herdada da tentativa anterior. A equipe ainda precisa concluir
+a revisão e toda a cadeia posterior sob o contrato v2.
 
-Na consulta de referência, manutenção `sealed` e `drained=true`; o proxy está
-**ligado**, não pausado no provedor, com 6.254/10.000 chamadas. São estados
+Depois da revisão terminal, a manutenção foi selada e drenada novamente e o
+proxy foi parado. O contador permaneceu em 6.260/10.000 chamadas. São estados
 independentes: uma task `completed`, uma lease fechada e uma revisão aprovada
 não são equivalentes. Confirme o estado vivo antes de agir. Nenhum resultado
 histórico abaixo substitui esse diagnóstico.

@@ -34,7 +34,7 @@ class PageGate:
     def __init__(self,journal,plan):
         self.request_id=journal.request_id
         self.manifest_sha256=journal.manifest_sha256
-        self.pending={(p['path'],p['offset'],p['limit']) for p in plan['pages']}
+        self.pending={(p['path'],p['offset'],p['limit']) for p in plan['pending_pages']}
 
 
 def arm(agent,journal,*,required_paths=None,priority_paths=None):
@@ -72,13 +72,28 @@ def revoke(agent):
         if gate is not None:gate.pending.clear()
 
 
+def rejection(config):
+    """A page-plan correction, never new read authority or an ACL diagnosis."""
+    with _GATE_LOCK:
+        gate=_GATES.get(config['request_id'])
+        require(gate is not None and gate.manifest_sha256==config['review_context']['packet']['manifest_sha256'])
+        return dict(error='review_page_not_pending: choose pending_reads from the latest controller notice; '
+                'do not retry this page; do not infer loss of access',
+            next_reads=[dict(path=p,offset=o,limit=n) for p,o,n in sorted(gate.pending)[:MAX_BATCH]],
+            tests_approved=False,execution_authorized=False,delivery_approval=False)
+
+
 def project(parameters,plan):
     """Narrow the existing schema, retaining its constraints and descriptions."""
-    require(isinstance(parameters,dict) and parameters.get('type')=='object' and plan['pages'])
+    pending=plan.get('pending_pages',plan['pages'])
+    require(isinstance(parameters,dict) and parameters.get('type')=='object' and pending)
     result=copy.deepcopy(parameters)
     original=result.get('properties',{})
     require(isinstance(original,dict) and set(result.get('required',[]))<={'path','offset','limit'})
-    choices=dict(path=[p['path'] for p in plan['pages']],offset=[plan['pages'][0]['offset']],limit=[100])
+    # Providers need no oneOf/anyOf support. The handler enforces exact tuples,
+    # not the cross product of these finite schema alternatives.
+    choices=dict(path=list(dict.fromkeys(p['path'] for p in pending)),
+        offset=sorted({p['offset'] for p in pending}),limit=[100])
     properties={}
     for key,values in choices.items():
         prop=copy.deepcopy(original.get(key,{}));expected='string' if key=='path' else 'integer'
@@ -171,7 +186,7 @@ class Journal:
         require(isinstance(priority,list) and all(isinstance(path,str) for path in priority)
             and len(priority)==len(set(priority)) and set(priority)<=set(required))
         ranks={path:n for n,path in enumerate(priority)}
-        observed=self._coverage();cohorts={};complete=[]
+        observed=self._coverage();cohorts={};complete=[];pending=[]
         messages=self.messages()
         # Check every complete file, including those outside a rejection's
         # narrower scope. Wrong bytes must stop rather than restart at line 1.
@@ -186,21 +201,36 @@ class Journal:
             next_offset=page['next_offset'] if page is not None else 1
             require(type(next_offset) is int and next_offset>=1)
             cohorts.setdefault(next_offset,[]).append(path)
+            if page is None:
+                pending.append(dict(path=path,offset=1,limit=100))
+            else:
+                # All genuinely missing chunks of a known-length file may be
+                # read independently, including out of recommended order. An
+                # unknown file exposes line 1 only: never guess EOF or totals.
+                cursor=next_offset
+                while cursor<=page['total_lines']:
+                    if cursor in page['line_content']:
+                        cursor+=1;continue
+                    pending.append(dict(path=path,offset=cursor,limit=100))
+                    require(len(pending)<=MAX_PAIRS)
+                    cursor+=100
+            require(len(pending)<=MAX_PAIRS)
         pages=[]
         if cohorts:
             # One exact offset permits a simple bounded schema/handler plan.
             # Finish mandatory new tests first so a grounded rejection does not
             # wait for the approval-only scope. Keep independent same-offset
             # pages in that cohort; priority never reduces required coverage.
-            pending={path:offset for offset,paths in cohorts.items() for path in paths}
-            first=next((path for path in priority if path in pending),None)
-            offset=pending[first] if first is not None else min(cohorts,key=lambda n:(-len(cohorts[n]),n))
+            offsets_by_path={path:offset for offset,paths in cohorts.items() for path in paths}
+            first=next((path for path in priority if path in offsets_by_path),None)
+            offset=offsets_by_path[first] if first is not None else min(cohorts,key=lambda n:(-len(cohorts[n]),n))
             ordered=sorted(cohorts[offset],key=lambda path:(ranks.get(path,len(ranks)),path))
             pages=[dict(path=path,offset=offset,limit=100) for path in ordered[:MAX_BATCH]]
         progress={path:dict(total_lines=page['total_lines'],line_content=page['line_content'])
             for path,page in sorted(observed.items())}
+        pending.sort(key=lambda p:(ranks.get(p['path'],len(ranks)),p['path'],p['offset']))
         return dict(request_id=self.request_id,manifest_sha256=self.manifest_sha256,
-            pages=pages,required_files=len(required),complete_files=len(complete),
+            pages=pages,pending_pages=pending,required_files=len(required),complete_files=len(complete),
             remaining_files=len(required)-len(complete),
             progress_sha256=digest(dict(request_id=self.request_id,
                 manifest_sha256=self.manifest_sha256,observed=progress)),

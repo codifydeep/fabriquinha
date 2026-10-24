@@ -132,7 +132,7 @@ def qualification(b,value,operation):
     validate_execution_controls(report.get('execution_controls'))
     execution_evidence.validate_scale(report.get('scale_controls'))
     require(type(report.get('total_fixed_provider_calls')) is int
-        and report['total_fixed_provider_calls']==29+report['scale_controls']['summary_provider_calls']
+        and report['total_fixed_provider_calls']==23+report['scale_controls']['summary_provider_calls']
         and report.get('fixture_source_sha256')==hashlib.sha256(Path(execution_evidence.__file__).read_bytes()).hexdigest())
     return quality.digest(report['guard_sources'])
 

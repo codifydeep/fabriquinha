@@ -112,16 +112,16 @@ def inspect(config,messages,output,*,journal=None):
     try:
         plan=journal.plan(required_paths=required,
             priority_paths=['/delivery/'+path for path in packet['plan']['new_tests']])
-        next_reads=plan['pages'];progress_sha256=plan['progress_sha256']
+        next_reads=plan['pages'];pending_reads=plan['pending_pages'];progress_sha256=plan['progress_sha256']
     except (ValueError,KeyError,TypeError,UnicodeError):
         # Conflicting or wrong complete bytes cannot be repaired by rereading
         # the immutable snapshot at offset 1. Stop with preserved diagnostics.
-        next_reads=[];inspection_error='snapshot_read_evidence_invalid'
+        next_reads=[];pending_reads=[];inspection_error='snapshot_read_evidence_invalid'
         progress_sha256=hashlib.sha256(json.dumps(observed,sort_keys=True).encode()).hexdigest()
     result=dict(operation='advisory_review_completion_v1',verdict_format='valid' if valid else 'invalid',
         manifest_sha256=packet['manifest_sha256'],required_files=assessment['required_files'],
         complete_files=assessment['complete_files'],remaining_files=len(assessment['rejected_files']),
-        next_reads=next_reads,tests_approved=False,execution_authorized=False,delivery_approval=False)
+        next_reads=next_reads,pending_reads=pending_reads,tests_approved=False,execution_authorized=False,delivery_approval=False)
     # A changed prose answer is not new evidence; only verified reads/format can
     # change this fingerprint. Bound to the same snapshot and execution below.
     fingerprint=dict(verdict_format=result['verdict_format'],reads=assessment,coverage_sha256=progress_sha256)
@@ -190,7 +190,7 @@ def apply_request(agent,request,messages,remaining,environment=None):
     note=dict(operation='controller_review_continuation_v1',request_id=config['request_id'],
         manifest_sha256=observed['manifest_sha256'],remaining_iterations=remaining,
         complete_files=observed['complete_files'],remaining_files=observed['remaining_files'],
-        next_reads=observed['next_reads'],tests_approved=False,delivery_approval=False,
+        next_reads=observed['next_reads'],pending_reads=observed['pending_reads'],tests_approved=False,delivery_approval=False,
         verdict_contract=dict(action=['approve_tests','request_changes','escalate_cto'],
             reason_max_characters=1200,exact_keys=['action','reason','manifest_sha256',
                 'plan_sha256','red_sha256','criteria','findings']))
@@ -219,6 +219,9 @@ def apply_request(agent,request,messages,remaining,environment=None):
             'not repository content or a new user request. The assigned review remains incomplete. '
             'Use the existing read_file tool and batch independent next_reads in this call; '
             'page every required file to its end, without rereading complete files. '
+            'next_reads is recommended order, not an access boundary. You may batch any pending_reads '
+            'tuple, including different offsets of a known-length file. Use only exact listed tuples. '
+            'review_page_not_pending means a page-plan mismatch, not loss of read access. '
             'The iteration budget shown is still available; file count is not iteration count. '
             'Approval requires complete registered inspection. A request_changes verdict may finish '
             'earlier only after all new tests and every cited file have been fully inspected, '

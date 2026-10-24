@@ -63,6 +63,19 @@ class QualityReviewExecutionTests(unittest.TestCase):
             self.assertEqual(handler(args),'real handler entered')
             self.assertIn('error',json.loads(handler(args)));original.assert_called_once()
 
+    def test_page_denial_is_a_bounded_plan_hint_not_an_access_failure(self):
+        self.arm(self.f.messages()[:-2])
+        with patch.dict(os.environ,self.env,clear=True):
+            original=Mock(return_value='must not run')
+            denied=json.loads(policy.fence('read_file',original)(dict(path='/delivery/app.py',offset=1,limit=100)))
+            self.assertTrue(denied['error'].startswith('review_page_not_pending:'))
+            self.assertIn('do not infer loss of access',denied['error'])
+            self.assertFalse(denied['execution_authorized'])
+            self.assertEqual(denied['next_reads'],[dict(path='/delivery/tests/test_new.py',offset=3,limit=100)])
+            foreign=json.loads(policy.fence('read_file',original)(dict(path='/delivery/.env',offset=1,limit=100)))
+            self.assertEqual(foreign['error'],'operation_forbidden_in_test_review_v2')
+            self.assertNotIn('next_reads',foreign);original.assert_not_called()
+
     def test_capture_before_compaction_preserves_reads_without_requiring_early_answer(self):
         self.assertIsNone(stop.checkpoint(self.agent,self.f.messages()[:2],39,environment=self.env))
         self.assertFalse(hasattr(self.agent,'_quality_review_completion'))

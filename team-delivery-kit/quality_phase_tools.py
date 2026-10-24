@@ -52,8 +52,8 @@ def controlled(name,args,environment,*,handler_entry=False):
             if config['phase']=='test_review_v2' and (set(args)!={'path','offset','limit'}
                     or not 1<=args['limit']<=100):return deny()
             if config['phase']=='test_review_v2' and 'review_context' in config:
-                from quality_review_paging import allowed
-                if not allowed(config,args,consume=handler_entry):return deny()
+                from quality_review_paging import allowed,rejection
+                if not allowed(config,args,consume=handler_entry):return json.dumps(rejection(config))
             return None
         if config['phase'] in ('tests_only_v2','implementation_v2') and name=='write_file' and set(args)=={'path','content'} and path in config['editable_paths']:
             content=args['content']

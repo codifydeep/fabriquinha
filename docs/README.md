@@ -33,9 +33,12 @@ ativar outra linhagem de execução.
 - **HOMOLOGADA:** único sucesso terminal da release, depois de revisão, PR/CI,
   deploy, QA e rollback verificáveis no mesmo commit.
 
-No estado de referência, o hardening de revisão já foi instalado, mas a nova
-revisão continua bloqueada. A orientação de paginação desde a primeira chamada
-é a correção imediata pendente. Temporal não é motor do runtime instalado.
+No estado de referência, a orientação de paginação desde a primeira chamada
+foi qualificada e instalada. A revisão sucessora também bloqueou: páginas
+pendentes fora do lote recomendado foram tratadas como operações proibidas.
+A correção seguinte separa ordem e permissão, já qualificada e instalada, ainda
+sem aprovação nativa. Os bloqueios anteriores continuam preservados. Temporal
+não é motor do runtime instalado.
 
 ## Política de atualização
 

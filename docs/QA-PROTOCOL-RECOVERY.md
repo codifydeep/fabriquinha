@@ -25,11 +25,11 @@ proof cannot authorize replay of that execution. The native generic error is
 not, by itself, a product defect or a precise infrastructure diagnosis.
 
 The installed hardening retains actual read evidence across context compaction,
-plans missing pages after a premature final answer and reports stalled progress
+plans missing pages from the first model request and reports stalled progress
 or budget exhaustion structurally. Partial new coverage must count as progress; repeated calls,
 prose and cache responses without content must not. The bounded journal and
 pending-page planner, loop capture, handler enforcement and structured stops
-are installed in reference controller `20261023.30` and worker `20261023.6`.
+are installed in reference controller `20261023.32` and worker `20261023.8`.
 Dispatch checks without consuming; only the fenced handler claims the page
 atomically. The initial consuming check at both
 boundaries was rejected by the real registry canary and corrected without
@@ -37,34 +37,45 @@ rewriting that failure. The expanded canary passed with seven fixed local
 responses: normal ACP continuation, direct duplicate denial, stalled tool
 rounds and the budget boundary. The latter uses a one-iteration fixture loop;
 the ACP factory remains fixed at 40. No external model was called. The expanded
-fixture also passed: 71 files, 563,066 bytes, 219 unique pages, 23 main local
+next-candidate fixture also passed: 71 files, 563,066 bytes, 219 unique pages, 16 main local
 responses and two local summary responses. Two real compression commits removed
-197 read pairs from conversation while the journal retained full byte-bound
-coverage. The complete fixed suite used 32 local responses, no external model.
+190 read pairs from conversation while the journal retained full byte-bound
+coverage. It exercised 126 pending reads outside recommendations and twelve
+mixed-offset batches. The complete fixed suite used 25 local responses, no external model.
 Installation, verified backup/restoration and host scheduler pin migration
-completed. These fixed-response paths begin with a premature final answer;
-they do not qualify initial guidance for a tool-only model strategy.
+completed. The normal control retains a premature answer; the scale control
+uses tools from its first reply without initializing completion state. That
+qualifies the fixed tool-only path, not every strategy of a real model.
 Approval still requires independent, byte-bound
 inspection of the required scope, exact verdict and native identities. No
 operator may manufacture missing reads or convert failure into approval.
 
-After the restricted recovery registration, the coordinator dispatched a new
+After an earlier restricted recovery registration, the coordinator dispatched a
 native review. It stopped after seven provider calls with `read_progress_stalled`,
 16/71 files complete and 33 iterations remaining. Native `completed` did not
 mean approval: the controller preserved `technical_blocked`, classified the
 diagnostic as an invalid terminal verdict and disabled automatic retry.
 
-The current gap is specific: `apply_request()` does not project the pending-page
-queue/schema/handler gate until a premature final answer has created completion
-state. A model using tools throughout may never receive that guidance. Capture
-and stall detection remain active, but are insufficient to complete inspection.
-The fix must guide reads from the first request while retaining a substantiated
-`request_changes` path without requiring the entire approval scope first.
-Full approval must still require the registered complete inspection.
+The identified gap was specific: the queue/schema/handler gate depended on a
+premature final answer. The qualified replacement projects them from the first
+request. It prioritizes new tests without shrinking approval scope and retains
+a substantiated `request_changes` path after complete new-test/citation reads.
+Full approval still requires the registered complete inspection.
 
-Before another native attempt, qualify this changed condition with bounded
-multi-file/pagination fixtures and the real Hermes/handler/ACP boundary. Preserve
-the earlier failure and require a separately qualified recovery. A technical
+That changed condition passed bounded multi-file fixtures and the real
+Hermes/handler/ACP boundary. Installation and recovery preserved the earlier
+failure. The coordinator dispatched its successor; it completed after six
+calls with 36 accepted pages and 26/71 complete files, still technically blocked.
+The model requested genuinely pending pages outside the recommended cohort,
+received a generic forbidden-operation error and interpreted it as lost access.
+Its escalation did not satisfy full inspection. No review was approved.
+
+The next candidate separates the recommended batch from all verifiably missing
+page tuples, including mixed offsets when the total is already observed. Unknown
+files allow the first page only. Exact handler checks still reject duplicate,
+EOF and cross-product tuples, while unregistered paths remain forbidden. A page
+plan denial is described as such, not a diagnosis of lost access. The qualified
+candidate was installed under maintenance; native validation remains required. A technical
 hold assigned to CTO is visible accountability, not proof that the team has
 autonomously diagnosed and recovered the workflow.
 
@@ -93,7 +104,8 @@ native prompt. Do not reuse the failed-inspection classification or qualificatio
 identity to repeat an unchanged worker. A new source-qualified condition and
 the matching recovery route must be verified under sealed maintenance.
 
-The reference is currently sealed and drained, while its model proxy is running.
+After that review terminated, maintenance was sealed/drained again and the proxy
+stopped. The counter is 6,260/10,000; no ceiling or history was reset.
 Maintenance, provider pause and container stop are separate controls; consult
 live state before any operation. This document grants no maintenance release,
 model calls or delivery approval.

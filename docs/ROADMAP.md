@@ -14,14 +14,18 @@ da qualificação ponta a ponta ainda necessária.
    repetição/EOF e diagnóstico estruturado antes de esgotar as 40 iterações.
    Progresso parcial conta; prosa, cache sem conteúdo e chamadas repetidas não.
    Diário, captura e paradas já estão instalados após o canário Hermes/ACP de
-   563 KB, 219 páginas e duas compactações reais. A fila ainda depende de uma
-   resposta final prematura. Corrigir sua ativação desde a primeira chamada,
-   incluindo o modelo que só usa ferramentas, sem impedir rejeição fundamentada
-   de testes antes de completar todo o escopo necessário para aprovação.
+   563 KB, 219 páginas e duas compactações reais. A fila dependia de uma
+   resposta final prematura na versão anterior. A correção desde a primeira
+   chamada também foi qualificada e instalada, sem impedir rejeição fundamentada.
+   A revisão sucessora também bloqueou: o gate confundia o lote recomendado
+   com todas as páginas pendentes permitidas. A candidata seguinte separa os
+   dois conceitos e permite offsets mistos verificáveis, sem reduzir os gates.
+   O marco continua aberto até parecer nativo aceito.
 2. **Qualificação antes de novo ensaio:** fixtures com múltiplos arquivos e
    páginas, controles negativos e Hermes/handlers/ACP reais sem provedor.
-   Acrescentar o caminho sem resposta final prematura às provas de escala e
-   compactação. Instalar sob manutenção e registrar recuperação da condição corrigida,
+   O caminho só de ferramentas já passou pela prova física de escala e
+   compactação e foi instalado sob manutenção, com recuperação específica.
+   Concluir a prova nativa sem reduzir evidências,
    sem apagar a falha ou reutilizar uma prova de capacidade para outro incidente.
 3. **Contrato v2 ponta a ponta:** congelamento independente dos testes, Green,
    controles negativos, revisão da entrega, PR/CI, deploy, QA e rollback ligados
@@ -37,9 +41,11 @@ anterior esgotou 40 iterações com 57/71 arquivos completos. Após a instalaç�
 diário e das paradas, a sucessora terminou bloqueada por falta de progresso,
 com 16/71 completos e 33 iterações restantes. Nenhuma aprovou os testes.
 Ampliar o corpo, trocar o modelo ou aumentar iterações não corrige a lacuna
-comprovada de orientação desde a primeira chamada.
+identificada de orientação desde a primeira chamada. A correção dessa lacuna
+está instalada, mas a revisão posterior expôs o bloqueio de ordem/permissão.
+Essa segunda correção passou na prova física e foi instalada; todas as falhas permanecem.
 
-### Critérios de saída da correção imediata
+### Critérios de saída da correção de orientação inicial
 
 - A primeira chamada já contém a fila confiável; ferramenta e handler recusam
   páginas não planejadas, repetidas ou fora do arquivo desde esse ponto.
@@ -49,6 +55,12 @@ comprovada de orientação desde a primeira chamada.
   `request_changes`; aprovação exige o escopo integral registrado.
 - A nova revisão nativa produz parecer independente aceito pelo controlador.
   Parada estruturada, transporte válido ou mero estado `completed` não bastam.
+
+Os três primeiros controles passaram offline; o caminho de leitura desde a
+primeira resposta também passou no canário Hermes real com compactação. O
+último critério continua pendente. Acrescentar à qualificação leituras legítimas
+fora do lote recomendado, offsets mistos e negativas de plano que não sejam
+apresentadas como perda de acesso.
 
 ### Continuidade após Green
 

@@ -18,7 +18,7 @@ significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
 | TDD e entrega congelada | `broker/tdd_evidence.py`, `broker/test_first_protocol.py`, `review_instruction.py`, `additive_test_policy.py` |
 | Qualidade v2 | `broker/quality_team_progress.py`, `broker/quality_review_attestation.py`, `quality_phase_tools.py`, `quality_review_stop.py` |
 | Provas de leitura | `broker/quality_review_reads.py`, `broker/read_stream_receipts.py`, `artifact_read_evidence.py` |
-| Paginação instalada, ativação inicial incompleta | `quality_review_paging.py`, `quality_review_stop.py`, `install_quality_review_stop.py` |
+| Paginação instalada desde a primeira chamada | `quality_review_paging.py`, `quality_review_stop.py`, `install_quality_review_stop.py` |
 | Modelo e limites | `model_policy.py`, `model_proxy.py`, `broker/worker_model_config.py` |
 | Capacidade e recuperação restrita | `proxy_capacity_contract.py`, `qualify_model_proxy_capacity.py`, `install_model_proxy_capacity.py`, `broker/quality_review_capacity_recovery.py` |
 | Qualificação de paginação/compactação | `review_execution_evidence.py`, `qualify_quality_review_stop.py`, `tests/quality_review_stop_canary.py` |
@@ -38,10 +38,12 @@ flowchart TD
     A --> S[Snapshot imutável e Red real]
     S --> R[Revisor independente: leitura e decisão]
     R --> J[Diário de leituras reais antes da compactação]
-    J --> K{Houve tentativa de resposta final?}
-    K -->|Não: lacuna atual de orientação| R
-    K -->|Prematura| P[Fila pendente, schema restrito e gate no handler]
-    P -->|Mesmo turno e orçamento de 40 iterações| R
+    J --> P[Fila desde a primeira chamada: schema e gate no handler]
+    P -->|Prioridade aos testes novos; até 16 páginas por lote| R
+    P --> N[Handler: ordem sugerida distinta das tuplas pendentes permitidas]
+    N -->|Só tuplas exatas ainda ausentes| R
+    R --> F[Guard do parecer: formato e escopo da decisão]
+    F -->|Evidência incompleta; mesmo orçamento de 40 iterações| P
     J -->|Duas rodadas sem progresso| B[Bloqueio técnico preservado]
     R --> E[Controlador confere bytes, identidade e parecer]
     E -->|Mudanças válidas| A
@@ -54,12 +56,22 @@ flowchart TD
 
 As setas tracejadas indicam etapas ainda não comprovadas nesta linhagem nativa
 v2, não uma dispensa de execução. Feedback, planejador, diário e paradas estão
-instalados no controlador `20261023.30` e worker `20261023.6` da referência.
-Ainda falta ativar a orientação de paginação desde a primeira chamada:
-`apply_request()` retorna sem projetar a fila quando não existe estado de uma
-resposta final prematura. O caminho só de ferramentas pode alcançar o detector
-de falta de progresso sem receber essa orientação. A correção está pendente,
-não representada como funcionalidade já implantada.
+instalados no controlador `20261023.32` e worker `20261023.8` da referência.
+`apply_request()` agora arma a orientação e o gate desde a primeira chamada,
+sem depender de uma resposta final prematura. Testes novos têm prioridade;
+uma rejeição fundamentada continua possível sem completar todo o escopo de
+aprovação. A revisão sucessora terminou com 26/71 arquivos completos após seis
+chamadas, sem parecer aceito: o gate de lote negou páginas legítimas ainda
+pendentes que não estavam na recomendação daquela chamada.
+
+A correção instalada mantém a recomendação de até 16 páginas, mas enumera
+separadamente todas as tuplas pendentes verificáveis. Páginas de um arquivo
+com total observado podem ser lidas fora de ordem; um arquivo ainda desconhecido
+só permite offset 1. O schema enumera alternativas finitas e o handler valida
+a tupla exata, não o produto cartesiano de caminhos e offsets. Cada página é
+consumida uma vez. Negativas de plano trazem orientação distinta de operações
+realmente proibidas; não concedem novos caminhos ou evidência de inspeção.
+A qualificação física passou; o parecer nativo da nova revisão continua necessário.
 
 O diário é limitado a 512 pares/8 MiB, vincula execução e manifesto, não descarta
 evidências para caber no limite e sugere até 16 páginas com um offset comum
@@ -78,11 +90,12 @@ real com sete respostas locais: ACP normal, negação de duplicatas, duas rodada
 sem progresso e saída no fim do orçamento. O controle desta última fronteira
 usa uma iteração sintética;
 a fábrica ACP permanece fixada em 40. A extensão de escala percorreu 219 páginas
-de 71 arquivos (563.066 bytes), com 23 chamadas principais, duas sumarizações
-locais e duas compactações reais. Elas removeram 197 pares da conversa sem
-perder cobertura no diário. Esse caminho começa por uma resposta prematura;
-não qualificou a orientação inicial do fluxo só de ferramentas.
-A instalação foi seguida de uma revisão nativa: sete chamadas, 16/71 arquivos
+de 71 arquivos (563.066 bytes), com 16 chamadas principais, duas sumarizações
+locais e duas compactações reais. Elas removeram 190 pares da conversa sem
+perder cobertura no diário. Essa extensão usa ferramentas desde a primeira
+resposta, sem inicializar estado de conclusão prematura. A candidata também
+exerceu 126 leituras fora da recomendação e 12 lotes com offsets mistos.
+A revisão nativa anterior terminou com sete chamadas, 16/71 arquivos
 completos e parada `read_progress_stalled` com 33 iterações restantes.
 A atestação bloqueou o diagnóstico como parecer inválido; não houve aprovação.
 A projeção da interface e o diário consultivo do worker não substituem os recibos

@@ -31,7 +31,7 @@ verdict=json.dumps(dict(action='approve_tests',reason='Fixed offline fixture onl
     **{k:packet[k] for k in ('manifest_sha256','plan_sha256','red_sha256')}))
 calls=[];auxiliary=[]
 scenario='normal'
-scale_summaries=[];scale_reads=set()
+scale_summaries=[];scale_reads=set();outside_recommendations=[];mixed_offset_batches=[]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
                 'No tests or delivery have been approved. Follow the original operator fixture '
                 'and the controller notices for exact pending paths and offsets.')),'stop','summary')
         index=len(calls);calls.append(dict(stream=bool(body.get('stream')),messages=len(body.get('messages',[]))))
-        maximum=22 if scenario=='scale' else 1 if scenario=='budget' else 3
+        maximum=16 if scenario=='scale' else 1 if scenario=='budget' else 3
         if index>=maximum:
             self.send_response(400);self.end_headers();self.wfile.write(b'{"error":"fixed fixture call ceiling"}');return
         if scenario=='normal' and index==1:
@@ -86,10 +86,12 @@ class Handler(BaseHTTPRequestHandler):
             assert note['request_id']=='60000000-0000-4000-8000-000000000005'
             if note['remaining_files']:
                 assert body.get('tool_choice')=='auto'
-                pages=note['next_reads'];assert 1<=len(pages)<=16
+                pages=note['pending_reads'][:16];assert 1<=len(pages)<=16
+                outside_recommendations.extend(page for page in pages if page not in note['next_reads'])
+                if len({page['offset'] for page in pages})>1:mixed_offset_batches.append(True)
                 schema=body['tools'][0]['function']['parameters']['properties']
-                assert schema['path']['enum']==[p['path'] for p in pages]
-                assert schema['offset']['enum']==[pages[0]['offset']] and schema['limit']['enum']==[100]
+                assert schema['path']['enum']==list(dict.fromkeys(p['path'] for p in note['pending_reads']))
+                assert schema['offset']['enum']==sorted({p['offset'] for p in note['pending_reads']}) and schema['limit']['enum']==[100]
                 for page in pages:
                     key=(page['path'],page['offset'],page['limit'])
                     assert key not in scale_reads
@@ -199,11 +201,11 @@ def execution_controls():
     assert not hasattr(probe_agent,'_quality_review_completion')
     args=dict(path='/delivery/app.py',offset=1,limit=100)
     denied=json.loads(registry.get_entry('read_file').handler({**args,'offset':401}))
-    assert denied.get('error')=='operation_forbidden_in_test_review_v2',denied
+    assert denied.get('error','').startswith('review_page_not_pending:'),denied
     read=json.loads(registry.dispatch('read_file',args))
     assert not read.get('error') and read.get('content_returned') is not False,read
     repeated=json.loads(registry.get_entry('read_file').handler(args))
-    assert repeated.get('error')=='operation_forbidden_in_test_review_v2',repeated
+    assert repeated.get('error','').startswith('review_page_not_pending:'),repeated
     results={}
     for mode,request_id,iterations in [('stall','60000000-0000-4000-8000-000000000002',40),
             ('budget','60000000-0000-4000-8000-000000000003',1)]:
@@ -296,7 +298,8 @@ def scale_compaction_control():
         result=current.run_conversation('Fixed operator scale fixture. Review all registered pages; do not authorize any native delivery.')
     finally:local.shutdown();local.server_close()
     assert result['final_response']==verdict,result
-    assert len(calls)==22 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert len(calls)==16 and 1<=len(scale_summaries)<=4 and len(scale_reads)==219,(calls,scale_summaries,len(scale_reads))
+    assert outside_recommendations and mixed_offset_batches
     assert not hasattr(current,'_quality_review_completion')  # Tools from call zero, never a premature final.
     assert len(commits)==len(scale_summaries)==compressor.compression_count and all(n>0 for n in commits),commits
     assert current._quality_review_journal.plan()['complete_files']==71
@@ -305,6 +308,7 @@ def scale_compaction_control():
         main_provider_calls=len(calls),summary_provider_calls=len(scale_summaries),max_iterations=40,
         complete_files=71,compactions=compressor.compression_count,dropped_read_pairs=sum(commits),
         duplicate_reads=0,eof_reads=0,tool_only_from_first_call=True,
+        out_of_recommended_reads=len(outside_recommendations),mixed_offset_batches=len(mixed_offset_batches),
         snapshot_unchanged=True,model_calls=0,tests_approved=False,delivery_approval=False)
 
 

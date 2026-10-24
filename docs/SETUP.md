@@ -71,14 +71,16 @@ custo nem uma permissão para elevar o teto de chamadas. Não há fallback de
 modelo automático. A qualificação específica deve anteceder um novo ensaio pago.
 
 O modelo de referência é `anthropic/claude-haiku-5.5` via proxy OpenRouter.
-O controlador `20261023.30` e o worker `20261023.6` já estão instalados nessa
+O controlador `20261023.32` e o worker `20261023.8` já estão instalados nessa
 referência; esses identificadores não constituem imagens publicadas para download.
-A nova revisão ficou bloqueada, portanto não há autorização implícita para
-iniciar o Truco ou repetir o ensaio sem uma mudança qualificada.
+A sucessora liberada após a mudança qualificada também ficou bloqueada.
+O seletor atual inclui a correção de páginas pendentes, ainda sem aprovação nativa.
+Isso não autoriza iniciar o Truco ou repetir indefinidamente o ensaio.
 
 Manutenção, pausa do provedor e estado do contêiner do proxy são independentes.
-Na consulta de 23 de outubro, a barreira estava selada e drenada, mas o proxy
-permanecia ligado. Para conferir somente os serviços dessa instância:
+Após a revisão terminal de 23 de outubro, a barreira foi selada/drenada e o
+proxy parado novamente, preservando contador e teto. Para conferir somente
+os serviços dessa instância:
 
 ```bash
 docker ps -a \

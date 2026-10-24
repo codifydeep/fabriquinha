@@ -84,8 +84,10 @@ class QualityReviewStopTests(unittest.TestCase):
         stop.checkpoint(agent,self.messages()[2:4],39,after_tools=True,environment=self.env)
         result=stop.apply_request(agent,request,[],39,self.env)
         props=result['tools'][0]['function']['parameters']['properties']
-        self.assertEqual(props['path']['enum'],['/delivery/tests/test_new.py'])
-        self.assertEqual(props['offset']['enum'],[3])
+        self.assertEqual(props['path']['enum'],['/delivery/tests/test_new.py','/delivery/app.py'])
+        self.assertEqual(props['offset']['enum'],[1,3])
+        content=result['messages'][0]['content'];note=json.loads(content[content.index('{'):])
+        self.assertEqual(note['next_reads'],[dict(path='/delivery/tests/test_new.py',offset=3,limit=100)])
         self.assertFalse(hasattr(agent,'_quality_review_completion'))
         stop.checkpoint(agent,self.messages()[4:],38,after_tools=True,environment=self.env)
         result=stop.apply_request(agent,request,[],38,self.env)
