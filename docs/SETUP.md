@@ -19,8 +19,9 @@ as rotas de fixture expiram e não devem ser reutilizadas como produção. Prove
 reais exigem política privada explicitamente habilitada e limite de consumo.
 As instalações S4 antigas permanecem pausadas. Uma nova tentativa foi preparada
 após R2 e autorização específica, mas ficou bloqueada e foi preservada com relay
-desligado. Após correção de contexto validada offline, outra fronteira limpa
-está em execução. Não reutilize sessões ou evidências históricas para reproduzi-la.
+desligado. Uma fronteira posterior chegou ao Green e também ficou em triagem;
+feedback e limite de exploração foram corrigidos antes de preparar outra
+execução limpa. Não reutilize sessões ou evidências históricas para reproduzi-la.
 A auditoria sozinha não autoriza ativação.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
 explícita de Lead/CTO e cards nativos de recuperação com SPIKE. Sua prova também

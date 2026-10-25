@@ -3,13 +3,14 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
-**R1/F1 e R2 limitado qualificados offline; nova tentativa S4 real em execução.**
+**R1/F1 e R2 limitado qualificados offline; S4 real ainda incompleto.**
 O proprietário aprovou o refinamento F1, implementado e validado com
 Chromium/Docker. As provas R1/R2 usaram zero chamadas pagas. O novo S4 usa
 Claude Haiku sob cota específica autorizada, com relay isolado e perfis limpos.
-Uma tentativa bloqueada foi preservada com relay desligado; a correção de
-contexto passou offline e originou outra fronteira limpa. As tentativas
-anteriores permanecem pausadas e preservadas.
+A tentativa real mais recente chegou ao Green, mas terminou em triagem antes
+da revisão da entrega. O CTO manteve um bloqueio explícito; relay e dispatcher
+foram desligados após drenagem. O feedback dos controles e o limite de exploração
+foram corrigidos e qualificados offline. Outra fronteira limpa está preparada.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -23,7 +24,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Nova fronteira limpa: brief idêntico aprovado, plano revisado, CI inicial verde; recuperação real pelo Lead, mudanças atendidas pelo QA e freeze independente dos testes | Implementação/Green, controles, revisão da entrega, PR/CI, integração, deploy e QA finais |
+| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais; recuperação pelo Lead até concluir testes | Controles aceitos, revisão da entrega, PR/CI, integração, deploy e QA; a última tentativa terminou em triagem |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |
@@ -36,7 +37,7 @@ Até agora, nenhuma release S4 foi homologada autonomamente.
 
 As cinco fronteiras identificadas pela auditoria não eram cinco execuções
 completas: quatro não qualificaram entrega e a última ficou incompleta e pausada.
-Uma fronteira posterior a R2 ficou bloqueada; a seguinte está em execução, sem homologação. A aprovação de brief reutilizado comprova continuidade do
+As fronteiras posteriores a R2 também não completaram a entrega. A aprovação de brief reutilizado comprova continuidade do
 aceite, não uma nova descoberta autônoma de produto.
 
 ## Impedimentos encontrados na revisão
@@ -64,7 +65,7 @@ instalação auditada. Notificações em fila não comprovam visibilidade no Tel
 O núcleo auditado em `98e09069` tinha 19 módulos funcionais mais `__init__`,
 5.060 linhas e 233 testes verdes, sem cobrir a contradição. Os testes novos
 exercitam alvos, risco adicional, imutabilidade, skip, inventário e legado.
-Os **260 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
+Os **261 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
 SLA ou portabilidade.
 
 A revalidação integrada inicialmente encontrou esgotamento dos pools de rede
@@ -82,23 +83,24 @@ foram simulados. Uma tentativa anterior falhou por orientação de DevOps vazand
 para a fase QA; foi preservada e o isolamento de fases foi corrigido antes da
 prova aprovada. Veja [recuperação](HERMES-RECOVERY-QUALIFICATION.md).
 
-No S4 real, a resposta do QA foi truncada em 8.192 tokens. O SDK tentou repetir
-com 16.384 e o relay rejeitou corretamente por exceder a política. O Lead recebeu
-apenas falta de handoff e tentou ler caminhos privados do host no contêiner;
-executou um SPIKE e manteve o bloqueio em vez de inventar uma correção. A fonte
-agora apresenta `/workspace` como sistema de arquivos das ferramentas e conserva
-o código específico da falha SDK sem copiar respostas ou credenciais. A política
-de saída permanece em 8.192. O consumo foi de 13 chamadas nesta tentativa;
-restam 51 sob o teto específico aprovado. Mudanças de fonte exigem nova fronteira,
-sem aproveitar os testes ou aprovações técnicas da tentativa bloqueada.
+As tentativas reais revelaram truncamento seguido de aumento indevido de saída
+pelo SDK, caminhos do host no contexto do contêiner e feedback insuficiente dos
+controles. O relay recusou corretamente saída acima da política. O contexto foi
+corrigido para `/workspace`, com código de falha SDK limitado, sem resposta bruta.
+Na tentativa seguinte o Lead recuperou o QA: Red, mudanças, correção e freeze
+independentes ocorreram sem intervenção técnica externa. O incidente só resolveu
+com freeze válido. A implementação passou nos dez testes, mas os controles
+propostos não cobriram todos os alvos; um lote exploratório longo terminou sem
+handoff. A triagem acionou o CTO e preservou o bloqueio, sem aprovação fictícia.
 
-Na fronteira seguinte, o mesmo limite de saída voltou a ser atingido. O Lead
-identificou a causa com os metadados corrigidos, leu os arquivos em `/workspace`,
-executou um SPIKE e retomou a fase original. O QA produziu Red, recebeu mudanças
-de cobertura, corrigiu e obteve revisão/freeze independentes. O incidente só foi
-resolvido após o freeze válido; o Frontend então iniciou a implementação.
-Essa recuperação foi conduzida pelos agentes reais, sem intervenção técnica
-externa após o aceite. A release completa continua não qualificada.
+O gate agora informa os casos cobertos e ausentes, preservando todos os alvos e a
+suíte completa. Schema e handler limitam exploração terminal a 120 segundos;
+validação fixa continua com seu orçamento próprio. A prova de nove atividades
+e 29 respostas locais verificou rejeição antes de execução, propagação do HTTP
+422 e recuperação até as evidências TDD, sem chamadas pagas. Mudanças de fonte
+exigem nova fronteira, sem importar evidências técnicas das tentativas bloqueadas.
+O teto de chamadas só foi elevado por autorização explícita do proprietário;
+modelo, limite de saída e ausência de fallback permanecem.
 
 ## Próxima sequência
 
@@ -106,7 +108,7 @@ O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
 - R2 limitado e correção de contexto revalidados offline, inclusive HTTP 422
-  através do SDK real; nova fronteira S4 sob o contrato 2 em execução.
+  através do SDK real; feedback dos controles e exploração limitada qualificados.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 

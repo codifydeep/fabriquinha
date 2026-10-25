@@ -281,8 +281,12 @@ class Quality:
                         f['function'].startswith('test') for f in failure['frames']):
                     coverage.add(failure['case'])
             jobs.append(job)
-        if not set(frozen['control_cases']) <= coverage:
-            raise ValueError('negative controls did not witness all independently frozen behavior targets')
+        missing=sorted(set(frozen['control_cases'])-coverage)
+        if missing:
+            feedback=dict(missing=missing[:32],missing_count=len(missing),covered=sorted(coverage)[:32],
+                covered_count=len(coverage),required_count=len(frozen['control_cases']))
+            raise ValueError('negative controls did not witness all independently frozen behavior targets: '+json.dumps(feedback)+
+                '. Correct product mutations for the missing cases; preserve the full suite and frozen tests.')
         return self.record(run, 'controls', dict(control_contract=CONTROL_CONTRACT,green=green_id, jobs=jobs, coverage=sorted(coverage)))
 
     def delivery_review(self, run, green_id, controls_id, decision):

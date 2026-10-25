@@ -81,7 +81,10 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                 with kbc.connect_closing() as conn:
                     changes=conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='changes_requested'",(run.task,)).fetchone()[0]
                 finding=[dict(path='app.py',line=1,detail='Delivery needs an actual behavior test before implementation')]
-                if run.number==1:sequence=[('read_file',{'path':'/workspace/app.py'}),(None,'I will finish the task later.')]
+                if run.number==1:sequence=[
+                    ('terminal',dict(command='touch /workspace/tests/over-cap-marker.txt',timeout=570)),
+                    ('read_file',{'path':'/workspace/tests/over-cap-marker.txt'}),
+                    ('read_file',{'path':'/workspace/app.py'}),(None,'I will finish the task later.')]
                 elif run.kind=='diagnostic' and run.actor=='flow-lead':
                     sequence=[('read_file',{'path':'/workspace/app.py'}),
                         ('diagnostic_decide',dict(action='resume',reason='Not enough evidence yet',findings=finding)),
@@ -109,7 +112,14 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                     sequence=steps(run,changes)
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
-            if provider_error and run.number==1 and index==1:
+            if run.number==1:
+                schema=next(t['function']['parameters'] for t in body['tools'] if t['function']['name']=='terminal')
+                assert schema['properties']['timeout']['maximum']==120
+                if index==1:assert 'terminal timeout must be at most 120 seconds' in str(body['messages'][-1]['content'])
+                if index==2:
+                    assert not (runtime.board.workspace(run)/'tests/over-cap-marker.txt').exists(),'over-cap command must never execute'
+                    assert 'not found' in str(body['messages'][-1]['content']).lower()
+            if provider_error and run.number==1 and index==3:
                 data=json.dumps(dict(error=dict(code='output_budget_exceeds_policy',message='output_budget_exceeds_policy'))).encode()
                 self.send_response(422);self.send_header('Content-Type','application/json')
                 self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
@@ -221,6 +231,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
         if provider_error:proof.update(native_sdk_policy_error_reached_diagnosis=True)
+        proof.update(terminal_timeout_rejected_before_execution=True)
         if notifications:
             messages=[value['message'] for value in sink_data['accepted'].values()]
             for row in runs:

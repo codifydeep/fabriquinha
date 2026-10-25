@@ -22,6 +22,28 @@ def sandbox_context(prompt):
         if line.startswith('Workspace: ') else line for line in prompt.splitlines())
 
 
+def terminal_arguments(args,limit):
+    """Exploration is bounded; qualification remains the fixed delivery gate."""
+    if not isinstance(args,dict):raise ValueError('terminal arguments must be an object')
+    timeout=args.get('timeout')
+    if timeout is not None and (type(timeout) is not int or not 1<=timeout<=limit):
+        raise ValueError('terminal timeout must be at most '+str(limit)+' seconds. Split exploratory batches; use delivery_submit for complete qualification, never replace it with partial test runs.')
+    return {**args,'timeout':limit if timeout is None else timeout}
+
+
+def terminal_schema(limit):
+    """Scope native metadata before the SDK takes its tool-schema snapshot."""
+    import tools.terminal_tool  # Register through the native extension API.
+    from tools.registry import registry
+    entry=next(e for e in registry.get_all_entries() if e.name=='terminal')
+    fields={name:getattr(entry,name) for name in entry.__dataclass_fields__}
+    schema=json.loads(json.dumps(entry.schema))
+    schema['parameters']['properties']['timeout'].update(minimum=1,maximum=limit,default=limit,
+        description='Controller exploration limit in seconds; at most '+str(limit)+'. Use fixed delivery_submit for qualification.')
+    fields['schema']=schema
+    registry.register(**fields,override=True)
+
+
 def incomplete_activity(result, output_limit):
     """Retain actionable SDK state without copying response text or credentials."""
     result=result if isinstance(result,dict) else {}
@@ -246,6 +268,9 @@ def restrict_handlers(sandbox,allowed):
             def guarded(*args,**kwargs):
                 if entry_name in {'delivery_submit','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
                 else:sandbox.ensure()
+                if entry_name=='terminal':
+                    if len(args)!=1:raise ValueError('one terminal argument object required')
+                    args=(terminal_arguments(args[0],min(120,sandbox.project.timeout_seconds)),)
                 return handler(*args,**kwargs)
             return guarded
         fields={name:getattr(entry,name) for name in entry.__dataclass_fields__}
@@ -352,8 +377,9 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
-        phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch.'
+        phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch. Exploratory terminal calls are limited to '+str(min(120,sandbox.project.timeout_seconds))+' seconds. The delivery_submit gate runs the full suite; partial exploratory runs never qualify delivery. Use its covered/missing control feedback rather than repeating unchanged mutation proposals.'
         prompt=sandbox_context(prompt)
+        if 'terminal' in allowed:terminal_schema(min(120,sandbox.project.timeout_seconds))
         agent=AIAgent(**route,max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
             quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
             session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,

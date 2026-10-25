@@ -65,7 +65,10 @@ class BehaviorControlTargets(unittest.TestCase):
     def test_reviewer_can_require_a_passing_risk_and_author_cannot_ignore_it(self):
         self.freeze([dict(case='passing_risk',reason='A passing security assertion still needs a negative control.')])
         green,mutant=self.green_and_mutant()
-        with self.assertRaises(ValueError):self.q.controls(self.implementer,green,[mutant])
+        with self.assertRaises(ValueError) as error:self.q.controls(self.implementer,green,[mutant])
+        self.assertIn('"missing": ["passing_risk"]',str(error.exception))
+        self.assertIn('"covered": ["feature"]',str(error.exception))
+        self.assertIn('preserve the full suite and frozen tests',str(error.exception))
         self.failing=['feature','passing_risk']
         self.q.controls(self.implementer,green,[mutant])
 

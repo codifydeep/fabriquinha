@@ -151,6 +151,16 @@ concluiu nove atividades e 27 respostas locais até as evidências TDD finais.
 Ambas usaram zero chamadas pagas. Isso qualifica propagação e contexto, não a
 capacidade do modelo real de decidir a recuperação correta.
 
+A fronteira real seguinte recuperou o QA até o freeze independente e chegou ao
+Green, mas não completou os controles. O feedback agora identifica casos ausentes
+e cobertos, sem alterar sua exigência. Comandos exploratórios acima de 120 segundos
+são recusados pelo handler e pelo schema apresentado ao SDK, antes de executarem;
+o gate fixo mantém seu orçamento e a suíte completa. A prova posterior com
+`--provider-error` passou com nove atividades e 29 respostas locais: tentou criar
+um arquivo com prazo excessivo, confirmou que ele não existia, propagou o HTTP
+422 e concluiu a recuperação TDD. Zero chamadas pagas; a triagem real anterior
+permanece preservada e não foi convertida em entrega válida.
+
 Para repetir, use uma raiz privada nova para cada modo, imagens verificadas e
 o checkout/venv fixados. O script fornece respostas locais; o serviço real
 despacha e recupera as atividades:
