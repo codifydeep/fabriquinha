@@ -31,6 +31,7 @@ from .deployment import Deployment
 from .operations import Control, ActivityPaused, doctor
 from .intake import Intake, DraftActivity
 from .releases import Releases
+from .provider import Policy, Held, inspect as inspect_provider
 
 
 class IntegrationRunner(Runner):
@@ -65,20 +66,27 @@ def Owner(root):
 
 
 def model_route(project,path):
-    # The old financial pause is not lifted by installing an adapter. Wire the
-    # metered, explicitly released provider before enabling production here.
-    if not project.qualification:
-        raise ValueError('real provider release is not yet installed; paid execution remains disabled')
     path=Path(path)
-    if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o077:
+    if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o077 or path.stat().st_size>4096:
         raise ValueError('private controller route file required')
     route=json.loads(path.read_bytes())
     from urllib.parse import urlsplit
-    if not isinstance(route,dict) or not isinstance(route.get('base_url'),str):
-        raise ValueError('explicit qualification route required')
+    if (not isinstance(route,dict) or set(route)!={'base_url','api_key','provider','api_mode','model'}
+            or any(not isinstance(value,str) or not value for value in route.values())
+            or route['provider']!='custom' or route['api_mode']!='chat_completions'):
+        raise ValueError('explicit closed controller route required')
     url=urlsplit(route['base_url'])
-    if url.scheme!='http' or url.hostname!='127.0.0.1' or url.username or url.password:
-        raise ValueError('qualification route must be loopback only')
+    if (url.scheme!='http' or url.hostname!='127.0.0.1' or not url.port or url.username or url.password
+            or url.path!='/v1' or url.query or url.fragment):
+        raise ValueError('controller route must use fixed loopback /v1')
+    policy_path=path.parent/'provider-policy.json'
+    if not project.qualification or policy_path.exists() or policy_path.is_symlink():
+        if (not policy_path.is_file() or policy_path.is_symlink() or policy_path.stat().st_mode&0o077
+                or policy_path.stat().st_size>4096):raise ValueError('private explicit provider policy required')
+        policy=Policy.parse(json.loads(policy_path.read_bytes()))
+        if route['model']!=policy.model or route['api_key']!=policy.client_token:
+            raise ValueError('route must match exact operator provider policy')
+        inspect_provider(policy,'http://127.0.0.1:'+str(url.port),project.fingerprint())
     return route
 
 
@@ -115,6 +123,7 @@ class Runtime:
         self.board=Board(self.project,guard=self.control.ensure)
         self.children=[];self.settlement={};self.recovery_issues={};self.integration_issues={}
         self.admission=None;self._next_admission=0
+        self.provider=None;self.provider_issues={}
         self.recovery=Recovery(self.project,self.store,self.board)
         self.intake=Intake(self.project,self.store,self.board);self.intake_issues={}
         self.releases=Releases(self.project,self.store,self.board,self.intake);self.release_issues={}
@@ -160,6 +169,11 @@ class Runtime:
         if not admission['ready']:
             from tools.process_registry import RestartSafeScopeUnavailable
             raise RestartSafeScopeUnavailable('runtime admission deferred; inspect doctor/status')
+        if json.loads(task.body).get('kind')!='integration':
+            state=self.provider_status()
+            if not state['ready']:
+                from tools.process_registry import RestartSafeScopeUnavailable
+                raise RestartSafeScopeUnavailable('provider deferred: '+state['reason'])
         if self.project.delivery_roles:
             try:self.releases.admit(task)
             except (ValueError,KeyError,TypeError,OSError):
@@ -192,6 +206,44 @@ class Runtime:
             self.admission=doctor(self.project,self.root,self.store)
             self._next_admission=now+15
         return self.admission
+
+    def provider_status(self):
+        """Metadata only; no credential load or inference. Integration needs no model."""
+        try:
+            route=model_route(self.project,self.root/'route.json')
+            self.provider=dict(ready=True,model=route['model'],reason=None)
+        except Held as error:self.provider=dict(ready=False,reason=error.code,status=error.status)
+        except (ValueError,KeyError,TypeError,OSError):self.provider=dict(ready=False,reason='InvalidProviderConfiguration')
+        return self.provider
+
+    def settle_provider(self,conn):
+        """Verified-dead held runs use the pinned native infrastructure deferral.
+
+        Reclaim/unblock reset budgets; this restores the original lane while
+        preserving counters. Native spawn_failed/infrastructure also provides
+        cooldown. The immutable receipt distinguishes partial SDK work from a
+        preflight refusal; neither is a functional failure or completed delivery.
+        """
+        kb,_,dispatch=native();issues={}
+        for path in (self.root/'runs').glob('*/provider-wait.json'):
+            try:
+                number=int(path.parent.name)
+                row=conn.execute('SELECT * FROM task_runs WHERE id=?',(number,)).fetchone()
+                if not row:raise ValueError('provider wait has no native run')
+                if row['ended_at'] is not None:continue
+                wait=self.store.receipt(json.loads(path.read_bytes())['receipt'],kind='provider_wait')
+                binding=wait['binding'];run=self.board.current(row['task_id'],number)
+                if wait['payload']['project']!=self.project.fingerprint() or run.binding()!=binding:
+                    raise ValueError('provider wait belongs to a different assignment')
+                if worker_alive(recorded_worker(conn,row)):continue
+                self.outbox.enqueue('provider-wait:'+str(number),dict(text=self.project.namespace+': '+run.task+
+                    ' @'+run.actor+' provider wait; phase and functional failure budget preserved. '+wait['payload']['reason']))
+                dispatch._record_task_failure(conn,run.task,'provider deferred: '+wait['payload']['reason'],
+                    outcome='spawn_failed',infrastructure=True,release_claim=True,end_run=True)
+                self.settle(run.task,conn=conn)
+            except (ValueError,KeyError,TypeError,OSError,EffectBlocked) as error:issues[path.parent.name]=type(error).__name__
+        self.provider_issues=issues
+        return issues
 
     def pause_status(self,conn):
         busy=[];open_runs=[]
@@ -255,6 +307,7 @@ class Runtime:
             raise ValueError('project changed while service was running')
         _,kbc,dispatch=native()
         with kbc.connect_closing() as conn:
+            self.settle_provider(conn)
             if self.control.read()['paused']:
                 self.maintain_pause(conn)
                 return dispatch.DispatchResult()
@@ -384,6 +437,7 @@ class Runtime:
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
                     integration_issues=self.integration_issues,intake_issues=self.intake_issues,release_issues=self.release_issues,
                     control=control,admission=self.admission,
+                    provider=self.provider_status(),provider_issues=self.provider_issues,
                     incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
@@ -396,7 +450,7 @@ class Runtime:
 
     def _serve(self,stop,*,interval=15):
         if not 0.1<=interval<=60:raise ValueError('bounded dispatch interval required')
-        if not self.control.read()['paused']:model_route(self.project,self.root/'route.json')
+        if not self.control.read()['paused']:self.provider_status()
         self.status()  # Validate the read surface before any worker is spawned.
         _,kbc,_=native()
         enabled=threading.Event()
@@ -456,15 +510,27 @@ class Runtime:
                     result=self.park_integration(run)
                 write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
                 return
-            route=model_route(self.project,self.root/'route.json')
+            try:route=model_route(self.project,self.root/'route.json')
+            except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
+            def provider_check():
+                try:current=model_route(self.project,self.root/'route.json')
+                except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
+                if current!=route:raise Held('provider_route_changed')
+            def guard():
+                self.control.ensure();provider_check()
+            self.board.guard=guard
             if run.kind=='implementation' and not run.reviewing:
                 work=self.board.workspace(run);frozen=quality.freeze(run,self.board.input(run,'tests'))
                 if not any(work.iterdir()):self.store.checkout(frozen['snapshot'],work)
                 else:quality.protect(frozen['snapshot'],self.store.capture(work),exact_tests=True)
             sandbox=(DraftActivity if run.kind in ('brief','plan') else Sandbox)(self.project,self.store,self.board,run)
             prompt='Delivery activity '+json.dumps(run.binding(),sort_keys=True)+'\n'+prompt
-            result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'])
+            result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'],provider_check=provider_check)
             write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
+        except Held as error:
+            wait=self.store.record('provider_wait',run.binding(),dict(project=self.project.fingerprint(),
+                reason=error.code,status=error.status,delivery_approval=False))
+            write_json(self.root/'runs'/str(number)/'provider-wait.json',dict(receipt=wait))
         except ActivityPaused:
             interrupted=self.store.record('activity_interrupted',run.binding(),dict(project=self.project.fingerprint(),
                 pause=self.control.read()['episode'],delivery_approval=False))

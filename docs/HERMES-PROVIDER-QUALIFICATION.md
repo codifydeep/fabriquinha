@@ -26,8 +26,11 @@ de produção nem libera a execução da equipe.**
 
 Não é um gateway multi-tenant, um sandbox do próprio controlador nem uma
 garantia de autorização de consumo. A autorização de negócio do brief não
-habilita o provedor. A rota de produção do runtime continua recusada até sua
-integração explícita; não basta iniciar este relay.
+habilita o provedor. O runtime aceita a rota de produção somente com
+`provider-policy.json` privado e explícito, identidade do projeto, modelo/token
+da rota e metadados do relay exatos. A implementação dessa admissão não instala
+nem habilita uma política real. A instalação de referência continua sem agentes
+pagos ligados; não basta iniciar este relay.
 
 ## Provas realizadas
 
@@ -58,8 +61,53 @@ iniciar outro canário por hábito. Sem nova autorização, não repetir o envio
 
 ## Próxima fronteira
 
-Conectar política/admissão e espera por provedor ao worker nativo, preservando
-sessão/fase e liberando capacidade, sem contabilizar indisponibilidade financeira
-como falha funcional. Qualificar essa fronteira offline antes de iniciar S4
-real com GitHub e modelo. Telegram, segunda release/memória, instalação limpa e
-cutover continuam pendentes. Essa implementação não introduz outro scheduler.
+### Admissão e espera conectadas ao worker
+
+`runtime.model_route` valida a rota privada fechada (`custom`,
+`chat_completions`, loopback `/v1`) e a política do relay. Em qualificação, uma
+fixture local pode funcionar sem medidor; se existir uma política, ela também é
+obrigatoriamente validada. Em produção, a política nunca é opcional. A fonte do
+modelo nessa rota é essa política explícita, não as antigas configurações de
+perfil do Hermes nem um fallback herdado.
+
+Antes do spawn, indisponibilidade produz a recusa nativa de infraestrutura,
+sem iniciar SDK. Durante a atividade, o watcher observa metadados, interrompe o
+SDK e os handlers deixam de conceder ferramentas. O recibo `provider_wait`
+preserva a identidade da fase; workspace e sessão continuam disponíveis. Um
+handoff já validado não é desfeito por uma indisponibilidade posterior.
+
+O serviço só libera a claim depois de comprovar a morte do processo pelo PID e
+fingerprint nativos. Usa a primitiva de infraestrutura do upstream fixado,
+sem patch: restaura `ready` ou `review`, preserva `consecutive_failures` e aplica
+o cooldown nativo. Não usa `reclaim`/`unblock`, pois essas operações zeram o
+contador. O outcome nativo se chama `spawn_failed`, inclusive no adiamento após
+trabalho parcial; o recibo distingue esse caso da recusa antes de criar processo.
+Não é conclusão, falha funcional nem nova autorização de consumo.
+
+O status mostra a disponibilidade atual separada dos recursos do Docker. A
+outbox recebe o impedimento com chave estável antes da liberação. Integração e
+QA fixos não dependem do provedor de modelo. O cooldown espaça novas verificações
+locais; não remove o marcador financeiro nem autoriza novas inferências. Não é
+uma garantia geral de ausência de starvation sob toda falha de infraestrutura.
+
+`scripts/qualify_hermes_provider_wait.py` passou com SDK, sessões, Kanban e TDD
+Docker reais, usando somente um provedor HTTP local programado:
+
+- 402 após edição do autor e outro na revisão independente.
+- Reinício com cada bloqueio ativo, sem nova reserva ou envio ao provedor local.
+- Um contador de falhas funcionais anterior preservado, sem incremento ou reset.
+- Fase de revisão, arquivo do autor e sessões retomados; mudanças solicitadas,
+  correção, freeze, Green e controles negativos concluídos.
+- Onze runs nativos, dezenove envios locais, zero chamadas pagas. Cooldown do
+  ensaio reduzido explicitamente para dois segundos; produção usa o nativo.
+- Encerramento pausado/drenado, sem workers, sandboxes ou efeitos pendentes.
+
+A primeira tentativa completou TDD, mas seu verificador procurou PID em uma
+recusa que nunca criou processo. Permanece não aprovada. A segunda, em board
+novo e sem reparos durante a execução, passou após corrigir o verificador; não
+houve aprovação retroativa. Decisões eram sintéticas, não julgamento de modelo.
+
+Próximo: preparar instalação e objetivo pequeno S4, obter autorização explícita
+da execução paga e usar GitHub/modelo reais. Telegram, segunda release/memória,
+instalação limpa e cutover continuam pendentes. A implementação não introduz
+outro scheduler, DB ou mecanismo próprio de retry.

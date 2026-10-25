@@ -30,6 +30,8 @@ class NativeRuntime(unittest.TestCase):
         write_json(self.root/'project.json',configuration())
         with patch('fabriquinha.runtime.bind'):
             self.runtime=Runtime(self.root,self.root/'upstream')
+        write_json(self.root/'route.json',dict(base_url='http://127.0.0.1:12345/v1',api_key='fixture-only',
+            provider='custom',api_mode='chat_completions',model='local-fixture'))
 
     def test_only_one_continuous_owner_and_shutdown_does_not_kill_workers(self):
         with Owner(self.root):
@@ -110,7 +112,7 @@ class NativeRuntime(unittest.TestCase):
         with self.assertRaises(ValueError):model_route(self.runtime.project,path)
 
     def test_spawn_uses_fixed_worker_command_without_inherited_provider_keys(self):
-        task=SimpleNamespace(id='task',current_run_id=7,assignee='backend')
+        task=SimpleNamespace(id='task',current_run_id=7,assignee='backend',body='{"kind":"tests"}')
         with patch.dict(os.environ,GH_TOKEN='must-not-inherit',OPENROUTER_API_KEY='must-not-inherit'), \
              patch.object(self.runtime,'check_admission',return_value=dict(ready=True,missing_profiles=[])), \
              patch.object(self.runtime,'settle'), \
@@ -131,7 +133,7 @@ class NativeRuntime(unittest.TestCase):
         self.assertIn('older',self.runtime.settlement)
 
     def test_cached_missing_profile_cannot_refuse_a_fresh_native_dispatch(self):
-        task=SimpleNamespace(id='task',current_run_id=7,assignee='backend')
+        task=SimpleNamespace(id='task',current_run_id=7,assignee='backend',body='{"kind":"tests"}')
         modules={'tools':SimpleNamespace(),'tools.process_registry':SimpleNamespace(RestartSafeScopeUnavailable=EffectBlocked)}
         with patch.dict(sys.modules,modules), \
              patch.object(self.runtime,'check_admission',return_value=dict(ready=True,missing_profiles=['backend'])), \
@@ -143,7 +145,7 @@ class NativeRuntime(unittest.TestCase):
             delivery_roles={'tests':'qa','integration':'devops'},browser_image='sha256:'+'b'*64,
             reviewers={'backend':'lead','lead':'cto','qa':'lead','devops':'qa'})
         self.runtime.project=Project.parse(value);self.runtime.releases=Mock()
-        task=SimpleNamespace(id='work',current_run_id=7,assignee='backend')
+        task=SimpleNamespace(id='work',current_run_id=7,assignee='backend',body='{"kind":"tests"}')
         modules={'tools':SimpleNamespace(),'tools.process_registry':SimpleNamespace(RestartSafeScopeUnavailable=EffectBlocked)}
         with patch.dict(sys.modules,modules),patch.object(self.runtime,'check_admission',return_value={'ready':True}), \
              patch.object(self.runtime,'settle'),patch.object(self.runtime,'_spawn',return_value=42) as spawn:
@@ -151,7 +153,55 @@ class NativeRuntime(unittest.TestCase):
             with self.assertRaises(EffectBlocked):self.runtime.spawn(task,'/unused')
             spawn.assert_not_called();self.assertFalse(self.runtime.control.read()['paused'])
             self.runtime.releases.admit.side_effect=None
-            self.assertEqual(self.runtime.spawn(SimpleNamespace(id='diagnosis'),'/unused'),42)
+            self.assertEqual(self.runtime.spawn(SimpleNamespace(id='diagnosis',body='{"kind":"diagnostic"}'),'/unused'),42)
+
+    def test_production_route_requires_exact_private_policy_and_metadata_admission(self):
+        from fabriquinha.provider import Held
+        value=configuration();value['qualification']=False;project=Project.parse(value)
+        policy=dict(version=1,project=project.fingerprint(),model='example/model',max_calls=100,
+            max_output_tokens=4096,enabled=True,client_token='fixture-client-token-no-provider-key')
+        route=dict(base_url='http://127.0.0.1:12345/v1',api_key=policy['client_token'],provider='custom',
+            api_mode='chat_completions',model=policy['model'])
+        write_json(self.root/'route.json',route);write_json(self.root/'provider-policy.json',policy)
+        with patch('fabriquinha.runtime.inspect_provider',return_value={}) as inspect:
+            self.assertEqual(model_route(project,self.root/'route.json'),route)
+            self.assertEqual(inspect.call_args.args[2],project.fingerprint())
+            inspect.side_effect=Held('provider_paused',402)
+            with self.assertRaises(Held):model_route(project,self.root/'route.json')
+            route['model']='example/alternate';write_json(self.root/'route.json',route)
+            with self.assertRaises(ValueError):model_route(project,self.root/'route.json')
+            self.assertEqual(inspect.call_count,2)
+
+    def test_unavailable_provider_refuses_model_spawn_but_not_fixed_integration(self):
+        from fabriquinha.provider import Held
+        modules={'tools':SimpleNamespace(),'tools.process_registry':SimpleNamespace(RestartSafeScopeUnavailable=EffectBlocked)}
+        with patch.dict(sys.modules,modules),patch('fabriquinha.runtime.model_route',side_effect=Held('provider_paused',402)), \
+             patch.object(self.runtime,'check_admission',return_value={'ready':True}),patch.object(self.runtime,'settle'), \
+             patch.object(self.runtime,'_spawn',return_value=42) as spawn:
+            with self.assertRaises(EffectBlocked):self.runtime.spawn(SimpleNamespace(body='{"kind":"plan"}'),'/unused')
+            spawn.assert_not_called()
+            self.assertEqual(self.runtime.provider,dict(ready=False,reason='provider_paused',status=402))
+            self.assertEqual(self.runtime.spawn(SimpleNamespace(id='deploy',body='{"kind":"integration"}'),'/unused'),42)
+
+    def test_provider_wait_never_releases_live_or_changed_assignment(self):
+        run=Run('task',7,'lead','tests',True,'backend','v1','contract')
+        receipt=self.runtime.store.record('provider_wait',run.binding(),dict(project=self.runtime.project.fingerprint(),reason='provider_paused'))
+        write_json(self.root/'runs/7/provider-wait.json',dict(receipt=receipt))
+        conn=Mock();row=dict(task_id='task',ended_at=None);conn.execute.return_value.fetchone.return_value=row
+        dispatch=Mock();self.runtime.board.current=Mock(return_value=run)
+        with patch('fabriquinha.runtime.native',return_value=(Mock(),None,dispatch)), \
+             patch('fabriquinha.runtime.recorded_worker',return_value=row),patch('fabriquinha.runtime.worker_alive',return_value=True):
+            self.runtime.settle_provider(conn);dispatch._record_task_failure.assert_not_called()
+        self.runtime.board.current.return_value=Run('task',7,'different','tests',True,'backend','v1','contract')
+        with patch('fabriquinha.runtime.native',return_value=(Mock(),None,dispatch)):
+            self.assertIn('7',self.runtime.settle_provider(conn));dispatch._record_task_failure.assert_not_called()
+        self.runtime.board.current.return_value=run
+        with patch('fabriquinha.runtime.native',return_value=(Mock(),None,dispatch)), \
+             patch('fabriquinha.runtime.recorded_worker',return_value=row),patch('fabriquinha.runtime.worker_alive',return_value=False), \
+             patch.object(self.runtime,'settle'):
+            self.runtime.settle_provider(conn)
+        self.assertTrue(dispatch._record_task_failure.call_args.kwargs['infrastructure'])
+        self.assertTrue(dispatch._record_task_failure.call_args.kwargs['end_run'])
 
     def test_second_process_cannot_adopt_an_already_owned_run_or_block_its_owner(self):
         conn=Mock();conn.__enter__=Mock(return_value=conn);conn.__exit__=Mock(return_value=False)

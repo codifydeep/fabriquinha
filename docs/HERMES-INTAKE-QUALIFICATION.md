@@ -219,7 +219,10 @@ e IDs QA existentes. A base dependente exige QA independente do predecessor
 antes de começar, não apenas no aceite final. O relay neutro passou pelo SDK
 local; ver [provedor](HERMES-PROVIDER-QUALIFICATION.md) para evidências e limites.
 
-**Próxima fronteira:** conectar a rota e espera/admissão metered do provedor ao
-worker nativo, respeitando autorizações e bloqueios; depois S4 com modelo e
+**Continuação do provedor:** a rota e espera/admissão metered já passaram no
+worker nativo com dois 402 locais, reinício e TDD completo, preservando sessões,
+fase e contador de falhas anterior. Não há instalação paga ou equipe ligada.
+
+**Próxima fronteira:** preparar S4, com autorização explícita, modelo e
 GitHub reais. O ciclo offline não substitui esse ensaio, a segunda release com
 memória/incidente, instalação reproduzível ou retomada do Truco.

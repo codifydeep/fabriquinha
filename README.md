@@ -48,9 +48,11 @@ vinculação do PR e vida útil das conexões SQLite, sem patch upstream.
 O [relay neutro do provedor](docs/HERMES-PROVIDER-QUALIFICATION.md) também passou
 pelo SDK com transporte local e pausa persistente. Uma única chamada real curta
 autorizada confirmou acesso ao modelo, sem iniciar agentes. O contexto dos
-perfis inclui agora arquitetura, limites e QA existentes. A rota de produção e
-a espera nativa por indisponibilidade do provedor ainda precisam ser conectadas;
-o canário não libera uma execução autônoma nem substitui S4.
+perfis inclui agora arquitetura, limites e QA existentes. A admissão da rota e
+a espera por provedor também passaram no worker nativo: dois 402 locais,
+reinícios e retomada até TDD completo preservaram sessões, fases e orçamento de
+falhas. Ainda faltam instalação/autorização do ensaio real S4; o canário não
+libera uma execução autônoma nem substitui esse marco.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -67,7 +69,9 @@ flowchart LR
     DG --> K
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
     C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
-    N --> V[Relay neutro: SDK local qualificado; produção não conectada]
+    N --> V[Relay neutro: admissão e espera qualificadas; instalação paga pendente]
+    V -->|Indisponível: encerra SDK; confirma processo morto| VW[Adiamento nativo; fase e contador preservados]
+    VW -->|Cooldown; só retoma com admissão válida| K
     F[Pausa persistente e preflight sem modelo] -->|Fence de spawn e ferramentas| C
     K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
     K --> L[Diagnóstico Lead/CTO: SPIKE e orientação]

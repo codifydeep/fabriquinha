@@ -16,7 +16,7 @@ caminho. O legado e as chamadas pagas continuam pausados; nenhuma migração apl
 | [Operação](HERMES-OPERATIONS-QUALIFICATION.md) | Pausa persistente, interrupção, retomada e perfil restaurado sem falso retry | Não libera consumo pago |
 | [Brief/plano](HERMES-INTAKE-QUALIFICATION.md) | Perguntas, aprovação exata do CEO, DAG completo e revisão Lead/CTO; nove atividades SDK | Primeira fatia com dez respostas locais, complementada abaixo |
 | [Ciclo de release](HERMES-INTAKE-QUALIFICATION.md#dag-executável-e-aceite-integral--continuação) | Dois incrementos, seis cards gerados, bases encadeadas, três artefatos, sete atualizações Compose, QA e aceite integral | Terceira tentativa passou; autores/CI sintéticos, não produto autônomo |
-| [Provedor neutro](HERMES-PROVIDER-QUALIFICATION.md) | SDK real com relay sem adapters; pausa/contador preservados; um canário real autorizado respondeu | Não instalado como rota de produção; não libera a equipe |
+| [Provedor neutro](HERMES-PROVIDER-QUALIFICATION.md) | Admissão/espera conectadas ao worker; dois 402 locais, reinício, sessões/fases/budget preservados e TDD concluído; canário real curto anterior passou | Decisões programadas; instalação paga e S4 ainda não iniciados |
 
 **S2 permanece parcial.** Materialização e aceite integral passaram no ciclo
 offline: 24 runs nativos, 11 atividades SDK e 17 respostas locais. Foram corrigidos
@@ -25,17 +25,18 @@ as duas falhas permanecem no histórico. O contexto agora inclui limites técnic
 arquitetura aprovada, observabilidade e cenários QA existentes; bases dependentes
 exigem QA independente do predecessor antes de iniciar. O relay neutro passou
 pelo SDK e uma chamada real curta autorizada confirmou acesso ao modelo, sem
-reativar a equipe. **Próxima fatia:** conectar a rota/admissão ao worker nativo,
-incluindo espera por provedor sem retry funcional ou slot ocupado.
-Depois: liberação autorizada da execução e S4 real sem condução de handoffs pelo
+reativar a equipe. A espera pelo provedor passou depois pelo worker nativo:
+dois bloqueios, dois reinícios e retomada até o TDD completo, com falhas funcionais
+anteriores preservadas. **Próxima fatia:** instalação S4 e objetivo pequeno,
+liberação autorizada da execução e ensaio real sem condução de handoffs pelo
 operador; S5 segunda versão/memória/recuperação; S6 instalação/segundo repo/cutover;
 S7 Truco. Nenhuma release autônoma foi qualificada.
 
-Checks atuais: 181 testes do caminho novo passaram. A última execução dos 4.523
+Checks atuais: 184 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.
-O núcleo tem 19 módulos funcionais + `__init__`, 4.593 linhas incluindo a lane S1;
+O núcleo tem 19 módulos funcionais + `__init__`, 4.672 linhas incluindo a lane S1;
 o desvio da meta 12/~3.000 segue explícito. Recibos completos continuam privados.
 As estimativas e detalhes históricos abaixo não são porcentagens de conclusão
 da nova arquitetura nem evidência de entrega autônoma.

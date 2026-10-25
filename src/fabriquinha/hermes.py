@@ -274,7 +274,7 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     return {name},operations
 
 
-def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None):
+def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None,provider_check=None):
     """Trusted SDK adapter; no lifecycle inference from the assistant's prose.
 
     Route comes from controller configuration, not a model tool argument.
@@ -294,7 +294,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     from run_agent import AIAgent
     from hermes_state import SessionDB
     from toolsets import create_custom_toolset
-    db=SessionDB();agent=None;terminal={};watcher=None;watch_done=threading.Event()
+    db=SessionDB();agent=None;terminal={};watcher=None;watch_done=threading.Event();provider_hold=[]
     def finished(result):
         terminal.update(result)
         agent.interrupt(tool_reason='delivery_handoff')
@@ -334,16 +334,29 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
             label=('Approved business context' if sandbox.run.kind in ('brief','plan') else
                    'Incident context' if sandbox.run.kind=='diagnostic' else 'TDD evidence (historical Red is not to be reproduced)')
             prompt+='\nController-recorded '+label+':\n'+json.dumps(operations.evidence())
-        if stop_requested:
+        if stop_requested or provider_check:
             sandbox.board.ensure(sandbox.run)
             def watch():
                 while not watch_done.is_set():
-                    if stop_requested() and not terminal and not agent.is_interrupted:
+                    if provider_check and not terminal:
+                        from .provider import Held
+                        try:provider_check()
+                        except Held as error:
+                            provider_hold.append(error)
+                            if not watch_done.is_set() and not agent.is_interrupted:agent.hard_interrupt(tool_reason='provider_wait')
+                            return
+                    if stop_requested and stop_requested() and not terminal and not agent.is_interrupted:
                         agent.hard_interrupt(tool_reason='operator_pause')
-                    watch_done.wait(0.1)
+                    watch_done.wait(0.25)
             watcher=threading.Thread(target=watch,daemon=True);watcher.start()
-        result=agent.run_conversation(prompt,conversation_history=history,
-                                     system_message=previous.get('system_prompt') if previous else None)
+        try:
+            result=agent.run_conversation(prompt,conversation_history=history,
+                                         system_message=previous.get('system_prompt') if previous else None)
+        except Exception:
+            if not terminal and provider_check:provider_check()
+            raise
+        if not terminal and provider_hold:raise provider_hold[0]
+        if not terminal and provider_check:provider_check()
         if not terminal and stop_requested and stop_requested():
             from .operations import ActivityPaused
             raise ActivityPaused('SDK activity interrupted by operational pause')
@@ -352,6 +365,6 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                     sdk_exit=result.get('exit_reason'),delivery_approval=False)
     finally:
         watch_done.set()
-        if watcher:watcher.join(timeout=1)
+        if watcher:watcher.join(timeout=4)
         if agent:agent.close()
         db.close();sandbox.close()
