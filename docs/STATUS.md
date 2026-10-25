@@ -56,7 +56,13 @@ desativar controles de qualidade. O proprietário autorizou arquivar o hold com
 cópia recuperável e usar a cota remanescente com saída de até 8.192 tokens, sem
 aumentar o teto de chamadas. A nova tentativa será identificada separadamente.
 
-Checks atuais: 226 testes do caminho novo passaram. A última execução dos 4.523
+O teto maior permitiu chamadas de ferramenta completas na segunda tentativa,
+mas IDs de pacotes foram recusados por uma restrição ausente do schema. Não houve
+aprovação de plano ou entrega. O schema agora expõe IDs, donos e critérios reais,
+com erros por campo; pacotes são verticais, não duplicações dos passos do controlador.
+Essa tentativa também permanece não qualificada, sem converter textos em execução.
+
+Checks atuais: 228 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.

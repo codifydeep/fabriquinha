@@ -226,3 +226,31 @@ fase e contador de falhas anterior. Não há instalação paga ou equipe ligada.
 **Próxima fronteira:** preparar S4, com autorização explícita, modelo e
 GitHub reais. O ciclo offline não substitui esse ensaio, a segunda release com
 memória/incidente, instalação reproduzível ou retomada do Truco.
+
+## Interface de planejamento alinhada — 25 de outubro de 2026
+
+O S4 real encontrou uma divergência que as respostas programadas não expunham:
+o validador exigia IDs minúsculos sem pontos, mas a ferramenta mostrava somente
+`string`. O modelo enviou quatro propostas com IDs incompatíveis e recebeu o
+mesmo erro genérico sobre ID/dono, embora os donos estivessem corretos. Nenhuma
+proposta foi aceita; houve bloqueio, não um plano falsamente executado.
+
+`draft_schemas` agora usa as mesmas constantes do validador para IDs. Expõe os
+donos configurados, critérios do brief exato aprovado, limites de campos,
+dependências únicas e formato fechado. O erro distingue `tasks[n].id`, duplicação
+e `tasks[n].owner`; não corrige silenciosamente argumentos do modelo. Exemplos
+inválidos permanecem inválidos, com diagnóstico que permite ao agente corrigir.
+
+O contrato também explicita a unidade de trabalho: um pacote vertical de
+implementação, implantável e testável, não cada passo interno do processo.
+Testes, revisões independentes, implementação, CI/deploy e QA já são gerados pelo
+controlador para cada pacote. Repeti-los no DAG como pacotes adicionais criaria
+decomposição desnecessária e critérios impossíveis de satisfazer parcialmente.
+O limite de 24 pacotes permanece; não foram removidos cobertura integral,
+revisão do CTO, gates de TDD ou o limite de dois workers.
+
+A prova offline verificou os padrões/enums efetivamente presentes na requisição
+do SDK, além de revisão independente, alterações e cobertura: nove atividades,
+dez respostas locais e zero chamadas pagas. Não é julgamento real de arquitetura.
+As tentativas reais bloqueadas permanecem não qualificadas; o operador não
+normalizou/importou o plano nem aprovou em nome de um revisor para obter sucesso.

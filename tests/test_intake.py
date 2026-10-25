@@ -1,6 +1,7 @@
 """Business approval and work coverage are not execution or release approval."""
 import copy
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 import sys
@@ -14,7 +15,7 @@ from fabriquinha.artifacts import Store
 from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.hermes import tool_names
-from fabriquinha.intake import brief, plan, Intake, DraftActivity, DraftTools
+from fabriquinha.intake import brief, plan, Intake, DraftActivity, DraftTools,draft_schemas,WORK_ID_PATTERN
 from test_delivery_core import configuration
 
 
@@ -63,6 +64,25 @@ class IntakeContracts(unittest.TestCase):
         for field,value in (('criteria',['ROOM']),('criteria',['UNAPPROVED']),('owner','unconfigured')):
             broken=work();broken['tasks'][1][field]=value
             with self.subTest(field=field,value=value),self.assertRaises(ValueError):plan(broken,document(),self.project)
+
+    def test_schema_exposes_exact_work_ids_owners_and_approved_criteria(self):
+        schemas=draft_schemas(self.project,['ROOM','JOIN'])
+        fields=schemas['plan_submit']['tasks']['items']['properties']
+        self.assertEqual(fields['id']['pattern'],WORK_ID_PATTERN)
+        self.assertEqual(fields['owner']['enum'],list(self.project.reviewers))
+        self.assertEqual(fields['criteria']['items']['enum'],['ROOM','JOIN'])
+        self.assertEqual(fields['title']['maxLength'],200)
+        self.assertEqual(fields['depends_on']['items']['pattern'],WORK_ID_PATTERN)
+        self.assertIn('IMPLEMENTATION PACKAGES',schemas['plan_submit']['tasks']['description'])
+        self.assertIn('controller generates',schemas['plan_submit']['tasks']['description'])
+
+    def test_rejected_id_and_role_feedback_identifies_the_actual_field(self):
+        for name in ('S4-1.1','S4-1-probe','../host'):
+            broken=work();broken['tasks'][0]['id']=name
+            self.assertIsNone(re.fullmatch(draft_schemas(self.project)['plan_submit']['tasks']['items']['properties']['id']['pattern'],name))
+            with self.assertRaisesRegex(ValueError,r'tasks\[0\]\.id must match'):plan(broken,document(),self.project)
+        broken=work();broken['tasks'][0]['owner']='unknown'
+        with self.assertRaisesRegex(ValueError,r'tasks\[0\]\.owner must be one of:'):plan(broken,document(),self.project)
 
     def test_plan_rejects_unknown_dependencies_cycles_and_duplicate_identity(self):
         for deps in (['unknown'],['join'],['room','room']):

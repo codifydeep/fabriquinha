@@ -13,6 +13,14 @@ from .kanban_lane import native
 from .config import execution_context
 
 HUMAN_REVIEWER='fabriquinha-ceo'  # Reserved human identity, never an installed model profile.
+WORK_ID_PATTERN=r'^[a-z][a-z0-9_-]{0,31}$'
+CRITERION_ID_PATTERN=r'^[A-Z][A-Z0-9_-]{0,31}$'
+PACKAGE_CONTRACT=(
+    'Tasks are independently deployable vertical IMPLEMENTATION PACKAGES, not internal workflow steps. '
+    'The controller generates test-authoring, independent test review, implementation, independent delivery review, '
+    'CI/integration/deployment and deployed QA for each package. Do not create separate packages for those steps, '
+    'briefing or planning. Choose the smallest useful packages covering all approved criteria; a small feature '
+    'typically needs one package. Each package must satisfy its assigned browser acceptance criteria when deployed.')
 
 def text(value, limit=4000):
     if not isinstance(value,str) or not 1<=len(value.strip())<=limit or '\0' in value:
@@ -37,7 +45,7 @@ def brief(value):
     seen=set()
     for item in criteria:
         if (not isinstance(item,dict) or set(item)!={'id','statement'}
-                or not isinstance(item['id'],str) or not re.fullmatch('[A-Z][A-Z0-9_-]{0,31}',item['id'])
+                or not isinstance(item['id'],str) or not re.fullmatch(CRITERION_ID_PATTERN,item['id'])
                 or item['id'] in seen):raise ValueError('unique criterion identity required')
         text(item['statement']);seen.add(item['id'])
     if len(encoded(value))>64000:raise ValueError('brief exceeds context bound')
@@ -51,11 +59,15 @@ def plan(value, approved, project):
     tasks=value['tasks'];criteria={item['id'] for item in approved['criteria']}
     if not isinstance(tasks,list) or not 1<=len(tasks)<=24:raise ValueError('bounded work DAG required')
     graph={};covered=set()
-    for item in tasks:
-        if (not isinstance(item,dict) or set(item)!={'id','title','owner','depends_on','criteria','acceptance'}
-                or not isinstance(item['id'],str) or not re.fullmatch('[a-z][a-z0-9_-]{0,31}',item['id'])
-                or item['id'] in graph or not isinstance(item['owner'],str)
-                or item['owner'] not in project.reviewers):raise ValueError('unique work id and configured reviewed owner required')
+    for index,item in enumerate(tasks):
+        field=f'tasks[{index}]'
+        if not isinstance(item,dict) or set(item)!={'id','title','owner','depends_on','criteria','acceptance'}:
+            raise ValueError(field+' requires exactly id, title, owner, depends_on, criteria, acceptance')
+        if not isinstance(item['id'],str) or not re.fullmatch(WORK_ID_PATTERN,item['id']):
+            raise ValueError(field+'.id must match '+WORK_ID_PATTERN+' (lowercase; no dots, spaces or slashes)')
+        if item['id'] in graph:raise ValueError(field+'.id duplicates another package: '+item['id'])
+        if not isinstance(item['owner'],str) or item['owner'] not in project.reviewers:
+            raise ValueError(field+'.owner must be one of: '+', '.join(project.reviewers))
         text(item['title'],200);text(item['acceptance'])
         texts(item['depends_on'],maximum=24);texts(item['criteria'],minimum=1,maximum=24)
         if len(set(item['depends_on']))!=len(item['depends_on']) or len(set(item['criteria']))!=len(item['criteria']):
@@ -257,7 +269,7 @@ class DraftTools:
         approval=self.a.board.input(self.run,'approved_brief');record,proposal=self.intake.approved(approval)
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
         result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers),
-                    execution=execution_context(self.a.project))
+                    execution=execution_context(self.a.project),work_unit_contract=PACKAGE_CONTRACT)
         if self.run.reviewing:
             receipt=self.a.store.receipt(self.a.board.input(self.run,'plan',review_handoff=True),kind='work_plan')
             origin=receipt['binding']
@@ -313,23 +325,36 @@ class DraftTools:
         return dict(status='plan_approved' if args['decision']=='approve' else 'plan_changes_requested',review=receipt,delivery_approval=False)
 
 
+def draft_schemas(project,criteria_ids=()):
+    """Same constraints exposed to the model and enforced by the controller."""
+    string=dict(type='string',minLength=1,maxLength=4000)
+    array=dict(type='array',items=string,maxItems=16)
+    work_id=dict(type='string',minLength=1,maxLength=32,pattern=WORK_ID_PATTERN)
+    criterion_id=dict(type='string',minLength=1,maxLength=32,pattern=CRITERION_ID_PATTERN)
+    criterion=dict(type='object',additionalProperties=False,required=['id','statement'],properties=dict(id=criterion_id,statement=string))
+    work=dict(type='object',additionalProperties=False,required=['id','title','owner','depends_on','criteria','acceptance'],
+        properties=dict(id=work_id,title={**string,'maxLength':200},owner=dict(type='string',enum=list(project.reviewers)),
+            depends_on=dict(type='array',maxItems=24,uniqueItems=True,items=work_id),
+            criteria=dict(type='array',minItems=1,maxItems=24,uniqueItems=True,
+                items={**criterion_id,**({'enum':list(criteria_ids)} if criteria_ids else {})}),acceptance=string))
+    return dict(
+        brief_submit=dict(summary=dict(type='string',minLength=1,maxLength=12000),criteria=dict(type='array',minItems=1,
+                          maxItems=20 if project.delivery_roles else 24,items=criterion),
+                          out_of_scope=array,assumptions=array,observability=string),
+        brief_question=dict(question=string,context=string,options=dict(type='array',minItems=2,maxItems=4,items=string)),
+        plan_submit=dict(architecture=dict(type='string',minLength=1,maxLength=12000),tasks=dict(type='array',minItems=1,
+            maxItems=24,items=work,description=PACKAGE_CONTRACT),observability=string),
+        plan_review=dict(decision=dict(type='string',enum=['approve','changes']),reason=string,findings=dict(type='array',maxItems=8,items=string)))
+
+
 def register_draft(activity,on_terminal):
     from tools.registry import registry
     operations=DraftTools(activity)
     names={'plan_review':operations.review} if activity.run.reviewing else (
         {'brief_submit':operations.submit,'brief_question':operations.question} if activity.run.kind=='brief' else {'plan_submit':operations.submit})
-    # Full closed schemas are generated from fixed examples below, never by a worker.
-    string=dict(type='string',minLength=1,maxLength=4000)
-    array=dict(type='array',items=string,maxItems=16)
-    criterion=dict(type='object',additionalProperties=False,required=['id','statement'],properties=dict(id=string,statement=string))
-    work=dict(type='object',additionalProperties=False,required=['id','title','owner','depends_on','criteria','acceptance'],
-        properties=dict(id=string,title=string,owner=string,depends_on=array,criteria=array,acceptance=string))
-    properties=dict(
-        brief_submit=dict(summary=dict(type='string',minLength=1,maxLength=12000),criteria=dict(type='array',minItems=1,maxItems=24,items=criterion),
-                          out_of_scope=array,assumptions=array,observability=string),
-        brief_question=dict(question=string,context=string,options=dict(type='array',minItems=2,maxItems=4,items=string)),
-        plan_submit=dict(architecture=dict(type='string',minLength=1,maxLength=12000),tasks=dict(type='array',minItems=1,maxItems=24,items=work),observability=string),
-        plan_review=dict(decision=dict(type='string',enum=['approve','changes']),reason=string,findings=dict(type='array',maxItems=8,items=string)))
+    criteria_ids=([item['id'] for item in operations.evidence()['approved_brief']['criteria']]
+                  if activity.run.kind=='plan' else ())
+    properties=draft_schemas(activity.project,criteria_ids)
     for name,operation in names.items():
         def handler(args,operation=operation,**kwargs):
             result=operation(args)

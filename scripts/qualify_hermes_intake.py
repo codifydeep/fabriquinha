@@ -75,6 +75,13 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             assert run.binding()==binding
             expected={'plan_review'} if run.reviewing else {'brief_submit','brief_question'} if run.kind=='brief' else {'plan_submit'}
             assert {tool['function']['name'] for tool in body['tools']}==expected
+            if run.kind=='plan' and not run.reviewing:
+                from fabriquinha.intake import WORK_ID_PATTERN
+                schema=body['tools'][0]['function']['parameters']['properties']['tasks']
+                fields=schema['items']['properties']
+                assert fields['id']['pattern']==WORK_ID_PATTERN
+                assert fields['owner']['enum']==list(runtime.project.reviewers)
+                assert fields['criteria']['items']['enum']==['CREATE','JOIN']
             all_requests.append(dict(binding=binding,tools=sorted(expected),max_tokens=body.get('max_tokens')))
             if run.number not in sequences:
                 actor='product' if run.kind=='brief' else 'cto' if run.reviewing else 'lead'
@@ -239,7 +246,7 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             else:raise AssertionError('metadata admission bypassed the financial pause')
             assert relay.status()['calls']==10 and len(all_requests)==10
             result.update(neutral_relay=True,relay_calls=10,paused_request_not_forwarded=True,
-                sdk_output_budget_aligned=True,legacy_adapters=0)
+                sdk_output_budget_aligned=True,plan_schema_constraints_observed=True,legacy_adapters=0)
         write_json(root/'receipt.json',result);return result
     finally:
         if relay_server:
