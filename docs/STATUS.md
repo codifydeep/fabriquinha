@@ -7,10 +7,11 @@ Temporal não participam do caminho novo; a instalação legada permanece pausad
 O proprietário aprovou o refinamento F1, implementado e validado com
 Chromium/Docker. As provas R1/R2 usaram zero chamadas pagas. O novo S4 usa
 Claude Haiku sob cota específica autorizada, com relay isolado e perfis limpos.
-A tentativa real mais recente chegou ao Green, mas terminou em triagem antes
+Uma tentativa real anterior chegou ao Green, mas terminou em triagem antes
 da revisão da entrega. O CTO manteve um bloqueio explícito; relay e dispatcher
 foram desligados após drenagem. O feedback dos controles e o limite de exploração
-foram corrigidos e qualificados offline. Outra fronteira limpa está preparada.
+foram corrigidos e qualificados offline. Outra fronteira limpa está ativa:
+o brief idêntico foi aprovado, o CTO revisou o plano e o QA iniciou o Red.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -24,7 +25,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais; recuperação pelo Lead até concluir testes | Controles aceitos, revisão da entrega, PR/CI, integração, deploy e QA; a última tentativa terminou em triagem |
+| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais em tentativa anterior; recuperação pelo Lead até concluir testes | Nova fronteira ativa no Red; controles aceitos, revisão da entrega, PR/CI, integração, deploy e QA ainda pendentes |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |

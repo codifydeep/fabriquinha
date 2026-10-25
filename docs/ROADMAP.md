@@ -80,6 +80,10 @@ e handler. Passou offline sem dispensar controles ou alterar testes congelados.
 Repetir em fronteira limpa com essas pré-condições, mantendo o modelo e o teto
 de saída e sem importar provas técnicas anteriores.
 
+A nova fronteira foi iniciada após CI inicial verde e igualdade canônica do
+brief. O CTO aprovou seu plano e o QA está produzindo Red. A tentativa anterior
+em triagem permanece preservada; não conta como release entregue.
+
 **Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
 → `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do
 aceite. Reparos externos tornam a tentativa assistida. Não substituir essa prova
