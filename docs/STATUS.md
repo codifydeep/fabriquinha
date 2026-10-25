@@ -62,11 +62,30 @@ aprovação de plano ou entrega. O schema agora expõe IDs, donos e critérios r
 com erros por campo; pacotes são verticais, não duplicações dos passos do controlador.
 Essa tentativa também permanece não qualificada, sem converter textos em execução.
 
-Checks atuais: 228 testes do caminho novo passaram. A última execução dos 4.523
+A terceira tentativa avançou: Lead planejou, CTO aprovou, QA produziu Red e as
+revisões solicitaram correções. O processo, porém, repetiu testes estáticos de
+HTML/JS sem comprovar interação, até atingir a cota. A imagem original não
+oferecia navegador no Red/Green; não houve implementação ou PR de produto.
+
+A [capacidade TDD de navegador](BROWSER-TDD-QUALIFICATION.md) agora passou em
+quatro jobs Docker/Chromium reais: Red por assertion, mesmos testes congelados
+em Green, controle negativo sem efeito rejeitado e escrita/credenciais negadas.
+Uma instalação limpa foi preparada pausada, com nove perfis e sem copiar testes,
+sessões ou revisões antigas. A CI local dessa instalação passou novamente sobre
+a base exata. O próximo S4 ainda não está qualificado. A escalada explícita de
+revisão ao CTO passou em 11 runs nativos/34 respostas locais, com retorno à revisão
+e achados completos para o autor. Detecção pelo modelo e cobertura geral de
+starvation continuam sem comprovação; a proteção de reincidência nativa permanece.
+
+O proprietário autorizou mais 64 chamadas (teto S4 de 6.420), saída de até 8.192
+tokens e reaplicação do aceite apenas se o novo documento de Produto for idêntico
+ao aprovado. Não há fallback, reset do contador ou importação de evidências antigas.
+
+Checks atuais: 233 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.
-O núcleo tem 19 módulos funcionais + `__init__`, aproximadamente 4.900 linhas incluindo a lane S1;
+O núcleo tem 19 módulos funcionais + `__init__`, aproximadamente 5.100 linhas incluindo a lane S1;
 o desvio da meta 12/~3.000 segue explícito. Recibos completos continuam privados.
 As estimativas e detalhes históricos abaixo não são porcentagens de conclusão
 da nova arquitetura nem evidência de entrega autônoma.

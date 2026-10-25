@@ -91,6 +91,28 @@ class FailedJobRecovery(unittest.TestCase):
     def test_timeout_is_archived_retired_and_never_restarted(self):
         self.check_failure()
 
+    def test_browser_capability_requires_a_qualified_image_label(self):
+        project=Project.parse({**configuration(),'browser_tdd':True})
+        image=dict(Id=project.validation_image,Config=dict(User='65534:65534',
+            Entrypoint=['python','-B','/opt/fabriquinha/suite.py'],Labels={}))
+        with patch('fabriquinha.executor.docker',return_value=json.dumps([image])):
+            with self.assertRaisesRegex(ValueError,'browser TDD image capability'):Runner(project,self.store)
+        image['Config']['Labels']['fabriquinha.browser-tdd']='1'
+        with patch('fabriquinha.executor.docker',return_value=json.dumps([image])):
+            self.assertIsInstance(Runner(project,self.store),Runner)
+
+    def test_browser_profile_keeps_readonly_no_network_and_bounded_resources(self):
+        self.runner.project=Project.parse({**configuration(),'browser_tdd':True})
+        with patch.object(self.runner,'_execute',return_value='fixture-job') as execute:
+            self.runner.run(self.run,self.snapshot,'red')
+        command=execute.call_args.args[2]
+        self.assertEqual(command[command.index('--memory')+1],'512m')
+        self.assertEqual(command[command.index('--pids-limit')+1],'128')
+        self.assertEqual(command[command.index('--network')+1],'none')
+        self.assertIn('--read-only',command)
+        self.assertIn('/tmp:rw,noexec,nosuid,size=128m',command)
+        self.assertTrue(command[-2].endswith(',dst=/workspace,readonly'))
+
     def test_rejected_start_is_archived_retired_and_never_restarted(self):
         self.failure = 'start'
         self.check_failure()

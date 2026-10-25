@@ -1,0 +1,7 @@
+# Reuse the already-qualified cached browser base. No dependency download.
+FROM delivery-kit-browser-qa:20261001.1@sha256:72cb1ba338b9f4047a52a8fea4702ebebebc7eb9dac11aba9c1becf605c12b4b
+COPY src/fabriquinha/suite.py /opt/fabriquinha/suite.py
+USER 65534:65534
+ENV PYTHONDONTWRITEBYTECODE=1 HOME=/tmp
+ENTRYPOINT ["python", "-B", "/opt/fabriquinha/suite.py"]
+LABEL org.opencontainers.image.source="https://github.com/codifydeep/fabriquinha" fabriquinha.browser-tdd="1"

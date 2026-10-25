@@ -70,6 +70,13 @@ não se qualificou para autonomia. O contrato de saída SDK/relay foi corrigido
 offline, e uma chamada de transporte incerto permaneceu contabilizada, sem repetição;
 o hold foi arquivado pelo operador somente com autorização explícita e cópia de recuperação.
 Não houve PR de feature nem homologação de produto por esse caminho.
+O S4 seguinte expôs uma lacuna de toolchain: navegador somente pós-deploy não
+basta para TDD de interação client-side. A [capacidade de navegador no próprio
+Red/Green](docs/BROWSER-TDD-QUALIFICATION.md) passou com Chromium real e um
+controle que mantém palavras no código sem implementar a interação. Usa o mesmo
+executor/comando e isolamento; não adiciona outro motor de workflow. A instalação
+nova ainda precisa de uma entrega real, e sua base de navegador depende do cache
+local até a qualificação de instalação limpa S6.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -90,8 +97,10 @@ flowchart LR
     V -->|Indisponível: encerra SDK; confirma processo morto| VW[Adiamento nativo; fase e contador preservados]
     VW -->|Cooldown; só retoma com admissão válida| K
     F[Pausa persistente e preflight sem modelo] -->|Fence de spawn e ferramentas| C
-    K[Hermes Kanban] --> T[TDD e revisão imutável com suplência]
+    K[Hermes Kanban] --> T[TDD unitário e navegador opt-in; revisão imutável]
     K --> L[Diagnóstico Lead/CTO: SPIKE e orientação]
+    T -->|Impedimento explícito de revisão| L
+    L -->|Retoma autor ou revisão; preserva os gates| K
     L -->|Retomada nativa; gates preservados| T
     K --> O[Outbox durável; sender sem modelo]
     O --> B[Transporte local qualificado; Telegram real pendente]

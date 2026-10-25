@@ -91,3 +91,21 @@ class ModelDeliveryOperations(unittest.TestCase):
         receipt=self.store.receipt(self.events[-1][1][2]['tests'],kind='tests_frozen')
         self.assertEqual(receipt['payload']['red'],red)
         self.assertEqual(result['status'],'completed')
+
+    def test_review_impasse_records_changes_and_escalates_without_freeze_or_approval(self):
+        red=self.store.record('red',self.run.binding(),dict(project=self.project.fingerprint(),snapshot=self.baseline,
+            baseline=self.baseline,cases=['existing','new'],new_cases=['new']))
+        self.board.input=lambda *args,**kwargs:red
+        self.board.escalate_review=Mock()
+        self.sandbox.run=replace(self.run,number=2,actor='lead',reviewing=True)
+        tools=DeliveryTools(self.sandbox,self.quality)
+        result=tools.review(dict(decision='escalate',reason='Need a CTO experiment',
+            findings=[dict(path='app.py',line=1,detail='Clarify behavior using an isolated experiment')]))
+        record=self.store.receipt(result['escalation'],kind='review_escalation')
+        review=self.store.receipt(record['payload']['review'],kind='test_review')
+        self.assertEqual(review['payload']['verdict']['decision'],'changes')
+        self.assertEqual(record['binding'],self.sandbox.run.binding())
+        self.assertEqual(record['payload']['snapshot'],self.baseline)
+        self.assertEqual([event[0] for event in self.events],['close'])
+        self.board.escalate_review.assert_called_once_with(self.sandbox.run,result['escalation'])
+        self.assertFalse(result['delivery_approval'])

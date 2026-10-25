@@ -54,6 +54,8 @@ class Runner:
                 or image['Config'].get('User') != '65534:65534'
                 or image['Config'].get('Entrypoint') != ['python', '-B', '/opt/fabriquinha/suite.py']):
             raise ValueError('canonical unprivileged fixed validator image required')
+        if project.browser_tdd and (image['Config'].get('Labels') or {}).get('fabriquinha.browser-tdd')!='1':
+            raise ValueError('qualified browser TDD image capability required')
 
     def inspect(self, name, expected):
         info = json.loads(docker('inspect', name))[0]
@@ -131,9 +133,9 @@ class Runner:
         command = ['create', '--name', name, *grouping('validation', self.project.namespace),
             '--label', 'fabriquinha.job='+key, '--network', 'none', '--read-only',
             '--user', '65534:65534', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true',
-            '--memory', '256m', '--cpus', '1', '--pids-limit', '128',
+            '--memory', '512m' if self.project.browser_tdd else '256m', '--cpus', '1', '--pids-limit', '128',
             '--log-opt', 'max-size=1m', '--log-opt', 'max-file=2',
-            '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m', '--workdir', '/workspace',
+            '--tmpfs', '/tmp:rw,noexec,nosuid,size=128m' if self.project.browser_tdd else '/tmp:rw,noexec,nosuid,size=64m', '--workdir', '/workspace',
             '--env', 'PYTHONDONTWRITEBYTECODE=1', '--env', 'FABRIQUINHA_TESTS_DIR='+self.project.tests_dir,
             '--mount', f'type=bind,src={self.store.tree(snapshot)},dst=/workspace,readonly',
             self.project.validation_image]

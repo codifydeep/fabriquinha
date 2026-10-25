@@ -248,12 +248,14 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     if sandbox.run.reviewing:
         name='delivery_review'
         schema=dict(type='object',additionalProperties=False,required=['decision','reason','findings'],properties=dict(
-            decision={'type':'string','enum':['approve','changes']},reason={'type':'string','minLength':1,'maxLength':2000},
+            decision={'type':'string','enum':['approve','changes','escalate']},reason={'type':'string','minLength':1,'maxLength':2000},
             findings=dict(type='array',maxItems=8,items=dict(type='object',additionalProperties=False,
                 required=['path','line','detail'],properties=dict(path={'type':'string'},
                     line={'type':'integer','minimum':1},detail={'type':'string','minLength':1,'maxLength':2000})))))
         operation=operations.review
-        description='Submit independent review of the existing immutable delivery. Never recreate Red or edit the author work.'
+        description=('Review the immutable delivery: approve, request concrete changes, or escalate a technical impasse to CTO. '
+            'Use escalate instead of repeatedly requesting unsupported work or ending in prose. It never approves delivery. '
+            'Never recreate Red or edit author work.')
     else:
         name='delivery_submit'
         schema=dict(type='object',additionalProperties=False,properties={})
@@ -331,6 +333,8 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
             fallback_model=None,ephemeral_system_prompt=phase)
         if agent.valid_tool_names!=allowed:raise ValueError('native tool surface diverged from phase policy')
         restrict_handlers(sandbox,allowed)
+        if sandbox.run.kind in ('tests','implementation'):
+            prompt+='\nController-recorded previous review findings:\n'+json.dumps(sandbox.board.review_feedback(sandbox.run,sandbox.store))
         if sandbox.run.reviewing or sandbox.run.kind in ('diagnostic','brief','plan'):
             label=('Approved business context' if sandbox.run.kind in ('brief','plan') else
                    'Incident context' if sandbox.run.kind=='diagnostic' else 'TDD evidence (historical Red is not to be reproduced)')

@@ -1,0 +1,5 @@
+**
+!Dockerfile.validation-browser
+!src/
+!src/fabriquinha/
+!src/fabriquinha/suite.py

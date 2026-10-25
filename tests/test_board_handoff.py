@@ -3,17 +3,46 @@ import json
 from pathlib import Path
 import sqlite3
 import sys
+import tempfile
+from dataclasses import replace
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.board import Board
+from fabriquinha.board import Board, Run
+from fabriquinha.artifacts import Store
 from fabriquinha.config import Project
 from test_delivery_core import configuration
 
 
 class ClosedParentHandoff(unittest.TestCase):
+    def test_complete_review_findings_are_scoped_to_author_contract_and_reviewer_execution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store=Store(Path(directory)/'private');work=Path(directory)/'work';work.mkdir()
+            (work/'app.py').write_text('VALUE = 1\n');snapshot=store.capture(work)
+            project=Project.parse(configuration());board=Board(project)
+            run=Run('task',3,'backend','tests',False,'backend','v1','contract')
+            reviewer=replace(run,number=2,actor='lead',reviewing=True)
+            verdict=dict(decision='changes',reason='Fix behavior',findings=[dict(path='app.py',line=1,detail='Assert actual behavior')])
+            payload=dict(project=project.fingerprint(),snapshot=snapshot,verdict=verdict)
+            conn=sqlite3.connect(':memory:');conn.row_factory=sqlite3.Row;self.addCleanup(conn.close)
+            conn.execute('CREATE TABLE task_events(id INTEGER PRIMARY KEY,task_id,run_id,kind,payload)')
+            def event(receipt):
+                conn.execute('DELETE FROM task_events')
+                conn.execute('INSERT INTO task_events VALUES(1,?,?,?,?)',('task',2,'changes_requested',
+                    json.dumps(dict(reason=json.dumps(dict(evidence={'review':receipt}))))))
+            kbc=SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(conn))
+            with patch.object(board,'ensure'),patch('fabriquinha.board.native',return_value=(None,kbc,None)):
+                event(store.record('test_review',reviewer.binding(),payload))
+                result=board.review_feedback(run,store)
+                self.assertEqual(result[0]['verdict'],verdict)
+                for invalid in (replace(reviewer,task='another'),replace(reviewer,contract='other'),
+                                replace(reviewer,number=99),replace(reviewer,actor='backend'),
+                                replace(reviewer,reviewing=False)):
+                    event(store.record('test_review',invalid.binding(),payload))
+                    with self.subTest(binding=invalid),self.assertRaises(ValueError):board.review_feedback(run,store)
+
     def test_package_coverage_is_read_from_current_server_contract(self):
         task=SimpleNamespace(body=json.dumps(dict(release_plan='reviewed-plan',criteria=['APPROVED'])))
         api=SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(None))

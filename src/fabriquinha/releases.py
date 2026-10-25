@@ -201,7 +201,10 @@ class Releases:
             tdd='Tests author: change tests only; Red requires a real failing assertion in a new test body, not import/discovery/runtime errors. '
                 'Never change old tests/configs or reduce discovery. Implementer: Green uses the exact frozen inventory. '
                 'delivery_submit mutations are disposable full replacements of existing product files, not patches; never tests/configs. '
-                'Controls must fail by assertions and collectively cover every new test. Controller executes all evidence, never accept prose pass claims.',
+                'Controls must fail by assertions and collectively cover every new test. Controller executes all evidence, never accept prose pass claims. '
+                'Tests author and reviewer are part of the team: they may pin selectors and deterministic UI wording where the approved brief delegates those choices. '
+                'Treat those frozen choices as the implementation contract, not new CEO decisions; never add out-of-scope requirements. '
+                'Use actual browser_protocol operations, not hypothetical unsupported assertions.',
             browser='Add only missing criterion IDs in '+self.project.tests_dir+'/qa.'+body['package']+'-'+run.release[:12]+'.json; '
                 'preserve every old QA contract and avoid duplicate IDs. Follow browser_protocol, including exact field names.')
 

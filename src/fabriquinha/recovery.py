@@ -24,7 +24,11 @@ class Diagnostic:
         self.experiment=None
 
     def evidence(self):
-        result=dict(incident=self.incident,failed_execution=self.original)
+        from .config import execution_context
+        result=dict(incident=self.incident,failed_execution=self.original,execution=execution_context(self.q.project))
+        if self.incident.get('review_escalation'):
+            escalation=self.store.receipt(self.incident['review_escalation'],kind='review_escalation')['payload']
+            result['review_feedback']=self.store.receipt(escalation['review'])['payload']['verdict']
         kb,kbc,_=native()
         with kbc.connect_closing() as conn:
             body=json.loads(kb.get_task(conn,self.run.task).body)
@@ -125,18 +129,29 @@ class Recovery:
         source=Run(task.id,row['id'],row['profile'],body['kind'],reviewing,author,body['release'],digest(body))
         failure=row['summary'] or row['error'] or task.result or 'Native worker could not complete'
         payload=json.loads(event['payload'] or '{}')
-        reason=payload.get('reason')
+        reason=payload.get('reason');escalation_id=None
         if isinstance(reason,str):
-            try:
-                data=json.loads(reason)
+            try:data=json.loads(reason)
+            except (ValueError,TypeError):data=None
+            if isinstance(data,dict):
                 if data.get('failure'):
                     failure_record=self.store.receipt(data['failure'],kind='worker_failure')
                     if failure_record['binding']==source.binding():failure=failure_record['payload']['message']
-            except (ValueError,TypeError):pass
+                if data.get('category')=='review_escalation':
+                    record=self.store.receipt(data['escalation'],kind='review_escalation')
+                    review=self.store.receipt(record['payload']['review'],kind='test_review' if source.kind=='tests' else 'delivery_review')
+                    if (not source.reviewing or record['binding']!=source.binding()
+                            or record['payload']['project']!=self.project.fingerprint()
+                            or record['payload']['snapshot']!=snapshot or review['binding']!=source.binding()
+                            or review['payload']['project']!=self.project.fingerprint()
+                            or review['payload']['snapshot']!=snapshot or review['payload']['verdict']['decision']!='changes'):
+                        raise ValueError('exact review escalation required')
+                    escalation_id=data['escalation']
+                    failure='Independent review technical impasse; CTO experiment and guidance required'
         cause=digest([task.id,source.contract,reviewing,snapshot,failure])
         incident=self.store.record('incident',source.binding(),dict(project=self.project.fingerprint(),snapshot=snapshot,
             source=task.id,source_run=row['id'],block_event=event['id'],cause=cause,failure=failure,
-            workspace=task.workspace_path))
+            workspace=task.workspace_path,**({'review_escalation':escalation_id} if escalation_id else {})))
         # A native idempotent anchor survives restart before stage materialization.
         self.create(conn,incident,stage)
 

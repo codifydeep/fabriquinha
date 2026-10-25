@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from fabriquinha.artifacts import Store, protected_unchanged, digest
-from fabriquinha.config import Project
+from fabriquinha.config import Project,execution_context
 
 
 def configuration():
@@ -64,6 +64,15 @@ class ProjectBoundaries(unittest.TestCase):
         browser=Project.parse({**configuration(),'browser_image':'sha256:'+'b'*64})
         self.assertNotEqual(browser.fingerprint(),digest(old))
         with self.assertRaises(ValueError):Project.parse({**configuration(),'browser_image':'browser:latest'})
+
+    def test_browser_tdd_is_explicit_and_does_not_claim_unavailable_tools(self):
+        old=Project.parse(configuration());new=Project.parse({**configuration(),'browser_tdd':True})
+        self.assertNotEqual(old.fingerprint(),new.fingerprint())
+        self.assertEqual(execution_context(old)['test_tooling']['available'],['unittest'])
+        self.assertIn('playwright.sync_api',execution_context(new)['test_tooling']['available'])
+        self.assertIn('assertion',execution_context(new)['test_tooling']['contract'])
+        for value in ('true',1,[]):
+            with self.assertRaises(ValueError):Project.parse({**configuration(),'browser_tdd':value})
 
 
 class ArtifactBoundaries(unittest.TestCase):

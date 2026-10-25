@@ -22,10 +22,10 @@ from qualify_hermes_delivery import create_trial, steps
 from fabriquinha.effects import write_json
 from fabriquinha.executor import docker
 from fabriquinha.kanban_lane import native
-from fabriquinha.runtime import Runtime, worker_alive
+from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False):
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False):
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
     kb,kbc,_=native()
     from hermes_cli.profiles import create_profile
@@ -36,7 +36,7 @@ def qualify(root,upstream,image,*,notifications=False):
             terminal={'backend':'fabriquinha','cwd':'/workspace'}))
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
-    resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[]
+    resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
     sink=None;sink_thread=None;sink_data=dict(accepted={},attempts={},accepted_at={},lookups=0,lost=None)
     if notifications:
         class Sink(BaseHTTPRequestHandler):
@@ -93,7 +93,17 @@ def qualify(root,upstream,image,*,notifications=False):
                             replacements={'app.py':'VALUE = 2\n'})),
                         ('diagnostic_decide',dict(action='resume',reason='Add the approved VALUE=2 behavior test, observe real Red, then request independent review.',
                             findings=[dict(path='tests/test_existing.py',line=3,detail='The baseline checks type, not the required value; write a new behavior test.')]))]
-                else:sequence=steps(run,changes)
+                elif review_escalation and run.reviewing and run.kind=='tests' and not escalated_reviews:
+                    escalated_reviews.append(run.number)
+                    sequence=[('read_file',{'path':'/workspace/tests/test_new.py'}),
+                        ('delivery_review',dict(decision='escalate',reason='Technical impasse needs a CTO experiment',
+                            findings=[dict(path='tests/test_new.py',line=3,detail='Confirm expected value with a disposable CTO experiment before reviewing again')]))]
+                else:
+                    if run.task==source and not run.reviewing and changes:
+                        context=str(body['messages'])
+                        assert 'Expect value 2' in context,'full structured review finding must reach the author'
+                        feedback_seen.append(run.number)
+                    sequence=steps(run,changes)
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
             if index>=len(sequences[run.number]):self.send_error(400);return
@@ -130,10 +140,11 @@ def qualify(root,upstream,image,*,notifications=False):
             if status_path.is_file():
                 status=json.loads(status_path.read_bytes())['board']
                 with kbc.connect_closing() as conn:
-                    live=any(worker_alive(row) for row in conn.execute('SELECT * FROM task_runs'))
+                    live=any(worker_alive(recorded_worker(conn,row)) for row in conn.execute('SELECT * FROM task_runs'))
                     cto_blocked=any(task.status=='blocked' and json.loads(task.body).get('stage')=='cto'
                         for task in runtime.recovery.cards(conn))
-                fatal=any(value=='ValueError' for value in status['recovery_issues'].values()) or cto_blocked
+                fatal=(any(value=='ValueError' for value in status['recovery_issues'].values()) or cto_blocked
+                    or any(c['status']=='triage' for c in status['cards']))
                 if fatal and not live and not any(c['status']=='running' for c in status['cards']):
                     unattended=unattended or time.monotonic()
                     if time.monotonic()-unattended>10:raise RuntimeError('all work terminally blocked by recovery contract error')
@@ -161,7 +172,7 @@ def qualify(root,upstream,image,*,notifications=False):
                 tasks=runtime.recovery.cards(conn)
                 if not all(task.status=='done' for task in tasks):return False
                 rows=conn.execute('SELECT * FROM task_runs').fetchall()
-                return all(not worker_alive(row) for row in rows)
+                return all(not worker_alive(recorded_worker(conn,row)) for row in rows)
         wait_for(finished,service)
         if notifications:
             def drained():
@@ -173,14 +184,19 @@ def qualify(root,upstream,image,*,notifications=False):
         stop(service)
         with kbc.connect_closing() as conn:
             runs=[dict(row) for row in conn.execute('SELECT * FROM task_runs ORDER BY id')]
-            assert len(runs)==9 and runs[0]['outcome']=='blocked'
-            assert len(runtime.recovery.cards(conn))==4
+            assert len(runs)==(11 if review_escalation else 9) and runs[0]['outcome']=='blocked'
+            assert len(runtime.recovery.cards(conn))==(5 if review_escalation else 4)
             incidents=runtime.recovery.status(conn);assert all(item['state']=='resolved' for item in incidents)
-            assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='unblocked'",(source,)).fetchone()[0]==1
-            assert conn.execute("SELECT COUNT(*) FROM task_comments WHERE task_id=? AND body LIKE 'DIAG %'",(source,)).fetchone()[0]==1
+            assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='unblocked'",(source,)).fetchone()[0]==(2 if review_escalation else 1)
+            assert conn.execute("SELECT COUNT(*) FROM task_comments WHERE task_id=? AND body LIKE 'DIAG %'",(source,)).fetchone()[0]==(2 if review_escalation else 1)
             decisions=[runtime.store.receipt(json.loads(r['metadata'])['diagnosis'],kind='diagnostic_decision')
                 for r in runs if r['metadata'] and 'diagnosis' in json.loads(r['metadata'])]
-        assert [r['payload']['action'] for r in decisions]==['escalate','resume']
+        assert [r['payload']['action'] for r in decisions]==(['escalate','resume','resume'] if review_escalation else ['escalate','resume'])
+        if review_escalation:
+            assert len(escalated_reviews)==1 and feedback_seen
+            failed=next(r for r in runs if r['id']==escalated_reviews[0]);assert failed['outcome']=='blocked'
+            following=next(r for r in runs if r['id']>failed['id'] and r['task_id']==source)
+            assert following['profile']==failed['profile'],'recovery must resume independent review, not author mode'
         experiment=runtime.store.receipt(decisions[-1]['payload']['experiment'],kind='diagnostic_experiment')
         assert (runtime.store.tree(experiment['payload']['snapshot'])/'app.py').read_text()=='VALUE = 2\n'
         assert (root/'work/tests/app.py').read_text()=='VALUE = 1\n'
@@ -188,8 +204,9 @@ def qualify(root,upstream,image,*,notifications=False):
         assert not docker('ps','-aq','--filter','label=com.docker.compose.project='+project['namespace']+'-tests').strip()
         proof=dict(native_diagnostic_cards=True,lead_escalated_to_cto=True,cto_executed_real_disposable_spike=True,
             source_unchanged_by_diagnosticians=True,author_resumed_with_guidance=True,restart_did_not_duplicate_actions=True,
-            incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=2,runs=9,
+            incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=len(decisions),runs=len(runs),
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
+        if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
         if notifications:
             messages=[value['message'] for value in sink_data['accepted'].values()]
             for row in runs:
@@ -210,7 +227,7 @@ def qualify(root,upstream,image,*,notifications=False):
         release.set()
         for process in services:
             if process.poll() is None:stop(process)
-        with kbc.connect_closing() as conn:rows=conn.execute('SELECT * FROM task_runs WHERE ended_at IS NULL').fetchall()
+        with kbc.connect_closing() as conn:rows=[recorded_worker(conn,row) for row in conn.execute('SELECT * FROM task_runs WHERE ended_at IS NULL')]
         for row in rows:
             if worker_alive(row):os.kill(row['worker_pid'],signal.SIGTERM)
         deadline=time.monotonic()+15
@@ -224,9 +241,10 @@ def qualify(root,upstream,image,*,notifications=False):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    parser.add_argument('--image',required=True);parser.add_argument('--notifications',action='store_true');args=parser.parse_args()
+    parser.add_argument('--image',required=True);parser.add_argument('--notifications',action='store_true')
+    parser.add_argument('--review-escalation',action='store_true');args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
-    try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications)
+    try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

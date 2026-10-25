@@ -7,6 +7,7 @@
   "browser_image": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "tests_dir": "tests",
   "qualification": false,
+  "browser_tdd": true,
   "local_ci": {"context": "fabriquinha-local-ci", "publisher": "YOUR-GITHUB-LOGIN"},
   "max_workers": 2,
   "technical_roles": {"lead": "techlead", "cto": "cto"},

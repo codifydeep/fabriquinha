@@ -22,13 +22,14 @@ class Project:
     coordination_roles: dict | None = None
     delivery_roles: dict | None = None
     local_ci: dict | None = None
+    browser_tdd: bool | None = None
 
     @classmethod
     def parse(cls, value):
         required = {'version', 'namespace', 'repository', 'branch', 'validation_image',
                     'tests_dir', 'reviewers', 'qualification'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles', 'local_ci'}
+                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles', 'local_ci', 'browser_tdd'}
                 or type(value['version']) is not int or value['version'] != 1):
             raise ValueError('versioned project contract required')
         if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}', str(value['namespace']))
@@ -84,17 +85,20 @@ class Project:
                 or not isinstance(ci['publisher'],str)
                 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}',ci['publisher'])):
             raise ValueError('fixed local CI context, publisher and non-primary branch required')
+        browser_tdd=value.get('browser_tdd')
+        if browser_tdd is not None and type(browser_tdd) is not bool:
+            raise ValueError('explicit qualified browser TDD capability required')
         return cls(**fields, reviewers=MappingProxyType(matrix), max_workers=workers,
                    timeout_seconds=timeout,browser_image=browser,
                    technical_roles=MappingProxyType(dict(roles)) if roles else None,
                    coordination_roles=MappingProxyType(dict(coordination)) if coordination else None,
                    delivery_roles=MappingProxyType(dict(delivery)) if delivery else None,
-                   local_ci=MappingProxyType(dict(ci)) if ci else None)
+                   local_ci=MappingProxyType(dict(ci)) if ci else None,browser_tdd=browser_tdd)
 
     def fingerprint(self):
         return digest({name: dict(value) if name in ('reviewers','technical_roles','coordination_roles','delivery_roles','local_ci') and value is not None else value
                        for name in self.__dataclass_fields__ for value in (getattr(self, name),)
-                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles','local_ci') or value is not None})
+                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles','local_ci','browser_tdd') or value is not None})
 
     def reviewers_for(self, author):
         try:
@@ -116,6 +120,15 @@ def execution_context(project):
         workers=project.max_workers,tests_dir=project.tests_dir,iterations=40,
         reviewers={role:list(project.reviewers_for(role)) for role in project.reviewers},
         coordination_roles=dict(project.coordination_roles or {}),delivery_roles=dict(project.delivery_roles or {}),
+        test_tooling=dict(command='python -B /opt/fabriquinha/suite.py',browser_tdd=bool(project.browser_tdd),
+            available=['unittest','playwright.sync_api','Chromium'] if project.browser_tdd else ['unittest'],
+            runtime='The shipped application remains Python stdlib only; browser libraries belong in tests, never product imports.',
+            contract=('Browser behaviors must be exercised in tests, not inferred from HTML/JS token strings. '
+                'Tests may start their own temporary local HTTP app and Chromium; register cleanup for both. '
+                'Use assertions/expectations before interacting with missing elements so Red fails by assertion, not a selector timeout. '
+                'Browser tests use the same immutable, no-network suite job as unit tests.' if project.browser_tdd else
+                'No JavaScript engine or browser is provided for Red/Green in this image; post-deploy browser QA is separate.')),
+        build_contract='Controller supplies the trusted build recipe, CI and deployment; do not add product Dockerfiles or workflows to duplicate them.',
         deployment='Local Docker only; container HTTP port 8080, dynamic host port and URL supplied by controller; GET /health and /identity; immutable reviewed image.',
         http_contract=dict(entrypoint=['python','-B','/app/app.py','8080'],
             health=dict(path='/health',status=200,json={'status':'ok'}),

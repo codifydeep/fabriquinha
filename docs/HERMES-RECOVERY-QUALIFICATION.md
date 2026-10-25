@@ -104,6 +104,35 @@ autor. Não apresentar esse escopo como prova de todas as classes de incidente.
 
 ## Reprodução e pendências
 
+### Escalada explícita de revisão — 25/10/2026
+
+A ferramenta `delivery_review` aceita `escalate`, além de aprovação e mudanças.
+O parecer é persistido como **mudanças**, nunca como aprovação/congelamento;
+o pedido técnico vincula o snapshot e a execução exatos. O serviço cria um DIAG
+do CTO, exige experimento e devolve a atividade à revisão nativa. O diagnóstico
+recebe o parecer completo e as capacidades reais do executor. O autor recebe os
+dois últimos pareceres estruturados válidos de seu card/contrato, incluindo
+arquivos e linhas; hashes isolados não são tratados como orientação suficiente.
+
+A prova com `--review-escalation` passou: 11 runs, três diagnósticos e 34 respostas
+HTTP locais programadas. Verificou retomada do mesmo revisor, achados chegando ao
+autor, testes congelados, Green e controles, sem alteração do autor pelo CTO.
+A primeira execução permaneceu não qualificada: uma categoria compartilhada com
+a falha anterior acionou a triagem nativa. Agora apoio ao especialista usa
+`needs_input`; falha de capacidade do autor continua `capability`. A proteção
+nativa contra reincidência permanece; não há reset dos contadores upstream.
+
+Isso prova o caminho explícito de escalada, **não** a capacidade de um modelo
+detectar toda conversa circular. Triagem por reincidência não é desbloqueada
+automaticamente. A escolha correta de escalar e o ciclo com modelo real ainda
+precisam da validação S4. Não há aprovação retroativa das tentativas antigas.
+
+```bash
+.local-simplification/venv-agent/bin/python scripts/qualify_hermes_recovery.py \
+  --upstream .local-simplification/hermes-upstream --root RAIZ_PRIVADA_NOVA \
+  --image sha256:ID_EXATO_DO_VALIDADOR --review-escalation
+```
+
 Use o mesmo checkout/venv fixados do [agente nativo](HERMES-AGENT-QUALIFICATION.md),
 validador canônico S2 e raiz nova, após as prévias de limpeza do `AGENTS.md`:
 

@@ -174,6 +174,44 @@ class Board:
                     summary=summary, metadata=evidence, expected_run_id=run.number):
                 raise ValueError('native review handoff refused')
 
+    def review_feedback(self,run,store):
+        """Bounded cross-run memory: exact findings, not just an opaque hash."""
+        self.ensure(run)
+        if run.kind not in ('tests','implementation'):return []
+        _,kbc,_=native();result=[]
+        with kbc.connect_closing() as conn:
+            rows=conn.execute("SELECT run_id,payload FROM task_events WHERE task_id=? AND kind='changes_requested' ORDER BY id DESC LIMIT 2",
+                (run.task,)).fetchall()
+        for row in reversed(rows):
+            payload=json.loads(row['payload']);reason=payload.get('reason')
+            try:details=json.loads(reason)
+            except (ValueError,TypeError):continue  # An older plain operator comment is not a receipt.
+            evidence=details.get('evidence') if isinstance(details,dict) else None
+            key=evidence.get('review') if isinstance(evidence,dict) else None
+            if not key:continue
+            record=store.receipt(key,kind='test_review' if run.kind=='tests' else 'delivery_review')
+            scope,data=record['binding'],record['payload']
+            if (scope.get('task')!=run.task or scope.get('contract')!=run.contract or scope.get('release')!=run.release
+                    or scope.get('number')!=row['run_id'] or scope.get('author')!=run.author
+                    or scope.get('kind')!=run.kind or scope.get('reviewing') is not True
+                    or scope.get('actor') not in self.project.reviewers_for(run.author)
+                    or data.get('project')!=self.project.fingerprint() or data['verdict']['decision']!='changes'):
+                raise ValueError('review feedback belongs to another contract, role or execution')
+            store.tree(data['snapshot'])
+            result.append(dict(receipt=key,reviewer=scope['actor'],run=scope['number'],snapshot=data['snapshot'],verdict=data['verdict']))
+        return result
+
+    def escalate_review(self,run,receipt):
+        self.ensure(run)
+        if not run.reviewing:raise ValueError('only the current independent reviewer can escalate a review')
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            reason=json.dumps(dict(category='review_escalation',escalation=receipt))
+            # Specialist input is distinct from an author's capability failure.
+            # Preserve native recurrence protection for repeated review impasses.
+            if not kb.block_task(conn,run.task,reason=reason,kind='needs_input',expected_run_id=run.number):
+                raise ValueError('native technical review block refused')
+
     def require_parent(self, run, task_id):
         self.ensure(run)
         kb, kbc, _ = native()

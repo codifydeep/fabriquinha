@@ -24,6 +24,8 @@
 !/examples/python-http/bootstrap/**
 !/Dockerfile.validation
 !/Dockerfile.validation.dockerignore
+!/Dockerfile.validation-browser
+!/Dockerfile.validation-browser.dockerignore
 !/Dockerfile.web
 /bootstrap/*
 !/bootstrap/infra/

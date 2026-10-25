@@ -286,7 +286,7 @@ class DeliveryTools:
             raise ValueError('same controller and current TDD activity required')
         self.sandbox,self.quality,self.run=sandbox,quality,sandbox.run
         self.store,self.board=quality.store,quality.board
-        self.submission=None;self.verdict=None
+        self.submission=None;self.verdict=None;self.escalating=None
 
     def wait(self,call,*,jobs=1):
         # These are actual local validation jobs, not model polling or CI waits.
@@ -329,10 +329,13 @@ class DeliveryTools:
     def review(self,decision):
         q,run=self.quality,self.run
         q.check(run,run.kind,reviewing=True)
+        escalate=isinstance(decision,dict) and decision.get('decision')=='escalate'
+        effective={**decision,'decision':'changes'} if escalate else decision
         if self.verdict is None:
+            self.escalating=escalate
             if run.kind=='tests':
                 red=self.board.input(run,'red',review_handoff=True)
-                receipt=q.tests_review(run,red,decision)
+                receipt=q.tests_review(run,red,effective)
                 result=self.store.receipt(receipt)
                 changes=result['kind']=='test_review'
                 if changes:verdict=result['payload']['verdict']
@@ -341,14 +344,19 @@ class DeliveryTools:
             else:
                 green=self.board.input(run,'green',review_handoff=True)
                 controls=self.board.input(run,'controls',review_handoff=True)
-                receipt=self.wait(lambda:q.delivery_review(run,green,controls,decision))
+                receipt=self.wait(lambda:q.delivery_review(run,green,controls,effective))
                 verdict=self.store.receipt(receipt)['payload']['verdict']
                 changes=verdict['decision']=='changes'
                 evidence={'review' if changes else 'delivery':receipt}
             self.verdict=(verdict,evidence,changes)
         verdict,evidence,changes=self.verdict
-        if decision!=verdict:raise ValueError('pending review decision cannot change during retirement')
+        if effective!=verdict or escalate!=self.escalating:raise ValueError('pending review decision cannot change during retirement')
         self.sandbox.close()
+        if escalate:
+            review=self.store.receipt(evidence['review'])
+            receipt=q.record(run,'review_escalation',dict(review=evidence['review'],snapshot=review['payload']['snapshot']))
+            self.board.escalate_review(run,receipt)
+            return dict(status='technical_diagnosis_requested',task=run.task,escalation=receipt,delivery_approval=False)
         self.board.finish_review(run,verdict['reason'],evidence,changes=changes)
         return dict(status='changes_requested' if changes else 'completed',task=run.task,
                     evidence=evidence,delivery_approval=False)
