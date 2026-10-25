@@ -274,7 +274,7 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     return {name},operations
 
 
-def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None,provider_check=None):
+def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None,provider_check=None,output_limit=None):
     """Trusted SDK adapter; no lifecycle inference from the assistant's prose.
 
     Route comes from controller configuration, not a model tool argument.
@@ -283,7 +283,8 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     """
     if (not isinstance(route,dict) or set(route)!={'base_url','api_key','provider','api_mode','model'}
             or any(not isinstance(v,str) or not v for v in route.values())
-            or type(run_seconds) is not int or not 1<=run_seconds<=3600):
+            or type(run_seconds) is not int or not 1<=run_seconds<=3600
+            or output_limit is not None and (type(output_limit) is not int or output_limit not in (2048,4096,8192))):
         raise ValueError('explicit bounded controller model route required')
     url=urlsplit(route['base_url'])
     if url.username or url.password or sandbox.project.qualification and (url.scheme!='http' or url.hostname!='127.0.0.1'):
@@ -324,7 +325,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
-        agent=AIAgent(**route,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
+        agent=AIAgent(**route,max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
             quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
             session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,
             fallback_model=None,ephemeral_system_prompt=phase)

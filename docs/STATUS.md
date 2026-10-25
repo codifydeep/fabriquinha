@@ -2,8 +2,9 @@
 
 **Estratégia atual:** Hermes + Kanban nativos como único dono do ciclo de vida,
 com executor determinístico pequeno. Sem Temporal, broker ACP ou Multica no novo
-caminho. O legado continua pausado; o novo S4 iniciou a elaboração do brief com
-modelo real e teto autorizado. Nenhuma migração aplicada.
+caminho. O legado continua pausado. O novo S4 iniciou com modelo real, mas foi
+contido após truncamentos repetidos no planejamento; nenhuma
+migração aplicada e nenhuma entrega autônoma aprovada.
 
 | Área | Evidência atual | Limite |
 |---|---|---|
@@ -46,8 +47,16 @@ feedback técnico identificado do operador: esclarecer limite de cenários e URL
 dinâmica, além de permitir entrada vazia/espaços no executor QA. A proposta
 original permanece preservada. O CEO aprovou a revisão corrigida; o ensaio sem
 intervenção técnica é medido a partir desse aceite, não dessa preparação assistida.
+Essa primeira tentativa não se qualificou: planejamento produziu respostas
+truncadas, e foi necessária intervenção para conter a repetição. A última chamada
+ficou com transporte incerto e permanece contabilizada, sem repetição.
+O brief aprovado, sessões e board foram preservados; nenhum produto foi integrado.
+Foi corrigida offline a divergência entre orçamento do SDK e teto do relay, sem
+desativar controles de qualidade. O proprietário autorizou arquivar o hold com
+cópia recuperável e usar a cota remanescente com saída de até 8.192 tokens, sem
+aumentar o teto de chamadas. A nova tentativa será identificada separadamente.
 
-Checks atuais: 220 testes do caminho novo passaram. A última execução dos 4.523
+Checks atuais: 226 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.

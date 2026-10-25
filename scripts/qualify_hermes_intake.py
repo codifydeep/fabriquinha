@@ -75,7 +75,7 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             assert run.binding()==binding
             expected={'plan_review'} if run.reviewing else {'brief_submit','brief_question'} if run.kind=='brief' else {'plan_submit'}
             assert {tool['function']['name'] for tool in body['tools']}==expected
-            all_requests.append(dict(binding=binding,tools=sorted(expected)))
+            all_requests.append(dict(binding=binding,tools=sorted(expected),max_tokens=body.get('max_tokens')))
             if run.number not in sequences:
                 actor='product' if run.kind=='brief' else 'cto' if run.reviewing else 'lead'
                 index=counters[actor];counters[actor]+=1
@@ -228,6 +228,7 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             endpoint='http://127.0.0.1:'+str(port)
             status=inspect(policy,endpoint,runtime.project.fingerprint())
             assert status['calls']==len(all_requests)==10
+            assert all(request.get('max_tokens')==policy.max_output_tokens for request in all_requests)
             relay.ledger.pause(status['calls'],402)
             connection=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
             connection.request('POST','/v1/chat/completions',json.dumps(dict(model=model,messages=[dict(role='user',content='Must not reach the fixture')])),
@@ -237,7 +238,8 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             except Held as error:assert error.status==402
             else:raise AssertionError('metadata admission bypassed the financial pause')
             assert relay.status()['calls']==10 and len(all_requests)==10
-            result.update(neutral_relay=True,relay_calls=10,paused_request_not_forwarded=True,legacy_adapters=0)
+            result.update(neutral_relay=True,relay_calls=10,paused_request_not_forwarded=True,
+                sdk_output_budget_aligned=True,legacy_adapters=0)
         write_json(root/'receipt.json',result);return result
     finally:
         if relay_server:

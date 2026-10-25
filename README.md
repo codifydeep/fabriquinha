@@ -64,6 +64,12 @@ revalidação antes de merge/QA/aceite. O seed da nova branch protegida recebeu
 seu primeiro status real verde. A `main` e seu check `ci` não mudaram; nenhum
 runner público foi registrado. Ainda falta o PR de feature e a entrega S4 real
 pelos agentes, com brief aprovado pelo CEO; o seed não comprova autonomia.
+Na primeira tentativa S4, Produto gerou o brief real e o CEO aprovou a revisão
+corrigida. O planejamento foi contido após truncamentos repetidos; a tentativa
+não se qualificou para autonomia. O contrato de saída SDK/relay foi corrigido
+offline, e uma chamada de transporte incerto permaneceu contabilizada, sem repetição;
+o hold foi arquivado pelo operador somente com autorização explícita e cópia de recuperação.
+Não houve PR de feature nem homologação de produto por esse caminho.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 

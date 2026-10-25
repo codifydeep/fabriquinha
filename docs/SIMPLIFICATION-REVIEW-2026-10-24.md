@@ -868,7 +868,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream |
 | S2 Executor/qualidade pequenos | Parcial: ciclo offline completo; contexto/relay/admissão/espera conectados ao SDK; canário real curto anterior passou | Preparar instalação S4 e autorização de consumo; Telegram real não testado |
 | S3 Publicação/deploy conectados | Cadeia offline; CI local conectado com ACK perdido qualificado e primeiro status real verde do seed na branch nova | PR de feature real ainda não integrado; toolchain de navegador reproduzível em S6 |
-| S4 Primeira entrega autônoma | Nova base/branch, nove perfis e teto autorizados; Produto refinou o brief real, CEO aprovou a revisão corrigida | Planejamento e entrega após o aceite devem ocorrer sem reparos do operador; autonomia ainda não comprovada |
+| S4 Primeira entrega autônoma | Infraestrutura/CI e brief real aprovado; primeiro planejamento contido após truncamentos, tentativa não qualificada; contrato de saída corrigido offline | Resolver chamada incerta por autorização e identificar nova tentativa; não afirmar autonomia nem homologação |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
 | S6 Instalação/segundo repo/cutover | Não iniciado | Reprodução limpa e caminho único |
 | S7 Retomada do Truco | Não iniciado | Plataforma qualificada e brief confirmado |

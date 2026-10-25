@@ -17,6 +17,14 @@ Isso não aprova o brief nem comprova a entrega autônoma da equipe.
   Ferramentas/mensagens/respostas passam sem adaptação semântica.
 - HTTP 401/402/403 produz pausa persistente. Transporte incerto produz hold
   separado e impede uma segunda reserva até diagnóstico autorizado.
+- O SDK recebe explicitamente o teto de saída da política. Pedido maior é
+  recusado com 422 antes de reservar/enviar; não é mais reduzido silenciosamente.
+  Isso evita um retry de truncamento que parece aumentar o orçamento, mas envia
+  o mesmo teto ao provedor e gasta novamente sem a condição esperada pelo SDK.
+- Metadados por tentativa preservam hash da requisição, teto solicitado/efetivo,
+  status, finish reason, contagens de tokens e classe de erro. Não gravam chave,
+  mensagens, respostas textuais ou argumentos das ferramentas. O JSON recebido
+  pelo SDK continua sem reparo ou reescrita semântica.
 - `/status` consulta somente metadados; admissão vincula projeto, modelo, política,
   teto e disponibilidade. Não lê a chave, consulta créditos nem remove bloqueios.
 - A chave só é lida no envio autorizado. Logs não incluem prompts, chave ou
@@ -122,3 +130,34 @@ e deve aguardar o brief exato aprovado pelo CEO. A nova branch tem CI local real
 PR de feature, julgamento independente, merge, deploy e QA pelos agentes ainda
 são a fronteira S4. Telegram, segunda release/memória, instalação limpa e cutover
 continuam pendentes. Não foi introduzido outro scheduler, DB ou retry de modelo.
+
+### Primeiro planejamento real: limite encontrado
+
+Produto refinou o brief com modelo real, e o CEO aprovou a revisão corrigida.
+O planejamento seguinte produziu truncamentos repetidos sob o teto de saída.
+A contenção do operador foi registrada: a tentativa não qualifica S4 autônomo.
+Uma chamada terminou com transporte incerto; permanece consumida no contador e
+seu hold foi arquivado apenas após autorização humana explícita, mantendo cópia
+recuperável, exclusão do proprietário e ausência de escritores ativos. Não houve
+repetição do envio nem reset do contador, PR de feature ou homologação de produto.
+
+A análise encontrou o teto sendo reduzido silenciosamente pelo relay enquanto o
+SDK podia tentar recuperações com saída maior. O contrato foi corrigido offline
+conforme acima. O timeout de cabeçalhos também passou a respeitar o orçamento
+total de 120 segundos; antes podia falhar após 30 segundos mesmo sem esgotá-lo.
+Esse é um modo de falha encontrado no código, não prova retroativa da causa
+exata da chamada incerta. Testes e uma fixture não comprovam que o modelo real
+agora produzirá um plano; nova tentativa é necessária, com evidências separadas.
+
+A nova prova offline de brief/plano passou com nove atividades SDK e dez chamadas
+a respostas locais programadas, verificando o teto de saída em cada requisição.
+O primeiro verificador não havia armazenado esse campo e falhou; sua tentativa
+permanece não aprovada. A prova corrigida usou board novo, não aprovação retroativa.
+Isso não é julgamento real de modelo nem validação do saldo disponível.
+
+`Ledger.archive_uncertain` é uma API local do operador, não endpoint HTTP nem
+ferramenta de agente. Exige contador/marcador exatos e identificador de autorização;
+grava e sincroniza o arquivo antes de remover o marcador. Reentrada observa o
+mesmo recibo, não limpa outra ocorrência e não repete inferência. A chave do
+provedor não é necessária para esse arquivamento. Continuar exige nova política
+e admissão válidas; a operação isoladamente não inicia agentes.

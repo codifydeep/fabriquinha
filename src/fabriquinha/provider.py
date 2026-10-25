@@ -75,10 +75,17 @@ class Ledger:
         return json.loads(path.read_bytes())
 
     def save(self,name,value):
-        write_json(self.root/name,value)
-        descriptor=os.open(self.root,os.O_RDONLY)
-        try:os.fsync(descriptor)
-        finally:os.close(descriptor)
+        target=self.root/name
+        if not target.parent.resolve().is_relative_to(self.root.resolve()):raise ValueError('meter write must stay inside its owner root')
+        write_json(target,value)
+        # Nested audit archives must be durable BEFORE removing a live marker.
+        directory=target.parent
+        while True:
+            descriptor=os.open(directory,os.O_RDONLY)
+            try:os.fsync(descriptor)
+            finally:os.close(descriptor)
+            if directory==self.root:break
+            directory=directory.parent
 
     def state(self):
         value=self.read('calls.json')
@@ -114,6 +121,39 @@ class Ledger:
     def uncertain(self,number):
         with self.lock('counter'):self.save('relay-hold.json',dict(category='transport_unknown',call_number=number))
 
+    def archive_uncertain(self,expected_calls,authorization):
+        """LOCAL operator API only, after explicit human authorization; no HTTP tool.
+
+        The possibly billed call stays consumed. An archive survives interrupted
+        acknowledgement; replay never clears a different/new hold.
+        """
+        if (type(expected_calls) is not int or expected_calls<1 or not isinstance(authorization,str)
+                or not re.fullmatch('[a-f0-9]{32}',authorization)):raise ValueError('exact operator authorization required')
+        folder=self.root/'hold-archives'/authorization;receipt=folder/'receipt.json'
+        with self.owner(),self.lock('counter'):
+            if receipt.exists():
+                prior=self.read(str(receipt.relative_to(self.root)))
+                if prior.get('calls_preserved')!=expected_calls:raise ValueError('authorization reused for another counter')
+                return prior
+            state=self.state();archive=folder/'relay-hold.json'
+            if state['calls']!=expected_calls or state['provider_pause']:
+                raise ValueError('counter or financial pause changed; preserve all markers')
+            expected=dict(category='transport_unknown',call_number=expected_calls)
+            if archive.exists():
+                if self.read(str(archive.relative_to(self.root)))!=expected:raise ValueError('archive identity drift')
+            else:
+                if state['relay_hold']!=expected:raise ValueError('exact current uncertain call required')
+                self.save(str(archive.relative_to(self.root)),expected)
+            if state['relay_hold'] is not None:
+                if state['relay_hold']!=expected:raise ValueError('hold changed; never remove another occurrence')
+                (self.root/'relay-hold.json').unlink()
+                fd=os.open(self.root,os.O_RDONLY)
+                try:os.fsync(fd)
+                finally:os.close(fd)
+            result=dict(authorization=authorization,calls_preserved=expected_calls,archived=expected,
+                model_calls=0,retry_executed=False,counter_reset=False)
+            self.save(str(receipt.relative_to(self.root)),result);return result
+
 
 class Relay:
     def __init__(self,policy,meter,key):self.policy,self.ledger,self.key=policy,Ledger(meter,policy.max_calls),Path(key)
@@ -144,12 +184,28 @@ class Relay:
             for field in ('max_tokens','max_completion_tokens'):
                 if field in body:
                     if type(body[field]) is not int or body[field]<1:raise Held('invalid_output_budget',400)
-                    body[field]=min(body[field],self.policy.max_output_tokens)
+                    # Do not pretend the SDK's retry boost was honored while
+                    # silently resending the same effective generation budget.
+                    if body[field]>self.policy.max_output_tokens:raise Held('output_budget_exceeds_policy',422)
             if not {'max_tokens','max_completion_tokens'}&set(body):body['max_tokens']=self.policy.max_output_tokens
             number=self.ledger.reserve()  # Commit before any HTTP attempt. Never refund uncertainty.
+            evidence=dict(project=self.policy.project,model=self.policy.model,request_hash=digest(body),
+                output_cap=self.policy.max_output_tokens,requested_output=body.get('max_tokens',body.get('max_completion_tokens')),
+                call_number=number,category='reserved')
+            path=f'attempts/{number}.json';self.ledger.save(path,evidence)
             try:status,data=self.forward(body)  # One upstream attempt; never repair/rewrite its schema.
-            except Exception:
+            except Exception as error:
+                self.ledger.save(path,{**evidence,'category':'transport_unknown','error_type':type(error).__name__})
                 self.ledger.uncertain(number);raise Held('transport_unknown') from None
+            metadata={}
+            try:
+                reply=json.loads(data)
+                reasons=[item.get('finish_reason') for item in reply.get('choices',[])]
+                metadata['finish_reasons']=[r if r in ('stop','length','tool_calls','content_filter',None) else 'other' for r in reasons[:16]]
+                metadata['usage']={k:v for k,v in (reply.get('usage') or {}).items()
+                    if k in ('prompt_tokens','completion_tokens','total_tokens') and type(v) is int}
+            except (ValueError,TypeError,AttributeError):metadata['response_metadata_unavailable']=True
+            self.ledger.save(path,{**evidence,'category':'returned','upstream_status':status,**metadata})
             if status in (401,402,403):self.ledger.pause(number,status)
             if status!=200:raise Held('upstream_'+str(status),status if 400<=status<=599 else 502)
             return 200,data
@@ -162,10 +218,13 @@ class Relay:
     def forward(self,body):
         with self.key.open() as file:key=file.read(4097).strip()
         if not 20<=len(key)<=4096 or '\n' in key:raise ValueError('credential unavailable')
-        connection=http.client.HTTPSConnection('openrouter.ai',timeout=30);deadline=time.monotonic()+120
+        connection=http.client.HTTPSConnection('openrouter.ai',timeout=120);deadline=time.monotonic()+120
         try:
             connection.request('POST','/api/v1/chat/completions',json.dumps(body).encode(),
                 {'Authorization':'Bearer '+key,'Content-Type':'application/json','X-Title':'Fabriquinha'})
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise TimeoutError('bounded provider headers expired')
+            if connection.sock:connection.sock.settimeout(remaining)
             response=connection.getresponse();chunks=[];size=0
             while True:
                 remaining=deadline-time.monotonic()

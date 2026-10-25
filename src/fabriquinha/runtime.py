@@ -528,7 +528,10 @@ class Runtime:
                 else:quality.protect(frozen['snapshot'],self.store.capture(work),exact_tests=True)
             sandbox=(DraftActivity if run.kind in ('brief','plan') else Sandbox)(self.project,self.store,self.board,run)
             prompt='Delivery activity '+json.dumps(run.binding(),sort_keys=True)+'\n'+prompt
-            result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'],provider_check=provider_check)
+            policy=self.root/'provider-policy.json'
+            output_limit=Policy.parse(json.loads(policy.read_bytes())).max_output_tokens if policy.exists() else None
+            result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'],provider_check=provider_check,
+                output_limit=output_limit)
             write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
         except Held as error:
             wait=self.store.record('provider_wait',run.binding(),dict(project=self.project.fingerprint(),
