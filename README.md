@@ -53,14 +53,17 @@ a espera por provedor também passaram no worker nativo: dois 402 locais,
 reinícios e retomada até TDD completo preservaram sessões, fases e orçamento de
 falhas. O [preparo isolado do S4](docs/HERMES-OPERATIONS-QUALIFICATION.md#preparação-isolada-antes-de-s4)
 também foi validado: nove perfis novos, board vazio, pausa persistente e provedor
-desabilitado, sem chamadas, serviços ou alterações GitHub. Ainda faltam CI local,
-base/branch e autorização de consumo antes do ensaio real. Não é um instalador
+desabilitado, sem copiar contextos ou credenciais antigos. Não é um instalador
 completo nem substitui esse marco de autonomia.
 A [computação local de CI](docs/HERMES-INTEGRATION-QUALIFICATION.md#computação-local-de-ci-antes-de-s4)
 foi qualificada separadamente com sete jobs Docker reais e comparação do inventário
 de testes base/candidato, incluindo um ataque à descoberta sem editar o teste
-antigo. Não publica status, registra runner ou afrouxa checks; a origem do check
-real da branch nova ainda depende de aprovação/configuração explícita.
+antigo. A publicação aprovada do status `fabriquinha-local-ci` já está conectada
+ao controlador: recibo/SHA/base/publicador exatos, observação de ACK perdido e
+revalidação antes de merge/QA/aceite. O seed da nova branch protegida recebeu
+seu primeiro status real verde. A `main` e seu check `ci` não mudaram; nenhum
+runner público foi registrado. Ainda falta o PR de feature e a entrega S4 real
+pelos agentes, com brief aprovado pelo CEO; o seed não comprova autonomia.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -77,7 +80,7 @@ flowchart LR
     DG --> K
     N[AIAgent real: ferramentas de entrega; respostas locais] --> K
     C[Serviço contínuo isolado: reinício e recuperação qualificados] --> N
-    N --> V[Relay neutro: admissão e espera qualificadas; instalação paga pendente]
+    N --> V[Relay neutro: admissão e espera qualificadas; rota S4 limitada e autorizada]
     V -->|Indisponível: encerra SDK; confirma processo morto| VW[Adiamento nativo; fase e contador preservados]
     VW -->|Cooldown; só retoma com admissão válida| K
     F[Pausa persistente e preflight sem modelo] -->|Fence de spawn e ferramentas| C
@@ -89,7 +92,7 @@ flowchart LR
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]
-    LC[CI local fixo: base/candidato e inventário qualificados] -. Publicação de check ainda não conectada .-> P
+    LC[CI local: recibo e SHA; status GitHub conectado; seed real verde] --> P
     P -->|Pendente: encerra claim| W[scheduled; retomada automática pelo serviço]
     W --> K
     P --> M[Merge e suíte no SHA integrado]

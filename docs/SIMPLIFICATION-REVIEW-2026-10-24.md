@@ -867,8 +867,8 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | S0 Referência e ADR | Concluída; referência e arquivo comprimido reconferidos | Referência Git, hashes e restauração íntegra original do backup |
 | S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream |
 | S2 Executor/qualidade pequenos | Parcial: ciclo offline completo; contexto/relay/admissão/espera conectados ao SDK; canário real curto anterior passou | Preparar instalação S4 e autorização de consumo; Telegram real não testado |
-| S3 Publicação/deploy conectados | Cadeia offline conectada ao serviço; computação CI local adicional com base/candidato e sete jobs reais; transporte GitHub simulado | Aprovar/conectar origem do check real antes de S4; toolchain de navegador reproduzível em S6 |
-| S4 Primeira entrega autônoma | Execução não iniciada; preparo isolado pausado com nove perfis/board vazio validado | CI local/base/branch e autorização antes da release real sem condução humana |
+| S3 Publicação/deploy conectados | Cadeia offline; CI local conectado com ACK perdido qualificado e primeiro status real verde do seed na branch nova | PR de feature real ainda não integrado; toolchain de navegador reproduzível em S6 |
+| S4 Primeira entrega autônoma | Nova base/branch protegida e nove perfis preparados; até 64 chamadas autorizadas | Produto refina, CEO aprova e equipe executa sem condução humana; autonomia ainda não comprovada |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
 | S6 Instalação/segundo repo/cutover | Não iniciado | Reprodução limpa e caminho único |
 | S7 Retomada do Truco | Não iniciado | Plataforma qualificada e brief confirmado |

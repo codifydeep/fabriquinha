@@ -210,9 +210,26 @@ pausado/drenado, `provider_disabled` e doctor sem perfil/recurso ausente. A pol�
 desabilitada é recusada antes até da consulta HTTP ao relay. Isso não concede
 autorização de consumo nem é qualificação S6 de instalação limpa.
 
-Antes de S4 ainda são necessários base de infraestrutura revisada, branch e CI
-reais protegidos, runner local restrito, relay com política autorizada e objetivo
-de produto. Um workflow hospedado no GitHub ou preso aos caminhos históricos não
+O proprietário aprovou substituir o runner por CI local fixo e status no GitHub,
+somente na branch nova. O [bootstrap e seu primeiro CI real](HERMES-INTEGRATION-QUALIFICATION.md#status-obrigatório-real--25-de-outubro-de-2026)
+já passaram; a `main` não mudou. O novo home tem fingerprint próprio para essa
+política; não foi convertido silenciosamente o preparo anterior.
+
+O [Compose do relay](../examples/python-http/compose.provider.yml) mantém o serviço
+agrupado, sem socket Docker, chave em volume externo somente leitura e publicação
+somente em loopback. A configuração de instalação permanece privada. O contador
+existente não é criado ou zerado. `scripts/enable_hermes_provider.py` é uma ação
+explícita do operador: confere política desabilitada, contador/teto exatos e
+ausência de bloqueio, sem chamada ao modelo, aumento de teto ou remoção de hold.
+Recriar o relay é necessário depois; a aprovação de negócio não habilita consumo.
+
+Para S4 ainda é necessário refinar e aprovar o objetivo de produto e executar a
+cadeia completa. Um workflow hospedado no GitHub ou preso aos caminhos históricos não
 deve ser herdado como CI local qualificado. Não afrouxar checks para obter verde.
 Após Produto refinar o objetivo, o CEO aprova o brief exato; o operador não
 pré-escreve implementação, testes de feature ou pareceres para a equipe.
+
+O contexto agora informa o contrato exato de saúde/identidade e o esquema JSON
+do navegador, sem pré-escrever cenários da feature. QA malformado ou sem cobertura
+dos critérios do pacote é recusado antes do Red e novamente antes do freeze.
+Isso evita congelar testes que só seriam descobertos como inválidos após deploy.

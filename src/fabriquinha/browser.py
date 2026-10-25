@@ -7,6 +7,26 @@ import sys
 from urllib.parse import urlsplit
 
 
+def author_protocol():
+    """Feature-neutral format documentation, never prewritten product checks."""
+    text=dict(type='string',minLength=1,maxLength=1000,pattern=r'.*\S.*')
+    def action(name,fields):
+        return dict(type='object',additionalProperties=False,required=['action',*fields],
+            properties=dict(action={'const':name},**fields))
+    check=dict(type='object',additionalProperties=False,required=['id','path','actions','selector','text'],
+        properties=dict(id=text,path={**text,'pattern':r'^/(?!/)[^\\]*$'},selector=text,text=text,
+            actions=dict(type='array',minItems=1,maxItems=20,items=dict(oneOf=[
+                action('fill',dict(selector=text,value=dict(type='string',minLength=1,maxLength=8000,pattern=r'.*\S.*'))),
+                action('click',dict(selector=text))]))))
+    return dict(schema=dict(type='object',additionalProperties=False,required=['version','checks'],
+        properties=dict(version={'const':1},checks=dict(type='array',minItems=1,maxItems=20,items=check))),
+        rules=['Each check ID is an approved acceptance criterion. Reuse existing IDs without adding duplicate scenarios.',
+            'Append missing scenarios in new qa.<package>.<release>.json files; never rewrite existing QA files.',
+            'At most 20 unique scenarios across all files. Each check navigates its local path, runs actions in order, then checks locator text.',
+            'Only same-origin HTTP assets/requests; no external CDNs, fonts, downloads or WebSockets.',
+            'No browser page/console errors. Serve a favicon or use an embedded data icon.'])
+
+
 def contract(value):
     def text(item,limit=1000):
         return isinstance(item,str) and 0<len(item.strip())<=limit

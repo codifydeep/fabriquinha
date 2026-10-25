@@ -7,7 +7,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock,patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.artifacts import Store
@@ -78,6 +78,28 @@ class PublicationFlow(unittest.TestCase):
         self.assertTrue(value['qualification'])
         self.assertEqual(self.publish(), key)
         self.assertEqual(self.github.calls, dict(create=1, merge=1))
+
+    def test_optional_local_ci_runs_before_merge_and_on_exact_integrated_sha(self):
+        local=Mock();local.publish.return_value=dict(receipt='fixture-ci',status_id=1,conclusion='success')
+        self.publisher.local_ci=local
+        key=self.publish();data=self.store.receipt(key)['payload']
+        self.assertEqual(local.publish.call_args.args,(data['head_sha'],data['base_sha']))
+        self.assertEqual(local.publish.call_args.kwargs['stage'],'proposal')
+        local.existing.assert_called_once_with(data['head_sha'],data['base_sha'],stage='proposal')
+        quality=Mock();quality.observe.return_value=('suite-job',dict(failures=[],cases=['test_behavior']))
+        self.publisher.validate_integrated(self.run,key,quality)
+        self.assertEqual(local.publish.call_args.args,(data['merge_sha'],data['base_sha']))
+        self.assertEqual(local.publish.call_args.kwargs['stage'],'integrated')
+        count=local.publish.call_count
+        self.publish()  # Resume an already merged publication without recomputing against a stale base.
+        self.assertEqual(local.publish.call_count,count)
+        self.assertEqual(self.github.calls,dict(create=1,merge=1))
+
+    def test_local_ci_refusal_never_merges_even_when_remote_checks_are_green(self):
+        local=Mock();local.publish.side_effect=EffectBlocked('wrong publisher')
+        self.publisher.local_ci=local
+        with self.assertRaises(EffectBlocked):self.publish()
+        self.assertEqual(self.github.calls,dict(create=1,merge=0))
 
     def test_lost_create_ack_observes_same_pr(self):
         self.github.lose_create = True

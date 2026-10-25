@@ -263,11 +263,94 @@ class GitHub:
         self.cli('pr', 'merge', self.url(url), '--merge', '--match-head-commit', sha(head))
         return self.view(url)
 
+    def local_status(self, commit):
+        """Bounded, complete status inventory; latest fixed context only."""
+        if not self.project.local_ci:raise ValueError('local CI is not configured')
+        rows=[]
+        for page in range(1,21):
+            batch=json.loads(self.cli('api',f'repos/{self.repo}/commits/{sha(commit)}/statuses?per_page=100&page={page}'))
+            if not isinstance(batch,list) or len(batch)>100:raise ValueError('invalid status inventory')
+            rows.extend(batch)
+            if len(batch)<100:break
+        else:raise ValueError('incomplete bounded status pagination')
+        matching=[s for s in rows if s.get('context')==self.project.local_ci['context']]
+        if any(type(s.get('id')) is not int for s in matching):raise ValueError('invalid status identity')
+        return max(matching,key=lambda s:s['id']) if matching else None
+
+    def publish_local_status(self, commit, state, description):
+        self.writable()
+        if (not self.project.local_ci or state not in ('success','failure')
+                or not re.fullmatch(r'Fabriquinha receipt [a-f0-9]{64}',description)):
+            raise ValueError('computed local CI provenance required')
+        account=json.loads(self.cli('api','user'))
+        if account.get('login','').lower()!=self.project.local_ci['publisher'].lower():
+            raise EffectBlocked('GitHub CI publisher account differs from approved policy')
+        self.cli('api','--method','POST',f'repos/{self.repo}/statuses/{sha(commit)}','--input','-',
+            data=json.dumps(dict(state=state,context=self.project.local_ci['context'],description=description)))
+        return self.local_status(commit)
+
+
+class LocalStatus:
+    """Compute before publishing; observe uncertain sends without duplicating them."""
+    def __init__(self,project,store,repo,github,runner):
+        if not project.local_ci:raise ValueError('explicit local CI policy required')
+        self.project,self.store,self.repo,self.github,self.runner=project,store,repo,github,runner
+        self.journal=Journal(store.root/'effects')
+
+    def identity(self,head,base,stage):
+        if stage not in ('proposal','integrated'):raise ValueError('explicit CI stage required')
+        return dict(project=self.project.fingerprint(),head=sha(head),base=sha(base),stage=stage)
+
+    def observe(self,identity,receipt):
+        value=self.store.receipt(receipt,kind='ci_validation');data=value['payload']
+        if (any(data.get(k)!=v for k,v in identity.items())
+                or value['binding']!={**identity,'scope':'local_ci','version':1}
+                or data['conclusion'] not in ('success','failure')):
+            raise ValueError('exact computed CI receipt required')
+        self.store.tree(data['snapshot'])
+        status=self.github.local_status(identity['head'])
+        if status is None:return None
+        if (status.get('description')!='Fabriquinha receipt '+receipt
+                or status.get('context')!=self.project.local_ci['context']
+                or status.get('state')!=data['conclusion']
+                or status.get('creator',{}).get('login','').lower()!=self.project.local_ci['publisher'].lower()):
+            raise EffectBlocked('latest local CI status does not identify this exact receipt and publisher')
+        return dict(receipt=receipt,status_id=status['id'],head=identity['head'],conclusion=data['conclusion'])
+
+    def existing(self,head,base,*,stage):
+        identity=self.identity(head,base,stage)
+        path=self.store.root/'local-ci'/(digest(identity)+'.json')
+        if not path.is_file():raise EffectBlocked('missing durable local CI proof')
+        receipt=json.loads(path.read_bytes())['receipt']
+        result=self.observe(identity,receipt)
+        if result is None:raise Pending('exact local CI status is not yet observable')
+        if result['conclusion']!='success':raise EffectBlocked('local CI assertions failed')
+        return result
+
+    def publish(self,head,base,*,stage,ensure=lambda:None):
+        ensure();identity=self.identity(head,base,stage)
+        receipt=LocalCI(self.project,self.store,self.repo,self.runner).validate(head,base,stage=stage)
+        data=self.store.receipt(receipt,kind='ci_validation')['payload']
+        write_json(self.store.root/'local-ci'/(digest(identity)+'.json'),dict(receipt=receipt))
+        def send():
+            ensure()
+            expected=base if stage=='proposal' else head
+            if self.repo.remote_head(self.project.branch)!=expected:raise EffectBlocked('CI branch moved before status publication')
+            self.github.publish_local_status(head,data['conclusion'],'Fabriquinha receipt '+receipt)
+            return self.observe(identity,receipt)
+        self.journal.do('local-ci:'+receipt,dict(**identity,receipt=receipt),send,lambda:self.observe(identity,receipt))
+        ensure()
+        expected=base if stage=='proposal' else head
+        if self.repo.remote_head(self.project.branch)!=expected:raise EffectBlocked('CI branch moved during status publication')
+        # A journaled ACK is not proof that the latest GitHub status is unchanged.
+        return self.existing(head,base,stage=stage)
+
 
 class Publication:
-    def __init__(self, project, store, board, repo, github):
+    def __init__(self, project, store, board, repo, github, *, runner=None):
         self.project, self.store, self.board, self.repo, self.github = project, store, board, repo, github
         self.journal = Journal(store.root/'effects')
+        self.local_ci=LocalStatus(project,store,repo,github,runner) if project.local_ci else None
 
     def require_ci(self, gate, head, deadline):
         if gate.get('head_sha') not in (None,head) or gate.get('classification') in {'failure','stale','auth'}:
@@ -351,6 +434,10 @@ class Publication:
                 or current['baseRefName'] != self.project.branch or current['state'] not in {'OPEN','MERGED'}
                 or current['state'] == 'OPEN' and current['baseRefOid'] != base):
             raise EffectBlocked('PR head/base/state diverged; rebase and independent review required')
+        if self.local_ci:
+            if current['state']=='OPEN':
+                self.local_ci.publish(head,base,stage='proposal',ensure=lambda:self.board.ensure(run))
+            else:self.local_ci.existing(head,base,stage='proposal')
         gate = self.github.accept(pr['url'])
         self.store.record('pr_acceptance', run.binding(), dict(project=self.project.fingerprint(),
                           review=review_id, qualification=self.project.qualification, acceptance=gate))
@@ -367,6 +454,8 @@ class Publication:
         def merge():
             if self.repo.remote_head(self.project.branch) != base:
                 raise EffectBlocked('integration base advanced; rebase and review required')
+            if self.local_ci:self.local_ci.existing(head,base,stage='proposal')
+            self.require_ci(self.github.accept(pr['url']),head,inputs['checks_deadline'])
             self.github.merge(pr['url'], head)
             return merged()
 
@@ -391,6 +480,9 @@ class Publication:
         wait = self.store.root/'publication'/('integrated-'+wait_key+'.json')
         if not wait.exists():
             write_json(wait,dict(deadline=time.time()+900))
+        local_status=None
+        if self.local_ci:
+            local_status=self.local_ci.publish(commit,data['base_sha'],stage='integrated',ensure=lambda:self.board.ensure(run))
         gate = self.github.accept(data['pr'], commit)
         self.require_ci(gate,commit,json.loads(wait.read_bytes())['deadline'])
         snapshot = self.repo.snapshot(commit)
@@ -406,4 +498,5 @@ class Publication:
             raise EffectBlocked('integration branch changed during validation')
         return self.store.record('integrated', run.binding(), dict(project=self.project.fingerprint(),
             qualification=self.project.qualification, publication=publication_id, snapshot=snapshot,
-            commit=commit, ci=gate, suite_job=job, delivery_approval=False))
+            commit=commit, ci=gate, suite_job=job, delivery_approval=False,
+            **({'local_ci':local_status} if self.local_ci else {})))

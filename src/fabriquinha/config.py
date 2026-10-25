@@ -21,13 +21,14 @@ class Project:
     technical_roles: dict | None = None
     coordination_roles: dict | None = None
     delivery_roles: dict | None = None
+    local_ci: dict | None = None
 
     @classmethod
     def parse(cls, value):
         required = {'version', 'namespace', 'repository', 'branch', 'validation_image',
                     'tests_dir', 'reviewers', 'qualification'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles'}
+                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles', 'local_ci'}
                 or type(value['version']) is not int or value['version'] != 1):
             raise ValueError('versioned project contract required')
         if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}', str(value['namespace']))
@@ -77,16 +78,23 @@ class Project:
                 or set(delivery)!={'tests','integration'} or delivery['tests']==delivery['integration']
                 or any(not isinstance(role,str) or role not in matrix for role in delivery.values())):
             raise ValueError('explicit reviewed tests/integration roles, coordination and browser required')
+        ci=value.get('local_ci')
+        if ci is not None and (not isinstance(ci,dict) or set(ci)!={'context','publisher'}
+                or ci['context']!='fabriquinha-local-ci' or value['branch'] in ('main','master')
+                or not isinstance(ci['publisher'],str)
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}',ci['publisher'])):
+            raise ValueError('fixed local CI context, publisher and non-primary branch required')
         return cls(**fields, reviewers=MappingProxyType(matrix), max_workers=workers,
                    timeout_seconds=timeout,browser_image=browser,
                    technical_roles=MappingProxyType(dict(roles)) if roles else None,
                    coordination_roles=MappingProxyType(dict(coordination)) if coordination else None,
-                   delivery_roles=MappingProxyType(dict(delivery)) if delivery else None)
+                   delivery_roles=MappingProxyType(dict(delivery)) if delivery else None,
+                   local_ci=MappingProxyType(dict(ci)) if ci else None)
 
     def fingerprint(self):
-        return digest({name: dict(value) if name in ('reviewers','technical_roles','coordination_roles','delivery_roles') and value is not None else value
+        return digest({name: dict(value) if name in ('reviewers','technical_roles','coordination_roles','delivery_roles','local_ci') and value is not None else value
                        for name in self.__dataclass_fields__ for value in (getattr(self, name),)
-                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles') or value is not None})
+                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles','local_ci') or value is not None})
 
     def reviewers_for(self, author):
         try:
@@ -109,5 +117,10 @@ def execution_context(project):
         reviewers={role:list(project.reviewers_for(role)) for role in project.reviewers},
         coordination_roles=dict(project.coordination_roles or {}),delivery_roles=dict(project.delivery_roles or {}),
         deployment='Local Docker only, HTTP port 8080, GET /health and /identity; immutable reviewed image.',
+        http_contract=dict(entrypoint=['python','-B','/app/app.py','8080'],
+            health=dict(path='/health',status=200,json={'status':'ok'}),
+            identity=dict(path='/identity',status=200,json_fields=['source_sha'],
+                source_sha='Exact runtime value of FABRIQUINHA_SOURCE_SHA environment variable; do not hardcode a commit.'),
+            assets='Same-origin HTTP only; no CDN/downloads or WebSockets in this qualified stack.'),
         quality='Red -> independent test freeze -> Green -> mutations -> independent delivery review -> integrated suite -> deployed browser QA.',
         browser_checks=20,network='No network, downloads, infrastructure credentials or Docker socket in product sandboxes.')

@@ -1,0 +1,46 @@
+# Operator-supplied paths/volumes only. No key or installation state in Git.
+# This starts a relay, not agents; policy and runtime admission remain mandatory.
+name: ${FABRIQUINHA_INSTANCE:?}
+services:
+  model-relay:
+    image: ${FABRIQUINHA_PYTHON_IMAGE:?}
+    pull_policy: never
+    entrypoint: [python]
+    command: [-B, -m, fabriquinha.provider, --policy, /policy.json, --meter, /meter, --key, /secret/openrouter.key, --host, 0.0.0.0, --port, "8080"]
+    environment:
+      PYTHONPATH: /opt/src
+      PYTHONDONTWRITEBYTECODE: "1"
+    user: "10000:10000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    ports:
+      - "127.0.0.1:${FABRIQUINHA_PROVIDER_PORT:?}:8080"
+    volumes:
+      - type: bind
+        source: ${FABRIQUINHA_SOURCE:?}/src
+        target: /opt/src
+        read_only: true
+      - type: bind
+        source: ${FABRIQUINHA_POLICY:?}
+        target: /policy.json
+        read_only: true
+      - meter:/meter
+      - type: volume
+        source: secret
+        target: /secret
+        read_only: true
+    restart: unless-stopped
+    logging:
+      driver: local
+      options: {max-size: 1m, max-file: "2"}
+volumes:
+  meter:
+    external: true
+    name: ${FABRIQUINHA_METER_VOLUME:?}
+  secret:
+    external: true
+    name: ${FABRIQUINHA_SECRET_VOLUME:?}

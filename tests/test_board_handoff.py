@@ -14,6 +14,17 @@ from test_delivery_core import configuration
 
 
 class ClosedParentHandoff(unittest.TestCase):
+    def test_package_coverage_is_read_from_current_server_contract(self):
+        task=SimpleNamespace(body=json.dumps(dict(release_plan='reviewed-plan',criteria=['APPROVED'])))
+        api=SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(None))
+        kb=SimpleNamespace(get_task=lambda *args:task);board=Board(None)
+        with patch.object(board,'ensure'),patch('fabriquinha.board.native',return_value=(kb,api,None)):
+            self.assertEqual(board.criteria(SimpleNamespace(task='current')),('APPROVED',))
+            for body in ({'criteria':['caller-value']},{'release_plan':'review','criteria':[]},
+                         {'release_plan':'review','criteria':['A','A']}):
+                task.body=json.dumps(body)
+                with self.assertRaises(ValueError):board.criteria(SimpleNamespace(task='current'))
+
     def test_release_evidence_cannot_use_manual_done_as_an_independent_review(self):
         conn=sqlite3.connect(':memory:');conn.row_factory=sqlite3.Row;self.addCleanup(conn.close)
         conn.executescript('CREATE TABLE task_events(id,task_id,run_id,kind,payload);CREATE TABLE task_runs(id,metadata);')

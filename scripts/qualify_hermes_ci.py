@@ -16,7 +16,7 @@ from fabriquinha.artifacts import Store
 from fabriquinha.config import Project
 from fabriquinha.effects import EffectBlocked,write_json
 from fabriquinha.executor import Runner,docker
-from fabriquinha.publication import LocalCI,Repository
+from fabriquinha.publication import LocalCI,LocalStatus,Repository
 
 
 def qualify(root,image):
@@ -24,8 +24,9 @@ def qualify(root,image):
     root.mkdir(mode=0o700,parents=True)
     project=Project.parse(dict(version=1,namespace='delivery-kit-hermes-ci',
         repository='https://github.com/example/ci-qualification',branch='release/ci',validation_image=image,
-        tests_dir='tests',reviewers={'author':'reviewer'},qualification=True))
-    write_json(root/'project.json',dict(version=1,**{name:(dict(value) if name=='reviewers' else value)
+        tests_dir='tests',reviewers={'author':'reviewer'},qualification=True,
+        local_ci=dict(context='fabriquinha-local-ci',publisher='fixture')))
+    write_json(root/'project.json',dict(version=1,**{name:(dict(value) if name in ('reviewers','local_ci') else value)
         for name,value in project.__dict__.items() if value is not None}))
     remote=root/'remote.git';remote.mkdir();seed=root/'seed'
     shutil.copytree(ROOT/'tests/fixtures/delivery/base',seed)
@@ -47,6 +48,24 @@ def qualify(root,image):
     passed=ci.validate(head,base,stage='proposal')
     assert store.receipt(passed)['payload']['conclusion']=='success' and job_count()==2
     assert ci.validate(head,base,stage='proposal')==passed and job_count()==2
+    class StatusFixture:
+        """Fake status transport ONLY; computation and journal are real."""
+        calls=0
+        def local_status(self,commit):
+            path=root/('fixture-status-'+commit+'.json')
+            return json.loads(path.read_bytes()) if path.exists() else None
+        def publish_local_status(self,commit,state,description):
+            self.calls+=1
+            write_json(root/('fixture-status-'+commit+'.json'),dict(id=self.calls,state=state,
+                context='fabriquinha-local-ci',creator={'login':'fixture'},description=description))
+            if self.calls==1:raise TimeoutError('fixture accepted; lost ACK')
+    github=StatusFixture();status=LocalStatus(project,store,repo,github,runner)
+    from fabriquinha.effects import Pending
+    try:status.publish(head,base,stage='proposal')
+    except Pending:pass
+    else:raise AssertionError('lost status ACK was not retained as pending')
+    status=LocalStatus(project,store,repo,github,runner)  # Reconstruct controller after uncertain send.
+    assert status.publish(head,base,stage='proposal')['receipt']==passed and github.calls==1 and job_count()==2
     try:ci.validate(head,base,stage='integrated')
     except EffectBlocked:pass
     else:raise AssertionError('unintegrated SHA passed integrated CI')
@@ -54,10 +73,15 @@ def qualify(root,image):
     repo.push(project.branch,head)
     integrated=ci.validate(head,base,stage='integrated')
     assert store.receipt(integrated)['payload']['conclusion']=='success' and job_count()==3
+    assert status.publish(head,base,stage='integrated')['receipt']==integrated and github.calls==2 and job_count()==3
     work=candidate('failure',head)
     (work/'tests/test_new.py').write_text('import unittest\nclass New(unittest.TestCase):\n def test_failure(self): self.assertEqual(1,2)\n')
     failing=propose('failure',work,head);result=ci.validate(failing,head,stage='proposal')
     assert store.receipt(result)['payload']['conclusion']=='failure' and job_count()==5
+    try:status.publish(failing,head,stage='proposal')
+    except EffectBlocked:pass
+    else:raise AssertionError('failed status authorized integration')
+    assert github.local_status(failing)['state']=='failure' and github.calls==3 and job_count()==5
     work=candidate('skipped',head)
     (work/'tests/test_new.py').write_text('import unittest\nclass New(unittest.TestCase):\n @unittest.skip("fixture")\n def test_skipped(self): self.assertEqual(1,2)\n')
     skipped=propose('skipped',work,head)
@@ -86,7 +110,9 @@ def qualify(root,image):
         integrated_sha_checked=True,assertion_failure_rejected=True,skip_rejected=True,
         weakened_existing_test_rejected_before_execution=True,reduced_discovery_rejected=True,baseline_cases_preserved=True,
         all_owned_jobs_retired=True,
-        github_status_published=False,actions_runner_registered=False,model_calls=0,delivery_approval=False)
+        github_status_published=False,simulated_status_posts=github.calls,status_lost_ack_observed_without_repeat=True,
+        proposal_and_integrated_status_bound_to_receipts=True,failed_status_did_not_authorize_merge=True,
+        actions_runner_registered=False,model_calls=0,delivery_approval=False)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result
 
 

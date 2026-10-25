@@ -11,7 +11,7 @@ from .kanban_lane import native
 from .publication import Publication
 from .deployment import Deployment
 from .config import execution_context
-from .browser import load_contract
+from .browser import load_contract,author_protocol
 
 
 def ordered(tasks):
@@ -196,9 +196,14 @@ class Releases:
         return dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
             architecture=proposed['payload']['document']['architecture'],observability=proposed['payload']['document']['observability'],
             execution=execution_context(self.project),baseline=snapshot,existing_qa=existing,
+            browser_protocol=author_protocol(),
             acceptance=body['acceptance'],stack='qualified Python HTTP, port 8080, /health and /identity; no downloads/network in workers',
-            tdd='Add assertion tests before implementation. Never change old tests or configs. Full suite and negative controls required.',
-            browser='Add '+self.project.tests_dir+'/qa.'+body['package']+'-'+run.release[:12]+'.json with check IDs matching these criteria; preserve every old QA contract.')
+            tdd='Tests author: change tests only; Red requires a real failing assertion in a new test body, not import/discovery/runtime errors. '
+                'Never change old tests/configs or reduce discovery. Implementer: Green uses the exact frozen inventory. '
+                'delivery_submit mutations are disposable full replacements of existing product files, not patches; never tests/configs. '
+                'Controls must fail by assertions and collectively cover every new test. Controller executes all evidence, never accept prose pass claims.',
+            browser='Add only missing criterion IDs in '+self.project.tests_dir+'/qa.'+body['package']+'-'+run.release[:12]+'.json; '
+                'preserve every old QA contract and avoid duplicate IDs. Follow browser_protocol, including exact field names.')
 
     def baseline(self,run,body):
         source=self.board.input(run,'baseline');reference=body['inputs']['baseline']
@@ -265,7 +270,13 @@ class Releases:
         repository,github=services(self.project.delivery_roles['integration'],task=last)
         if repository.remote_head(self.project.branch)!=final['commit']:raise EffectBlocked('release branch advanced after QA')
         ci=github.accept(final['pr'],final['commit'])
-        Publication(self.project,self.store,self.board,repository,github).require_ci(ci,final['commit'],time.time())
+        publication=Publication(self.project,self.store,self.board,repository,github)
+        if publication.local_ci:
+            integrated=self.store.receipt(qa['integrated'],kind='integrated')['payload']
+            published=self.store.receipt(integrated['publication'],kind='publication')['payload']
+            proof=publication.local_ci.existing(final['commit'],published['base_sha'],stage='integrated')
+            if integrated.get('local_ci')!=proof:raise EffectBlocked('final CI provenance changed since integrated validation')
+        publication.require_ci(ci,final['commit'],time.time())
         if self.board.guard:self.board.guard()
         acceptance=self.store.record('release_acceptance',self.binding(anchor),dict(project=self.project.fingerprint(),
             state='HOMOLOGADA',qualification=self.project.qualification,delivery_approval=not self.project.qualification,

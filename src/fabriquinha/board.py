@@ -120,6 +120,16 @@ class Board:
             raise ValueError('prepared absolute workspace required')
         return path.resolve()
 
+    def criteria(self,run):
+        """Read server-owned release criteria, never caller-provided coverage."""
+        self.ensure(run);kb,kbc,_=native()
+        with kbc.connect_closing() as conn:body=json.loads(kb.get_task(conn,run.task).body)
+        criteria=body.get('criteria')
+        if (not isinstance(body.get('release_plan'),str) or not isinstance(criteria,list) or not criteria
+                or any(not isinstance(item,str) or not item for item in criteria) or len(set(criteria))!=len(criteria)):
+            raise ValueError('current reviewed package criteria required')
+        return tuple(criteria)
+
     def input(self, run, name, *, review_handoff=False):
         self.ensure(run)
         kb, kbc, _ = native()

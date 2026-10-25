@@ -148,6 +148,7 @@ class Quality:
         prefix = self.project.tests_dir+'/'
         if any(not p.startswith(prefix) and left.get(p) != right.get(p) for p in set(left) | set(right)):
             raise ValueError('tests-only phase changed product')
+        self.browser_tests(run,candidate)
         base_job, base = self.observe(run, baseline, 'baseline')
         if base['failures']:
             raise ValueError('baseline must pass before Red')
@@ -163,6 +164,13 @@ class Quality:
         return self.record(run, 'red', dict(baseline=baseline, snapshot=candidate,
             baseline_job=base_job, red_job=red_job, cases=sorted(all_cases), new_cases=sorted(new)))
 
+    def browser_tests(self,run,snapshot):
+        if not self.project.delivery_roles:return
+        from .browser import load_contract
+        checks=load_contract(self.store.tree(snapshot)/self.project.tests_dir)['checks']
+        if not set(self.board.criteria(run))<={item['id'] for item in checks}:
+            raise ValueError('browser scenarios must cover every current package acceptance criterion before Red')
+
     def tests_review(self, run, red_id, decision):
         self.check(run, 'tests', reviewing=True)
         if self.board.input(run, 'red', review_handoff=True) != red_id:
@@ -174,6 +182,7 @@ class Quality:
             raise ValueError('review must match exact test authorship and contract')
         snapshot = data['snapshot']
         verdict = review_decision(decision, self.store.manifest(snapshot), self.store.tree(snapshot))
+        if verdict['decision']=='approve':self.browser_tests(run,snapshot)
         review = self.record(run, 'test_review', dict(red=red_id, snapshot=snapshot, verdict=verdict))
         if verdict['decision'] != 'approve':
             return review

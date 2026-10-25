@@ -2,8 +2,9 @@
 
 O caminho Hermes/Kanban possui agora `src/fabriquinha/provider.py`: relay pequeno
 para OpenRouter, sem imports dos adapters históricos de ferramentas/schema,
-fallback de modelo ou reparo de respostas. **Ainda não está instalado como rota
-de produção nem libera a execução da equipe.**
+fallback de modelo ou reparo de respostas. A instalação isolada S4 agora tem uma
+rota própria com autorização de consumo e teto restrito, descrita ao final.
+Isso não aprova o brief nem comprova a entrega autônoma da equipe.
 
 ## Contrato implementado
 
@@ -107,7 +108,17 @@ recusa que nunca criou processo. Permanece não aprovada. A segunda, em board
 novo e sem reparos durante a execução, passou após corrigir o verificador; não
 houve aprovação retroativa. Decisões eram sintéticas, não julgamento de modelo.
 
-Próximo: preparar instalação e objetivo pequeno S4, obter autorização explícita
-da execução paga e usar GitHub/modelo reais. Telegram, segunda release/memória,
-instalação limpa e cutover continuam pendentes. A implementação não introduz
-outro scheduler, DB ou mecanismo próprio de retry.
+### Instalação S4 autorizada — 25 de outubro de 2026
+
+O novo relay está em seu grupo Compose, sem socket e com chave em volume externo
+somente leitura. O proxy antigo foi confirmado parado; o novo proprietário usa o
+mesmo medidor sem zerar o contador. A política foi habilitada explicitamente após
+conferir metadados, contador e ausência de pause/hold. O teto efetivo limita as
+64 chamadas adicionais autorizadas e permanece abaixo do teto global anterior.
+O modelo permanece Claude Haiku, sem fallback automático.
+
+O relay sozinho não faz inferência. A execução começa pela atividade de Produto
+e deve aguardar o brief exato aprovado pelo CEO. A nova branch tem CI local real;
+PR de feature, julgamento independente, merge, deploy e QA pelos agentes ainda
+são a fronteira S4. Telegram, segunda release/memória, instalação limpa e cutover
+continuam pendentes. Não foi introduzido outro scheduler, DB ou retry de modelo.

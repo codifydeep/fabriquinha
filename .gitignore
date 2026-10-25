@@ -19,6 +19,9 @@
 !/examples/python-http/
 /examples/python-http/*
 !/examples/python-http/project.example.json
+!/examples/python-http/compose.provider.yml
+!/examples/python-http/bootstrap/
+!/examples/python-http/bootstrap/**
 !/Dockerfile.validation
 !/Dockerfile.validation.dockerignore
 !/Dockerfile.web

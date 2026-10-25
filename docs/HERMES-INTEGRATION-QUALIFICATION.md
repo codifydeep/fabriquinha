@@ -148,7 +148,7 @@ evidência de autonomia.
 validador isolado do TDD. Não registra runner, publica status GitHub, altera
 proteção de branch ou concede permissão de merge. O CLI
 `scripts/check_hermes_ci.py` é uma operação do controlador, não uma ferramenta de
-shell para os agentes. A instalação paga permanece desabilitada.
+shell para os agentes. A publicação é uma operação separada, descrita abaixo.
 
 O chamador confiável fornece head/base autenticados do PR ou merge. A computação:
 
@@ -179,16 +179,52 @@ foram arquivados/retirados; nenhuma imagem, volume ou snapshot foi apagado.
 Uma primeira fatia mais curta havia passado com quatro jobs; a prova ampliada
 não é uma execução de produto nem publicação de check no GitHub.
 
-**Limite atual:** a computação está qualificada, mas não foi conectada a um check
-obrigatório real. A origem do check na nova branch exige escolha explícita do
-proprietário; não alterar a `main` nem afrouxar seus checks existentes. Está
-proposta publicação de status no SHA pelo controlador local em vez de registrar
-um runner Actions público. O [GitHub recomenda evitar runners próprios em repos
-públicos](https://docs.github.com/en/actions/reference/security/secure-use), pois
-workflows não confiáveis podem comprometer o ambiente. Um runner compartilhado
-do Truco não deve ser reaproveitado por conveniência.
+### Status obrigatório real — 25 de outubro de 2026
 
-Antes da publicação real, o contrato deverá vincular o check ao recibo, SHA,
-base e projeto exatos e observar envios com ACK incerto. Só então configurar a
-branch nova e iniciar S4 autorizado. Não substituir esse passo por marcar check
-verde manualmente ou aceitar um recibo de CI como parecer independente.
+O proprietário aprovou CI local com publicação do status `fabriquinha-local-ci`
+pela conta do controlador, somente na branch nova. Não foi registrado runner
+Actions público, nem reaproveitado o runner do Truco. O [GitHub recomenda evitar runners próprios em repos
+públicos](https://docs.github.com/en/actions/reference/security/secure-use), pois
+workflows não confiáveis podem comprometer o ambiente.
+
+`Project.local_ci` é opt-in: contexto fixo e login do publicador, com fingerprint
+próprio e recusa de `main`/`master`. Projetos antigos sem a opção mantêm sua
+identidade. `LocalStatus` calcula o CI; não aceita resultado declarado pelo
+modelo. Publica `success`/`failure` com o hash completo do recibo na descrição,
+confere a conta antes do envio e consulta o status mais recente por SHA.
+
+O journal grava a intenção antes do POST. ACK perdido provoca observação do envio
+original, não outro POST. Mesmo um ACK já persistido exige observação fresca:
+status sobrescrito, publicador errado ou recibo divergente impedem integração.
+Proposta e merge têm provas distintas. O runtime revalida essa proveniência antes
+do merge, do QA e do aceite integral; CI nunca substitui revisão independente.
+
+A prova ampliada repetiu os sete jobs reais e simulou três POSTs: proposta,
+integração e falha. O primeiro perdeu o ACK; reconstruir o controlador observou
+o mesmo status sem repetir envio ou execução. O transporte dessa prova é
+sintético, não um PR real.
+
+Separadamente, a base de infraestrutura da nova branch S4 recebeu um status real
+verde no GitHub, após dois testes em Docker. A branch exige esse contexto com
+base atualizada, PR, administradores sujeitos à proteção e sem force-push ou
+exclusão. `main`, seu SHA e seu check Actions `ci` foram comparados antes/depois
+e preservados. O bootstrap é um commit normal descendente da história anterior,
+contendo somente `/health`, `/identity` e testes de infraestrutura. Não é uma
+feature desenvolvida autonomamente, aprovação de produto ou homologação.
+
+O comando do operador para uma base/commit autenticados é:
+
+```sh
+python scripts/check_hermes_ci.py --root /private/installation \
+  --upstream /path/to/pinned-hermes --head EXACT_SHA --base EXACT_BASE \
+  --stage integrated --publish
+```
+
+Sem `--publish`, só computa CI. A preparação de branch nova usa
+`scripts/bootstrap_hermes_branch.py`: exige instalação pausada, drenada e board
+vazio; recusa branch preexistente e preserva `main`. Nenhum desses comandos é
+ferramenta administrativa disponível ao modelo.
+
+**Fronteira restante:** PR real de uma feature produzida pelos agentes, revisão,
+merge, CI, deploy, QA e rollback sem reparo do operador após aprovar o brief.
+O status verde do seed não substitui essa entrega S4.

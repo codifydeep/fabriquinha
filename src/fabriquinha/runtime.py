@@ -2,7 +2,7 @@
 
 TDD/technical diagnostics use isolated SDK workers. Integration uses fixed
 publication/deployment/QA operations, never a host shell exposed to a model.
-Paid providers stay paused.
+Paid providers require an explicitly enabled private policy and scoped budget.
 """
 import argparse
 from contextlib import contextmanager
@@ -391,13 +391,15 @@ class Runtime:
         if task.completion_contract!=expected:
             GitHub(self.project,run.actor).url(task.completion_contract)  # exact previously bound PR only
         repo,github=self.integration_services(run)
-        publication=Publication(self.project,self.store,self.board,repo,github)
+        publication=Publication(self.project,self.store,self.board,repo,github,runner=quality.runner)
         deployment=Deployment(self.project,self.store,self.board,quality.runner)
         if run.reviewing:
             rollout=self.board.input(run,'rollout',review_handoff=True)
             artifact=self.store.receipt(self.store.receipt(rollout,kind='rollout')['payload']['candidate'],kind='artifact')['payload']
             integrated=artifact['integrated']
             published=self.store.receipt(self.store.receipt(integrated,kind='integrated')['payload']['publication'],kind='publication')['payload']
+            if self.project.local_ci:
+                publication.local_ci.existing(artifact['commit'],published['base_sha'],stage='integrated')
             publication.require_ci(github.accept(published['pr'],artifact['commit']),artifact['commit'],time.time())
             evidence=deployment.qa(run,rollout,repo)
             self.board.finish_review(run,'Independent deployed QA; release acceptance remains separate',
