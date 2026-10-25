@@ -79,6 +79,21 @@ class ReleaseContracts(unittest.TestCase):
         self.board.closed_review.return_value=(run,{'delivery':foreign},{'green':'green'})
         with self.assertRaises(ValueError):self.releases.closed('task','delivery','delivery_review')
 
+    def test_dependent_baseline_requires_parent_qa_before_author_work_begins(self):
+        run=Run('tests',10,'qa','tests',False,'qa','execution','contract')
+        self.board.input.return_value='snapshot'
+        body={'inputs':{'baseline':'parent:previous:baseline'}}
+        self.board.closed_review.side_effect=ValueError('manual done lacks independent QA')
+        with self.assertRaises(ValueError):self.releases.baseline(run,body)
+        self.board.closed_review.side_effect=None
+        parent=Run('previous',8,'qa','integration',True,'devops','execution','parent-contract')
+        artifact=self.store.record('artifact',{},dict(project=self.project.fingerprint(),snapshot='snapshot'))
+        qa=self.store.record('release_evidence',parent.binding(),dict(project=self.project.fingerprint(),artifact=artifact))
+        self.board.closed_review.return_value=(parent,{'release_evidence':qa},{})
+        self.assertEqual(self.releases.baseline(run,body),'snapshot')
+        self.board.input.return_value='different'
+        with self.assertRaises(ValueError):self.releases.baseline(run,body)
+
     def test_release_identity_is_not_a_current_worker_claim(self):
         anchor=SimpleNamespace(id='release',body='{"release":"execution"}')
         binding=self.releases.binding(anchor)

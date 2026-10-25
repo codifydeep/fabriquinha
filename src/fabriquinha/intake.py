@@ -10,6 +10,7 @@ from pathlib import Path
 from .artifacts import digest, encoded
 from .effects import Journal
 from .kanban_lane import native
+from .config import execution_context
 
 HUMAN_REVIEWER='fabriquinha-ceo'  # Reserved human identity, never an installed model profile.
 
@@ -252,10 +253,11 @@ class DraftTools:
     def evidence(self):
         self.a.ensure();kb,kbc,_=native()
         with kbc.connect_closing() as conn:body=json.loads(kb.get_task(conn,self.run.task).body)
-        if self.run.kind=='brief':return dict(original_objective=body['objective'])
+        if self.run.kind=='brief':return dict(original_objective=body['objective'],execution=execution_context(self.a.project))
         approval=self.a.board.input(self.run,'approved_brief');record,proposal=self.intake.approved(approval)
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
-        result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers))
+        result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers),
+                    execution=execution_context(self.a.project))
         if self.run.reviewing:
             receipt=self.a.store.receipt(self.a.board.input(self.run,'plan',review_handoff=True),kind='work_plan')
             origin=receipt['binding']

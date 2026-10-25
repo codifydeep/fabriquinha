@@ -100,3 +100,14 @@ class Project:
             if candidate not in exclude:
                 return candidate
         raise ValueError('no independent reviewer available in approved matrix')
+
+
+def execution_context(project):
+    """Bounded public constraints, not credentials or a grant to change policy."""
+    return dict(stack='python-http',repository=project.repository,branch=project.branch,
+        workers=project.max_workers,tests_dir=project.tests_dir,iterations=40,
+        reviewers={role:list(project.reviewers_for(role)) for role in project.reviewers},
+        coordination_roles=dict(project.coordination_roles or {}),delivery_roles=dict(project.delivery_roles or {}),
+        deployment='Local Docker only, HTTP port 8080, GET /health and /identity; immutable reviewed image.',
+        quality='Red -> independent test freeze -> Green -> mutations -> independent delivery review -> integrated suite -> deployed browser QA.',
+        browser_checks=20,network='No network, downloads, infrastructure credentials or Docker socket in product sandboxes.')

@@ -4,6 +4,7 @@ No pre-created work graph, Docker job, real model, GitHub mutation or release
 approval. Product/planner output is synthetic: this qualifies mechanisms only.
 """
 import argparse
+import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -25,7 +26,7 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, recorded_worker, worker_alive
 
 
-def qualify(root,upstream,image):
+def qualify(root,upstream,image,*,neutral_relay=False):
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -104,8 +105,27 @@ def qualify(root,upstream,image):
             raw=json.dumps(value).encode();self.send_response(200);self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
     server=ThreadingHTTPServer(('127.0.0.1',0),Response);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
-    write_json(root/'route.json',dict(base_url='http://127.0.0.1:'+str(server.server_port)+'/v1',api_key='local-fixture',
-        provider='custom',api_mode='chat_completions',model='fabriquinha-intake-fixture'))
+    relay=None;relay_server=None;relay_thread=None;relay_owner=None;port=server.server_port;client_key='local-fixture'
+    model='local/fabriquinha-intake-fixture'
+    if neutral_relay:
+        from fabriquinha.provider import Policy,Relay,server as relay_factory
+        meter=root/'relay-meter';meter.mkdir(mode=0o700);write_json(meter/'calls.json',{'calls':0})
+        key=root/'relay-fixture.key';key.write_text('not-a-provider-credential-only-fixture');key.chmod(0o600)
+        client_key='local-relay-client-for-qualification'
+        policy=Policy.parse(dict(version=1,project=runtime.project.fingerprint(),model=model,max_calls=32,
+            max_output_tokens=4096,enabled=True,client_token=client_key))
+        class LocalRelay(Relay):
+            def forward(self,body):
+                connection=http.client.HTTPConnection('127.0.0.1',server.server_port,timeout=10)
+                try:
+                    connection.request('POST','/v1/chat/completions',json.dumps(body),{'Content-Type':'application/json'})
+                    response=connection.getresponse();return response.status,response.read(4*1024*1024+1)
+                finally:connection.close()
+        relay=LocalRelay(policy,meter,key);relay_owner=relay.ledger.owner();relay_owner.__enter__()
+        relay_server=relay_factory(relay,'127.0.0.1',0);port=relay_server.server_port
+        relay_thread=threading.Thread(target=relay_server.serve_forever,daemon=True);relay_thread.start()
+    write_json(root/'route.json',dict(base_url='http://127.0.0.1:'+str(port)+'/v1',api_key=client_key,
+        provider='custom',api_mode='chat_completions',model=model))
     services=[]
     def start():
         with os.fdopen(os.open(root/('service-'+str(len(services)+1)+'.log'),os.O_CREAT|os.O_WRONLY,0o600),'wb') as log:
@@ -203,8 +223,26 @@ def qualify(root,upstream,image):
             approval_creation_gap_recovered=True,
             paid_calls=0,real_model_judgment=False,docker_jobs=0,work_graph_materialized=False,
             delivery_approval=False,migration=False)
+        if relay:
+            from fabriquinha.provider import inspect,Held
+            endpoint='http://127.0.0.1:'+str(port)
+            status=inspect(policy,endpoint,runtime.project.fingerprint())
+            assert status['calls']==len(all_requests)==10
+            relay.ledger.pause(status['calls'],402)
+            connection=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
+            connection.request('POST','/v1/chat/completions',json.dumps(dict(model=model,messages=[dict(role='user',content='Must not reach the fixture')])),
+                {'Authorization':'Bearer '+client_key,'Content-Type':'application/json'})
+            response=connection.getresponse();assert response.status==402;response.read();connection.close()
+            try:inspect(policy,endpoint,runtime.project.fingerprint())
+            except Held as error:assert error.status==402
+            else:raise AssertionError('metadata admission bypassed the financial pause')
+            assert relay.status()['calls']==10 and len(all_requests)==10
+            result.update(neutral_relay=True,relay_calls=10,paused_request_not_forwarded=True,legacy_adapters=0)
         write_json(root/'receipt.json',result);return result
     finally:
+        if relay_server:
+            relay_server.shutdown();relay_server.server_close();relay_thread.join(timeout=5)
+        if relay_owner:relay_owner.__exit__(None,None,None)
         server.shutdown();server.server_close();thread.join(timeout=5)
         # A failure does not kill unknown/live workers: the recorded pause is
         # reconciled by the current service, and evidence is never approved.
@@ -216,8 +254,8 @@ def qualify(root,upstream,image):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    parser.add_argument('--image',required=True);args=parser.parse_args()
-    try:print(json.dumps(qualify(args.root.resolve(),args.upstream.resolve(),args.image),indent=2))
+    parser.add_argument('--image',required=True);parser.add_argument('--neutral-relay',action='store_true');args=parser.parse_args()
+    try:print(json.dumps(qualify(args.root.resolve(),args.upstream.resolve(),args.image,neutral_relay=args.neutral_relay),indent=2))
     except BaseException as error:
         write_json(args.root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False))
         raise

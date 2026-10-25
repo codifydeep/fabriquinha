@@ -213,7 +213,13 @@ O núcleo atual tem 18 módulos funcionais + `__init__`, 4.301 linhas incluindo 
 lane S1. O desvio da meta 12/~3.000 permanece visível. O módulo adicional reúne
 materialização e gate final sobre o Kanban, não outro scheduler/DB.
 
-**Próxima fronteira:** completar contexto técnico do planejamento e admissão
-metered do provedor, respeitando a pausa financeira; depois S4 com modelo e
+**Continuação:** Produto e planejamento recebem os limites de execução sem
+credenciais. Os pacotes recebem arquitetura/observabilidade aprovadas, snapshot
+e IDs QA existentes. A base dependente exige QA independente do predecessor
+antes de começar, não apenas no aceite final. O relay neutro passou pelo SDK
+local; ver [provedor](HERMES-PROVIDER-QUALIFICATION.md) para evidências e limites.
+
+**Próxima fronteira:** conectar a rota e espera/admissão metered do provedor ao
+worker nativo, respeitando autorizações e bloqueios; depois S4 com modelo e
 GitHub reais. O ciclo offline não substitui esse ensaio, a segunda release com
 memória/incidente, instalação reproduzível ou retomada do Truco.

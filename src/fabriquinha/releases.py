@@ -10,6 +10,8 @@ from .intake import plan
 from .kanban_lane import native
 from .publication import Publication
 from .deployment import Deployment
+from .config import execution_context
+from .browser import load_contract
 
 
 def ordered(tasks):
@@ -176,16 +178,38 @@ class Releases:
             if not card or card['id']!=run.task or card['owner']!=run.author:raise ValueError('current graph-owned assignment required')
             self.check_card(conn,card)
         if run.kind=='tests' and not run.reviewing:
-            source=self.board.input(run,'baseline');workspace=self.board.workspace(run)
+            source=self.baseline(run,body);workspace=self.board.workspace(run)
             if not any(workspace.iterdir()):self.store.checkout(source,workspace)
             else:quality.protect(source,self.store.capture(workspace))
         review=self.store.receipt(body['release_plan'],kind='plan_review')
         proposed=self.store.receipt(review['payload']['plan'],kind='work_plan')
         _,brief=self.intake.approved(proposed['payload']['approval'])
+        if run.kind=='tests' and not run.reviewing:snapshot=source
+        elif run.kind=='implementation' and not run.reviewing:snapshot=quality.freeze(run,self.board.input(run,'tests'))['snapshot']
+        elif run.kind=='integration':snapshot=self.store.receipt(self.board.input(run,'delivery'),kind='delivery_review')['payload']['snapshot']
+        else:
+            key='red' if run.kind=='tests' else 'green'
+            snapshot=self.store.receipt(self.board.input(run,key,review_handoff=True),kind=key)['payload']['snapshot']
+        folder=self.store.tree(snapshot)/self.project.tests_dir
+        try:existing=[item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else []
+        except (ValueError,OSError):existing='InvalidBrowserContract: review the immutable files; do not weaken existing scenarios'
         return dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
+            architecture=proposed['payload']['document']['architecture'],observability=proposed['payload']['document']['observability'],
+            execution=execution_context(self.project),baseline=snapshot,existing_qa=existing,
             acceptance=body['acceptance'],stack='qualified Python HTTP, port 8080, /health and /identity; no downloads/network in workers',
             tdd='Add assertion tests before implementation. Never change old tests or configs. Full suite and negative controls required.',
             browser='Add '+self.project.tests_dir+'/qa.'+body['package']+'-'+run.release[:12]+'.json with check IDs matching these criteria; preserve every old QA contract.')
+
+    def baseline(self,run,body):
+        source=self.board.input(run,'baseline');reference=body['inputs']['baseline']
+        if reference.startswith('parent:'):
+            _,parent,key=reference.split(':',2)
+            if key!='baseline':raise ValueError('typed integrated baseline required')
+            _,qa,_=self.closed(parent,'release_evidence','release_evidence')
+            artifact=self.store.receipt(qa['payload']['artifact'],kind='artifact')['payload']
+            if (qa['binding']['release']!=run.release or artifact['project']!=self.project.fingerprint()
+                    or artifact['snapshot']!=source):raise ValueError('baseline must match exact independent parent QA')
+        return source
 
     def package_evidence(self,item,previous):
         cards=item['cards'];tests,frozen,_=self.closed(cards['tests']['id'],'tests','tests_frozen')

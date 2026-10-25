@@ -1,5 +1,6 @@
 """Business approval and work coverage are not execution or release approval."""
 import copy
+import json
 from dataclasses import replace
 from pathlib import Path
 import sys
@@ -119,6 +120,15 @@ class IntakeContracts(unittest.TestCase):
         tools=DraftTools(activity);self.board.ensure.side_effect=ValueError('claim superseded')
         with self.assertRaises(ValueError):tools.submit(document())
         self.assertEqual(list((self.store.root/'receipts').glob('*.json')),[])
+
+    def test_product_and_planner_receive_execution_limits_without_secrets_or_tool_authority(self):
+        from fabriquinha.config import execution_context
+        context=execution_context(self.project)
+        self.assertEqual(context['reviewers']['backend'],['lead'])
+        self.assertEqual(context['workers'],2)
+        self.assertEqual(context['tests_dir'],'tests')
+        self.assertEqual(context['stack'],'python-http')
+        self.assertNotIn('api_key',json.dumps(context))
 
 
 if __name__=='__main__':unittest.main()

@@ -866,7 +866,7 @@ o protocolo indefinidamente para compensar julgamento fraco.
 | Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
 | S0 Referência e ADR | Concluída; referência e arquivo comprimido reconferidos | Referência Git, hashes e restauração íntegra original do backup |
 | S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream |
-| S2 Executor/qualidade pequenos | Parcial: ciclo offline completo do brief ao aceite, com dois incrementos; diagnósticos/outbox/pausa também qualificados | Faltam contexto técnico completo e admissão/provedor autorizado; Telegram real não testado |
+| S2 Executor/qualidade pequenos | Parcial: ciclo offline completo, contexto técnico ampliado e relay neutro qualificado no SDK; canário real curto autorizado passou | Falta conectar rota e espera/admissão do provedor ao worker; Telegram real não testado |
 | S3 Publicação/deploy conectados | Cadeia offline Python/HTTP conectada ao serviço: publicação, espera, reinício, build/deploy/QA/rollback reais; CI simulado | Publicação real em S4 e toolchain de navegador reproduzível em S6 |
 | S4 Primeira entrega autônoma | Não iniciado | Release real sem condução humana |
 | S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
@@ -909,7 +909,11 @@ Próxima fatia após a prova offline S3:
    recursos já passaram. Brief, aprovação de negócio e plano independente agora
    passaram pelo SDK/serviço nativos. Materialização e aceite integral também
    passaram, com bases encadeadas, regressões e dois QA reais. Completar o contexto
-   técnico consumido pelos perfis e a admissão do provedor. Não criar
+   técnico consumido pelos perfis e a admissão do provedor. O contexto técnico
+   foi ampliado e o relay neutro passou pelo SDK local. Um canário real curto
+   autorizado respondeu sem iniciar agentes; ainda falta conectar a rota e a
+   espera por provedor ao worker nativo, sem gastar retry funcional ou slot.
+   Ver `HERMES-PROVIDER-QUALIFICATION.md`. Não criar
    outro ciclo de vida, nem implementar toda S5 antes de tentar S4. CEO não é
    fallback para decisões técnicas.
 5. Só depois resolver a pausa do provedor pelo caminho autorizado e executar S4
