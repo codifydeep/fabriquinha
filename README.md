@@ -39,6 +39,7 @@ flowchart LR
     H --> K
     K --> O[Outbox persistente e status]
     K --> R[Diagnóstico técnico Lead / CTO]
+    V -.->|recusa vinculada ao diagnóstico| R
     R --> X[Experimento fixo e evidência]
     X -->|retomada segura na fase original| K
     X -->|sem operação segura| B[Bloqueio com responsável e próxima ação]
@@ -138,7 +139,7 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 25/10/2026, os 263 testes do núcleo passaram. As provas S1–S3 e extensões
+Em 25/10/2026, os 270 testes do núcleo passaram. As provas S1–S3 e extensões
 qualificam fronteiras específicas; decisões programadas não são julgamento de
 um agente real. Falta a primeira release S4 completa sem intervenção técnica
 externa, depois uma segunda versão com regressão/memória/recuperação e uma

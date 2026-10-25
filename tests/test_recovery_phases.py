@@ -71,6 +71,83 @@ class RecoveryPhases(unittest.TestCase):
         key=json.loads(self.created[-1]['body'])['inputs']['incident']
         return key,self.store.receipt(key,kind='incident')
 
+    def failed_controls(self,*,foreign_run=False,foreign_project=False,foreign_green=False,missing_count=1):
+        task=self.failed('implementation');body=json.loads(task.body)
+        source=Run(task.id,1,'backend','implementation',False,'backend','v1',digest(body))
+        bound=replace(source,number=2) if foreign_run else source
+        green=self.store.record('green',(replace(bound,number=3) if foreign_green else bound).binding(),
+            dict(project=self.project.fingerprint(),snapshot=self.snapshot,freeze='f'*64))
+        missing=['existing_numeric_risk'] if missing_count==1 else ['risk_'+str(i) for i in range(missing_count)]
+        key=self.store.record('control_refusal',bound.binding(),dict(project='b'*64 if foreign_project else self.project.fingerprint(),
+            green=green,freeze='f'*64,snapshot=self.snapshot,missing=missing,coverage=['feature'],feedback=dict(missing=missing[:32],
+                missing_count=missing_count,covered=['feature'],covered_count=1,required_count=missing_count+1),delivery_approval=False))
+        failure=self.store.record('worker_failure',source.binding(),dict(project=self.project.fingerprint(),
+            message='activity ended without handoff',control_refusal=key))
+        self.conn.execute('UPDATE task_events SET payload=? WHERE id=3',
+            (json.dumps({'reason':json.dumps({'category':'ValueError','failure':failure})}),))
+        return task,key,source
+
+    def diagnostic_evidence(self,key):
+        body=json.loads(self.created[-1]['body']);actor=self.created[-1]['assignee']
+        run=Run('diag-0',2,actor,'diagnostic',False,actor,'v1',digest(body));self.board.input=lambda *a,**kw:key
+        q=Quality(self.project,self.store,None,self.board)
+        operation=Diagnostic(SimpleNamespace(project=self.project,store=self.store,board=self.board,run=run,close=Mock()),q)
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(self.conn))
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,api,None)):return operation.evidence()
+
+    def test_control_refusal_reaches_diagnosis_after_worker_exit_and_service_restart(self):
+        task,refusal,source=self.failed_controls();self.recovery=Recovery(self.project,self.store,self.board)
+        key,incident=self.discover(task)
+        self.assertEqual(incident['payload']['category'],'quality_gate')
+        self.assertEqual(incident['payload']['control_refusal'],refusal)
+        evidence=self.diagnostic_evidence(key)['last_control_refusal']
+        self.assertEqual(evidence['feedback']['missing'],['existing_numeric_risk'])
+        self.assertTrue(evidence['complete'])
+        self.assertTrue(evidence['matches_current_snapshot'])
+        self.assertTrue(evidence['requires_fresh_validation'])
+        self.assertFalse(evidence['delivery_approval'])
+        self.recovery=Recovery(self.project,self.store,self.board);self.discover(task)
+        self.assertEqual(len(self.created),1)
+
+    def test_diagnostic_keeps_every_missing_target_beyond_the_short_tool_error_summary(self):
+        task,_,_=self.failed_controls(missing_count=40);key,_=self.discover(task)
+        evidence=self.diagnostic_evidence(key)['last_control_refusal']
+        self.assertEqual(len(evidence['feedback']['missing']),32)
+        self.assertEqual(evidence['missing'],['risk_'+str(i) for i in range(40)])
+        self.assertTrue(evidence['complete'])
+        self.assertFalse(evidence['delivery_approval'])
+
+    def test_prior_control_refusal_is_explicitly_historical_if_author_changed_the_snapshot(self):
+        task,refusal,_=self.failed_controls();(self.work/'app.py').write_text('VALUE = 3\n')
+        key,incident=self.discover(task);evidence=self.diagnostic_evidence(key)['last_control_refusal']
+        self.assertFalse(evidence['matches_current_snapshot'])
+        self.assertNotEqual(evidence['snapshot'],incident['payload']['snapshot'])
+        self.assertTrue(evidence['requires_fresh_validation'])
+        self.assertEqual((self.work/'app.py').read_text(),'VALUE = 3\n')
+
+    def rejected_control_context(self,**kwargs):
+        self.failed_controls(**kwargs)
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,None,None)):
+            issues=self.recovery.reconcile(self.conn,Mock())
+        self.assertFalse(self.created);self.assertEqual(issues['source']['owner'],'cto')
+        self.assertIn('next_action',issues['source'])
+
+    def test_control_refusal_from_another_execution_cannot_enter_the_incident(self):
+        self.rejected_control_context(foreign_run=True)
+
+    def test_control_refusal_from_another_project_is_not_shared_with_the_diagnostic_agent(self):
+        self.rejected_control_context(foreign_project=True)
+
+    def test_control_refusal_cannot_cite_a_green_from_another_execution(self):
+        self.rejected_control_context(foreign_green=True)
+
+    def test_missing_control_refusal_stays_visible_as_evidence_failure(self):
+        task,key,_=self.failed_controls();(self.store.root/'receipts'/(key+'.json')).unlink()
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,None,None)):
+            issues=self.recovery.reconcile(self.conn,Mock())
+        self.assertFalse(self.created);self.assertEqual(issues['source']['owner'],'cto')
+        self.assertIn('next_action',issues['source'])
+
     def test_blocked_planning_creates_one_cto_incident_with_approved_context(self):
         task=self.failed('plan',inputs={'approved_brief':self.approve()})
         key,incident=self.discover(task)

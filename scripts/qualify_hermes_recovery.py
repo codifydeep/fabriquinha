@@ -25,7 +25,8 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False):
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False):
+    if review_escalation and control_refusal:raise ValueError('choose one independent recovery scenario')
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
     kb,kbc,_=native()
     from hermes_cli.profiles import create_profile
@@ -37,6 +38,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
+    control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[]
     sink=None;sink_thread=None;sink_data=dict(accepted={},attempts={},accepted_at={},lookups=0,lost=None)
     if notifications:
         class Sink(BaseHTTPRequestHandler):
@@ -81,7 +83,32 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                 with kbc.connect_closing() as conn:
                     changes=conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='changes_requested'",(run.task,)).fetchone()[0]
                 finding=[dict(path='app.py',line=1,detail='Delivery needs an actual behavior test before implementation')]
-                if run.number==1:sequence=[
+                control_diagnosis=False
+                if control_refusal and run.kind=='diagnostic':
+                    incident=runtime.store.receipt(runtime.board.input(run,'incident'),kind='incident')
+                    control_diagnosis=incident['binding']['kind']=='implementation'
+                if control_diagnosis:
+                    visible=json.loads(native_context.split('Controller-recorded Incident context:\n',1)[1])['last_control_refusal']
+                    assert visible['feedback']['missing']==['test_existing.Existing.test_type']
+                    assert visible['matches_current_snapshot'] and not visible['delivery_approval']
+                    control_seen.append(run.number)
+                    if run.actor=='flow-lead':
+                        control_ready.set();control_release.wait()
+                        sequence=[('read_file',{'path':'/workspace/app.py'}),
+                            ('diagnostic_validate',dict(hypothesis='Current code passes but the numeric invariant lacks a mutation witness')),
+                            ('diagnostic_decide',dict(action='escalate',reason='CTO must validate a product-only counterfactual for the exact missing numeric target',findings=finding))]
+                    else:
+                        sequence=[('read_file',{'path':'/workspace/tests/test_existing.py'}),
+                            ('diagnostic_validate',dict(hypothesis='A noninteger product value must fail both feature and numeric invariant',replacements={'app.py':"VALUE = 'broken'\n"})),
+                            ('diagnostic_decide',dict(action='resume',reason='Keep production VALUE=2 and submit a noninteger disposable mutation to witness the frozen numeric risk.',
+                                findings=[dict(path='app.py',line=1,detail='The refused mutation missed the numeric invariant; use a product-only noninteger counterfactual, never edit tests.')]))]
+                elif control_refusal and run.kind=='implementation' and not run.reviewing:
+                    if not control_failed:
+                        control_failed.append(run.number)
+                        sequence=steps(run,changes)+[(None,'The incomplete control proposal did not qualify; diagnostic ownership is required.')]
+                    else:
+                        sequence=[('read_file',{'path':'/workspace/app.py'}),('delivery_submit',{'mutations':[{'app.py':"VALUE = 'broken'\n"}]})]
+                elif run.number==1:sequence=[
                     ('terminal',dict(command='touch /workspace/tests/over-cap-marker.txt',timeout=570)),
                     ('read_file',{'path':'/workspace/tests/over-cap-marker.txt'}),
                     ('read_file',{'path':'/workspace/app.py'}),(None,'I will finish the task later.')]
@@ -110,6 +137,8 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                         assert 'Expect value 2' in context,'full structured review finding must reach the author'
                         feedback_seen.append(run.number)
                     sequence=steps(run,changes)
+                    if control_refusal and run.reviewing and run.kind=='tests' and sequence[-1][1]['decision']=='approve':
+                        sequence[-1][1]['control_risks']=[dict(case='test_existing.Existing.test_type',reason='The product value must remain numeric; preserve and witness this existing behavior.')]
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
             if run.number==1:
@@ -162,8 +191,10 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                     live=any(worker_alive(recorded_worker(conn,row)) for row in conn.execute('SELECT * FROM task_runs'))
                     cto_blocked=any(task.status=='blocked' and json.loads(task.body).get('stage')=='cto'
                         for task in runtime.recovery.cards(conn))
-                fatal=(any(value=='ValueError' for value in status['recovery_issues'].values()) or cto_blocked
-                    or any(c['status']=='triage' for c in status['cards']))
+                fatal=(any(value=='ValueError' or isinstance(value,dict) and value.get('category') in ('ValueError','KeyError','TypeError')
+                        for value in status['recovery_issues'].values()) or cto_blocked
+                    or any(c['status']=='triage' for c in status['cards'])
+                    or any(i['state'] in ('held','diagnosis_failed') for i in status.get('incidents',[])))
                 if fatal and not live and not any(c['status']=='running' for c in status['cards']):
                     unattended=unattended or time.monotonic()
                     if time.monotonic()-unattended>10:raise RuntimeError('all work terminally blocked by recovery contract error')
@@ -196,6 +227,10 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                 if not all(task.status=='done' for task in tasks):return False
                 rows=conn.execute('SELECT * FROM task_runs').fetchall()
                 return all(not worker_alive(recorded_worker(conn,row)) for row in rows)
+        if control_refusal:
+            wait_for(control_ready.is_set,service);stop(service);service=start()
+            wait_for(lambda:json.loads((root/'status.json').read_bytes())['dispatcher_pid']==service.pid,service)
+            control_release.set();print('Control refusal reached diagnosis; supervisor restarted before diagnostic tools executed.',flush=True)
         wait_for(finished,service)
         if notifications:
             def drained():
@@ -207,21 +242,21 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
         stop(service)
         with kbc.connect_closing() as conn:
             runs=[dict(row) for row in conn.execute('SELECT * FROM task_runs ORDER BY id')]
-            assert len(runs)==(11 if review_escalation else 9) and runs[0]['outcome']=='blocked'
-            assert len(runtime.recovery.cards(conn))==(5 if review_escalation else 4)
+            assert len(runs)==(12 if control_refusal else 11 if review_escalation else 9) and runs[0]['outcome']=='blocked'
+            assert len(runtime.recovery.cards(conn))==(6 if control_refusal else 5 if review_escalation else 4)
             incidents=runtime.recovery.status(conn);assert all(item['state']=='resolved' for item in incidents)
             assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='unblocked'",(source,)).fetchone()[0]==(2 if review_escalation else 1)
             assert conn.execute("SELECT COUNT(*) FROM task_comments WHERE task_id=? AND body LIKE 'DIAG %'",(source,)).fetchone()[0]==(2 if review_escalation else 1)
             decisions=[runtime.store.receipt(json.loads(r['metadata'])['diagnosis'],kind='diagnostic_decision')
                 for r in runs if r['metadata'] and 'diagnosis' in json.loads(r['metadata'])]
-        assert [r['payload']['action'] for r in decisions]==(['escalate','resume','resume'] if review_escalation else ['escalate','resume'])
+        assert [r['payload']['action'] for r in decisions]==(['escalate','resume']*2 if control_refusal else ['escalate','resume','resume'] if review_escalation else ['escalate','resume'])
         if review_escalation:
             assert len(escalated_reviews)==1 and feedback_seen
             failed=next(r for r in runs if r['id']==escalated_reviews[0]);assert failed['outcome']=='blocked'
             following=next(r for r in runs if r['id']>failed['id'] and r['task_id']==source)
             assert following['profile']==failed['profile'],'recovery must resume independent review, not author mode'
         experiment=runtime.store.receipt(decisions[-1]['payload']['experiment'],kind='diagnostic_experiment')
-        assert (runtime.store.tree(experiment['payload']['snapshot'])/'app.py').read_text()=='VALUE = 2\n'
+        assert (runtime.store.tree(experiment['payload']['snapshot'])/'app.py').read_text()==("VALUE = 'broken'\n" if control_refusal else 'VALUE = 2\n')
         assert (root/'work/tests/app.py').read_text()=='VALUE = 1\n'
         assert (root/'work/implementation/app.py').read_text()=='VALUE = 2\n'
         assert not docker('ps','-aq','--filter','label=com.docker.compose.project='+project['namespace']+'-tests').strip()
@@ -231,6 +266,14 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
         if provider_error:proof.update(native_sdk_policy_error_reached_diagnosis=True)
+        if control_refusal:
+            assert len(control_failed)==1 and len(control_seen)==2
+            failed=next(r for r in runs if r['id']==control_failed[0])
+            worker_failure=runtime.store.receipt(json.loads(failed['summary'])['failure'],kind='worker_failure')
+            refusal=runtime.store.receipt(worker_failure['payload']['control_refusal'],kind='control_refusal')
+            assert refusal['binding']['number']==control_failed[0] and refusal['payload']['feedback']['missing']==['test_existing.Existing.test_type']
+            proof.update(control_refusal_survived_worker_exit_and_supervisor_restart=True,
+                missing_targets_reached_lead_and_cto=True,corrected_controls_revalidated_independently=True)
         proof.update(terminal_timeout_rejected_before_execution=True)
         if notifications:
             messages=[value['message'] for value in sink_data['accepted'].values()]
@@ -250,6 +293,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
         write_json(root/'receipt.json',proof);print(json.dumps(proof,indent=2))
     finally:
         release.set()
+        control_release.set()
         for process in services:
             if process.poll() is None:stop(process)
         with kbc.connect_closing() as conn:rows=[recorded_worker(conn,row) for row in conn.execute('SELECT * FROM task_runs WHERE ended_at IS NULL')]
@@ -267,12 +311,14 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image',required=True);parser.add_argument('--notifications',action='store_true')
-    parser.add_argument('--review-escalation',action='store_true')
+    scenario=parser.add_mutually_exclusive_group()
+    scenario.add_argument('--review-escalation',action='store_true')
+    scenario.add_argument('--control-refusal',action='store_true')
     parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
     args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
     try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
-        provider_error=args.provider_error)
+        provider_error=args.provider_error,control_refusal=args.control_refusal)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

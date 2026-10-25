@@ -61,6 +61,11 @@ planejamento/integração e `triage`, preservar a fase e impedir repetição id�
 sem diagnóstico. Cada impedimento deve ter responsável e próxima operação
 possível. Conferir schema/handler/prompt/configuração preparados.
 
+Recusas de cobertura dos controles agora sobrevivem à saída do worker e ao
+reinício do supervisor com vínculo ao Green/freeze e listas completas de alvos.
+A prova offline passou até correção e revisão independente, sem transformar
+essa informação negativa em aprovação ou resolver a release real bloqueada.
+
 **Saída:** testes determinísticos de devolução de plano, falha de integração,
 segundo bloqueio, reinício e espera humana correta. Não precisa completar toda
 S5; uma reparação sem operação segura deve ser declarada como limite visível.

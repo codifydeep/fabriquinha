@@ -105,6 +105,25 @@ autor. Não apresentar esse escopo como prova de todas as classes de incidente.
 
 ## Reprodução e pendências
 
+### Recusa dos controles como contexto durável
+
+Cobertura insuficiente agora cria um recibo `control_refusal`, sem autoridade de
+aprovação, vinculado ao Green, snapshot, contrato de testes e execução exatos.
+Se o worker terminar sem handoff, seu recibo de falha referencia essa recusa;
+o incidente e o diagnóstico recuperam os alvos ausentes e cobertos. O resumo
+do erro é limitado, mas o recibo e o contexto guardam as listas completas.
+Se o autor modificou o snapshot, a recusa é apresentada como histórica, sem
+dispensar novo experimento. Recibos de outro projeto/run/Green são rejeitados.
+
+A prova `qualify_hermes_recovery.py --control-refusal` passou com 12 atividades,
+quatro diagnósticos e 38 respostas HTTP locais. Uma mutação deixou de cobrir um
+risco numérico congelado pelo revisor. Após a saída do worker e reinício do
+supervisor, Lead e CTO receberam o alvo exato; o CTO validou um contrafactual
+descartável, o autor corrigiu a proposta e a revisão independente concluiu.
+Produção e testes não foram alterados pelo diagnosticador. O incidente só foi
+resolvido após a entrega válida. Zero chamadas OpenRouter; decisões programadas,
+sem GitHub real nem homologação. Esse modo é independente de `--review-escalation`.
+
 ### R2 — Planejamento, integração e triagem
 
 O serviço cobre origens `brief`, `plan`, `tests`, `implementation` e

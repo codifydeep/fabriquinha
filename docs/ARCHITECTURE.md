@@ -80,6 +80,10 @@ offline de dois incrementos recuperou plano e integração até deploy/QA/rollba
 Ferramentas enxergam `/workspace`, não os caminhos privados do controlador;
 falhas SDK conservam metadados limitados para o diagnóstico. O ensaio real e
 seus limites atuais continuam descritos em [STATUS](STATUS.md).
+Recusas de cobertura dos controles ficam no mesmo armazenamento de recibos,
+ligadas ao Green e ao freeze. Falhas de worker propagam a referência ao incidente;
+o diagnóstico distingue contexto atual de histórico. Recusa não concede aprovação
+nem dispensa revalidação; não há outro banco ou serviço para esse contexto.
 A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou depois
 com conexão recusada, ACK perdido e reinício: 21 mensagens locais, com ator do run
 e início/término únicos. O sender é independente dos slots; o status separa

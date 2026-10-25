@@ -508,7 +508,7 @@ class Runtime:
             if not owner or owner['worker_pid']!=os.getpid():
                 raise ValueError('native run belongs to another worker process')
             prompt=kb.build_worker_context(conn,task)
-        run=self.board.current(task,number)
+        run=self.board.current(task,number);quality=None
         try:
             self.control.ensure()
             os.environ['HERMES_HOME']=str(self.root/'home/profiles'/run.actor)
@@ -557,8 +557,10 @@ class Runtime:
             # Keep claim until this process is really gone. Paused maintenance
             # then reclaims it natively, without changing author/review phase.
         except BaseException as error:
+            control_refusal=getattr(quality,'control_refusal',None)
             failure=self.store.record('worker_failure',run.binding(),dict(project=self.project.fingerprint(),
-                category=type(error).__name__,message=str(error)[:2000]))
+                category=type(error).__name__,message=str(error)[:2000],
+                **({'control_refusal':control_refusal} if control_refusal else {})))
             with kbc.connect_closing() as conn:
                 kb.block_task(conn,task,reason=json.dumps(dict(category=type(error).__name__,failure=failure)),
                               kind='capability',expected_run_id=number)

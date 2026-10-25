@@ -72,6 +72,7 @@ class Quality:
     def __init__(self, project, store, runner, board):
         self.project, self.store, self.runner, self.board = project, store, runner, board
         self.observed_jobs=set()
+        self.control_refusal=None
 
     def check(self, run, kind, *, reviewing=False):
         self.board.ensure(run)
@@ -285,8 +286,11 @@ class Quality:
         if missing:
             feedback=dict(missing=missing[:32],missing_count=len(missing),covered=sorted(coverage)[:32],
                 covered_count=len(coverage),required_count=len(frozen['control_cases']))
-            raise ValueError('negative controls did not witness all independently frozen behavior targets: '+json.dumps(feedback)+
+            self.control_refusal=self.record(run,'control_refusal',dict(green=green_id,freeze=data['freeze'],
+                snapshot=data['snapshot'],jobs=jobs,missing=missing,coverage=sorted(coverage),feedback=feedback,delivery_approval=False))
+            raise ValueError('negative controls did not witness all independently frozen behavior targets: '+json.dumps({**feedback,'refusal':self.control_refusal})+
                 '. Correct product mutations for the missing cases; preserve the full suite and frozen tests.')
+        self.control_refusal=None
         return self.record(run, 'controls', dict(control_contract=CONTROL_CONTRACT,green=green_id, jobs=jobs, coverage=sorted(coverage)))
 
     def delivery_review(self, run, green_id, controls_id, decision):

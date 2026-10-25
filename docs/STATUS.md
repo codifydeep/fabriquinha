@@ -68,7 +68,7 @@ instalação auditada. Notificações em fila não comprovam visibilidade no Tel
 O núcleo auditado em `98e09069` tinha 19 módulos funcionais mais `__init__`,
 5.060 linhas e 233 testes verdes, sem cobrir a contradição. Os testes novos
 exercitam alvos, risco adicional, imutabilidade, skip, inventário e legado.
-Os **263 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
+Os **270 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
 SLA ou portabilidade.
 
 A revalidação integrada inicialmente encontrou esgotamento dos pools de rede
@@ -104,6 +104,15 @@ e 29 respostas locais verificou rejeição antes de execução, propagação do 
 exigem nova fronteira, sem importar evidências técnicas das tentativas bloqueadas.
 O teto de chamadas só foi elevado por autorização explícita do proprietário;
 modelo, limite de saída e ausência de fallback permanecem.
+
+Uma melhoria offline posterior preserva recusas de cobertura dos controles em
+recibo negativo, ligado à execução, Green, snapshot e freeze exatos. O diagnóstico
+recebe todos os casos ausentes; se o código mudou, o contexto fica explicitamente
+histórico e exige validação nova. Referências de outra execução/projeto/Green ou
+evidência ausente são recusadas. A prova com decisões programadas concluiu 12
+atividades e 38 respostas locais, incluindo saída do worker, reinício do supervisor,
+Lead → CTO, correção pelo autor e revisão independente. Zero chamadas OpenRouter;
+essa prova não transforma a release real bloqueada em entrega aprovada.
 
 A fronteira posterior voltou a ser interrompida no QA por `output_budget_exceeds_policy`.
 Dois canários sintéticos isolados (padrão e esforço baixo) retornaram argumentos

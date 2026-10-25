@@ -69,8 +69,17 @@ class BehaviorControlTargets(unittest.TestCase):
         self.assertIn('"missing": ["passing_risk"]',str(error.exception))
         self.assertIn('"covered": ["feature"]',str(error.exception))
         self.assertIn('preserve the full suite and frozen tests',str(error.exception))
+        refusal=self.store.receipt(self.q.control_refusal,kind='control_refusal')
+        self.assertEqual(refusal['binding'],self.implementer.binding())
+        self.assertEqual(refusal['payload']['green'],green)
+        self.assertEqual(refusal['payload']['feedback']['missing'],['passing_risk'])
+        self.assertEqual(refusal['payload']['missing'],['passing_risk'])
+        self.assertEqual(refusal['payload']['coverage'],['feature'])
+        self.assertFalse(refusal['payload']['delivery_approval'])
+        self.assertFalse(any(self.store.receipt(p.stem)['kind']=='controls' for p in (self.store.root/'receipts').glob('*.json')))
         self.failing=['feature','passing_risk']
         self.q.controls(self.implementer,green,[mutant])
+        self.assertIsNone(self.q.control_refusal)
 
     def test_unjustified_unknown_duplicate_or_nonapproval_risks_are_rejected(self):
         for risks in ([dict(case='unknown',reason='risk')],[dict(case='qa_metadata',reason='')],
