@@ -5,14 +5,18 @@ das etapas ainda não qualificadas. A presença de um módulo não comprova sua
 ativação no runtime. Não descreve uma arquitetura futura como se Temporal já
 estivesse instalado.
 
-Estado de referência: **24 de outubro de 2026**. Componentes existentes não
-significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md).
+Estado de referência revisto: **25 de outubro de 2026**. Componentes existentes
+não significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md) e a
+[auditoria da execução](EXECUTION-REVIEW-2026-10-25.md). O gate de mutações tem uma
+contradição conhecida e a recuperação não cobre todas as fases. As correções
+propostas ainda não foram instaladas; o desenvolvimento permanece pausado.
 
 ## Caminho Hermes isolado em construção
 
 [S0/S1](HERMES-S1-QUALIFICATION.md) qualificaram dispatcher, recuperação nativa
-e isolamento. A [fatia S2](HERMES-S2-QUALIFICATION.md) acrescenta o fluxo abaixo,
-sem instalar um novo gateway nem migrar o Multica. Autores/revisores são fixtures.
+e isolamento. A [fatia S2](HERMES-S2-QUALIFICATION.md) acrescentou o fluxo abaixo
+com autores/revisores programados. O S4 posterior usa agentes reais e chegou ao
+freeze dos testes; ainda não completou a entrega. Não houve migração do Multica.
 
 ```mermaid
 flowchart LR
@@ -23,7 +27,7 @@ flowchart LR
     A --> E[executor.py: validação fixa em Docker]
     E --> Q[quality.py: Red, freeze, Green e controles]
     Q --> B
-    B --> I[recovery.py: DIAG nativo Lead/CTO]
+    B --> I[recovery.py: DIAG Lead/CTO para testes e implementação]
     I --> X[SPIKE descartável; orientação validada]
     X -->|Retomada nativa; gates mantidos| B
     B --> O[notifications.py: eventos e outbox privados]

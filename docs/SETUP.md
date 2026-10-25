@@ -1,6 +1,6 @@
 # Instalação segura e limites
 
-Estado de referência: **24 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
+Estado de referência revisto: **25 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
 antes de ativar agentes. O kit continua experimental; não há instalação completa
 e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
@@ -15,8 +15,9 @@ sem modelo ou GitHub real. O navegador ainda requer toolchain local previamente
 selecionado por ID; não há promessa de reprodução limpa dessa dependência até S6.
 O [serviço contínuo TDD](HERMES-RUNTIME-QUALIFICATION.md) já passou em isolamento
 com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
-as rotas de fixture expiram e não devem ser reutilizadas como produção. A entrada
-operacional ainda recusa provedores reais, preservando a pausa anterior.
+as rotas de fixture expiram e não devem ser reutilizadas como produção. Provedores
+reais exigem política privada explicitamente habilitada e limite de consumo.
+A instalação S4 está pausada; a auditoria não remove essa pausa.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
 explícita de Lead/CTO e cards nativos de recuperação com SPIKE. Sua prova também
 usa respostas locais; não constitui ativação dos nove perfis em produção.
@@ -25,6 +26,23 @@ qualificada com transporte local. `notifications.json` pertence à raiz privada
 da instalação, nunca ao Git; não copie tokens para SOULs, cards ou testes. O modo
 de qualificação recusa Telegram real. A futura ativação depende do destino
 explicitamente configurado, sem reativar os gateways antigos por consequência.
+
+## Caminho atual e referência histórica
+
+O caminho novo é `src/fabriquinha`, com preparação parcial por
+`scripts/prepare_hermes_project.py`. Esse script não instala imagens, provisiona
+GitHub ou inicia relay/serviço. A [revisão atual](EXECUTION-REVIEW-2026-10-25.md)
+documenta os gates a corrigir antes da próxima execução e as lacunas de S6.
+
+Para consultar uma instalação existente, use o Python do SDK já provisionado,
+com `PYTHONPATH=src`, e `python -m fabriquinha.runtime status --root
+<raiz-privada> --upstream <checkout-Hermes-fixado>`. A consulta não retoma
+dispatch. Os caminhos são inputs privados do operador; não copie instalações
+ou credenciais de outra máquina.
+
+**As seções numeradas abaixo preservam procedimentos do legado.** Os comandos
+Multica, port2 e da ponte de revisão não são a instalação do caminho Hermes.
+Para testes offline atuais, use os comandos do [README](../README.md).
 
 ## 1. Testes offline primeiro
 

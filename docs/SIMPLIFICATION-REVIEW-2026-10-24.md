@@ -1,37 +1,19 @@
 # Fabriquinha: revisão estratégica e plano de simplificação
 
-Data: 24 de outubro de 2026. Base de código examinada: `e33c893f`.
-Destinatários: proprietário do projeto e GPT 6.1 Sol, responsável pela futura execução.
-Estado: **plano e mudanças de contrato aprovados pelo proprietário em 24/10/2026**.
-S0/S1 concluídos; [resultado e limites da prova](HERMES-S1-QUALIFICATION.md).
-S2 parcial: [mecanismos TDD qualificados sem modelo](HERMES-S2-QUALIFICATION.md).
-[S3 passou no escopo offline Python/HTTP](HERMES-S3-QUALIFICATION.md), incluindo
-build, Compose, QA em Chromium e rollback reais. GitHub e decisões permanecem
-simulados; serviço contínuo e entrega por agentes reais ainda não qualificados.
-A ponte `AIAgent`/ferramentas/sessões passou depois com respostas locais; as
-operações fixas de submissão/parecer percorreram dois cards e seis atividades
-pelo dispatcher nativo. Essa prova não instala serviço operacional nem migra estado.
-Uma prova posterior do [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md) passou
-com reinício, crash, retirada da sandbox órfã e retomada de arquivo/sessão.
-O serviço completo da equipe e a instalação de produção continuam pendentes.
-O [diagnóstico executável](HERMES-RECOVERY-QUALIFICATION.md) passou depois com
-Lead/CTO, SPIKE real, orientação idempotente e revalidação do trabalho original.
-A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou com
-indisponibilidade de conexão, ACK perdido, reinício e 21 mensagens locais.
-Telegram real não foi ativado. A
-[conexão de publicação/esperas/deploy/QA](HERMES-INTEGRATION-QUALIFICATION.md)
-passou depois pelo serviço, com CI simulado, reinício e recuperação de um crash
-de partida. [Pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md) também
-passaram depois, com interrupção do SDK, preservação da revisão e perfil
-restaurado sem gastar retry. A [entrada do brief e planejamento independente](HERMES-INTAKE-QUALIFICATION.md)
-passou depois com três esclarecimentos, devolução do brief, aprovação exata do
-CEO e plano revisado pelo CTO. Foram nove atividades SDK/dez respostas locais;
-o DAG ainda não era materializado naquela fatia. A continuação passou pelo ciclo
-offline completo: dois incrementos dependentes, seis cards gerados, PRs simulados,
-Git/build/deploy/QA/rollback reais e gate integral. Terceira tentativa passou;
-as duas anteriores falharam por vinculação de PR e preflight/WAL. Não é autonomia
-de produto: ainda faltam contexto técnico completo, admissão/provedor e S4 reais.
-A referência antiga e chamadas pagas continuam pausadas; nenhuma migração foi aplicada.
+Data do plano: 24 de outubro de 2026. Base examinada: `e33c893f`.
+Destinatários: proprietário do projeto e GPT 6.1 Sol.
+**Estratégia e mudanças de contrato aprovadas em 24/10/2026.**
+
+**Continuidade atualizada em 25/10:** ler a
+[revisão da execução](EXECUTION-REVIEW-2026-10-25.md) e o
+[roadmap vigente](ROADMAP.md) antes de executar próximos passos. S0/S1 passaram;
+S2/S3 têm provas delimitadas; S4 chegou a freeze real e implementação, mas ainda
+não entregou uma release. A execução permanece pausada.
+
+As seções 1–13 preservam o raciocínio e o plano aprovado na data original. Os
+achados novos e refinamentos propostos estão na revisão de 25/10; não são
+mudanças já instaladas nem autorização de consumo. O quadro da seção 14 foi
+atualizado para eliminar instruções de retomada obsoletas.
 
 ## 1. Decisão recomendada
 
@@ -860,88 +842,37 @@ o protocolo indefinidamente para compensar julgamento fraco.
 
 ## 14. Quadro durável e instrução de continuidade
 
-| Etapa | Estado atual | Prova necessária |
+Atualização: 25 de outubro de 2026. Base auditada: `98e09069`.
+
+| Etapa | Estado | Próxima prova |
 |---|---|---|
-| Análise e plano | Concluídos em documento | Fontes e código citados acima |
-| Aprovação da estratégia/contrato | Aprovada em 24/10 | Aceite explícito e ADR 0001 |
-| S0 Referência e ADR | Concluída; referência e arquivo comprimido reconferidos | Referência Git, hashes e restauração íntegra original do backup |
-| S1 Viabilidade Hermes isolado | Concluída e revalidada em outro board vazio | Onze controles físicos/nativos, zero modelo e zero patches upstream |
-| S2 Executor/qualidade pequenos | Parcial: ciclo offline completo; contexto/relay/admissão/espera conectados ao SDK; canário real curto anterior passou | Preparar instalação S4 e autorização de consumo; Telegram real não testado |
-| S3 Publicação/deploy conectados | Cadeia offline; CI local conectado com ACK perdido qualificado e primeiro status real verde do seed na branch nova | PR de feature real ainda não integrado; toolchain de navegador reproduzível em S6 |
-| S4 Primeira entrega autônoma | Brief/plano reais revisados; TDD/revisão expuseram falta de navegador no Red/Green e esgotaram a cota; capacidade corrigida e qualificada offline com Chromium | Nova instalação/ensaio com evidências próprias; escalonamento de revisão sem progresso ainda não comprovado; sem homologação |
-| S5 Evolução e recuperação | Não iniciado | Regressão, memória e incidente recuperado |
-| S6 Instalação/segundo repo/cutover | Não iniciado | Reprodução limpa e caminho único |
-| S7 Retomada do Truco | Não iniciado | Plataforma qualificada e brief confirmado |
+| S0/S1 | Concluídas no escopo de referência e viabilidade nativa | Preservar upstream fixado e sem patches |
+| S2 | Mecanismos funcionam; incompatibilidade de controles encontrada | Contrato satisfazível, inclusive com teste auxiliar independente do produto |
+| S3 | Cadeia determinística e CI local real da base | Feature com PR, integração e homologação por agentes reais |
+| S4 | Brief/plano/testes aprovados; implementação iniciada e pausada pelo proprietário | Completar a cadeia sem intervenção técnica externa |
+| S5 | Não qualificada | Segunda versão, memória e recuperação executável |
+| S6 | Não qualificada | Instalação limpa em outro repo; depois cutover |
+| S7 | Não iniciada | Retomar Truco após qualificação |
 
-Próxima fatia após a prova offline S3:
+O freeze atual inclui um teste que só valida um JSON protegido de QA. O gate
+exige que toda função de teste nova falhe por mutação do produto, inclusive
+essa função independente do produto. Não retomar o ensaio sob essa regra sem
+tratar a contradição. A pausa humana atual não foi causada por esse gate.
 
-1. A ponte de sessões/ferramentas reais passou com transporte local fixo, sem patch
-   no loop Hermes: escrita/terminal na sandbox, revisão sem handlers proibidos,
-   Red real e sessão retomada em outro processo sem duplicação. Submissão/parecer
-   já passaram como ferramentas fixas no `dispatch_once`; o serviço contínuo
-   isolado recuperou crash e reinício, preservando workspace/sessão e retirando
-   a sandbox órfã antes da substituta. Não confundir isso com julgamento real. A
-   política de registry pertence ao processo isolado, nunca ao gateway multiplexado.
-2. Espera por CI/provedor/revisão deve liberar capacidade e preservar a fase.
-   Não manter um processo ocupado só para observar, nem reiniciar efeito já aceito.
-   A semântica upstream foi comprovada: espera agendada encerra o run e a retomada
-   cria outro. PR/merge já passaram com novas claims, um único efeito, origem
-   preservada e claims antigas sem autoridade. Aprovações continuam ligadas à
-   execução exata. Build/deploy também passaram entre claims, com artefato e
-   etapas de origem preservados, rollback e QA independente no mesmo candidato.
-   O serviço TDD já acorda os cards nativamente. A continuação de integração/CI
-   também passou no serviço, usando `scheduled` e recibos, sem outro ciclo de vida.
-   Perfil/recursos e pausa/retomada já passaram na fronteira operacional;
-   provedor e intake ainda exigem suas fronteiras explícitas.
-   Atenção: `scheduled` volta a `ready`
-   no upstream, portanto não usar esse caminho genericamente para revisores.
-3. A matriz já aceita suplentes explicitamente permitidos. O handoff TDD deriva
-   exclusão do autor dos testes do recibo congelado e seleciona o próximo revisor.
-   Isso passou em fixture nativa; exaustão do pool ainda precisa gerar diagnóstico
-   técnico executável, não apenas lançar erro. A
-   integração/deploy deve ser de DevOps, com QA independente, não revisão de
-   implementação pelo próprio autor dos testes.
-4. O diagnóstico executável já passou para falha de worker: Lead/CTO criados pelo
-   serviço, SPIKE em cópia descartável, orientação e retomada sem duplicar ações.
-   O incidente só resolveu após evidência válida dos gates do trabalho original.
-   Outbox/alertas já passaram com falhas de conexão e ACK/reinício, sem bloquear
-   o trabalho. A conexão de publicação/deploy/QA e a admissão básica de perfil/
-   recursos já passaram. Brief, aprovação de negócio e plano independente agora
-   passaram pelo SDK/serviço nativos. Materialização e aceite integral também
-   passaram, com bases encadeadas, regressões e dois QA reais. Completar o contexto
-   técnico consumido pelos perfis e a admissão do provedor. O contexto técnico
-   foi ampliado e o relay neutro passou pelo SDK local. Um canário real curto
-   autorizado respondeu sem iniciar agentes. A rota e a espera por provedor já
-   passaram no worker nativo, sem gastar/resetar falhas funcionais: dois 402
-   locais, reinício e retomada até TDD completo. A primeira tentativa falhou no
-   verificador final; a segunda passou em board novo. Próximo é preparar S4 e
-   obter a autorização explícita da execução paga, não outro ensaio genérico.
-   Ver `HERMES-PROVIDER-QUALIFICATION.md`. Não criar
-   outro ciclo de vida, nem implementar toda S5 antes de tentar S4. CEO não é
-   fallback para decisões técnicas.
-5. Só depois resolver a pausa do provedor pelo caminho autorizado e executar S4
-   com Produto/brief aprovado, modelo e GitHub reais. Preservar o contador e teto;
-   não considerar uma fixture ou tarefa `done` como release homologada.
-   Antes de liberar consumo, concluir contexto/admissão e usar a pausa explícita
-   qualificada: parar o dispatcher para reinício não significa interromper workers
-   saudáveis. A admissão ainda não é monitoramento completo de capacidade nem
-   diagnóstico de todo problema de infraestrutura. Manter uma fonte canônica de modelos
-   e nenhum fallback automático.
+Ao retomar com Sol:
 
-Ao retomar com GPT 6.1 Sol:
+1. Ler [EXECUTION-REVIEW-2026-10-25.md](EXECUTION-REVIEW-2026-10-25.md), que contém
+   evidências, alterações propostas e critérios detalhados de R0–R5.
+2. Conferir pausa e limites efetivos privados. Esta revisão não retoma agentes.
+3. Registrar o aceite do refinamento de qualidade, preservar a tentativa atual
+   e corrigir offline a contradição e os caminhos conhecidos de feedback/impedimento.
+4. Executar um único S4 completo, com os agentes conduzindo os handoffs. Uma
+   mudança de gate/runtime após o aceite exige outra fronteira de medição.
+5. Só então avançar S5, S6 e S7; não construir toda a recuperação universal antes
+   da primeira entrega, nem repetir qualificações genéricas já suficientes.
+6. Atualizar STATUS e ROADMAP de forma concisa. Manter evidências privadas e
+   histórico no Git; automação pode ir à main conforme autorização vigente.
+   Produtos continuam sujeitos a PR, revisão independente e CI.
 
-1. Ler este documento, `AGENTS.md` e a última linha de progresso registrada.
-2. Considerar a aprovação registrada no ADR 0001 e ler os resultados S0/S1, S2 e S3.
-3. Conferir estado vivo e autorização de consumo sem iniciar o legado por hábito.
-4. Começar pela primeira etapa incompleta. Não retomar automaticamente a antiga
-   tarefa de adicionar outra admissão/recuperação à ponte v2.
-5. Atualizar este quadro com evidência e limitações. Usar um arquivo de resultados
-   público conciso, sem UUIDs privados, credenciais, conversas ou recibos completos.
-6. Manter código e documentos no Git. Mudanças da automação podem ir à `main`
-   conforme autorização vigente; produtos continuam com PR/revisão/CI.
-
-O proprietário aprovou o plano e autorizou a execução inicial de S0/S1. Essas
-etapas demonstraram a viabilidade da fronteira Hermes/Kanban em ambiente separado.
-O gateway de produção, modelo real e entrega de software ainda exigem as etapas
-seguintes. Os experimentos existentes permanecem pausados, os bloqueios preservados
-e nenhuma versão foi declarada homologada por essa qualificação.
+As aprovações registradas anteriormente permanecem válidas em seus escopos.
+Nenhum teste, parecer, resultado histórico ou pausa foi convertido em homologação.
