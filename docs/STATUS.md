@@ -3,13 +3,13 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
-**R1/F1 e R2 limitado qualificados offline; tentativa S4 real bloqueada.**
+**R1/F1 e R2 limitado qualificados offline; nova tentativa S4 real em execução.**
 O proprietário aprovou o refinamento F1, implementado e validado com
 Chromium/Docker. As provas R1/R2 usaram zero chamadas pagas. O novo S4 usa
 Claude Haiku sob cota específica autorizada, com relay isolado e perfis limpos.
-O Lead manteve um impedimento explícito; a tentativa está preservada e seu
-relay foi desligado para correção offline. As tentativas anteriores permanecem
-pausadas e preservadas.
+Uma tentativa bloqueada foi preservada com relay desligado; a correção de
+contexto passou offline e originou outra fronteira limpa. As tentativas
+anteriores permanecem pausadas e preservadas.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -23,7 +23,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Nova fronteira sob contrato 2; brief idêntico aprovado, plano revisado, CI inicial verde; falha do QA acionou diagnóstico real do Lead | Red/revisão/freeze, Green/controles, PR/CI, integração, deploy e QA; corrigir contexto antes de outra fronteira |
+| S4 | Nova fronteira limpa: brief idêntico aprovado, plano revisado, CI inicial verde; recuperação real pelo Lead, mudanças atendidas pelo QA e freeze independente dos testes | Implementação/Green, controles, revisão da entrega, PR/CI, integração, deploy e QA finais |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |
@@ -36,7 +36,7 @@ Até agora, nenhuma release S4 foi homologada autonomamente.
 
 As cinco fronteiras identificadas pela auditoria não eram cinco execuções
 completas: quatro não qualificaram entrega e a última ficou incompleta e pausada.
-A nova fronteira posterior a R2 ficou bloqueada, sem homologação. A aprovação de brief reutilizado comprova continuidade do
+Uma fronteira posterior a R2 ficou bloqueada; a seguinte está em execução, sem homologação. A aprovação de brief reutilizado comprova continuidade do
 aceite, não uma nova descoberta autônoma de produto.
 
 ## Impedimentos encontrados na revisão
@@ -92,13 +92,21 @@ de saída permanece em 8.192. O consumo foi de 13 chamadas nesta tentativa;
 restam 51 sob o teto específico aprovado. Mudanças de fonte exigem nova fronteira,
 sem aproveitar os testes ou aprovações técnicas da tentativa bloqueada.
 
+Na fronteira seguinte, o mesmo limite de saída voltou a ser atingido. O Lead
+identificou a causa com os metadados corrigidos, leu os arquivos em `/workspace`,
+executou um SPIKE e retomou a fase original. O QA produziu Red, recebeu mudanças
+de cobertura, corrigiu e obteve revisão/freeze independentes. O incidente só foi
+resolvido após o freeze válido; o Frontend então iniciou a implementação.
+Essa recuperação foi conduzida pelos agentes reais, sem intervenção técnica
+externa após o aceite. A release completa continua não qualificada.
+
 ## Próxima sequência
 
 O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
 - R2 limitado e correção de contexto revalidados offline, inclusive HTTP 422
-  através do SDK real; preparar outra fronteira S4 sob o contrato 2.
+  através do SDK real; nova fronteira S4 sob o contrato 2 em execução.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 

@@ -65,12 +65,21 @@ processo isolado por claim e nunca deve ser instalada num gateway compartilhado.
 O [serviço contínuo](HERMES-RUNTIME-QUALIFICATION.md), em `runtime.py`, passou
 depois com TDD nativo, reinício preservando worker vivo e recuperação de crash.
 Retira a sandbox órfã por identidade antes da substituta; retoma arquivo/sessão.
-Não instala gateway nem outro banco de tarefas; a rota de produção segue bloqueada.
+Não instala gateway nem outro banco de tarefas; a rota real exige política
+privada habilitada pelo operador e cota explícita, sem fallback.
 A [recuperação técnica](HERMES-RECOVERY-QUALIFICATION.md) também passou em
 isolamento: o serviço cria DIAGs nativos, Lead escala, CTO executa SPIKE sem tocar
 o autor, orientação idempotente retoma o trabalho e os gates são revalidados.
 Incidente só resolve com evidência válida. Isso ainda usa decisões programadas
 e não cobre toda classe de impedimento ou publicação/GitHub reais.
+R2 ampliou o mesmo mecanismo para planejamento, integração e triagem nativa:
+o diagnóstico recebe o snapshot pertinente, valida documentos ou executa SPIKE
+fixo, e retoma somente a fase autorizada. Triagem ou efeito expirado mantém
+bloqueio técnico com responsável e próxima ação, sem zerar contadores. A cadeia
+offline de dois incrementos recuperou plano e integração até deploy/QA/rollback.
+Ferramentas enxergam `/workspace`, não os caminhos privados do controlador;
+falhas SDK conservam metadados limitados para o diagnóstico. O ensaio real e
+seus limites atuais continuam descritos em [STATUS](STATUS.md).
 A [outbox/observabilidade](HERMES-NOTIFICATIONS-QUALIFICATION.md) passou depois
 com conexão recusada, ACK perdido e reinício: 21 mensagens locais, com ator do run
 e início/término únicos. O sender é independente dos slots; o status separa

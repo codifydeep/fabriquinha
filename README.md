@@ -39,7 +39,9 @@ flowchart LR
     H --> K
     K --> O[Outbox persistente e status]
     K --> R[Diagnóstico técnico Lead / CTO]
-    R --> K
+    R --> X[Experimento fixo e evidência]
+    X -->|retomada segura na fase original| K
+    X -->|sem operação segura| B[Bloqueio com responsável e próxima ação]
 ```
 
 Kanban é o dono do ciclo de vida. O controlador executa operações fixas e verifica
@@ -58,10 +60,13 @@ sob demanda; não exige nove passagens para toda atividade.
 flowchart TD
     B[Produto: brief aprovado pelo proprietário] --> P[Tech Lead: plano]
     P --> C[CTO: revisão técnica]
+    C -->|mudanças| P
     C --> T[QA: testes com Red real]
     T --> F[Revisão independente e freeze]
+    F -->|mudanças| T
     F --> I[Desenvolvedor: implementação e Green]
     I --> N[Controles negativos e revisão da entrega]
+    N -->|mudanças| I
     N --> PR[PR e CI no SHA exato]
     PR --> M[Integração e revalidação]
     M --> D[DevOps: deploy e rollback]
@@ -70,8 +75,9 @@ flowchart TD
 ```
 
 O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
-A tentativa com agentes reais mais recente chegou ao freeze independente e
-iniciou implementação, antes da pausa humana. **Ainda não completou esse fluxo.**
+Uma tentativa real anterior chegou ao freeze independente e iniciou implementação
+antes da pausa humana. As novas fronteiras do contrato 2 estão descritas no
+[status](docs/STATUS.md). **Ainda não há entrega real completa qualificada.**
 
 A [auditoria](docs/EXECUTION-REVIEW-2026-10-25.md) encontrou um gate de mutações
 incompatível com um teste auxiliar congelado. O [contrato 2 aprovado](docs/ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
