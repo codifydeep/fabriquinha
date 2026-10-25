@@ -51,8 +51,11 @@ autorizada confirmou acesso ao modelo, sem iniciar agentes. O contexto dos
 perfis inclui agora arquitetura, limites e QA existentes. A admissão da rota e
 a espera por provedor também passaram no worker nativo: dois 402 locais,
 reinícios e retomada até TDD completo preservaram sessões, fases e orçamento de
-falhas. Ainda faltam instalação/autorização do ensaio real S4; o canário não
-libera uma execução autônoma nem substitui esse marco.
+falhas. O [preparo isolado do S4](docs/HERMES-OPERATIONS-QUALIFICATION.md#preparação-isolada-antes-de-s4)
+também foi validado: nove perfis novos, board vazio, pausa persistente e provedor
+desabilitado, sem chamadas, serviços ou alterações GitHub. Ainda faltam CI local,
+base/branch e autorização de consumo antes do ensaio real. Não é um instalador
+completo nem substitui esse marco de autonomia.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 

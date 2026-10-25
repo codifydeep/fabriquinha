@@ -171,6 +171,10 @@ class NativeRuntime(unittest.TestCase):
             route['model']='example/alternate';write_json(self.root/'route.json',route)
             with self.assertRaises(ValueError):model_route(project,self.root/'route.json')
             self.assertEqual(inspect.call_count,2)
+            route['model']=policy['model'];write_json(self.root/'route.json',route)
+            write_json(self.root/'provider-policy.json',{**policy,'enabled':False})
+            with self.assertRaises(Held) as held:model_route(project,self.root/'route.json')
+            self.assertEqual(held.exception.code,'provider_disabled');self.assertEqual(inspect.call_count,2)
 
     def test_unavailable_provider_refuses_model_spawn_but_not_fixed_integration(self):
         from fabriquinha.provider import Held

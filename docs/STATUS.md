@@ -32,11 +32,16 @@ liberação autorizada da execução e ensaio real sem condução de handoffs pe
 operador; S5 segunda versão/memória/recuperação; S6 instalação/segundo repo/cutover;
 S7 Truco. Nenhuma release autônoma foi qualificada.
 
-Checks atuais: 184 testes do caminho novo passaram. A última execução dos 4.523
+O preparo isolado S4 já confirmou nove perfis, board vazio, pausa/drenagem e
+provedor desabilitado; doctor sem recursos/perfis ausentes. Não iniciou agentes,
+criou branches ou registrou runner. O CI local da nova branch e a autorização
+de consumo continuam sendo pré-condições, não etapas presumidas concluídas.
+
+Checks atuais: 188 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.
-O núcleo tem 19 módulos funcionais + `__init__`, 4.672 linhas incluindo a lane S1;
+O núcleo tem 19 módulos funcionais + `__init__`, 4.673 linhas incluindo a lane S1;
 o desvio da meta 12/~3.000 segue explícito. Recibos completos continuam privados.
 As estimativas e detalhes históricos abaixo não são porcentagens de conclusão
 da nova arquitetura nem evidência de entrega autônoma.

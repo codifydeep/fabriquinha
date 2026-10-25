@@ -14,6 +14,11 @@
 !/bootstrap/
 !/src/
 !/tests/
+!/examples/
+/examples/*
+!/examples/python-http/
+/examples/python-http/*
+!/examples/python-http/project.example.json
 !/Dockerfile.validation
 !/Dockerfile.validation.dockerignore
 !/Dockerfile.web

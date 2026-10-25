@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "namespace": "delivery-kit-example",
+  "repository": "https://github.com/example/product",
+  "branch": "release/v0.1",
+  "validation_image": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "browser_image": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tests_dir": "tests",
+  "qualification": false,
+  "max_workers": 2,
+  "technical_roles": {"lead": "techlead", "cto": "cto"},
+  "coordination_roles": {"product": "produto", "lead": "techlead"},
+  "delivery_roles": {"tests": "quality_security", "integration": "devops"},
+  "reviewers": {
+    "produto": "techlead",
+    "designer": "produto",
+    "cto": "techlead",
+    "techlead": "cto",
+    "backend_data": ["techlead", "cto"],
+    "frontend": ["techlead", "cto"],
+    "mobile": ["techlead", "cto"],
+    "devops": ["quality_security", "cto"],
+    "quality_security": ["techlead", "cto"]
+  }
+}

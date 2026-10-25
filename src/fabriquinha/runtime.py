@@ -84,8 +84,9 @@ def model_route(project,path):
         if (not policy_path.is_file() or policy_path.is_symlink() or policy_path.stat().st_mode&0o077
                 or policy_path.stat().st_size>4096):raise ValueError('private explicit provider policy required')
         policy=Policy.parse(json.loads(policy_path.read_bytes()))
-        if route['model']!=policy.model or route['api_key']!=policy.client_token:
+        if policy.project!=project.fingerprint() or route['model']!=policy.model or route['api_key']!=policy.client_token:
             raise ValueError('route must match exact operator provider policy')
+        if not policy.enabled:raise Held('provider_disabled')
         inspect_provider(policy,'http://127.0.0.1:'+str(url.port),project.fingerprint())
     return route
 

@@ -166,7 +166,53 @@ para reproduzir o broker antigo.
 
 ## Continuidade
 
-Faltam brief/plano/aprovação de negócio e aceite integral da release, antes de S4
-com modelo/GitHub reais. Incidentes de integração e outras provas S5 continuam
-pendentes. Não acrescentar outro scheduler, mais perfis ou uma recuperação por
-erro para preencher essas lacunas.
+As provas posteriores de brief/plano, aprovação exata e aceite integral estão em
+[intake/release](HERMES-INTAKE-QUALIFICATION.md). A espera por provedor foi
+conectada e qualificada separadamente em [provedor](HERMES-PROVIDER-QUALIFICATION.md).
+Esses resultados não transformam esta prova de pausa em entrega autônoma.
+Incidentes de integração e outras provas S5 continuam pendentes. Não acrescentar
+outro scheduler ou uma recuperação por erro para preencher essas lacunas.
+
+## Preparação isolada antes de S4
+
+`scripts/prepare_hermes_project.py` prepara um home novo, board vazio e perfis
+derivados da matriz. Não copia bancos, sessões, SOULs, skills ou credenciais da
+instalação antiga; as instruções do worker continuam sendo os contratos explícitos
+de fase, não uma promessa de que plugins antigos foram carregados. Um preparo
+parcial não é sobrescrito nem retomado silenciosamente.
+
+O [exemplo de projeto](../examples/python-http/project.example.json) contém as
+nove identidades e a matriz de suplência. Repositório e hashes de imagem são
+placeholders: substituir por valores próprios e imagens já qualificadas. Ter um
+perfil mobile não qualifica uma toolchain mobile; esta stack continua Python/HTTP.
+
+Com SDK/dependências e o upstream fixado já disponíveis, a forma de uso é:
+
+```sh
+python scripts/prepare_hermes_project.py \
+  --root .local-simplification/my-project \
+  --upstream /path/to/pristine/pinned-hermes \
+  --project /path/to/project.json \
+  --model provider/model \
+  --provider-port 19390 \
+  --max-calls 10000
+```
+
+O comando valida configuração, exige branch diferente de `main`/`master`, recusa
+raiz existente e, dentro do checkout da automação, exige um destino ignorado pelo
+Git. Grava a pausa antes de perfis/rota, política `enabled=false` e arquivos
+privados. O token gerado é de cliente local, não chave OpenRouter. Não monta ou
+consulta o medidor real, registra runner, cria branch/PR, inicia serviço ou chama
+modelo. `preparation.json` distingue explicitamente preparo de instalação completa.
+
+A prova na instalação de referência confirmou nove perfis, zero cards, estado
+pausado/drenado, `provider_disabled` e doctor sem perfil/recurso ausente. A política
+desabilitada é recusada antes até da consulta HTTP ao relay. Isso não concede
+autorização de consumo nem é qualificação S6 de instalação limpa.
+
+Antes de S4 ainda são necessários base de infraestrutura revisada, branch e CI
+reais protegidos, runner local restrito, relay com política autorizada e objetivo
+de produto. Um workflow hospedado no GitHub ou preso aos caminhos históricos não
+deve ser herdado como CI local qualificado. Não afrouxar checks para obter verde.
+Após Produto refinar o objetivo, o CEO aprova o brief exato; o operador não
+pré-escreve implementação, testes de feature ou pareceres para a equipe.
