@@ -3,9 +3,11 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
-**Correções e qualificações offline retomadas.** O S4 real e seu relay continuam
-pausados. O proprietário aprovou o refinamento F1; ele foi implementado no
-código e validado com Chromium/Docker. Nenhuma chamada paga foi feita nesta etapa.
+**R1/F1 e R2 limitado qualificados offline; nova tentativa S4 real iniciada.**
+O proprietário aprovou o refinamento F1, implementado e validado com
+Chromium/Docker. As provas R1/R2 usaram zero chamadas pagas. O novo S4 usa
+Claude Haiku sob cota específica autorizada, com relay isolado e perfis limpos.
+As tentativas anteriores permanecem pausadas e preservadas.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -19,19 +21,20 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Brief aprovado, plano revisado e testes de navegador corrigidos/congelados; implementação iniciada | Green, controles, revisão, PR, integração, deploy e QA finais |
+| S4 | Nova fronteira sob contrato 2; perfis limpos, CI local do SHA inicial verde e brief idêntico com aprovação condicional reaplicada | Planejamento, Red/revisão/freeze, Green/controles, PR/CI, integração, deploy e QA desta tentativa |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |
 
-Na tentativa real mais recente, QA recebeu mudanças, corrigiu e obteve aprovação
+Na tentativa real anterior, QA recebeu mudanças, corrigiu e obteve aprovação
 independente dos testes. A pausa humana interrompeu a implementação de forma
-controlada. **Essa pausa não é uma falha do ensaio.** Até agora, nenhuma release
-S4 foi homologada autonomamente.
+controlada. **Essa pausa não é uma falha do ensaio.** A alteração do contrato
+exigiu nova fronteira; suas provas não foram importadas para a nova tentativa.
+Até agora, nenhuma release S4 foi homologada autonomamente.
 
-As cinco fronteiras de tentativa identificadas não devem ser somadas como cinco
-execuções completas: quatro anteriores não qualificaram entrega; a atual está
-incompleta e pausada. A aprovação de brief reutilizado comprova continuidade do
+As cinco fronteiras identificadas pela auditoria não eram cinco execuções
+completas: quatro não qualificaram entrega e a última ficou incompleta e pausada.
+A nova fronteira posterior a R2 está em execução. A aprovação de brief reutilizado comprova continuidade do
 aceite, não uma nova descoberta autônoma de produto.
 
 ## Impedimentos encontrados na revisão
@@ -82,7 +85,7 @@ prova aprovada. Veja [recuperação](HERMES-RECOVERY-QUALIFICATION.md).
 O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
-- R2 limitado qualificado; preparar nova tentativa S4 sob o contrato 2.
+- R2 limitado qualificado; nova tentativa S4 sob o contrato 2 em execução.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 
