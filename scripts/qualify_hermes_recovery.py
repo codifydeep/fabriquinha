@@ -25,7 +25,7 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False):
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False):
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
     kb,kbc,_=native()
     from hermes_cli.profiles import create_profile
@@ -74,6 +74,9 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False):
             if not marker or body.get('stream'):self.send_error(400);return
             binding=json.loads(marker.removeprefix('Delivery activity '));run=runtime.board.current(binding['task'],binding['number'])
             assert run.binding()==binding
+            native_context=next(m['content'] for m in body['messages'] if m.get('role')=='user' and
+                isinstance(m.get('content'),str) and m['content'].startswith('Delivery activity '))
+            assert 'Workspace: dir @ /workspace' in native_context,'native host path must not be advertised as tool workspace'
             if run.number not in sequences:
                 with kbc.connect_closing() as conn:
                     changes=conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='changes_requested'",(run.task,)).fetchone()[0]
@@ -106,6 +109,12 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False):
                     sequence=steps(run,changes)
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
+            if provider_error and run.number==1 and index==1:
+                data=json.dumps(dict(error=dict(code='output_budget_exceeds_policy',message='output_budget_exceeds_policy'))).encode()
+                self.send_response(422);self.send_header('Content-Type','application/json')
+                self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
+            if run.kind=='diagnostic' and run.actor=='flow-lead' and index==1:
+                assert 'VALUE' in str(body['messages'][-1].get('content')),'diagnostic must actually read the mounted source'
             if index>=len(sequences[run.number]):self.send_error(400);return
             if run.task==source and run.number!=1 and not run.reviewing and not resumed.is_set():
                 resumed.set();release.wait()
@@ -159,6 +168,10 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False):
         with kbc.connect_closing() as conn:
             diagnostic_cards=[task for task in runtime.recovery.cards(conn) if json.loads(task.body).get('kind')=='diagnostic']
             incidents=runtime.recovery.status(conn)
+            if provider_error:
+                incident_id=json.loads(diagnostic_cards[0].body)['inputs']['incident']
+                failure=runtime.store.receipt(incident_id,kind='incident')['payload']['failure']
+                assert 'output_budget_exceeds_policy' in failure,'real SDK failure code must reach technical diagnosis'
             assert len(diagnostic_cards)==2 and all(task.status=='done' for task in diagnostic_cards)
             assert incidents and all(item['state']=='revalidating' for item in incidents)
             assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='unblocked'",(source,)).fetchone()[0]==1
@@ -207,6 +220,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False):
             incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=len(decisions),runs=len(runs),
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
+        if provider_error:proof.update(native_sdk_policy_error_reached_diagnosis=True)
         if notifications:
             messages=[value['message'] for value in sink_data['accepted'].values()]
             for row in runs:
@@ -242,9 +256,12 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image',required=True);parser.add_argument('--notifications',action='store_true')
-    parser.add_argument('--review-escalation',action='store_true');args=parser.parse_args()
+    parser.add_argument('--review-escalation',action='store_true')
+    parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
+    args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
-    try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation)
+    try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
+        provider_error=args.provider_error)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

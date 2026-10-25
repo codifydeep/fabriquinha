@@ -136,6 +136,21 @@ preservada como falha; não foi convertida em evidência de sucesso. Alertas
 incluem bloqueio/triagem técnica, excluem o card âncora de release e não
 interpretam manutenção pausada como falta de progresso.
 
+O S4 real posterior revelou dois problemas de contexto: o SDK ocultava a causa
+específica atrás de “sem handoff”, e o diagnóstico tentava usar caminhos do
+controlador no contêiner. O contexto agora anuncia `/workspace`; o incidente
+privado conserva sua localização original. A falha SDK transmite somente código,
+estado e contagem limitados, sem resposta bruta ou credenciais. O relay continua
+recusando saída acima da política; não houve aumento do teto de saída.
+
+Essa correção passou em uma prova de revisão/escalada com 11 atividades e 34
+respostas locais, verificando leitura efetiva do arquivo montado. Uma segunda
+prova com `--provider-error` injetou HTTP 422 pelo transporte real do SDK:
+o código `output_budget_exceeds_policy` chegou ao diagnóstico, e a recuperação
+concluiu nove atividades e 27 respostas locais até as evidências TDD finais.
+Ambas usaram zero chamadas pagas. Isso qualifica propagação e contexto, não a
+capacidade do modelo real de decidir a recuperação correta.
+
 Para repetir, use uma raiz privada nova para cada modo, imagens verificadas e
 o checkout/venv fixados. O script fornece respostas locais; o serviço real
 despacha e recupera as atividades:

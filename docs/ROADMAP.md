@@ -9,8 +9,9 @@ orquestrador, novo banco de memória ou migração de modelo nesta fase.
 
 O proprietário aprovou F1, registrado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md).
 O contrato 2 e o feedback do plano estão implementados e passaram em provas
-offline delimitadas. Uma nova tentativa S4 real foi iniciada após autorização
-específica de consumo; este roadmap não autoriza ampliar a cota.
+offline delimitadas. Uma nova tentativa S4 real foi bloqueada e preservada;
+seu relay está desligado durante correção offline. Este roadmap não autoriza
+ampliar a cota.
 
 ## Antes do próximo ensaio pago
 
@@ -71,9 +72,11 @@ S5; uma reparação sem operação segura deve ser declarada como limite visíve
 Mesmo brief aprovado, stack qualificada e modelo. Preparação e orçamento
 verificados antes de liberar; o operador observa, a equipe executa os handoffs.
 
-Em execução em nova fronteira sob o contrato 2, com nove perfis limpos,
-CI local do SHA inicial e igualdade canônica do novo brief verificadas. Não
-foram reutilizados planos, testes congelados ou aprovações de entrega antigas.
+Na nova fronteira sob o contrato 2, nove perfis limpos, CI inicial, brief idêntico
+e plano revisado foram verificados. O QA falhou após truncamento e rejeição
+correta de aumento de saída; o Lead executou diagnóstico e manteve o bloqueio.
+Corrigir a informação da falha SDK e o contexto de caminhos antes de repetir,
+sem ampliar o teto de saída nem importar provas técnicas anteriores.
 
 **Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
 → `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do

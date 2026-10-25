@@ -30,7 +30,7 @@ class Diagnostic:
 
     def evidence(self):
         from .config import execution_context
-        result=dict(incident=self.incident,failed_execution=self.original,execution=execution_context(self.q.project),
+        result=dict(incident={**self.incident,'workspace':'/workspace'},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
         if self.incident.get('review_escalation'):

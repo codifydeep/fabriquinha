@@ -16,6 +16,24 @@ from .effects import Journal, EffectBlocked, write_json
 from .executor import docker, grouping, phase_mounts
 
 
+def sandbox_context(prompt):
+    """Native workspace paths describe the controller, not the tool filesystem."""
+    return '\n'.join('Workspace: dir @ /workspace (isolated tool filesystem; host paths are unavailable)'
+        if line.startswith('Workspace: ') else line for line in prompt.splitlines())
+
+
+def incomplete_activity(result, output_limit):
+    """Retain actionable SDK state without copying response text or credentials."""
+    result=result if isinstance(result,dict) else {}
+    error=result.get('error')
+    code=('output_budget_exceeds_policy' if isinstance(error,str) and 'output_budget_exceeds_policy' in error else
+          'sdk_failed' if result.get('failed') is True else 'missing_terminal_operation')
+    state=dict(code=code,output_limit=output_limit,failed=result.get('failed') is True)
+    calls=result.get('api_calls')
+    if type(calls) is int and 0<=calls<=1000:state['api_calls']=calls
+    return ValueError('activity ended without a controller-validated native handoff; SDK status '+json.dumps(state))
+
+
 def command(project, expected):
     return ['create','--name',project.namespace+'-agent-'+digest(expected)[:16],
         *grouping('agent',project.namespace),'--label','fabriquinha.agent='+digest(expected),
@@ -334,6 +352,8 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
+        phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch.'
+        prompt=sandbox_context(prompt)
         agent=AIAgent(**route,max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
             quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
             session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,
@@ -372,9 +392,9 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
         if not terminal and stop_requested and stop_requested():
             from .operations import ActivityPaused
             raise ActivityPaused('SDK activity interrupted by operational pause')
-        if not terminal:raise ValueError('activity ended without a controller-validated native handoff')
+        if not terminal:raise incomplete_activity(result,output_limit)
         return dict(transition=terminal,session=agent.session_id,resumed=bool(previous),
-                    sdk_exit=result.get('exit_reason'),delivery_approval=False)
+                    sdk_exit=result.get('turn_exit_reason',result.get('exit_reason')),delivery_approval=False)
     finally:
         watch_done.set()
         if watcher:watcher.join(timeout=4)

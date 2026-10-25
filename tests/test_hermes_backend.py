@@ -12,12 +12,30 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.artifacts import Store
 from fabriquinha.board import Run
 from fabriquinha.config import Project
-from fabriquinha.hermes import Sandbox, command
+from fabriquinha.hermes import Sandbox, command, sandbox_context, incomplete_activity
 from fabriquinha.effects import Pending
 from test_delivery_core import configuration
 
 
 class NativeBackendPolicy(unittest.TestCase):
+    def test_native_host_workspace_is_not_advertised_as_tool_filesystem(self):
+        context='Task: t_example\nWorkspace: dir @ /controller/private/work/card\n## Body\nKeep every criterion.'
+        visible=sandbox_context(context)
+        self.assertNotIn('/controller/private',visible)
+        self.assertIn('/workspace',visible)
+        self.assertIn('Keep every criterion.',visible)
+        self.assertEqual(sandbox_context(visible),visible)
+
+    def test_missing_handoff_retains_output_policy_failure_without_sdk_response(self):
+        result=dict(failed=True,api_calls=5,error='HTTP 422 output_budget_exceeds_policy SECRET-MUST-NOT-LEAK',
+            messages=[{'content':'private conversation'}],final_response='private response')
+        message=str(incomplete_activity(result,8192))
+        self.assertIn('output_budget_exceeds_policy',message)
+        self.assertIn('8192',message)
+        self.assertNotIn('SECRET',message)
+        self.assertNotIn('private',message)
+        self.assertIn('missing_terminal_operation',str(incomplete_activity({},8192)))
+
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory();self.addCleanup(self.temporary.cleanup)
         self.root=Path(self.temporary.name).resolve()

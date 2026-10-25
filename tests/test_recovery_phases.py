@@ -98,11 +98,18 @@ class RecoveryPhases(unittest.TestCase):
 
     def test_planning_experiment_executes_fixed_validator_without_writing_author_files(self):
         key,incident=self.discover(self.failed('plan',inputs={'approved_brief':self.approve()}))
-        run=Run('diagnostic',2,'cto','diagnostic',False,'cto','v1','diagnostic-contract')
+        run=Run('diag-0',2,'cto','diagnostic',False,'cto','v1','diagnostic-contract')
         self.board.input=lambda *a,**kw:key
         q=Quality(self.project,self.store,None,self.board)
         sandbox=SimpleNamespace(project=self.project,store=self.store,board=self.board,run=run,close=Mock())
         operation=Diagnostic(sandbox,q)
+        # Evidence must advertise the mounted tree, never the private host path.
+        self.kb.latest_run=lambda *a:None
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,SimpleNamespace(connect_closing=lambda:nullcontext(self.conn)),None)):
+            evidence=operation.evidence()
+        self.assertEqual(evidence['incident']['workspace'],'/workspace')
+        self.assertNotIn(str(self.work),json.dumps(evidence))
+        self.assertEqual(operation.incident['workspace'],str(self.work))
         result=operation.validate({'hypothesis':'The candidate has a valid complete work DAG','document':work()})
         self.assertTrue(result['report']['valid'])
         invalid=operation.validate({'hypothesis':'The original missing document is incomplete'})

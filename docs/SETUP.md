@@ -18,8 +18,9 @@ com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
 as rotas de fixture expiram e não devem ser reutilizadas como produção. Provedores
 reais exigem política privada explicitamente habilitada e limite de consumo.
 As instalações S4 antigas permanecem pausadas. Uma nova tentativa foi preparada
-e iniciada após R2 e autorização específica; não reutilize sessões ou evidências
-históricas para reproduzi-la. A auditoria sozinha não autoriza ativação.
+após R2 e autorização específica, mas ficou bloqueada e foi preservada com relay
+desligado. Não reutilize sessões ou evidências históricas para reproduzi-la.
+A auditoria sozinha não autoriza ativação.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
 explícita de Lead/CTO e cards nativos de recuperação com SPIKE. Sua prova também
 usa respostas locais; não constitui ativação dos nove perfis em produção.

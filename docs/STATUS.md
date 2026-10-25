@@ -3,11 +3,13 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
-**R1/F1 e R2 limitado qualificados offline; nova tentativa S4 real iniciada.**
+**R1/F1 e R2 limitado qualificados offline; tentativa S4 real bloqueada.**
 O proprietário aprovou o refinamento F1, implementado e validado com
 Chromium/Docker. As provas R1/R2 usaram zero chamadas pagas. O novo S4 usa
 Claude Haiku sob cota específica autorizada, com relay isolado e perfis limpos.
-As tentativas anteriores permanecem pausadas e preservadas.
+O Lead manteve um impedimento explícito; a tentativa está preservada e seu
+relay foi desligado para correção offline. As tentativas anteriores permanecem
+pausadas e preservadas.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -21,7 +23,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Nova fronteira sob contrato 2; perfis limpos, CI local do SHA inicial verde e brief idêntico com aprovação condicional reaplicada | Planejamento, Red/revisão/freeze, Green/controles, PR/CI, integração, deploy e QA desta tentativa |
+| S4 | Nova fronteira sob contrato 2; brief idêntico aprovado, plano revisado, CI inicial verde; falha do QA acionou diagnóstico real do Lead | Red/revisão/freeze, Green/controles, PR/CI, integração, deploy e QA; corrigir contexto antes de outra fronteira |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |
@@ -34,7 +36,7 @@ Até agora, nenhuma release S4 foi homologada autonomamente.
 
 As cinco fronteiras identificadas pela auditoria não eram cinco execuções
 completas: quatro não qualificaram entrega e a última ficou incompleta e pausada.
-A nova fronteira posterior a R2 está em execução. A aprovação de brief reutilizado comprova continuidade do
+A nova fronteira posterior a R2 ficou bloqueada, sem homologação. A aprovação de brief reutilizado comprova continuidade do
 aceite, não uma nova descoberta autônoma de produto.
 
 ## Impedimentos encontrados na revisão
@@ -62,7 +64,7 @@ instalação auditada. Notificações em fila não comprovam visibilidade no Tel
 O núcleo auditado em `98e09069` tinha 19 módulos funcionais mais `__init__`,
 5.060 linhas e 233 testes verdes, sem cobrir a contradição. Os testes novos
 exercitam alvos, risco adicional, imutabilidade, skip, inventário e legado.
-Os **258 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
+Os **260 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
 SLA ou portabilidade.
 
 A revalidação integrada inicialmente encontrou esgotamento dos pools de rede
@@ -80,12 +82,23 @@ foram simulados. Uma tentativa anterior falhou por orientação de DevOps vazand
 para a fase QA; foi preservada e o isolamento de fases foi corrigido antes da
 prova aprovada. Veja [recuperação](HERMES-RECOVERY-QUALIFICATION.md).
 
+No S4 real, a resposta do QA foi truncada em 8.192 tokens. O SDK tentou repetir
+com 16.384 e o relay rejeitou corretamente por exceder a política. O Lead recebeu
+apenas falta de handoff e tentou ler caminhos privados do host no contêiner;
+executou um SPIKE e manteve o bloqueio em vez de inventar uma correção. A fonte
+agora apresenta `/workspace` como sistema de arquivos das ferramentas e conserva
+o código específico da falha SDK sem copiar respostas ou credenciais. A política
+de saída permanece em 8.192. O consumo foi de 13 chamadas nesta tentativa;
+restam 51 sob o teto específico aprovado. Mudanças de fonte exigem nova fronteira,
+sem aproveitar os testes ou aprovações técnicas da tentativa bloqueada.
+
 ## Próxima sequência
 
 O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
-- R2 limitado qualificado; nova tentativa S4 sob o contrato 2 em execução.
+- R2 limitado e correção de contexto revalidados offline, inclusive HTTP 422
+  através do SDK real; preparar outra fronteira S4 sob o contrato 2.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 
