@@ -40,9 +40,11 @@ aceite, não uma nova descoberta autônoma de produto.
    Red e riscos adicionais justificados pelo revisor. O teste auxiliar continua
    na suíte completa. Recibos históricos não são convertidos; o S4 antigo não
    pode ser retomado como se tivesse produzido provas desse contrato.
-2. **Recuperação:** `tests` e `implementation` têm diagnóstico executável;
-   planejamento, integração e `triage` não têm cobertura equivalente. Alertar
-   um CTO não significa despachar uma intervenção para ele.
+2. **Recuperação — R2 qualificado offline:** planejamento e integração agora
+   despacham diagnóstico técnico com snapshot, experimento e orientação completos.
+   A revisão retoma na mesma fase. A triagem nativa despacha o CTO, mas permanece
+   bloqueada quando não há operação segura; o contador nativo não é zerado.
+   Isso não equivale a recuperação universal nem a julgamento do modelo real.
 3. **Autoridade:** falta caminho versionado para corrigir contrato de testes
    após freeze, sem alteração da entrega antiga e sem intervenção do operador.
 4. **Contexto — parcial:** achados completos e proposta anterior do plano agora
@@ -57,7 +59,7 @@ instalação auditada. Notificações em fila não comprovam visibilidade no Tel
 O núcleo auditado em `98e09069` tinha 19 módulos funcionais mais `__init__`,
 5.060 linhas e 233 testes verdes, sem cobrir a contradição. Os testes novos
 exercitam alvos, risco adicional, imutabilidade, skip, inventário e legado.
-Os **246 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
+Os **258 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
 SLA ou portabilidade.
 
 A revalidação integrada inicialmente encontrou esgotamento dos pools de rede
@@ -66,12 +68,21 @@ vazias foram retirados com propriedade/leases conferidos e logs arquivados;
 volumes e instalação S4 atual foram preservados. A prova seguinte passou em
 grupo isolado e retirou automaticamente seu deploy e redes ao terminar.
 
+R2 percorreu dois incrementos dependentes com 15 atividades SDK e 24 respostas
+locais: recuperou revisão do plano e falha de integração por Lead → CTO,
+concluiu deploy/QA/rollback e retirou os recursos da prova. Outra prova manteve
+uma triagem sob responsabilidade do CTO após reinício, recusando retomada
+indevida e sem novas chamadas. Ambas usaram zero chamadas pagas; GitHub/CI
+foram simulados. Uma tentativa anterior falhou por orientação de DevOps vazando
+para a fase QA; foi preservada e o isolamento de fases foi corrigido antes da
+prova aprovada. Veja [recuperação](HERMES-RECOVERY-QUALIFICATION.md).
+
 ## Próxima sequência
 
 O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
-- Completar os caminhos conhecidos de impedimento de R2; feedback do plano já corrigido.
+- R2 limitado qualificado; preparar nova tentativa S4 sob o contrato 2.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 

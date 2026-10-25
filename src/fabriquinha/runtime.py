@@ -425,8 +425,10 @@ class Runtime:
                 'FROM tasks ORDER BY created_at')]
             for card in cards:
                 raw=card.pop('body')
-                try:card['contract']=digest(json.loads(raw or '{}'))
-                except ValueError:card['contract']=None
+                try:
+                    document=json.loads(raw or '{}');card['contract']=digest(document)
+                    card['kind']=document.get('kind') if isinstance(document,dict) else None
+                except ValueError:card['contract']=None;card['kind']=None
                 try:card['last_validation']=validation_progress(card,self.store,self.project)
                 except (ValueError,OSError):card['last_validation']={'error':'EvidenceUnavailable'}
                 if card['status']=='review' and card['assignee']=='fabriquinha-ceo':
@@ -434,7 +436,16 @@ class Runtime:
                         pending=self.intake.pending(conn,card['id'])
                         card['business_input']={key:value for key,value in pending.items() if key!='document'} if pending else None
                     except (ValueError,KeyError,TypeError,OSError):card['business_input']={'error':'EvidenceUnavailable'}
-            incidents=self.recovery.status(conn)
+            try:incidents=self.recovery.status(conn)
+            except (ValueError,KeyError,TypeError,OSError) as error:
+                incidents=[dict(source=None,state='evidence_unavailable',block_event=0,
+                    owner=(self.project.technical_roles or {}).get('cto','techlead'),
+                    next_action='Restore diagnostic evidence before interpreting recovery as successful: '+type(error).__name__,delivery_approval=False)]
+            for card in cards:
+                matching=[i for i in incidents if i['source']==card['id']]
+                if matching:
+                    incident=max(matching,key=lambda i:i['block_event'])
+                    card.update(technical_owner=incident['owner'],next_action=incident['next_action'])
             control=self.control.read()
             if control['paused']:control={**control,**self.pause_status(conn)}
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,
@@ -472,7 +483,7 @@ class Runtime:
                 self.tick()
                 capture()
                 try:
-                    alerts(self.outbox,self.status()['cards'],self.store,now=time.time())
+                    if not self.control.read()['paused']:alerts(self.outbox,self.status()['cards'],self.store,now=time.time())
                 except Exception as error:
                     self.outbox.save(self.outbox.root/'error.json',dict(category=type(error).__name__,at=time.time()))
                 write_json(self.root/'status.json',dict(dispatcher_pid=os.getpid(),dispatcher_state='running',observed_at=time.time(),board=self.status()))
@@ -513,6 +524,8 @@ class Runtime:
                     result=self.park_integration(run)
                 write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
                 return
+            guidance=self.recovery.guidance(run)
+            if guidance:prompt+='\nController-recorded diagnostic guidance:\n'+json.dumps(guidance)
             try:route=model_route(self.project,self.root/'route.json')
             except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
             def provider_check():

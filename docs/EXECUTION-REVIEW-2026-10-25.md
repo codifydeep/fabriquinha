@@ -9,8 +9,9 @@ Destinatário da execução: GPT 6.1 Sol.
 e passou na prova física de navegador com teste auxiliar preservado. O feedback
 completo do plano também passou no SDK/Kanban reais com respostas locais.
 Este documento preserva o diagnóstico sobre a base auditada; consulte
-[STATUS](STATUS.md) para execução atual. R2 ainda não está completo e o S4 real
-continua pausado, aguardando nova fronteira e pré-condições.
+[STATUS](STATUS.md) para execução atual. R2 foi qualificado no escopo offline
+delimitado, incluindo recuperação de plano/integração e triagem com responsável
+CTO. O S4 real continua pausado, aguardando nova fronteira e pré-condições.
 
 **Natureza deste documento:** auditoria e proposta de sequência atualizada. A
 estratégia anterior continua aprovada. Os refinamentos de contrato abaixo são

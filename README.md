@@ -132,12 +132,15 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 25/10/2026, os 246 testes do núcleo passaram. As provas S1–S3 e extensões
+Em 25/10/2026, os 258 testes do núcleo passaram. As provas S1–S3 e extensões
 qualificam fronteiras específicas; decisões programadas não são julgamento de
 um agente real. Falta a primeira release S4 completa sem intervenção técnica
 externa, depois uma segunda versão com regressão/memória/recuperação e uma
 instalação em outro repositório. O contrato 2 também percorreu dois incrementos
 dependentes no SDK/Kanban, com Git/deploy/QA reais e GitHub/CI simulados.
+Outra prova recuperou revisão do plano e integração por Lead/CTO até concluir
+a mesma cadeia. A triagem mantém bloqueio e responsável quando não existe
+retomada segura; não há promessa de recuperação universal.
 Veja [STATUS](docs/STATUS.md).
 
 ## Retirada de recursos de teste

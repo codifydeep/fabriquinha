@@ -24,6 +24,15 @@ from test_delivery_core import configuration
 
 
 class NativeRuntime(unittest.TestCase):
+    def test_human_pause_does_not_generate_stalled_work_alerts(self):
+        self.runtime.control.pause();stop=threading.Event()
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()))
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)), \
+             patch.object(self.runtime.outbox,'capture'),patch.object(self.runtime,'status',return_value={'cards':[{'id':'paused'}]}), \
+             patch.object(self.runtime,'tick',side_effect=lambda:stop.set()),patch('fabriquinha.runtime.alerts') as notify:
+            self.runtime.serve(stop,interval=0.1)
+        notify.assert_not_called()
+
     def setUp(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         self.root=Path(temporary.name).resolve()

@@ -1,9 +1,11 @@
 """Executable technical diagnostics as native Kanban cards, not another workflow DB."""
 import json
 from pathlib import Path
-from .artifacts import digest
+import tempfile
+import time
+from .artifacts import digest,encoded
 from .board import Run
-from .effects import Journal, EffectBlocked, Pending
+from .effects import Journal, EffectBlocked, Pending,write_json
 from .kanban_lane import native
 from .quality import DeliveryTools, product_mutations, review_decision
 
@@ -23,9 +25,14 @@ class Diagnostic:
         self.level=next(level for level,actor in roles.items() if actor==self.run.actor)
         self.experiment=None
 
+    def actions(self):
+        return (['resume'] if self.incident.get('resume_allowed',True) else [])+(['escalate'] if self.level=='lead' else [])+['hold']
+
     def evidence(self):
         from .config import execution_context
-        result=dict(incident=self.incident,failed_execution=self.original,execution=execution_context(self.q.project))
+        result=dict(incident=self.incident,failed_execution=self.original,execution=execution_context(self.q.project),
+            workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
+            allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
         if self.incident.get('review_escalation'):
             escalation=self.store.receipt(self.incident['review_escalation'],kind='review_escalation')['payload']
             result['review_feedback']=self.store.receipt(escalation['review'])['payload']['verdict']
@@ -43,10 +50,26 @@ class Diagnostic:
 
     def validate(self,args):
         self.board.ensure(self.run)
-        if (not isinstance(args,dict) or not {'hypothesis'}<=set(args) or set(args)-{'hypothesis','replacements'}
+        document_kind=self.incident.get('document_kind')
+        field='document' if document_kind else 'replacements'
+        if (not isinstance(args,dict) or not {'hypothesis'}<=set(args) or set(args)-{'hypothesis',field}
                 or not isinstance(args['hypothesis'],str) or not 1<=len(args['hypothesis'].strip())<=2000):
-            raise ValueError('bounded experiment hypothesis and optional product replacements required')
+            raise ValueError('bounded experiment hypothesis and optional '+field+' required')
         snapshot=self.incident['snapshot']
+        if document_kind:
+            from .intake import brief,plan
+            tree=self.store.tree(snapshot)
+            candidate=args.get('document',json.loads((tree/'document.json').read_bytes()))
+            if len(encoded(candidate))>64000:raise ValueError('bounded diagnostic document required')
+            try:
+                if document_kind=='brief':brief(candidate)
+                elif document_kind=='plan':plan(candidate,json.loads((tree/'approved_brief.json').read_bytes()),self.q.project)
+                else:raise ValueError('unknown document validator')
+                report=dict(valid=True,error=None)
+            except ValueError as error:report=dict(valid=False,error=str(error)[:2000])
+            self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
+                snapshot=snapshot,hypothesis=args['hypothesis'],validator=document_kind,document=candidate,report=report))
+            return dict(experiment=self.experiment,report=report,delivery_approval=False)
         if 'replacements' in args:snapshot=product_mutations(self.q,snapshot,[args['replacements']])[0]
         job,report=DeliveryTools.wait(self,lambda:self.q.observe(self.run,snapshot,'diagnostic'))
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
@@ -59,14 +82,24 @@ class Diagnostic:
     def decide(self,args):
         self.board.ensure(self.run)
         if (not isinstance(args,dict) or set(args)!={'action','reason','findings'}
-                or args['action'] not in ('resume','escalate','hold')
-                or args['action']=='escalate' and self.level=='cto'):
-            raise ValueError('technical resume, lead escalation or explicit hold required; never CEO or delivery approval')
+                or args['action'] not in self.actions()):
+            raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; preserve native triage and never send technical decisions to CEO')
         if args['action']=='resume' and self.experiment is None:
             raise ValueError('resume requires a real experiment in this execution')
         snapshot=self.incident['snapshot']
-        verdict=review_decision(dict(decision='changes',reason=args['reason'],findings=args['findings']),
-            self.store.manifest(snapshot),self.store.tree(snapshot))
+        if (not isinstance(args['reason'],str) or not 1<=len(args['reason'].strip())<=2000
+                or not isinstance(args['findings'],list) or not 1<=len(args['findings'])<=8):
+            raise ValueError('concrete bounded technical reason and findings required')
+        files=[]
+        for finding in args['findings']:
+            if isinstance(finding,dict) and set(finding)=={'evidence','detail'}:
+                if (finding['evidence'] not in ('incident','experiment')
+                        or finding['evidence']=='experiment' and self.experiment is None
+                        or not isinstance(finding['detail'],str) or not 1<=len(finding['detail'].strip())<=2000):
+                    raise ValueError('finding must cite the current incident or actual experiment')
+            else:files.append(finding)
+        if files:review_decision(dict(decision='changes',reason=args['reason'],findings=files),self.store.manifest(snapshot),self.store.tree(snapshot))
+        verdict=dict(decision='changes',reason=args['reason'],findings=args['findings'])
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),
             action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False))
         self.sandbox.close()
@@ -90,6 +123,99 @@ class Recovery:
     def stage_for(self,reviewing,actor):
         return 'cto' if reviewing or actor==self.project.technical_roles['lead'] else 'lead'
 
+    def expired_effects(self,task):
+        result=[]
+        for path in self.journal.root.glob('*.json'):
+            effect=json.loads(path.read_bytes());identity=effect.get('identity',{})
+            binding=identity.get('binding',{}) if isinstance(identity,dict) else {}
+            if (isinstance(binding,dict) and binding.get('task')==task and effect.get('state')!='done'
+                    and (effect.get('state')=='blocked' or effect.get('deadline',float('inf'))<=time.time())):result.append(path.stem)
+        return result
+
+    def guidance(self,run):
+        """Resolve full applied guidance; native prose may be length-capped."""
+        if not self.project.technical_roles or run.kind=='diagnostic':return []
+        self.board.ensure(run);_,api,_=native();result=[]
+        with api.connect_closing() as conn:
+            rows=conn.execute("SELECT author,body FROM task_comments WHERE task_id=? AND body LIKE 'DIAG %' ORDER BY id DESC LIMIT 2",(run.task,)).fetchall()
+        for row in reversed(rows):
+            if row['author'] not in self.project.technical_roles.values():continue
+            key=row['body'].split(' ',2)[1];record=self.store.receipt(key,kind='diagnostic_decision')
+            incident=self.store.receipt(record['payload']['incident'],kind='incident')
+            scope=incident['binding']
+            if (record['binding']['actor']!=row['author'] or record['binding']['kind']!='diagnostic'
+                    or record['payload']['project']!=self.project.fingerprint() or record['payload']['action']!='resume'
+                    or any(scope[k]!=getattr(run,k) for k in ('task','kind','author','release','contract')) or scope['number']>=run.number):
+                raise ValueError('diagnostic guidance belongs to another phase, owner or execution')
+            # A completed implementation may now be in independent QA/review.
+            # Prior-phase advice is historical context, never a veto or new authority.
+            if scope['reviewing']!=run.reviewing or scope['actor']!=run.actor:continue
+            experiment=self.store.receipt(record['payload']['experiment'],kind='diagnostic_experiment')
+            if experiment['binding']!=record['binding'] or experiment['payload']['incident']!=record['payload']['incident']:
+                raise ValueError('diagnostic guidance lacks its exact experiment')
+            result.append(dict(receipt=key,verdict=record['payload']['verdict'],experiment=experiment['payload']))
+        return result
+
+    def handoff(self,conn,task):
+        row=conn.execute("SELECT e.payload,r.metadata FROM task_events e JOIN task_runs r ON r.id=e.run_id "
+            "WHERE e.task_id=? AND e.kind='review_requested' ORDER BY e.id DESC LIMIT 1",(task.id,)).fetchone()
+        return (json.loads(row['payload']),json.loads(row['metadata'] or '{}')) if row else ({},{})
+
+    def input(self,conn,task,name):
+        """Controller read of an inactive task, never authority for a worker."""
+        value=json.loads(task.body).get('inputs',{}).get(name)
+        if isinstance(value,str) and value.startswith('parent:'):
+            _,parent,key=value.split(':',2)
+            if not conn.execute('SELECT 1 FROM task_links WHERE parent_id=? AND child_id=?',(parent,task.id)).fetchone():
+                raise ValueError('diagnosis requires the actual parent handoff')
+            _,metadata,_=self.board.closed_review(parent);value=metadata.get(key)
+        if not isinstance(value,str) or value.startswith('parent:'):raise ValueError('diagnostic input missing: '+name)
+        return value
+
+    def snapshot(self,conn,task,source,handoff):
+        if source.kind in ('brief','plan'):
+            from .intake import Intake
+            documents={'task.json':json.loads(task.body),'document.json':{}}
+            proposal=handoff.get('plan' if source.kind=='plan' else 'request')
+            if proposal:
+                record=self.store.receipt(proposal)
+                if record['kind'] in ('product_brief','work_plan'):
+                    origin=source.binding();origin.update(actor=source.author,reviewing=False)
+                    if (not Run(**origin).same_subject(record['binding']) or record['payload']['project']!=self.project.fingerprint()):
+                        raise ValueError('document incident must match its actual author and contract')
+                    documents['document.json']=record['payload']['document']
+            if source.kind=='plan':
+                approval,brief=Intake(self.project,self.store,self.board).approved(self.input(conn,task,'approved_brief'))
+                if approval['binding']['release']!=source.release:raise ValueError('foreign business approval in diagnostic')
+                documents['approved_brief.json']=brief['payload']['document']
+            with tempfile.TemporaryDirectory(prefix='.recovery-context-',dir=self.store.root.parent) as folder:
+                for name,data in documents.items():write_json(Path(folder)/name,data)
+                return self.store.capture(Path(folder))
+        if source.kind=='integration':
+            if source.reviewing:
+                rollout=self.store.receipt(handoff['rollout'],kind='rollout')
+                expected={**source.binding(),'actor':source.author,'reviewing':False}
+                if (not Run(**expected).same_subject(rollout['binding'])
+                        or rollout['payload']['project']!=self.project.fingerprint()):raise ValueError('foreign deployed QA handoff')
+                record=self.store.receipt(rollout['payload']['candidate'],kind='artifact')
+            else:
+                record=self.store.receipt(self.input(conn,task,'delivery'),kind='delivery_review')
+                verdict=record['payload']['verdict']
+                if (record['binding']['kind']!='implementation' or record['binding']['reviewing'] is not True
+                        or record['binding']['actor'] not in self.project.reviewers_for(record['binding']['author'])
+                        or verdict['decision']!='approve' or verdict['findings']):raise ValueError('approved independent delivery required for integration diagnosis')
+            if record['payload']['project']!=self.project.fingerprint() or record['binding']['release']!=source.release:
+                raise ValueError('foreign integration snapshot')
+            self.store.tree(record['payload']['snapshot']);return record['payload']['snapshot']
+        if source.reviewing:
+            kind='red' if source.kind=='tests' else 'green'
+            record=self.store.receipt(handoff[kind],kind=kind)
+            expected={**source.binding(),'actor':source.author,'reviewing':False}
+            if (not Run(**expected).same_subject(record['binding']) or record['payload']['project']!=self.project.fingerprint()):
+                raise ValueError('review diagnostic must match its exact immutable author handoff')
+            return record['payload']['snapshot']
+        return self.store.capture(Path(task.workspace_path))
+
     def create(self,conn,incident,stage,*,previous=None):
         kb,_,_=native();record=self.store.receipt(incident,kind='incident');data=record['payload']
         actor=self.project.technical_roles[stage]
@@ -106,27 +232,22 @@ class Recovery:
         if body.get('kind')=='diagnostic':
             if body['stage']=='lead':self.create(conn,body['inputs']['incident'],'cto',previous=task.id)
             return
-        if body.get('version')!=1 or body.get('kind') not in ('tests','implementation'):return
+        if body.get('version')!=1 or body.get('kind') not in ('brief','plan','tests','implementation','integration'):return
         row=conn.execute('SELECT * FROM task_runs WHERE task_id=? ORDER BY id DESC LIMIT 1',(task.id,)).fetchone()
-        event=conn.execute("SELECT * FROM task_events WHERE task_id=? AND kind IN ('blocked','gave_up') ORDER BY id DESC LIMIT 1",(task.id,)).fetchone()
+        event=conn.execute("SELECT * FROM task_events WHERE task_id=? AND kind IN ('blocked','gave_up','block_loop_detected') ORDER BY id DESC LIMIT 1",(task.id,)).fetchone()
         if not row or not row['ended_at'] or not event:return
         claimed=conn.execute("SELECT payload FROM task_events WHERE run_id=? AND kind='claimed' ORDER BY id DESC LIMIT 1",(row['id'],)).fetchone()
         reviewing=bool(claimed and json.loads(claimed[0]).get('source_status')=='review')
-        stage=self.stage_for(reviewing,row['profile'])
+        stage='cto' if task.status=='triage' else self.stage_for(reviewing,row['profile'])
         key=digest([self.project.fingerprint(),task.id,row['id'],event['id'],'diagnostic',stage])
         existing=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
         if existing:return
         settle(task.id,conn=conn)
-        author=row['profile']
+        author=row['profile'];origin,handoff=self.handoff(conn,task)
         if reviewing:
-            origin=conn.execute("SELECT payload FROM task_events WHERE task_id=? AND kind='review_requested' ORDER BY id DESC LIMIT 1",(task.id,)).fetchone()
-            author=json.loads(origin[0])['implementer']
-            handoff=json.loads(conn.execute('SELECT metadata FROM task_runs WHERE id=(SELECT run_id FROM task_events '
-                "WHERE task_id=? AND kind='review_requested' ORDER BY id DESC LIMIT 1)",(task.id,)).fetchone()[0])
-            kind='red' if body['kind']=='tests' else 'green'
-            snapshot=self.store.receipt(handoff[kind],kind=kind)['payload']['snapshot']
-        else:snapshot=self.store.capture(Path(task.workspace_path))
+            author=origin['implementer']
         source=Run(task.id,row['id'],row['profile'],body['kind'],reviewing,author,body['release'],digest(body))
+        snapshot=self.snapshot(conn,task,source,handoff)
         failure=row['summary'] or row['error'] or task.result or 'Native worker could not complete'
         payload=json.loads(event['payload'] or '{}')
         reason=payload.get('reason');escalation_id=None
@@ -149,8 +270,16 @@ class Recovery:
                     escalation_id=data['escalation']
                     failure='Independent review technical impasse; CTO experiment and guidance required'
         cause=digest([task.id,source.contract,reviewing,snapshot,failure])
+        effects=self.expired_effects(task.id)
+        allowed=task.status=='blocked' and not effects
+        category=('native_triage' if task.status=='triage' else 'controller_effect' if effects else
+                  'technical_impasse' if escalation_id else 'document_activity' if source.kind in ('brief','plan') else
+                  'integration_activity' if source.kind=='integration' else 'worker_activity')
         incident=self.store.record('incident',source.binding(),dict(project=self.project.fingerprint(),snapshot=snapshot,
-            source=task.id,source_run=row['id'],block_event=event['id'],cause=cause,failure=failure,
+            source=task.id,source_run=row['id'],block_event=event['id'],cause=cause,failure=failure,category=category,
+            source_state=task.status,resume_allowed=allowed,controller_effects=effects,
+            recovery_limit=None if allowed else 'Native triage or expired controller effect requires a scoped technical repair; preserve phase and breaker, never repeat the mutation.',
+            **({'document_kind':source.kind} if source.kind in ('brief','plan') else {}),
             workspace=task.workspace_path,**({'review_escalation':escalation_id} if escalation_id else {})))
         # A native idempotent anchor survives restart before stage materialization.
         self.create(conn,incident,stage)
@@ -168,6 +297,7 @@ class Recovery:
             if body['stage']!='lead':raise ValueError('only lead escalates to CTO')
             self.create(conn,data['incident'],'cto',previous=task.id);return
         if data['action']=='hold':return
+        if source.get('resume_allowed') is False:raise EffectBlocked('native triage/controller effect needs scoped repair; preserve source')
         experiment=self.store.receipt(data['experiment'],kind='diagnostic_experiment')
         if experiment['binding']!=expected.binding() or experiment['payload']['incident']!=data['incident']:
             raise ValueError('resume requires its current validated experiment')
@@ -196,7 +326,9 @@ class Recovery:
                     or target.workspace_path!=source['workspace']
                     or digest(json.loads(target.body))!=incident['binding']['contract']):
                 raise EffectBlocked('diagnosis is stale for the current source impediment')
-            if not incident['binding']['reviewing'] and self.store.capture(Path(target.workspace_path))!=source['snapshot']:
+            if self.expired_effects(target.id):raise EffectBlocked('controller effect expired during diagnosis; preserve its identity')
+            if (incident['binding']['kind'] in ('tests','implementation') and not incident['binding']['reviewing']
+                    and self.store.capture(Path(target.workspace_path))!=source['snapshot']):
                 raise EffectBlocked('source workspace changed after the diagnostic snapshot')
         guidance='DIAG '+receipt_id+' '+json.dumps(data['verdict'],sort_keys=True)
         def comment_observed():
@@ -223,8 +355,10 @@ class Recovery:
             try:
                 body=json.loads(task.body or '{}')
                 if body.get('kind')=='diagnostic' and task.status=='done':self.apply(conn,task)
-                elif task.status=='blocked':self.discover(conn,task,settle)
-            except (ValueError,EffectBlocked,Pending,OSError) as error:issues[task.id]=type(error).__name__
+                elif task.status in ('blocked','triage'):self.discover(conn,task,settle)
+            except (ValueError,KeyError,TypeError,EffectBlocked,Pending,OSError) as error:
+                issues[task.id]=dict(category=type(error).__name__,owner=self.project.technical_roles['cto'],
+                    detail=str(error)[:500],next_action='Observe the recorded identity/effect and repair preconditions; never reset or resubmit blindly.')
         return issues
 
     def status(self,conn):
@@ -236,18 +370,43 @@ class Recovery:
             key=body['inputs']['incident'];record=self.store.receipt(key,kind='incident')
             target=kb.get_task(conn,body['source']);state='blocked'
             if target.status in ('ready','running','review'):state='revalidating'
+            if target.status in ('blocked','triage'):
+                latest=kb.latest_run(conn,target.id)
+                if latest and latest.id!=record['payload']['source_run']:state='revalidation_failed'
             if target.status=='done':
                 last=kb.latest_run(conn,target.id);metadata=last.metadata if last else {}
-                name='tests' if record['binding']['kind']=='tests' else 'delivery'
+                kind=record['binding']['kind']
+                name,evidence_kind={'tests':('tests','tests_frozen'),'implementation':('delivery','delivery_review'),
+                    'integration':('release_evidence','release_evidence'),'plan':('plan_review','plan_review'),
+                    'brief':('approved_brief','brief_approval')}[kind]
                 state='evidence_missing'
                 if metadata and metadata.get(name):
-                    evidence=self.store.receipt(metadata[name],kind='tests_frozen' if name=='tests' else 'delivery_review')
-                    if (evidence['binding']['task']==target.id and evidence['binding']['contract']==record['binding']['contract']
-                            and evidence['payload']['project']==self.project.fingerprint()):state='resolved'
+                    evidence=self.store.receipt(metadata[name],kind=evidence_kind)
+                    if kind=='brief':
+                        from .intake import Intake
+                        approval,proposal=Intake(self.project,self.store,self.board).approved(metadata[name])
+                        valid=(approval['binding']['task']==target.id and proposal['binding']['contract']==record['binding']['contract'])
+                    else:
+                        reviewed,_,_=self.board.closed_review(target.id)
+                        valid=(evidence['binding']==reviewed.binding() and reviewed.contract==record['binding']['contract'])
+                    if valid and evidence['payload']['project']==self.project.fingerprint():state='resolved'
+            row=kb.latest_run(conn,task.id);decision=None
+            if row and isinstance(row.metadata,dict) and row.metadata.get('diagnosis'):
+                decision=self.store.receipt(row.metadata['diagnosis'],kind='diagnostic_decision')['payload']
+                if decision['incident']!=key:raise ValueError('diagnostic outcome belongs to another incident')
+                if decision['action']=='hold' and state!='resolved':state='held'
+            if task.status in ('blocked','triage') and state!='resolved':state='diagnosis_failed'
             previous=incidents.get(key)
             if previous and previous['stage']=='cto' and body['stage']=='lead':continue
             incidents[key]=dict(source=target.id,diagnostic=task.id,stage=body['stage'],state=state,
-                owner=target.assignee if state=='revalidating' else task.assignee,delivery_approval=False)
+                category=record['payload'].get('category','worker_activity'),
+                source_run=record['payload']['source_run'],block_event=record['payload']['block_event'],
+                owner=target.assignee if state=='revalidating' else task.assignee,
+                resume_allowed=record['payload'].get('resume_allowed',True),
+                next_action=(decision['verdict'] if decision else
+                    'CTO diagnostic failed: inspect its retained run and repair protocol/capability before another attempt.' if state=='diagnosis_failed' else
+                    'Assigned technical diagnosis; inspect recorded failure and execute a permitted experiment.'),
+                delivery_approval=False)
         return list(incidents.values())
 
 
@@ -256,12 +415,17 @@ def register_diagnostic(sandbox,quality,on_terminal):
     operations=Diagnostic(sandbox,quality)
     finding=dict(type='object',additionalProperties=False,required=['path','line','detail'],properties=dict(
         path={'type':'string'},line={'type':'integer','minimum':1},detail={'type':'string','minLength':1,'maxLength':2000}))
+    reference=dict(type='object',additionalProperties=False,required=['evidence','detail'],properties=dict(
+        evidence=dict(type='string',enum=['incident','experiment']),detail=dict(type='string',minLength=1,maxLength=2000)))
     schemas=dict(diagnostic_validate=dict(type='object',additionalProperties=False,required=['hypothesis'],properties=dict(
         hypothesis={'type':'string','minLength':1,'maxLength':2000},replacements=dict(type='object',minProperties=1,maxProperties=16,
             additionalProperties={'type':'string','maxLength':131072}))),
         diagnostic_decide=dict(type='object',additionalProperties=False,required=['action','reason','findings'],properties=dict(
-            action={'type':'string','enum':['resume','escalate','hold']},reason={'type':'string','minLength':1,'maxLength':2000},
-            findings=dict(type='array',minItems=1,maxItems=8,items=finding))))
+            action={'type':'string','enum':operations.actions()},reason={'type':'string','minLength':1,'maxLength':2000},
+            findings=dict(type='array',minItems=1,maxItems=8,items={'oneOf':[finding,reference]}))))
+    if operations.incident.get('document_kind'):
+        properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
+        properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')
     def handler(method,terminal):
         def invoke(args,**kwargs):
             result=method(args)
@@ -271,6 +435,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
     for name,method in (('diagnostic_validate',operations.validate),('diagnostic_decide',operations.decide)):
         registry.register(name=name,toolset='fabriquinha_delivery',schema=dict(name=name,parameters=schemas[name],
             description='Technical diagnosis only. Read immutable evidence, run a fixed disposable SPIKE, propose guidance or escalate. '
+                'Cite a real source line or evidence=incident/experiment for an operational finding; never invent a product defect. '
                 'Never edit the author, weaken tests, approve delivery or send technical decisions to the CEO.'),
             handler=handler(method,name=='diagnostic_decide'))
     return set(schemas),operations

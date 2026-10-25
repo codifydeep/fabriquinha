@@ -94,7 +94,7 @@ class TechnicalRecovery(unittest.TestCase):
 
     def test_respawn_is_revalidating_not_incident_resolution(self):
         recovery=Recovery(self.project,self.store,self.board)
-        task=SimpleNamespace(id='diagnostic',assignee='lead',body=json.dumps(dict(kind='diagnostic',
+        task=SimpleNamespace(id='diagnostic',status='done',assignee='lead',body=json.dumps(dict(kind='diagnostic',
             stage='lead',source='source',inputs={'incident':self.incident})))
         recovery.cards=lambda conn:[task]
         kb=Mock();kb.get_task.return_value=SimpleNamespace(id='source',status='running',assignee='backend')
@@ -104,7 +104,7 @@ class TechnicalRecovery(unittest.TestCase):
 
     def test_native_done_without_delivery_evidence_does_not_resolve_incident(self):
         recovery=Recovery(self.project,self.store,self.board)
-        task=SimpleNamespace(id='diagnostic',assignee='lead',body=json.dumps(dict(kind='diagnostic',
+        task=SimpleNamespace(id='diagnostic',status='done',assignee='lead',body=json.dumps(dict(kind='diagnostic',
             stage='lead',source='source',inputs={'incident':self.incident})))
         recovery.cards=lambda conn:[task]
         kb=Mock();kb.get_task.return_value=SimpleNamespace(id='source',status='done',assignee='backend')

@@ -243,7 +243,8 @@ def validation_progress(card,store,project):
 
 def alerts(outbox,cards,store,*,now,alert_after=600,escalate_after=1800):
     for card in cards:
-        if card['status'] not in ('ready','review','running'):continue
+        if card['status'] not in ('ready','review','running','blocked','triage'):continue
+        if card['status'] in ('blocked','triage') and card.get('kind') not in ('brief','plan','tests','implementation','integration','diagnostic'):continue
         marker=card.get('run_started_at') if card['status']=='running' else card.get('last_event_at')
         marker=card.get('created_at',now) if marker is None else marker
         evidence=None
@@ -254,7 +255,7 @@ def alerts(outbox,cards,store,*,now,alert_after=600,escalate_after=1800):
             if age<threshold:continue
             key=digest([card['id'],card['current_run_id'],marker,evidence,event])
             actor=card['assignee'] if re.fullmatch('[a-z][a-z0-9_-]{0,63}',card['assignee'] or '') else 'controller'
-            owner=(outbox.project.technical_roles or {}).get('cto' if event=='stalled' else 'lead','techlead')
+            owner=card.get('technical_owner') or (outbox.project.technical_roles or {}).get('cto' if event=='stalled' else 'lead','techlead')
             if card.get('business_input') and 'error' not in card['business_input']:
                 if event=='stalled':continue  # Business waits do not escalate to the CTO as technical stalls.
                 request=card['business_input']['request']

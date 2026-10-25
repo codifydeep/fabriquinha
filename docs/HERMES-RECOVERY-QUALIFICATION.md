@@ -1,6 +1,6 @@
 # Diagnóstico técnico executável pelo Kanban
 
-Data: 24/10/2026. Continuação do [serviço nativo](HERMES-RUNTIME-QUALIFICATION.md)
+Atualizado em 25/10/2026. Continuação do [serviço nativo](HERMES-RUNTIME-QUALIFICATION.md)
 e do [plano aprovado](SIMPLIFICATION-REVIEW-2026-10-24.md).
 
 **Passou em ambiente isolado:** um bloqueio de protocolo criou cards nativos de
@@ -14,11 +14,12 @@ Isso qualifica o mecanismo, não o raciocínio de um modelo real.
 ```mermaid
 flowchart LR
     F[Worker terminou sem handoff válido] --> B[Card original blocked; falha preservada]
-    B --> L[DIAG nativo do Tech Lead]
+    B --> L[DIAG Lead; falha de revisão vai ao CTO]
     L -->|escalate| C[DIAG nativo do CTO]
     C --> S[SPIKE em cópia descartável; suíte completa]
     S --> D[Decisão técnica tipada e evidência imutável]
-    D --> G[Comentário idempotente de orientação]
+    D -->|retomada segura| G[Comentário idempotente de orientação]
+    D -->|triagem ou efeito expirado| H[CTO mantém bloqueio; próxima ação explícita]
     G --> U[unblock_task nativo: preserva a fase]
     U --> A[Mesmo autor/revisor retoma o trabalho]
     A --> T[Red, revisão, freeze, Green e controles]
@@ -104,6 +105,52 @@ autor. Não apresentar esse escopo como prova de todas as classes de incidente.
 
 ## Reprodução e pendências
 
+### R2 — Planejamento, integração e triagem
+
+O serviço cobre origens `brief`, `plan`, `tests`, `implementation` e
+`integration`. Documentos recebem snapshot do contrato e contexto aprovado;
+integração recebe a entrega já revisada e QA recebe o candidato implantado.
+O diagnóstico de documento usa o validador fixo de brief/plano; o de produto
+executa a suíte completa em Docker isolado. Achados operacionais podem citar
+o incidente ou o experimento real, sem inventar uma linha defeituosa do produto.
+
+Uma prova com `--recovery recover` concluiu dois incrementos dependentes,
+recuperando uma revisão de plano sem perder sua fase e uma falha de integração
+por Lead → CTO. Foram 15 atividades SDK e 24 respostas HTTP locais, incluindo
+Git, deploy, QA e rollback; GitHub/CI e decisões eram programados. A orientação
+completa chegou à retomada, sem bloquear a fase posterior de QA com uma decisão
+antiga do DevOps. Incidentes só foram resolvidos após as evidências terminais
+do trabalho original. Deploy e redes descartáveis foram retirados após a prova.
+
+Uma prova separada com `--recovery triage` acionou a proteção nativa após duas
+falhas de revisão. O CTO recebeu o diagnóstico e uma tentativa de `resume` foi
+negada. O bloqueio com próxima ação concreta sobreviveu ao reinício, sem novas
+chamadas: nove respostas locais no total, nenhuma homologação. Triagem nativa
+e efeitos do controlador expirados **não** são zerados ou repetidos às cegas.
+Nesses casos a próxima ação pode exigir reparação operacional qualificada;
+não há declaração de ausência universal de starvation.
+
+As duas provas usaram zero chamadas pagas e o upstream permaneceu sem patches.
+Uma execução anterior que revelou vazamento de orientação entre fases foi
+preservada como falha; não foi convertida em evidência de sucesso. Alertas
+incluem bloqueio/triagem técnica, excluem o card âncora de release e não
+interpretam manutenção pausada como falta de progresso.
+
+Para repetir, use uma raiz privada nova para cada modo, imagens verificadas e
+o checkout/venv fixados. O script fornece respostas locais; o serviço real
+despacha e recupera as atividades:
+
+```bash
+PYTHONPATH=src .local-simplification/venv-agent/bin/python scripts/qualify_hermes_release.py \
+  --upstream .local-simplification/hermes-upstream --root RAIZ_PRIVADA_NOVA \
+  --image sha256:ID_EXATO_DO_VALIDADOR --browser-image sha256:ID_EXATO_DO_BROWSER \
+  --namespace delivery-kit-hermes-r2 --recovery recover
+```
+
+Use outra raiz e namespace com `--recovery triage`. Não reutilize os recibos
+locais como aprovação de entrega real. Julgamento do modelo, GitHub/CI reais,
+segunda versão/memória e instalação reproduzível continuam pendentes.
+
 ### Escalada explícita de revisão — 25/10/2026
 
 A ferramenta `delivery_review` aceita `escalate`, além de aprovação e mudanças.
@@ -147,13 +194,14 @@ fornece respostas locais e verifica as operações do serviço real. Há um úni
 modelo de fixture na rota local; não é fallback de produção. Recibos, conversas,
 sessões e bancos permanecem privados, fora do Git.
 
-Ainda faltam outbox/Telegram, alertas por idade/progresso, admissão de perfis e
+Na prova inicial de 24/10 ainda faltavam outbox/Telegram, alertas por idade/progresso, admissão de perfis e
 recursos indisponíveis antes de haver um run, esperas CI/provedor e ligação da
-publicação/deploy/QA ao serviço. Faltam também modelo/GitHub reais, segunda
+publicação/deploy/QA ao serviço. As extensões posteriores estão registradas em
+[STATUS](STATUS.md). Faltam modelo/GitHub reais, segunda
 release/memória e instalação reproduzível. A pausa do provedor segue intacta.
 Não ampliar para toda falha S5 antes de conectar a primeira entrega real S4.
 
-O caminho novo tem 14 módulos físicos (inclui lane S1) e cerca de 2.900 linhas,
+Na referência inicial o caminho novo tinha 14 módulos físicos (inclui lane S1) e cerca de 2.900 linhas,
 sem contar testes/upstream. Dois módulos além do alvo orientativo inicial são a
 entrada operacional e a recuperação comum, não novos bancos/workflows nem um
 adaptador por causa de erro. A contagem continua sendo limite de revisão de

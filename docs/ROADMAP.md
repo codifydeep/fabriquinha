@@ -46,9 +46,13 @@ dispensa de revisão independente.
 
 ### R2 — Completar feedback e destinos de impedimentos conhecidos
 
-Feedback completo do plano e proposta anterior qualificados com SDK/Kanban reais,
-nove atividades e 11 respostas locais. Preparação agora exige escolha explícita
-do limite de saída no CLI. As demais saídas de impedimento continuam pendentes.
+Concluído no escopo delimitado offline. A cadeia com dois incrementos recuperou
+revisão do plano e integração Lead → CTO, preservou fase e orientação completa,
+e concluiu deploy/QA/rollback: 15 atividades SDK, 24 respostas locais, zero
+chamadas pagas. GitHub/CI e decisões foram programados. A prova separada de
+triagem recusou retomada indevida e preservou o bloqueio com responsável CTO
+após reinício, sem novas chamadas. Não há reset do breaker nem reparação
+universal; retrabalho versionado de testes continua em S5.
 
 Transmitir achados completos de revisão do plano, tratar bloqueios de
 planejamento/integração e `triage`, preservar a fase e impedir repetição idêntica

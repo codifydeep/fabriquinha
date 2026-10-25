@@ -18,6 +18,16 @@ from test_delivery_core import configuration
 
 
 class NotificationDelivery(unittest.TestCase):
+    def test_blocked_and_triage_alerts_do_not_omit_a_technical_card_or_alert_the_release_anchor(self):
+        common=dict(assignee='backend',current_run_id=None,created_at=0,last_event_at=0)
+        cards=[dict(common,id='blocked',status='blocked',kind='integration'),
+               dict(common,id='triage',status='triage',kind='plan'),
+               dict(common,id='anchor',status='blocked',kind='release')]
+        alerts(self.outbox,cards,self.store,now=2000)
+        messages=[r['message'] for r in self.outbox.records()]
+        self.assertEqual({m['task'] for m in messages},{'blocked','triage'})
+        self.assertEqual(len(messages),4)
+
     def setUp(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         self.root=Path(temporary.name).resolve();self.project=Project.parse(configuration())

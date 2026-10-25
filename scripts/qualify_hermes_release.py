@@ -77,7 +77,15 @@ class FixtureRuntime(Runtime):
         gate._api=github.api
         return repo,github
 
-    def integration_services(self,run):return self.release_services(run.actor,task=run.task)
+    def integration_services(self,run):
+        fault=self.root/'recovery-mode.json';marker=self.root/'integration-fault.json'
+        if self.project.qualification and fault.exists() and json.loads(fault.read_bytes())['mode']=='recover' and not run.reviewing:
+            try:fd=os.open(marker,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            except FileExistsError:pass
+            else:
+                with os.fdopen(fd,'w') as f:json.dump({'run':run.number},f)
+                raise ValueError('Injected pre-publication integration precondition failure; no external effect was sent')
+        return self.release_services(run.actor,task=run.task)
 
     def spawn(self,*args,**kwargs):
         original=subprocess.Popen
@@ -88,7 +96,7 @@ class FixtureRuntime(Runtime):
         with patch('fabriquinha.runtime.subprocess.Popen',spawn):return super().spawn(*args,**kwargs)
 
 
-def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release'):
+def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none'):
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -104,9 +112,11 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         repository='https://github.com/example/release-qualification',branch='release/qualification',
         validation_image=image,browser_image=browser,tests_dir='tests',qualification=True,
         coordination_roles={'product':'release-product','lead':'release-lead'},
+        technical_roles={'lead':'release-lead','cto':'release-cto'},
         delivery_roles={'tests':'release-tests','integration':'release-devops'},
         reviewers={'release-tests':'release-lead','release-author':'release-lead','release-lead':'release-cto','release-devops':'release-tests'}))
     runtime=FixtureRuntime(root,upstream)
+    if recovery!='none':write_json(root/'recovery-mode.json',dict(mode=recovery))
     fixture=ROOT/'tests/fixtures/delivery';folder=root/'github-fixture';folder.mkdir(mode=0o700)
     remote,seed=folder/'remote.git',folder/'seed';remote.mkdir();shutil.copytree(fixture/'base',seed)
     def git(path,*args):
@@ -127,7 +137,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
     app2=app2.replace("        elif url.path == '/':", "        elif url.path == '/farewell':\n            status, value = 200, {'message': 'Goodbye, '+parse_qs(url.query).get('name', ['World'])[0]}\n        elif url.path == '/':")
     test1=(fixture/'test_greeting.py').read_text()
     test2=test1.replace('Greeting','Farewell').replace('test_named_greeting','test_named_farewell').replace('/greeting?','/farewell?').replace('Hello, Ada','Goodbye, Ada')
-    sequences={};requests={};bindings={}
+    sequences={};requests={};bindings={};plan_faults=[];diagnostic_actions=[];guidance_seen=[]
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_POST(self):
@@ -138,7 +148,21 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             binding=json.loads(marker.removeprefix('Delivery activity '));run=runtime.board.current(binding['task'],binding['number'])
             assert run.binding()==binding;bindings[run.number]=binding
             if run.number not in sequences:
-                if run.kind=='brief':sequence=[('brief_submit',brief)]
+                if run.kind=='diagnostic':
+                    context=runtime.store.receipt(runtime.board.input(run,'incident'),kind='incident')
+                    payload=context['payload'];source=context['binding']['kind']
+                    action=('hold' if not payload['resume_allowed'] else 'escalate'
+                            if source=='integration' and run.actor=='release-lead' else 'resume')
+                    reason='Repair the review protocol before any new attempt; keep native triage unchanged.' if action=='hold' else 'The fixed validation identifies a resumable precondition; follow the original phase.'
+                    decision=dict(action=action,reason=reason,findings=[dict(evidence='experiment',detail='Use this verified technical guidance without changing tests or delivery evidence.')])
+                    sequence=[('diagnostic_validate',{'hypothesis':'Check the recorded plan contract' if source=='plan' else 'Check the approved application suite'}),
+                        ('diagnostic_decide',decision)]
+                    if action=='hold':sequence.insert(0,('diagnostic_decide',{**decision,'action':'resume'}))
+                    diagnostic_actions.append((source,action,run.number))
+                elif run.kind=='brief':sequence=[('brief_submit',brief)]
+                elif run.kind=='plan' and run.reviewing and recovery!='none' and (recovery=='triage' or not plan_faults):
+                    plan_faults.append(run.number);sequence=[(None,'I will review this plan later.')]
+                    write_json(root/'plan-faults.json',dict(runs=plan_faults))
                 elif run.kind=='plan':sequence=[('plan_review',dict(decision='approve',reason='Independent fixture architecture review',findings=[]))] if run.reviewing else [('plan_submit',document)]
                 elif run.reviewing:sequence=[('delivery_review',dict(decision='approve',reason='Independent immutable fixture review',findings=[]))]
                 else:
@@ -153,21 +177,29 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                     else:sequence=[('write_file',dict(path='/workspace/app.py',content=app)),
                         ('delivery_submit',{'mutations':[{'app.py':app.replace('Hello, ','Wrong, ') if first else app.replace('Goodbye, ','Wrong, ')}]})]
                 sequences[run.number]=sequence
+                if recovery!='none' and run.kind=='plan' and run.reviewing and sequence[0][0]=='plan_review':
+                    assert 'Controller-recorded diagnostic guidance' in str(body['messages'])
+                    guidance_seen.append(run.number)
             index=requests.get(run.number,0);requests[run.number]=index+1
             if index>=len(sequences[run.number]):self.send_error(400);return
             name,args=sequences[run.number][index]
+            message=(dict(role='assistant',content=None,tool_calls=[dict(id='release-'+str(run.number)+'-'+str(index),
+                type='function',function=dict(name=name,arguments=json.dumps(args)))]) if name else dict(role='assistant',content=args))
             value=dict(id='local-'+str(run.number)+'-'+str(index),object='chat.completion',created=int(time.time()),model=body['model'],
-                choices=[dict(index=0,finish_reason='tool_calls',message=dict(role='assistant',content=None,tool_calls=[
-                    dict(id='release-'+str(run.number)+'-'+str(index),type='function',function=dict(name=name,arguments=json.dumps(args)))]))],
+                choices=[dict(index=0,finish_reason='tool_calls' if name else 'stop',message=message)],
                 usage=dict(prompt_tokens=100,completion_tokens=50,total_tokens=150))
             data=json.dumps(value).encode();self.send_response(200);self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
     server=ThreadingHTTPServer(('127.0.0.1',0),Response);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     write_json(root/'route.json',dict(base_url='http://127.0.0.1:'+str(server.server_port)+'/v1',api_key='local-fixture',
         provider='custom',api_mode='chat_completions',model='fabriquinha-release-fixture'))
-    with os.fdopen(os.open(root/'service.log',os.O_CREAT|os.O_WRONLY,0o600),'wb') as log:
-        service=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--mode','serve','--root',str(root),'--upstream',str(upstream)],
-            stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+    services=[]
+    def start():
+        with os.fdopen(os.open(root/('service-'+str(len(services)+1)+'.log'),os.O_CREAT|os.O_WRONLY,0o600),'wb') as log:
+            service=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--mode','serve','--root',str(root),'--upstream',str(upstream)],
+                stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        services.append(service);return service
+    service=start()
     def until(predicate,seconds=480):
         began=time.monotonic()
         while not predicate():
@@ -175,8 +207,10 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             status=json.loads((root/'status.json').read_bytes()) if (root/'status.json').exists() else {}
             board=status.get('board',{})
             with kbc.connect_closing() as conn:
-                blocked=conn.execute("SELECT 1 FROM task_runs WHERE outcome IN ('blocked','crashed','timed_out') LIMIT 1").fetchone()
-            if blocked or board.get('release_issues') or board.get('intake_issues'):
+                blocked={r[0] for r in conn.execute("SELECT id FROM task_runs WHERE outcome IN ('blocked','crashed','timed_out')")}
+            expected=set(plan_faults)
+            if (root/'integration-fault.json').exists():expected.add(json.loads((root/'integration-fault.json').read_bytes())['run'])
+            if blocked-expected or board.get('release_issues') or board.get('intake_issues') or board.get('recovery_issues'):
                 write_json(root/'failure-observation.json',status)
                 raise RuntimeError('release failed; inspect preserved evidence')
             if time.monotonic()-began>seconds:raise TimeoutError('observation expired; inspect same live handles, never restart on timeout')
@@ -191,13 +225,38 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         runtime.intake.respond(pending[0]['task'],pending[0]['request'],'approve','Approve this exact fixture business scope only')
         def delivered():
             with kbc.connect_closing() as conn:return runtime.intake.terminal(kb.get_task(conn,started['release']))
-        until(delivered)
         def settled():
             with kbc.connect_closing() as conn:
                 for row in conn.execute('SELECT * FROM task_runs'):
                     event=conn.execute("SELECT 1 FROM task_events WHERE run_id=? AND kind IN ('spawned','worker_registered')",(row['id'],)).fetchone()
                     if event and (not row['ended_at'] or worker_alive(recorded_worker(conn,row))):return False
             return True
+        if recovery=='triage':
+            until(lambda:any(i['state']=='held' for i in runtime.status()['incidents']))
+            until(settled);assert len(plan_faults)==2
+            with kbc.connect_closing() as conn:
+                source=kb.get_task(conn,bindings[plan_faults[-1]]['task'])
+                assert source.status=='triage' and source.block_recurrences==2
+                for number in plan_faults:
+                    event=conn.execute("SELECT payload FROM task_events WHERE run_id=? AND kind='claimed'",(number,)).fetchone()
+                    assert json.loads(event[0])['source_status']=='review'
+            service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
+            count=sum(requests.values());service=start()
+            until(lambda:any(i['state']=='held' for i in runtime.status()['incidents']))
+            time.sleep(1.5)
+            assert sum(requests.values())==count and not delivered()
+            with kbc.connect_closing() as conn:
+                source=kb.get_task(conn,source.id);assert source.status=='triage' and source.block_recurrences==2
+            service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
+            runtime.pause()
+            with kbc.connect_closing() as conn:assert runtime.pause_status(conn)['drained']
+            assert [(kind,action) for kind,action,_ in diagnostic_actions]==[('plan','resume'),('plan','hold')]
+            result=dict(passed=True,scenario='native_triage_owned_hold',review_phase_preserved=True,
+                native_breaker_not_reset=True,unsupported_resume_denied=True,hold_survived_restart_without_new_calls=True,
+                automatic_cto_assignment=True,source_review_failures=2,local_http_requests=count,
+                release_homologated=False,paid_calls=0,model_judgment=False,delivery_approval=False)
+            write_json(root/'receipt.json',result);return result
+        until(delivered)
         until(settled);service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
         with kbc.connect_closing() as conn:
             anchor=kb.get_task(conn,started['release']);row=kb.latest_run(conn,anchor.id)
@@ -214,6 +273,11 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             branch_bases_chained=True,old_tests_preserved=True,final_criteria=data['criteria'],
             release_gate_exercised=True,delivery_approval=False,migration=False,url=data['url'])
         result['wal_lifetime_probe']=wal
+        if recovery=='recover':
+            assert len(plan_faults)==1 and len(guidance_seen)==1
+            assert [(kind,action) for kind,action,_ in diagnostic_actions]==[('plan','resume'),('integration','escalate'),('integration','resume')]
+            assert all(i['state']=='resolved' for i in runtime.status()['incidents'])
+            result.update(planning_review_recovered_without_phase_loss=True,integration_recovered_by_lead_cto=True,complete_diagnostic_guidance=True)
         write_json(root/'chain-receipt.json',result)
         retire_fixture(root,upstream)
         result['deployment_retired_after_evidence']=True
@@ -228,6 +292,7 @@ if __name__=='__main__':
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image');parser.add_argument('--browser-image');parser.add_argument('--task');parser.add_argument('--run',type=int)
     parser.add_argument('--namespace',default='delivery-kit-hermes-release')
+    parser.add_argument('--recovery',choices=('none','recover','triage'),default='none')
     args=parser.parse_args();root,upstream=args.root.resolve(),args.upstream.resolve()
     if args.mode=='worker':FixtureRuntime(root,upstream).worker(args.task,args.run)
     elif args.mode=='serve':
@@ -237,6 +302,6 @@ if __name__=='__main__':
             FixtureRuntime(root,upstream).serve(stop,interval=0.25)
     elif args.mode=='retire':retire_fixture(root,upstream)
     else:
-        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace),indent=2))
+        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery),indent=2))
         except BaseException as error:
             write_json(root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False));raise
