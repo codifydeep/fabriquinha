@@ -17,6 +17,7 @@ caminho. O legado e as chamadas pagas continuam pausados; nenhuma migração apl
 | [Brief/plano](HERMES-INTAKE-QUALIFICATION.md) | Perguntas, aprovação exata do CEO, DAG completo e revisão Lead/CTO; nove atividades SDK | Primeira fatia com dez respostas locais, complementada abaixo |
 | [Ciclo de release](HERMES-INTAKE-QUALIFICATION.md#dag-executável-e-aceite-integral--continuação) | Dois incrementos, seis cards gerados, bases encadeadas, três artefatos, sete atualizações Compose, QA e aceite integral | Terceira tentativa passou; autores/CI sintéticos, não produto autônomo |
 | [Provedor neutro](HERMES-PROVIDER-QUALIFICATION.md) | Admissão/espera conectadas ao worker; dois 402 locais, reinício, sessões/fases/budget preservados e TDD concluído; canário real curto anterior passou | Decisões programadas; instalação paga e S4 ainda não iniciados |
+| [Computação CI local](HERMES-INTEGRATION-QUALIFICATION.md#computação-local-de-ci-antes-de-s4) | Sete jobs Docker reais; base/candidato, SHA integrado, reaproveitamento e controles contra skip/assertion/descoberta reduzida | Não publica status nem altera proteção; escolha da origem do check pendente |
 
 **S2 permanece parcial.** Materialização e aceite integral passaram no ciclo
 offline: 24 runs nativos, 11 atividades SDK e 17 respostas locais. Foram corrigidos
@@ -36,12 +37,14 @@ O preparo isolado S4 já confirmou nove perfis, board vazio, pausa/drenagem e
 provedor desabilitado; doctor sem recursos/perfis ausentes. Não iniciou agentes,
 criou branches ou registrou runner. O CI local da nova branch e a autorização
 de consumo continuam sendo pré-condições, não etapas presumidas concluídas.
+A computação de CI já passou localmente; falta aprovar/conectar a publicação do
+check real. Nenhum runner público foi registrado, nem o runner do Truco alterado.
 
-Checks atuais: 188 testes do caminho novo passaram. A última execução dos 4.523
+Checks atuais: 195 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.
-O núcleo tem 19 módulos funcionais + `__init__`, 4.673 linhas incluindo a lane S1;
+O núcleo tem 19 módulos funcionais + `__init__`, 4.724 linhas incluindo a lane S1;
 o desvio da meta 12/~3.000 segue explícito. Recibos completos continuam privados.
 As estimativas e detalhes históricos abaixo não são porcentagens de conclusão
 da nova arquitetura nem evidência de entrega autônoma.

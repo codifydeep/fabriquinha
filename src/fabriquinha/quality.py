@@ -16,6 +16,23 @@ PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
 
 
+def suite_report(value):
+    """Shared full-suite facts; caller must separately verify job provenance."""
+    report=value.get('report')
+    if (not isinstance(report,dict) or report.get('version')!=1
+            or type(report.get('tests_run')) is not int or report['tests_run']<1
+            or not isinstance(report.get('cases'),list)
+            or report['tests_run']!=len(report['cases']) or len(set(report['cases']))!=len(report['cases'])
+            or any(not isinstance(case,str) or not case for case in report['cases'])
+            or any(not isinstance(report.get(field),list) for field in ('failures','errors','skips','expected_failures','unexpected_successes'))
+            or any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes'))):
+        raise ValueError('complete real suite without errors or skips required')
+    failed={item['case'] for item in report['failures']}
+    if not failed<=set(report['cases']) or value['exit_code']!=(1 if failed else 0):
+        raise ValueError('suite exit and assertion facts disagree')
+    return report
+
+
 def review_decision(value, manifest, tree):
     def unique(pairs):
         result = {}
@@ -76,19 +93,9 @@ class Quality:
                 or identity['snapshot'] != snapshot or identity['phase'] != phase
                 or identity['project'] != self.project.fingerprint()
                 or identity['image'] != self.project.validation_image
-                or value['sandbox'] != dict(network='none', snapshot='readonly', user='65534:65534')
-                or not isinstance(report, dict) or report.get('version') != 1
-                or type(report.get('tests_run')) is not int or report['tests_run'] < 1
-                or not isinstance(report.get('cases'), list)
-                or report['tests_run'] != len(report['cases']) or len(set(report['cases'])) != len(report['cases'])
-                or any(not isinstance(p, str) or not p for p in report['cases'])
-                or any(not isinstance(report.get(field), list) for field in
-                       ('failures', 'errors', 'skips', 'expected_failures', 'unexpected_successes'))
-                or any(report[field] for field in ('errors', 'skips', 'expected_failures', 'unexpected_successes'))):
+                or value['sandbox'] != dict(network='none', snapshot='readonly', user='65534:65534')):
             raise ValueError('complete real suite without errors or skips required')
-        failed = {f['case'] for f in report['failures']}
-        if not failed <= set(report['cases']) or value['exit_code'] != (1 if failed else 0):
-            raise ValueError('suite exit and assertion facts disagree')
+        report=suite_report(value)
         self.board.ensure(run)
         self.store.tree(snapshot)
         self.observed_jobs.add(key)

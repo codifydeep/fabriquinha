@@ -56,6 +56,11 @@ também foi validado: nove perfis novos, board vazio, pausa persistente e proved
 desabilitado, sem chamadas, serviços ou alterações GitHub. Ainda faltam CI local,
 base/branch e autorização de consumo antes do ensaio real. Não é um instalador
 completo nem substitui esse marco de autonomia.
+A [computação local de CI](docs/HERMES-INTEGRATION-QUALIFICATION.md#computação-local-de-ci-antes-de-s4)
+foi qualificada separadamente com sete jobs Docker reais e comparação do inventário
+de testes base/candidato, incluindo um ataque à descoberta sem editar o teste
+antigo. Não publica status, registra runner ou afrouxa checks; a origem do check
+real da branch nova ainda depende de aprovação/configuração explícita.
 A instalação antiga descrita abaixo permanece como referência
 pausada; ainda não houve migração nem entrega autônoma pelo novo caminho.
 
@@ -84,6 +89,7 @@ flowchart LR
     T --> S[Snapshots e recibos privados]
     S --> G[Git: commit da entrega]
     G --> P[PR/CI simulados; gate nativo]
+    LC[CI local fixo: base/candidato e inventário qualificados] -. Publicação de check ainda não conectada .-> P
     P -->|Pendente: encerra claim| W[scheduled; retomada automática pelo serviço]
     W --> K
     P --> M[Merge e suíte no SHA integrado]

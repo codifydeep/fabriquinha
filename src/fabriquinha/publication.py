@@ -140,6 +140,50 @@ class Repository:
         return {'head':head}
 
 
+class LocalCI:
+    """Fixed local CI computation only; no status publishing or Kanban claims.
+
+    CI provenance deliberately is not a Run: it cannot stand in for an author's
+    Red, independent review or permission to merge. A caller derives head/base
+    from its authenticated PR/merge, never from model-supplied commands.
+    """
+    def __init__(self,project,store,repository,runner):
+        self.project,self.store,self.repo,self.runner=project,store,repository,runner
+
+    def validate(self,head,base,*,stage):
+        from .quality import Quality,suite_report
+        if stage not in ('proposal','integrated'):raise ValueError('explicit CI stage required')
+        head,base=sha(head),sha(base)
+        expected=base if stage=='proposal' else head
+        def current():
+            if self.repo.remote_head(self.project.branch)!=expected:
+                raise EffectBlocked('CI branch moved; never publish success for a stale base or merge')
+        current()
+        baseline,snapshot=self.repo.snapshot(base),self.repo.snapshot(head)
+        self.repo.git('merge-base','--is-ancestor',base,head)
+        Quality(self.project,self.store,self.runner,None).protect(baseline,snapshot)
+        binding=dict(scope='local_ci',version=1,project=self.project.fingerprint(),head=head,base=base,stage=stage)
+        def execute(tree,phase,scope):
+            class Execution:
+                def binding(self):return dict(scope)
+            job_id=self.runner.run(Execution(),tree,phase)
+            job=self.store.receipt(job_id,kind='suite_job');data=job['payload'];identity=data['identity']
+            if (job['binding']!=scope or identity['binding']!=scope or identity['snapshot']!=tree
+                    or identity['phase']!=phase or identity['project']!=self.project.fingerprint()
+                    or identity['image']!=self.project.validation_image
+                    or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
+                raise ValueError('CI must use the exact fixed isolated job and commit snapshot')
+            return job_id,suite_report(data)
+        baseline_job,old=execute(baseline,'baseline',{**binding,'head':base,'base':base,'stage':'baseline'})
+        if old['failures']:raise EffectBlocked('CI requires a passing independently executed baseline')
+        job_id,report=execute(snapshot,'integrated',binding)
+        if not set(old['cases'])<=set(report['cases']):raise ValueError('CI discovery omitted pre-existing test cases')
+        self.store.tree(snapshot);current()
+        return self.store.record('ci_validation',binding,dict(project=self.project.fingerprint(),head=head,base=base,
+            stage=stage,snapshot=snapshot,baseline_job=baseline_job,job=job_id,conclusion='failure' if report['failures'] else 'success',
+            tests_run=report['tests_run'],qualification=self.project.qualification,merge_authorized=False,delivery_approval=False))
+
+
 class GitHub:
     """Fixed gh operations. No arbitrary endpoint, command or protection override."""
     FIELDS = 'url,state,headRefOid,headRefName,baseRefName,baseRefOid,mergeCommit'

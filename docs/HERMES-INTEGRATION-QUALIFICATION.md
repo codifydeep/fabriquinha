@@ -129,8 +129,8 @@ HERMES_DISABLE_LAZY_INSTALLS=1 .local-hermes-agent/venv/bin/python \
 ## Próximos limites
 
 A [pausa/retomada e admissão](HERMES-OPERATIONS-QUALIFICATION.md) passaram depois,
-com limites próprios documentados. Faltam brief/plano/aprovação de negócio e
-critério integral de aceite da release. Incidentes de integração
+com limites próprios documentados. Brief/plano/aprovação exata e aceite integral
+passaram depois em [intake/release](HERMES-INTAKE-QUALIFICATION.md). Incidentes de integração
 ainda não percorrem todo o diagnóstico técnico qualificado para TDD. Telegram,
 modelo e GitHub reais, segunda release/memória e instalação portátil permanecem
 pendentes. Não converter essas lacunas em mais uma rodada de controles genéricos
@@ -141,3 +141,54 @@ S1 e `__init__`. A conexão acrescenta cerca de 120 linhas ao módulo operaciona
 sem novo módulo/coordenador/DB. O desvio de aproximadamente 310 linhas da meta
 inicial de 3.000 continua explícito; não é motivo para minificar o código nem
 evidência de autonomia.
+
+## Computação local de CI antes de S4
+
+`LocalCI`, no módulo de publicação, executa um comando fixo usando o mesmo
+validador isolado do TDD. Não registra runner, publica status GitHub, altera
+proteção de branch ou concede permissão de merge. O CLI
+`scripts/check_hermes_ci.py` é uma operação do controlador, não uma ferramenta de
+shell para os agentes. A instalação paga permanece desabilitada.
+
+O chamador confiável fornece head/base autenticados do PR ou merge. A computação:
+
+1. Confere a branch atual, exporta Git por SHA e exige ancestralidade da base.
+2. Preserva arquivos de testes e configurações, inclusive `.github`, antes de
+   executar código. Uma nova configuração protegida também não é aceita.
+3. Executa a suíte completa da base e do candidato em jobs separados, sem rede,
+   credenciais ou socket, usuário `65534`, árvore somente leitura e limites.
+4. Exige base verde, casos não vazios/únicos, ausência de erros/skips e preservação
+   de todos os casos antigos na descoberta. Uma assertion falha produz conclusão
+   `failure`, não sucesso. Uma configuração inválida não gera recibo verde.
+5. Confere proveniência dos jobs e revalida a branch após o teste. Commit/base
+   obsoletos não recebem aprovação, mesmo com suíte verde.
+
+O journal permite observar/reutilizar o mesmo job, sem executar novamente por
+perda de resposta. Base, proposta e commit integrado têm escopos próprios. Os
+recibos usam `scope=local_ci`, não fingem ser execuções nativas de um autor ou
+revisor; não podem substituir Red, freeze, revisão independente ou aceite final.
+As mesmas verificações de relatório foram extraídas do gate TDD sem retirar
+condições. CI continua sendo evidência separada, não autorização de entrega.
+
+A prova `scripts/qualify_hermes_ci.py` passou com remoto bare local e sete jobs
+Docker reais: proposta válida/reutilizada, SHA integrado, assertion falha, skip,
+alteração de teste antigo recusada antes do job e redução de descoberta recusada.
+O último controle adiciona um módulo que esconde a classe antiga do loader sem
+editar seu arquivo: comparar somente hashes não bastaria. Todos os jobs próprios
+foram arquivados/retirados; nenhuma imagem, volume ou snapshot foi apagado.
+Uma primeira fatia mais curta havia passado com quatro jobs; a prova ampliada
+não é uma execução de produto nem publicação de check no GitHub.
+
+**Limite atual:** a computação está qualificada, mas não foi conectada a um check
+obrigatório real. A origem do check na nova branch exige escolha explícita do
+proprietário; não alterar a `main` nem afrouxar seus checks existentes. Está
+proposta publicação de status no SHA pelo controlador local em vez de registrar
+um runner Actions público. O [GitHub recomenda evitar runners próprios em repos
+públicos](https://docs.github.com/en/actions/reference/security/secure-use), pois
+workflows não confiáveis podem comprometer o ambiente. Um runner compartilhado
+do Truco não deve ser reaproveitado por conveniência.
+
+Antes da publicação real, o contrato deverá vincular o check ao recibo, SHA,
+base e projeto exatos e observar envios com ACK incerto. Só então configurar a
+branch nova e iniciar S4 autorizado. Não substituir esse passo por marcar check
+verde manualmente ou aceitar um recibo de CI como parecer independente.
