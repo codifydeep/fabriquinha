@@ -4,6 +4,14 @@ Data: 25 de outubro de 2026. Código auditado: `98e0906947674134ea567b16188db5a6
 Plano de referência: [simplificação aprovada em 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md).
 Destinatário da execução: GPT 6.1 Sol.
 
+**Atualização posterior à auditoria:** o proprietário aprovou F1, registrado no
+[ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md). O contrato 2 foi implementado
+e passou na prova física de navegador com teste auxiliar preservado. O feedback
+completo do plano também passou no SDK/Kanban reais com respostas locais.
+Este documento preserva o diagnóstico sobre a base auditada; consulte
+[STATUS](STATUS.md) para execução atual. R2 ainda não está completo e o S4 real
+continua pausado, aguardando nova fronteira e pré-condições.
+
 **Natureza deste documento:** auditoria e proposta de sequência atualizada. A
 estratégia anterior continua aprovada. Os refinamentos de contrato abaixo são
 propostas explícitas; esta revisão não os instala, não retoma agentes e não

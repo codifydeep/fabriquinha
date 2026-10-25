@@ -1,5 +1,6 @@
 """Business approval and work coverage are not execution or release approval."""
 import copy
+from contextlib import nullcontext
 import json
 import re
 from dataclasses import replace
@@ -41,7 +42,27 @@ class IntakeContracts(unittest.TestCase):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         self.store=Store(Path(temporary.name)/'private')
         self.run=Run('brief',1,'product','brief',False,'product','release','contract')
-        self.board=SimpleNamespace(ensure=Mock(),input=Mock(),review=Mock(),finish_review=Mock())
+        self.board=SimpleNamespace(ensure=Mock(),input=Mock(),review=Mock(),finish_review=Mock(),review_feedback=Mock(return_value=[]))
+
+    def test_planner_receives_complete_findings_and_last_proposal_without_a_session(self):
+        run=replace(self.run,task='plan',kind='plan',actor='lead',author='lead',number=3)
+        author=replace(run,number=1)
+        approved='exact-approval'
+        proposal=self.store.record('work_plan',author.binding(),dict(project=self.project.fingerprint(),
+            approval=approved,document=work()))
+        finding='Keep server-owned room state while the second package joins it.'
+        feedback=[dict(plan=proposal,verdict=dict(decision='changes',reason='Revise plan',findings=[finding]))]
+        self.board.review_feedback.return_value=feedback;self.board.input.return_value=approved
+        tools=DraftTools(DraftActivity(self.project,self.store,self.board,run))
+        kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body='{}'))
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(None))
+        with patch('fabriquinha.intake.native',return_value=(kb,api,None)), \
+                patch.object(tools.intake,'approved',return_value=({'binding':{'release':run.release}}, {'payload':{'document':document()}})):
+            evidence=tools.evidence()
+        self.assertIn('previous_reviews',evidence)
+        self.assertEqual(evidence['previous_reviews'],feedback)
+        self.assertEqual(evidence['previous_plan'],work())
+        self.assertIn(finding,json.dumps(evidence))
 
     def test_coordination_roles_are_explicit_independent_and_fingerprinted(self):
         value=configured();parsed=Project.parse(value);value['coordination_roles']['product']='changed'

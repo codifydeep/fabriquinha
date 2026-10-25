@@ -63,7 +63,7 @@ def qualify(root,upstream,image,*,neutral_relay=False):
     proposed=dict(architecture='Local HTTP API with server-owned room state.',observability='Track failed joins.',tasks=[
         dict(id='create',title='Create room',owner='intake-lead',depends_on=[],criteria=['CREATE'],acceptance='Room visible in lobby.'),
         dict(id='join',title='Join room',owner='intake-lead',depends_on=['create'],criteria=['JOIN'],acceptance='Both clients see the same room.')])
-    sequences={};requests={};counters=dict(product=0,lead=0,cto=0);all_requests=[]
+    sequences={};requests={};counters=dict(product=0,lead=0,cto=0);all_requests=[];plan_feedback=[]
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_POST(self):
@@ -94,6 +94,13 @@ def qualify(root,upstream,image,*,neutral_relay=False):
                     if index==0:
                         partial={**proposed,'tasks':[proposed['tasks'][0]]}
                         sequence.append(('plan_submit',partial))  # Real handler must reject missing criterion.
+                    else:
+                        context=next(m['content'] for m in reversed(body['messages'])
+                            if m.get('role')=='user' and isinstance(m.get('content'),str) and m['content'].startswith('Delivery activity '))
+                        evidence=json.loads(context.rsplit('\nController-recorded Approved business context:\n',1)[1])
+                        assert evidence['previous_reviews'][-1]['verdict']['findings']==['Make the join dependency explicit.']
+                        assert evidence['previous_plan']==proposed
+                        plan_feedback.append(run.number)
                     sequence.append(('plan_submit',proposed))
                 else:
                     sequence=[('plan_review',dict(decision='changes' if index==0 else 'approve',
@@ -222,12 +229,14 @@ def qualify(root,upstream,image,*,neutral_relay=False):
         # Every model/SDK activity has a persisted session and tool result.
         activities=[json.loads((root/'runs'/str(number)/'activity.json').read_bytes()) for number in requests]
         assert len(activities)==9 and counters==dict(product=5,lead=2,cto=2)
+        assert len(plan_feedback)==1
         product=[item['result'] for item in activities if item['binding']['kind']=='brief']
         assert len({item['session'] for item in product})==1 and sum(item['resumed'] for item in product)==4
         assert not list((runtime.store.root/'agents').glob('*/sandbox.json'))
         runtime.pause()
         result=dict(passed=True,product_questions=3,business_change_request=True,stale_approval_refused=True,
             independent_plan_changes=True,complete_coverage_gate=True,plan_revisions=2,
+            complete_plan_findings_received_by_new_worker=True,
             native_sdk_activities=len(activities),local_http_requests=len(all_requests),
             same_product_session_resumed=True,duplicate_plan_refused=True,release_anchor=anchor.status,
             approval_creation_gap_recovered=True,

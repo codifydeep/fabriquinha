@@ -1,6 +1,7 @@
 """Real DOM behavior assertion plus delivery write/credential denial."""
 import os
 import errno
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -36,3 +37,9 @@ class CounterBehavior(unittest.TestCase):
         expect(page.locator('#count')).to_have_text('0', timeout=1000)
         page.locator('#increment').click(timeout=1000)
         expect(page.locator('#count')).to_have_text('1', timeout=1000)
+
+
+class FrozenQaMetadata(unittest.TestCase):
+    def test_support_contract_is_valid_independently_of_the_app(self):
+        document=json.loads((Path(__file__).parent/'support_contract.json').read_text())
+        self.assertEqual(document,{'version':1,'format':'frozen-support'})

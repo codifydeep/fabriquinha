@@ -1,5 +1,5 @@
 """Authenticate a current Hermes run at the controller edge; no extra board DB."""
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 import json
 from pathlib import Path
 from .artifacts import digest
@@ -177,7 +177,10 @@ class Board:
     def review_feedback(self,run,store):
         """Bounded cross-run memory: exact findings, not just an opaque hash."""
         self.ensure(run)
-        if run.kind not in ('tests','implementation'):return []
+        kinds={'tests':('review','test_review'),'implementation':('review','delivery_review'),
+               'plan':('plan_review','plan_review')}
+        if run.kind not in kinds:return []
+        field,receipt_kind=kinds[run.kind]
         _,kbc,_=native();result=[]
         with kbc.connect_closing() as conn:
             rows=conn.execute("SELECT run_id,payload FROM task_events WHERE task_id=? AND kind='changes_requested' ORDER BY id DESC LIMIT 2",
@@ -187,9 +190,9 @@ class Board:
             try:details=json.loads(reason)
             except (ValueError,TypeError):continue  # An older plain operator comment is not a receipt.
             evidence=details.get('evidence') if isinstance(details,dict) else None
-            key=evidence.get('review') if isinstance(evidence,dict) else None
+            key=evidence.get(field) if isinstance(evidence,dict) else None
             if not key:continue
-            record=store.receipt(key,kind='test_review' if run.kind=='tests' else 'delivery_review')
+            record=store.receipt(key,kind=receipt_kind)
             scope,data=record['binding'],record['payload']
             if (scope.get('task')!=run.task or scope.get('contract')!=run.contract or scope.get('release')!=run.release
                     or scope.get('number')!=row['run_id'] or scope.get('author')!=run.author
@@ -197,8 +200,18 @@ class Board:
                     or scope.get('actor') not in self.project.reviewers_for(run.author)
                     or data.get('project')!=self.project.fingerprint() or data['verdict']['decision']!='changes'):
                 raise ValueError('review feedback belongs to another contract, role or execution')
-            store.tree(data['snapshot'])
-            result.append(dict(receipt=key,reviewer=scope['actor'],run=scope['number'],snapshot=data['snapshot'],verdict=data['verdict']))
+            item=dict(receipt=key,reviewer=scope['actor'],run=scope['number'],verdict=data['verdict'])
+            if run.kind=='plan':
+                proposed=store.receipt(data['plan'],kind='work_plan')
+                if (not replace(run,actor=run.author,reviewing=False).same_subject(proposed['binding'])
+                        or proposed['binding']['number']>=scope['number']
+                        or proposed['payload']['project']!=self.project.fingerprint()
+                        or proposed['payload']['approval']!=self.input(run,'approved_brief')):
+                    raise ValueError('plan feedback must match its author and current approved brief')
+                item['plan']=data['plan']
+            else:
+                store.tree(data['snapshot']);item['snapshot']=data['snapshot']
+            result.append(item)
         return result
 
     def escalate_review(self,run,receipt):

@@ -7,9 +7,11 @@ estivesse instalado.
 
 Estado de referência revisto: **25 de outubro de 2026**. Componentes existentes
 não significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md) e a
-[auditoria da execução](EXECUTION-REVIEW-2026-10-25.md). O gate de mutações tem uma
-contradição conhecida e a recuperação não cobre todas as fases. As correções
-propostas ainda não foram instaladas; o desenvolvimento permanece pausado.
+[auditoria da execução](EXECUTION-REVIEW-2026-10-25.md). O refinamento F1 foi
+aprovado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) e implementado:
+alvos de controle vêm do Red e de riscos adicionais congelados pelo revisor;
+testes auxiliares permanecem na suíte completa. A recuperação ainda não cobre
+todas as fases. As correções offline foram retomadas; o S4 real continua pausado.
 
 ## Caminho Hermes isolado em construção
 

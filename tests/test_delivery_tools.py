@@ -13,6 +13,7 @@ from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.quality import Quality, DeliveryTools
 from test_delivery_core import configuration
+from fixtures.control_evidence import red_evidence
 
 
 class ModelDeliveryOperations(unittest.TestCase):
@@ -80,8 +81,7 @@ class ModelDeliveryOperations(unittest.TestCase):
         self.assertEqual(self.events,[])
 
     def test_independent_test_review_freezes_exact_handoff_then_finishes_native_review(self):
-        red=self.store.record('red',self.run.binding(),dict(project=self.project.fingerprint(),snapshot=self.baseline,
-            baseline=self.baseline,cases=['existing','new'],new_cases=['new']))
+        red=red_evidence(self.store,self.project,self.run,self.baseline,self.baseline)
         self.board.input=lambda *args,**kwargs:red
         self.sandbox.run=replace(self.run,number=2,actor='lead',reviewing=True)
         tools=DeliveryTools(self.sandbox,self.quality)
@@ -109,3 +109,15 @@ class ModelDeliveryOperations(unittest.TestCase):
         self.assertEqual([event[0] for event in self.events],['close'])
         self.board.escalate_review.assert_called_once_with(self.sandbox.run,result['escalation'])
         self.assertFalse(result['delivery_approval'])
+
+    def test_only_the_test_reviewer_can_freeze_additional_control_risks(self):
+        red=red_evidence(self.store,self.project,self.run,self.baseline,self.baseline)
+        self.board.input=lambda *args,**kwargs:red
+        self.sandbox.run=replace(self.run,number=2,actor='lead',reviewing=True)
+        result=DeliveryTools(self.sandbox,self.quality).review(dict(decision='approve',reason='Baseline risk reviewed',findings=[],
+            control_risks=[dict(case='existing',reason='The existing behavior is critical for this change.')]))
+        frozen=self.store.receipt(result['evidence']['tests'],kind='tests_frozen')
+        self.assertEqual(frozen['payload']['control_cases'],['existing','new'])
+        self.sandbox.run=replace(self.sandbox.run,kind='implementation')
+        with self.assertRaises(ValueError):DeliveryTools(self.sandbox,self.quality).review(dict(
+            decision='approve',reason='Cannot choose targets during delivery review',findings=[],control_risks=[]))

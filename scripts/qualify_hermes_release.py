@@ -88,7 +88,7 @@ class FixtureRuntime(Runtime):
         with patch('fabriquinha.runtime.subprocess.Popen',spawn):return super().spawn(*args,**kwargs)
 
 
-def qualify(root,upstream,image,browser):
+def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release'):
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -100,7 +100,7 @@ def qualify(root,upstream,image,browser):
         write_json(home/'profiles'/name/'config.yaml',dict(model={'streaming':False,'context_length':65536},
             auxiliary={'title_generation':{'enabled':False}},tools={'tool_search':{'enabled':'off'}},
             terminal={'backend':'fabriquinha','cwd':'/workspace'}))
-    write_json(root/'project.json',dict(version=1,namespace='delivery-kit-hermes-release',
+    write_json(root/'project.json',dict(version=1,namespace=namespace,
         repository='https://github.com/example/release-qualification',branch='release/qualification',
         validation_image=image,browser_image=browser,tests_dir='tests',qualification=True,
         coordination_roles={'product':'release-product','lead':'release-lead'},
@@ -214,6 +214,9 @@ def qualify(root,upstream,image,browser):
             branch_bases_chained=True,old_tests_preserved=True,final_criteria=data['criteria'],
             release_gate_exercised=True,delivery_approval=False,migration=False,url=data['url'])
         result['wal_lifetime_probe']=wal
+        write_json(root/'chain-receipt.json',result)
+        retire_fixture(root,upstream)
+        result['deployment_retired_after_evidence']=True
         write_json(root/'receipt.json',result);return result
     finally:
         server.shutdown();server.server_close();thread.join(timeout=5)
@@ -224,6 +227,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--mode',choices=('qualify','serve','worker','retire'),default='qualify')
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image');parser.add_argument('--browser-image');parser.add_argument('--task');parser.add_argument('--run',type=int)
+    parser.add_argument('--namespace',default='delivery-kit-hermes-release')
     args=parser.parse_args();root,upstream=args.root.resolve(),args.upstream.resolve()
     if args.mode=='worker':FixtureRuntime(root,upstream).worker(args.task,args.run)
     elif args.mode=='serve':
@@ -233,6 +237,6 @@ if __name__=='__main__':
             FixtureRuntime(root,upstream).serve(stop,interval=0.25)
     elif args.mode=='retire':retire_fixture(root,upstream)
     else:
-        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image),indent=2))
+        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace),indent=2))
         except BaseException as error:
             write_json(root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False));raise

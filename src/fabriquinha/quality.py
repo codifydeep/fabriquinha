@@ -16,6 +16,11 @@ PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
 REVIEW_FINDINGS_CONTRACT=('findings lists blocking defects only. approve requires findings=[]; '
     'put positive observations in reason. changes or escalate requires at least one concrete finding.')
+CONTROL_CONTRACT = 2
+CONTROL_REVIEW_CONTRACT=('Check approved acceptance coverage before approving tests. Every validated Red assertion failure is a mandatory '
+    'mutation target. Passing auxiliary checks still run in the full suite. Add control_risks only for passing cases requiring '
+    'an additional product negative control, with a concrete reason; never exclude a Red target. Request changes for missing or vacuous behavior tests '
+    'or any Red failure that cannot be fixed by implementing product behavior with the tests/configuration unchanged.')
 
 
 def suite_report(value):
@@ -163,8 +168,35 @@ class Quality:
             if not failure['assertion'] or not any(f['file'].startswith(prefix) and
                     f['function'].startswith('test') for f in failure['frames']):
                 raise ValueError('Red requires an assertion in a new test body')
-        return self.record(run, 'red', dict(baseline=baseline, snapshot=candidate,
+        return self.record(run, 'red', dict(control_contract=CONTROL_CONTRACT,baseline=baseline, snapshot=candidate,
             baseline_job=base_job, red_job=red_job, cases=sorted(all_cases), new_cases=sorted(new)))
+
+    def control_plan(self,red,risks):
+        data=red['payload']
+        if data.get('control_contract')!=CONTROL_CONTRACT:
+            raise ValueError('new Red evidence required for the approved behavior-control contract; no legacy conversion')
+        job=self.store.receipt(data['red_job'],kind='suite_job');value=job['payload'];identity=value['identity']
+        if (job['binding']!=red['binding'] or identity['binding']!=red['binding']
+                or identity['snapshot']!=data['snapshot'] or identity['phase']!='red'
+                or identity['project']!=self.project.fingerprint() or identity['image']!=self.project.validation_image):
+            raise ValueError('mutation targets require the exact validated Red job')
+        report=suite_report(value);required=set()
+        for failure in report['failures']:
+            if not failure['assertion'] or not any(f['file'].startswith(self.project.tests_dir+'/') and
+                    f['function'].startswith('test') for f in failure['frames']):
+                raise ValueError('mutation targets require actual Red assertions in new test bodies')
+            required.add(failure['case'])
+        if (not required or not required<=set(data['new_cases']) or set(report['cases'])!=set(data['cases'])
+                or not isinstance(risks,list) or len(risks)>32):
+            raise ValueError('validated Red cases and bounded independently reviewed risks required')
+        extra=set()
+        for risk in risks:
+            if (not isinstance(risk,dict) or set(risk)!={'case','reason'} or not isinstance(risk['case'],str)
+                    or risk['case'] not in report['cases'] or risk['case'] in required|extra
+                    or not isinstance(risk['reason'],str) or not 1<=len(risk['reason'].strip())<=2000):
+                raise ValueError('control_risks requires distinct passing suite cases and concrete reasons; Red targets are automatic')
+            extra.add(risk['case'])
+        return sorted(required|extra)
 
     def browser_tests(self,run,snapshot):
         if not self.project.delivery_roles:return
@@ -173,7 +205,7 @@ class Quality:
         if not set(self.board.criteria(run))<={item['id'] for item in checks}:
             raise ValueError('browser scenarios must cover every current package acceptance criterion before Red')
 
-    def tests_review(self, run, red_id, decision):
+    def tests_review(self, run, red_id, decision, *, control_risks=None):
         self.check(run, 'tests', reviewing=True)
         if self.board.input(run, 'red', review_handoff=True) != red_id:
             raise ValueError('obsolete test review input')
@@ -184,11 +216,15 @@ class Quality:
             raise ValueError('review must match exact test authorship and contract')
         snapshot = data['snapshot']
         verdict = review_decision(decision, self.store.manifest(snapshot), self.store.tree(snapshot))
-        if verdict['decision']=='approve':self.browser_tests(run,snapshot)
-        review = self.record(run, 'test_review', dict(red=red_id, snapshot=snapshot, verdict=verdict))
+        risks=[] if control_risks is None else control_risks
+        if verdict['decision']=='approve':
+            self.browser_tests(run,snapshot);targets=self.control_plan(red,risks)
+        elif risks!=[]:raise ValueError('only approval may freeze additional control risks')
+        review = self.record(run, 'test_review', dict(red=red_id, snapshot=snapshot, verdict=verdict,control_risks=risks))
         if verdict['decision'] != 'approve':
             return review
-        return self.record(run, 'tests_frozen', dict(red=red_id, review=review, snapshot=snapshot,
+        return self.record(run, 'tests_frozen', dict(control_contract=CONTROL_CONTRACT,control_cases=targets,
+            red=red_id, review=review, snapshot=snapshot,
             baseline=data['baseline'], tests=self.tests(snapshot), cases=data['cases'],
             new_cases=data['new_cases'], test_author=red['binding']['actor']))
 
@@ -199,6 +235,21 @@ class Quality:
         data = receipt['payload']
         if data['project'] != self.project.fingerprint() or receipt['binding']['release'] != run.release:
             raise ValueError('frozen tests belong to another project or release')
+        return self.frozen_plan(receipt)
+
+    def frozen_plan(self,receipt):
+        """Read current immutable quality semantics, without granting run authority."""
+        data=receipt['payload']
+        if data.get('control_contract')!=CONTROL_CONTRACT or data.get('project')!=self.project.fingerprint():
+            raise ValueError('frozen tests use a historical control contract; new independent review required')
+        red=self.store.receipt(data['red'],kind='red');review=self.store.receipt(data['review'],kind='test_review')
+        if (review['binding']!=receipt['binding'] or review['payload']['project']!=self.project.fingerprint()
+                or review['payload']['red']!=data['red'] or review['payload']['snapshot']!=data['snapshot']
+                or review['payload']['verdict']['decision']!='approve' or red['payload']['snapshot']!=data['snapshot']
+                or red['binding']['actor']!=data['test_author'] or receipt['binding']['actor']==data['test_author']
+                or data['cases']!=red['payload']['cases'] or data['new_cases']!=red['payload']['new_cases']
+                or data['control_cases']!=self.control_plan(red,review['payload']['control_risks'])):
+            raise ValueError('exact independently frozen behavior-control targets required')
         self.store.tree(data['snapshot'])
         return data
 
@@ -230,9 +281,9 @@ class Quality:
                         f['function'].startswith('test') for f in failure['frames']):
                     coverage.add(failure['case'])
             jobs.append(job)
-        if not set(frozen['new_cases']) <= coverage:
-            raise ValueError('negative controls did not witness all new test behaviors')
-        return self.record(run, 'controls', dict(green=green_id, jobs=jobs, coverage=sorted(coverage)))
+        if not set(frozen['control_cases']) <= coverage:
+            raise ValueError('negative controls did not witness all independently frozen behavior targets')
+        return self.record(run, 'controls', dict(control_contract=CONTROL_CONTRACT,green=green_id, jobs=jobs, coverage=sorted(coverage)))
 
     def delivery_review(self, run, green_id, controls_id, decision):
         self.check(run, 'implementation', reviewing=True)
@@ -288,7 +339,7 @@ class DeliveryTools:
             raise ValueError('same controller and current TDD activity required')
         self.sandbox,self.quality,self.run=sandbox,quality,sandbox.run
         self.store,self.board=quality.store,quality.board
-        self.submission=None;self.verdict=None;self.escalating=None
+        self.submission=None;self.verdict=None;self.escalating=None;self.reviewed_risks=None
 
     def wait(self,call,*,jobs=1):
         # These are actual local validation jobs, not model polling or CI waits.
@@ -331,13 +382,17 @@ class DeliveryTools:
     def review(self,decision):
         q,run=self.quality,self.run
         q.check(run,run.kind,reviewing=True)
+        if not isinstance(decision,dict):raise ValueError('structured independent review required')
+        risks=decision.get('control_risks',[])
+        if 'control_risks' in decision and run.kind!='tests':raise ValueError('control_risks belongs only to independent test review')
+        decision={key:value for key,value in decision.items() if key!='control_risks'}
         escalate=isinstance(decision,dict) and decision.get('decision')=='escalate'
         effective={**decision,'decision':'changes'} if escalate else decision
         if self.verdict is None:
             self.escalating=escalate
             if run.kind=='tests':
                 red=self.board.input(run,'red',review_handoff=True)
-                receipt=q.tests_review(run,red,effective)
+                receipt=q.tests_review(run,red,effective,control_risks=risks)
                 result=self.store.receipt(receipt)
                 changes=result['kind']=='test_review'
                 if changes:verdict=result['payload']['verdict']
@@ -351,8 +406,10 @@ class DeliveryTools:
                 changes=verdict['decision']=='changes'
                 evidence={'review' if changes else 'delivery':receipt}
             self.verdict=(verdict,evidence,changes)
+            self.reviewed_risks=json.loads(json.dumps(risks))
         verdict,evidence,changes=self.verdict
-        if effective!=verdict or escalate!=self.escalating:raise ValueError('pending review decision cannot change during retirement')
+        if effective!=verdict or escalate!=self.escalating or risks!=self.reviewed_risks:
+            raise ValueError('pending review decision cannot change during retirement')
         self.sandbox.close()
         if escalate:
             review=self.store.receipt(evidence['review'])
@@ -368,12 +425,13 @@ class DeliveryTools:
         q,run=self.quality,self.run;q.check(run,run.kind,reviewing=True)
         def payload(key,kind):return self.store.receipt(key,kind=kind)['payload']
         def report(key):return payload(key,'suite_job')['report']
-        context=dict(phase=run.kind,mutations=[])
+        context=dict(phase=run.kind,mutations=[],control_review_contract=CONTROL_REVIEW_CONTRACT)
         if run.kind=='tests':
             red=payload(self.board.input(run,'red',review_handoff=True),'red')
         else:
             green=payload(self.board.input(run,'green',review_handoff=True),'green')
             frozen=payload(green['freeze'],'tests_frozen');red=payload(frozen['red'],'red')
+            context['frozen_control_cases']=frozen['control_cases']
             controls=payload(self.board.input(run,'controls',review_handoff=True),'controls')
             context['green']=report(green['job'])
             before=self.store.manifest(green['snapshot'])
@@ -391,4 +449,6 @@ class DeliveryTools:
                     changes.append(change)
                 context['mutations'].append(dict(report=data['report'],changes=changes))
         context.update(baseline=report(red['baseline_job']),red=report(red['red_job']))
+        context['mandatory_red_targets']=sorted({failure['case'] for failure in context['red']['failures']})
+        context['passing_cases']=sorted(set(context['red']['cases'])-set(context['mandatory_red_targets']))
         return context

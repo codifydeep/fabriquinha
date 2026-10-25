@@ -33,6 +33,7 @@ def qualify(root,image):
     fixtures=ROOT/'tests/fixtures/browser_tdd';baseline=store.capture(fixtures/'base')
     work=root/'work';store.checkout(baseline,work)
     shutil.copyfile(fixtures/'test_counter.py',work/'tests/test_counter.py')
+    shutil.copyfile(fixtures/'support_contract.json',work/'tests/support_contract.json')
     run=Run('tests',1,'author','tests',False,'author','qualification','contract')
     def wait(operation):
         deadline=time.monotonic()+project.timeout_seconds+15
@@ -61,7 +62,12 @@ def qualify(root,image):
     (mutant/'app.py').write_text(app("<script>/* Same source tokens: addEventListener, textContent, String(++value). No behavior. */</script>"))
     control=wait(lambda:quality.controls(implementation,green,[store.capture(mutant)]))
     frozen_data=store.receipt(frozen)['payload'];red_data=store.receipt(red)['payload']
-    assert frozen_data['new_cases']==['test_counter.CounterBehavior.test_click_changes_dom_not_just_source_tokens']
+    behavior='test_counter.CounterBehavior.test_click_changes_dom_not_just_source_tokens'
+    auxiliary='test_counter.FrozenQaMetadata.test_support_contract_is_valid_independently_of_the_app'
+    assert set(frozen_data['new_cases'])=={behavior,auxiliary}
+    assert frozen_data['control_contract']==2 and frozen_data['control_cases']==[behavior]
+    assert auxiliary not in {f['case'] for f in store.receipt(red_data['red_job'])['payload']['report']['failures']}
+    assert auxiliary in store.receipt(store.receipt(green)['payload']['job'])['payload']['report']['cases']
     jobs=[red_data['baseline_job'],red_data['red_job'],store.receipt(green)['payload']['job'],*store.receipt(control)['payload']['jobs']]
     assert len(jobs)==4
     for key in jobs:
@@ -70,6 +76,7 @@ def qualify(root,image):
     result=dict(passed=True,real_chromium=True,real_docker_jobs=len(jobs),assertion_based_red=True,
         same_frozen_tests_green=True,source_token_decoy_rejected=True,credential_and_delivery_write_denied=True,
         scripted_review=True,native_lifecycle=False,model_judgment=False,paid_calls=0,delivery_approval=False,
+        behavior_control_contract=2,passing_auxiliary_still_in_full_suite=True,
         all_owned_jobs_retired=True,image=image)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result
 

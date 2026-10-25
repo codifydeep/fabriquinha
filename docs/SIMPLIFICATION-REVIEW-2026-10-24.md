@@ -4,11 +4,13 @@ Data do plano: 24 de outubro de 2026. Base examinada: `e33c893f`.
 Destinatários: proprietário do projeto e GPT 6.1 Sol.
 **Estratégia e mudanças de contrato aprovadas em 24/10/2026.**
 
-**Continuidade atualizada em 25/10:** ler a
+**Continuidade atualizada em 25/10:** F1 foi aprovado no
+[ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) e implementado/qualificado offline;
+feedback completo do plano também passou no SDK nativo. Ler a
 [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) e o
 [roadmap vigente](ROADMAP.md) antes de executar próximos passos. S0/S1 passaram;
 S2/S3 têm provas delimitadas; S4 chegou a freeze real e implementação, mas ainda
-não entregou uma release. A execução permanece pausada.
+não entregou uma release. O S4 real permanece pausado durante correções offline.
 
 As seções 1–13 preservam o raciocínio e o plano aprovado na data original. Os
 achados novos e refinamentos propostos estão na revisão de 25/10; não são
@@ -847,25 +849,26 @@ Atualização: 25 de outubro de 2026. Base auditada: `98e09069`.
 | Etapa | Estado | Próxima prova |
 |---|---|---|
 | S0/S1 | Concluídas no escopo de referência e viabilidade nativa | Preservar upstream fixado e sem patches |
-| S2 | Mecanismos funcionam; incompatibilidade de controles encontrada | Contrato satisfazível, inclusive com teste auxiliar independente do produto |
+| S2 | Contrato 2 corrigido; prova Chromium e cadeia integrada offline passaram | Julgamento real e entrega S4 |
 | S3 | Cadeia determinística e CI local real da base | Feature com PR, integração e homologação por agentes reais |
 | S4 | Brief/plano/testes aprovados; implementação iniciada e pausada pelo proprietário | Completar a cadeia sem intervenção técnica externa |
 | S5 | Não qualificada | Segunda versão, memória e recuperação executável |
 | S6 | Não qualificada | Instalação limpa em outro repo; depois cutover |
 | S7 | Não iniciada | Retomar Truco após qualificação |
 
-O freeze atual inclui um teste que só valida um JSON protegido de QA. O gate
-exige que toda função de teste nova falhe por mutação do produto, inclusive
-essa função independente do produto. Não retomar o ensaio sob essa regra sem
-tratar a contradição. A pausa humana atual não foi causada por esse gate.
+O freeze histórico inclui um teste que só valida um JSON protegido de QA e foi
+produzido sob o contrato antigo. O gate 2 elimina a contradição, mas não converte
+esse freeze para a regra nova. A próxima tentativa exige outra fronteira e
+evidências próprias. A pausa humana anterior não foi causada por esse gate.
 
 Ao retomar com Sol:
 
 1. Ler [EXECUTION-REVIEW-2026-10-25.md](EXECUTION-REVIEW-2026-10-25.md), que contém
    evidências, alterações propostas e critérios detalhados de R0–R5.
 2. Conferir pausa e limites efetivos privados. Esta revisão não retoma agentes.
-3. Registrar o aceite do refinamento de qualidade, preservar a tentativa atual
-   e corrigir offline a contradição e os caminhos conhecidos de feedback/impedimento.
+3. Considerar o aceite do ADR 0003 e a prova física de F1; preservar a tentativa
+   antiga e concluir os caminhos conhecidos de impedimento. Feedback do plano
+   já foi corrigido e qualificado com respostas locais, sem modelo pago.
 4. Executar um único S4 completo, com os agentes conduzindo os handoffs. Uma
    mudança de gate/runtime após o aceite exige outra fronteira de medição.
 5. Só então avançar S5, S6 e S7; não construir toda a recuperação universal antes

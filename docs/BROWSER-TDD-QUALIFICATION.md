@@ -1,5 +1,13 @@
 # TDD de frontend com navegador real — 25 de outubro de 2026
 
+Atualização: o [contrato F1 aprovado](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) passou
+em quatro jobs Docker/Chromium novos. O fixture também contém um teste de JSON
+auxiliar que passa no Red e permanece na suíte completa em Green/controle.
+Só o comportamento ausente demonstrado no Red é alvo obrigatório da mutação
+nesta prova. Os testes ficaram preservados; escrita/credenciais continuaram
+negadas; todos os jobs foram retirados. São decisões de revisão programadas,
+sem modelo pago ou homologação de produto.
+
 ## Problema encontrado no S4 real
 
 A arquitetura aprovada previa interação client-side. A imagem de validação,

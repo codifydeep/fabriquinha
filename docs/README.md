@@ -16,8 +16,9 @@ snapshots e recibos operacionais completos permanecem privados.
 5. [Arquitetura](ARCHITECTURE.md) e [instalação/limites](SETUP.md):
    distinguir caminho novo e referência histórica.
 
-O [README principal](../README.md) apresenta os diagramas atuais. A nova revisão
-não ativa agentes, muda gates instalados ou autoriza chamadas adicionais.
+O [README principal](../README.md) apresenta os diagramas atuais. O aceite
+posterior do [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) autorizou o F1;
+as correções offline não autorizam consumo adicional nem homologam o S4.
 
 ## Provas delimitadas do caminho Hermes
 

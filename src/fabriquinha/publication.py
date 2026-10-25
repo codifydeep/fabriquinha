@@ -12,6 +12,7 @@ import tempfile
 import time
 from .artifacts import EXCLUDED, digest
 from .effects import Journal, Pending, EffectBlocked, write_json
+from .quality import Quality, CONTROL_CONTRACT
 
 
 def sha(value):
@@ -373,6 +374,7 @@ class Publication:
             raise ValueError('independent approval of this exact project/release required')
         snapshot = data['snapshot']
         self.store.tree(snapshot)
+        self.description(run,review_id,snapshot)  # Validate current quality semantics before any Git/GitHub effect.
         key = digest(dict(subject=run.subject(), review=review_id, project=self.project.fingerprint()))
         with self.journal.lock(key+':publication'):
             return self._publish(run, review_id, snapshot, key)
@@ -381,10 +383,12 @@ class Publication:
         review = self.store.receipt(review_id,kind='delivery_review')
         data = review['payload']
         green = self.store.receipt(data['green'],kind='green')['payload']
-        frozen = self.store.receipt(green['freeze'],kind='tests_frozen')['payload']
+        frozen = Quality(self.project,self.store,None,self.board).frozen_plan(self.store.receipt(green['freeze'],kind='tests_frozen'))
         red = self.store.receipt(frozen['red'],kind='red')['payload']
         controls = self.store.receipt(data['controls'],kind='controls')['payload']
-        if green['snapshot'] != snapshot or controls['green'] != data['green']:
+        if (green['snapshot'] != snapshot or controls['green'] != data['green']
+                or controls.get('control_contract')!=CONTROL_CONTRACT
+                or not set(frozen['control_cases'])<=set(controls['coverage'])):
             raise ValueError('PR evidence does not identify the reviewed delivery')
         return ('Implementation card: '+review['binding']['task']+'\nIntegration card: '+run.task+
             '\nAuthor: '+review['binding']['author']+'\nIndependent reviewer: '+review['binding']['actor']+
@@ -392,7 +396,7 @@ class Publication:
             '\n\n## TDD evidence\nTrusted command: `python -B /opt/fabriquinha/suite.py`'+
             '\nDiscovery directory: '+self.project.tests_dir+'\nValidator image: '+self.project.validation_image+
             '\nPassing baseline job: '+red['baseline_job']+
-            '\nRed job: '+red['red_job']+'\nNew failing behaviors: '+', '.join(red['new_cases'])+
+            '\nRed job: '+red['red_job']+'\nRequired behavior controls: '+', '.join(frozen['control_cases'])+
             '\nFrozen tests: '+green['freeze']+'\nGreen job: '+green['job']+
             '\nComplete suite: '+str(len(green['cases']))+' cases'+
             '\nNegative control jobs: '+', '.join(controls['jobs'])+

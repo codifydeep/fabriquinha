@@ -20,6 +20,15 @@ def project():
 
 
 class PausedPreparation(unittest.TestCase):
+    def test_chosen_output_budget_is_preserved_without_enabling_or_expanding_calls(self):
+        _,policy,_=prepare_project.configuration(project(),'example/model',19390,6420,max_output_tokens=8192)
+        self.assertEqual(policy.max_output_tokens,8192)
+        self.assertEqual(policy.max_calls,6420)
+        self.assertFalse(policy.enabled)
+        for value in (True,0,8193,16384):
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                prepare_project.configuration(project(),'example/model',19390,6420,max_output_tokens=value)
+
     def test_policy_is_disabled_and_no_credentials_or_mutation_are_required_to_plan(self):
         parsed,policy,profiles=prepare_project.configuration(project(),'example/model',19390,10000)
         self.assertFalse(policy.enabled);self.assertEqual(policy.max_calls,10000)

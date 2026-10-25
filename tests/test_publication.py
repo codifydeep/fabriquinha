@@ -17,6 +17,7 @@ from fabriquinha.effects import EffectBlocked, Pending
 from fabriquinha.publication import GitHub, Publication, Repository
 from test_delivery_core import configuration
 from fixtures.github_transport import FakeGitHub
+from fixtures.control_evidence import frozen_evidence
 
 
 def git(folder, *args, data=None):
@@ -47,12 +48,11 @@ class PublicationFlow(unittest.TestCase):
         self.snapshot = self.store.capture(source)
         self.review_run = Run('implementation', 2, 'lead', 'implementation', True,
                               'backend', 'v1', 'contract')
-        red = self.store.record('red', {}, dict(red_job='fixture-red-job',baseline_job='fixture-baseline-job',
-                                               new_cases=['test_behavior'],baseline=self.store.capture(seed)))
-        frozen = self.store.record('tests_frozen', {}, dict(red=red))
+        author=Run('tests',1,'backend','tests',False,'backend','v1','test-contract')
+        frozen=frozen_evidence(self.store,self.project,author,self.store.capture(seed),self.store.capture(seed),'lead')
         green = self.store.record('green', {}, dict(cases=['test_behavior'], snapshot=self.snapshot,
                                                    freeze=frozen,job='fixture-green-job'))
-        controls = self.store.record('controls', {}, dict(green=green,jobs=['fixture-negative-job']))
+        controls = self.store.record('controls', {}, dict(control_contract=2,green=green,jobs=['fixture-negative-job'],coverage=['new']))
         self.review = self.store.record('delivery_review', self.review_run.binding(),
             dict(project=self.project.fingerprint(), qualification=True, snapshot=self.snapshot,
                  verdict=dict(decision='approve', reason='Fixture decision', findings=[]),
@@ -67,6 +67,15 @@ class PublicationFlow(unittest.TestCase):
 
     def publish(self):
         return self.publisher.publish(self.run, self.review)
+
+    def test_historical_control_receipt_cannot_publish_or_push_a_candidate(self):
+        delivery=self.store.receipt(self.review)
+        controls=self.store.receipt(delivery['payload']['controls'])
+        old=self.store.record('controls',controls['binding'],{**controls['payload'],'control_contract':1})
+        self.review=self.store.record('delivery_review',delivery['binding'],{**delivery['payload'],'controls':old})
+        with patch.object(self.publisher,'_publish') as effects:
+            with self.assertRaises(ValueError):self.publish()
+        effects.assert_not_called();self.assertEqual(self.github.calls,dict(create=0,merge=0))
 
     def test_exact_snapshot_is_integrated_and_merge_sha_is_not_pr_head(self):
         key = self.publish()

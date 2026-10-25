@@ -7,13 +7,16 @@ Este documento substitui a lista antiga de próximos passos da ponte Multica/ACP
 A estratégia é Hermes + Kanban e uma camada pequena de entrega. Não iniciar outro
 orquestrador, novo banco de memória ou migração de modelo nesta fase.
 
-A execução está pausada. Os refinamentos de contrato da revisão são propostos,
-não instalados. Retomar depende da orientação do proprietário e dos limites
-efetivos do ensaio; este roadmap não libera consumo.
+O proprietário aprovou F1, registrado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md).
+O contrato 2 e o feedback do plano estão implementados e passaram em provas
+offline delimitadas. O S4 real continua pausado; este roadmap não libera consumo.
 
 ## Antes do próximo ensaio pago
 
 ### R0 — Fixar contrato e referência
+
+Aceite de F1 registrado; referência anterior preservada. A retomada do ensaio
+real exige nova fronteira, sem importar aprovações do contrato antigo.
 
 Preservar os recibos, testes e fronteiras atuais. Registrar o aceite do refinamento
 de controles derivados do Red e riscos revisados, distinguindo testes auxiliares. A pausa
@@ -23,6 +26,12 @@ exige outra fronteira e novas evidências, sem aprovação retroativa.
 **Saída:** política inequívoca, referência recuperável e escopo de correção limitado.
 
 ### R1 — Eliminar a contradição do gate de controles
+
+Concluído no escopo offline: quatro jobs Docker/Chromium passaram com teste
+auxiliar imutável na suíte completa e alvo comportamental derivado do Red.
+A cadeia integrada passou com dois incrementos, regressão, 11 atividades SDK,
+17 respostas locais, Git/deploy/QA/rollback e retirada dos recursos da prova.
+Decisões programadas e GitHub/CI simulados não substituem S4 real.
 
 Derivar os alvos obrigatórios das falhas reais do Red e congelar os adicionais
 justificados pelo revisor. Revisão independente deve confirmar a cobertura dos
@@ -36,6 +45,10 @@ reduzida e mutante sem efeito rejeitados. Sem seleção parcial de suíte ou
 dispensa de revisão independente.
 
 ### R2 — Completar feedback e destinos de impedimentos conhecidos
+
+Feedback completo do plano e proposta anterior qualificados com SDK/Kanban reais,
+nove atividades e 11 respostas locais. Preparação agora exige escolha explícita
+do limite de saída no CLI. As demais saídas de impedimento continuam pendentes.
 
 Transmitir achados completos de revisão do plano, tratar bloqueios de
 planejamento/integração e `triage`, preservar a fase e impedir repetição idêntica

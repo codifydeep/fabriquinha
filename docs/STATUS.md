@@ -3,21 +3,22 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
-**Desenvolvimento pausado por solicitação do proprietário.** Esta atualização
-decorre de uma auditoria de código e evidências. Não iniciou agentes, chamadas
-ao modelo, integração de produto ou implantação.
+**Correções e qualificações offline retomadas.** O S4 real e seu relay continuam
+pausados. O proprietário aprovou o refinamento F1; ele foi implementado no
+código e validado com Chromium/Docker. Nenhuma chamada paga foi feita nesta etapa.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
-continua sendo a estratégia aprovada; refinamentos novos não foram instalados.
+continua sendo a estratégia aprovada. O [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
+registra o aceite e os limites do contrato F1; recibos antigos permanecem históricos.
 
 ## Evolução comprovada
 
 | Etapa | Evidência | Pendência |
 |---|---|---|
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
-| S2 | Red, freeze, isolamento, SDK/sessão, pausa e recibos exercitados | Corrigir incompatibilidade semântica do gate de controles |
-| S3 | Cadeia determinística de Git/deploy/QA/rollback; CI local com status real da base | Completar PR e integração de feature por agentes reais |
+| S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
+| S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
 | S4 | Brief aprovado, plano revisado e testes de navegador corrigidos/congelados; implementação iniciada | Green, controles, revisão, PR, integração, deploy e QA finais |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
@@ -35,37 +36,46 @@ aceite, não uma nova descoberta autônoma de produto.
 
 ## Impedimentos encontrados na revisão
 
-1. **Qualidade:** o gate exige mutação que derrube todos os testes novos,
-   inclusive um teste que lê apenas um JSON de QA protegido e não depende do
-   produto. É um bloqueio futuro demonstrado na lógica do gate, não a causa da
-   pausa atual.
+1. **Qualidade — corrigida em fonte:** o contrato 2 exige os alvos derivados do
+   Red e riscos adicionais justificados pelo revisor. O teste auxiliar continua
+   na suíte completa. Recibos históricos não são convertidos; o S4 antigo não
+   pode ser retomado como se tivesse produzido provas desse contrato.
 2. **Recuperação:** `tests` e `implementation` têm diagnóstico executável;
    planejamento, integração e `triage` não têm cobertura equivalente. Alertar
    um CTO não significa despachar uma intervenção para ele.
 3. **Autoridade:** falta caminho versionado para corrigir contrato de testes
    após freeze, sem alteração da entrega antiga e sem intervenção do operador.
-4. **Contexto:** achados completos do plano e memória arquitetural entre versões
-   precisam de tratamento explícito.
+4. **Contexto — parcial:** achados completos e proposta anterior do plano agora
+   chegam ao novo worker, qualificados em nove atividades SDK/11 respostas locais.
+   Memória arquitetural entre versões permanece em S5.
 5. **Distribuição:** imagens locais históricas e preparação parcialmente manual
    impedem declarar o kit reproduzível por terceiros.
 
 A outbox está implementada, mas o transporte real não está configurado na
 instalação auditada. Notificações em fila não comprovam visibilidade no Telegram.
 
-O núcleo auditado em `98e09069` tem 19 módulos funcionais mais `__init__`,
-5.060 linhas. Os **233 testes passaram novamente**; não cobriam a contradição
-identificada. Provas locais não equivalem a autonomia, SLA ou portabilidade.
+O núcleo auditado em `98e09069` tinha 19 módulos funcionais mais `__init__`,
+5.060 linhas e 233 testes verdes, sem cobrir a contradição. Os testes novos
+exercitam alvos, risco adicional, imutabilidade, skip, inventário e legado.
+Os **246 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
+SLA ou portabilidade.
+
+A revalidação integrada inicialmente encontrou esgotamento dos pools de rede
+Docker. A falha foi preservada. Dois relays de ensaios antigos e suas redes
+vazias foram retirados com propriedade/leases conferidos e logs arquivados;
+volumes e instalação S4 atual foram preservados. A prova seguinte passou em
+grupo isolado e retirou automaticamente seu deploy e redes ao terminar.
 
 ## Próxima sequência
 
 O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 
-- Concordar com o refinamento do contrato de controles e preservar a referência.
-- Corrigir a contradição e os caminhos conhecidos de feedback/impedimento offline.
+- F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
+- Completar os caminhos conhecidos de impedimento de R2; feedback do plano já corrigido.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 
-Não reiniciar diretamente o ensaio sob o gate contraditório. Não iniciar outra
+Não reiniciar diretamente o ensaio com aprovações do contrato antigo. Não iniciar outra
 migração, trocar o modelo ou ampliar consumo por conta desta análise.
 
 ## Como interpretar progresso

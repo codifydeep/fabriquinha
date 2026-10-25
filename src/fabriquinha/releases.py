@@ -12,6 +12,7 @@ from .publication import Publication
 from .deployment import Deployment
 from .config import execution_context
 from .browser import load_contract,author_protocol
+from .quality import Quality, CONTROL_CONTRACT
 
 
 def ordered(tasks):
@@ -193,7 +194,9 @@ class Releases:
         folder=self.store.tree(snapshot)/self.project.tests_dir
         try:existing=[item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else []
         except (ValueError,OSError):existing='InvalidBrowserContract: review the immutable files; do not weaken existing scenarios'
+        controls=(quality.freeze(run,self.board.input(run,'tests'))['control_cases'] if run.kind=='implementation' else None)
         return dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
+            required_control_cases=controls,
             architecture=proposed['payload']['document']['architecture'],observability=proposed['payload']['document']['observability'],
             execution=execution_context(self.project),baseline=snapshot,existing_qa=existing,
             browser_protocol=author_protocol(),
@@ -201,7 +204,9 @@ class Releases:
             tdd='Tests author: change tests only; Red requires a real failing assertion in a new test body, not import/discovery/runtime errors. '
                 'Never change old tests/configs or reduce discovery. Implementer: Green uses the exact frozen inventory. '
                 'delivery_submit mutations are disposable full replacements of existing product files, not patches; never tests/configs. '
-                'Controls must fail by assertions and collectively cover every new test. Controller executes all evidence, never accept prose pass claims. '
+                'Controls must fail by assertions and collectively cover every required_control_cases target frozen by independent review. '
+                'Passing auxiliary tests remain protected and run in the complete suite; never corrupt tests to kill a mutant. '
+                'Controller executes all evidence, never accept prose pass claims. '
                 'Tests author and reviewer are part of the team: they may pin selectors and deterministic UI wording where the approved brief delegates those choices. '
                 'Treat those frozen choices as the implementation contract, not new CEO decisions; never add out-of-scope requirements. '
                 'Use actual browser_protocol operations, not hypothetical unsupported assertions.',
@@ -221,6 +226,7 @@ class Releases:
 
     def package_evidence(self,item,previous):
         cards=item['cards'];tests,frozen,_=self.closed(cards['tests']['id'],'tests','tests_frozen')
+        frozen_plan=Quality(self.project,self.store,None,self.board).frozen_plan(frozen)
         delivery,review,_=self.closed(cards['implementation']['id'],'delivery','delivery_review')
         qa_id,qa,handoff=self.closed(cards['integration']['id'],'release_evidence','release_evidence')
         red=self.store.receipt(frozen['payload']['red'],kind='red');green=self.store.receipt(review['payload']['green'],kind='green')
@@ -229,6 +235,8 @@ class Releases:
         integrated=self.store.receipt(qa['payload']['integrated'],kind='integrated')
         publication=self.store.receipt(integrated['payload']['publication'],kind='publication')
         if (green['payload']['freeze']!=tests or review['payload']['verdict']['decision']!='approve'
+                or controls['payload'].get('control_contract')!=CONTROL_CONTRACT
+                or not set(frozen_plan['control_cases'])<=set(controls['payload']['coverage'])
                 or controls['payload']['green']!=review['payload']['green'] or controls['binding']!=green['binding']
                 or green['binding']['task']!=cards['implementation']['id'] or red['binding']['task']!=cards['tests']['id']
                 or red['payload']['baseline']!=previous['snapshot'] or publication['payload']['base_sha']!=previous['commit']

@@ -271,6 +271,10 @@ class DraftTools:
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
         result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers),
                     execution=execution_context(self.a.project),work_unit_contract=PACKAGE_CONTRACT)
+        result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
+        if result['previous_reviews']:
+            previous=self.a.store.receipt(result['previous_reviews'][-1]['plan'],kind='work_plan')
+            result['previous_plan']=previous['payload']['document']
         if self.run.reviewing:
             receipt=self.a.store.receipt(self.a.board.input(self.run,'plan',review_handoff=True),kind='work_plan')
             origin=receipt['binding']

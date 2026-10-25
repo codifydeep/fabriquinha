@@ -1,5 +1,12 @@
 # Brief aprovado e planejamento independente
 
+Atualização de 25/10: a devolução do plano agora fornece ao novo worker os
+achados completos do CTO e a proposta anterior, vinculados ao mesmo autor,
+contrato e brief. A prova percorreu nove atividades SDK/Kanban e 11 respostas
+HTTP locais; o achado foi colocado apenas em `findings`, sem depender de sua
+repetição no resumo. Pareceres de outra execução/autor/brief foram recusados
+nos testes do núcleo. Nenhuma chamada paga ou permissão de ferramenta foi adicionada.
+
 Data: 24/10/2026. Estado: **intake passou com Hermes/Kanban/SDK reais e respostas
 HTTP locais programadas**. Não comprova julgamento de modelo, entrega de
 produto, homologação ou migração.

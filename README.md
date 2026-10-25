@@ -73,10 +73,10 @@ O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
 A tentativa com agentes reais mais recente chegou ao freeze independente e
 iniciou implementação, antes da pausa humana. **Ainda não completou esse fluxo.**
 
-A [auditoria atual](docs/EXECUTION-REVIEW-2026-10-25.md) encontrou um gate de
-mutações incompatível com um teste auxiliar congelado e caminhos incompletos de
-recuperação. A proposta de correção está documentada, não instalada. Memória
-compartilhada entre versões e portabilidade continuam pendentes.
+A [auditoria](docs/EXECUTION-REVIEW-2026-10-25.md) encontrou um gate de mutações
+incompatível com um teste auxiliar congelado. O [contrato 2 aprovado](docs/ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
+corrige essa exigência e passou em prova física de navegador. Caminhos de
+recuperação, memória entre versões e portabilidade continuam incompletos.
 
 ## Qualidade e segurança
 
@@ -132,11 +132,13 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 25/10/2026, os 233 testes do núcleo passaram. As provas S1–S3 e extensões
+Em 25/10/2026, os 246 testes do núcleo passaram. As provas S1–S3 e extensões
 qualificam fronteiras específicas; decisões programadas não são julgamento de
 um agente real. Falta a primeira release S4 completa sem intervenção técnica
 externa, depois uma segunda versão com regressão/memória/recuperação e uma
-instalação em outro repositório. Veja [STATUS](docs/STATUS.md).
+instalação em outro repositório. O contrato 2 também percorreu dois incrementos
+dependentes no SDK/Kanban, com Git/deploy/QA reais e GitHub/CI simulados.
+Veja [STATUS](docs/STATUS.md).
 
 ## Retirada de recursos de teste
 

@@ -17,6 +17,47 @@ from test_delivery_core import configuration
 
 
 class ClosedParentHandoff(unittest.TestCase):
+    def test_plan_findings_survive_a_new_adapter_and_validate_the_reviewed_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);store=Store(root/'private');project=Project.parse(configuration())
+            run=Run('plan',3,'lead','plan',False,'lead','v1','contract')
+            author=replace(run,number=1);reviewer=replace(run,number=2,actor='cto',reviewing=True)
+            proposal=store.record('work_plan',author.binding(),dict(project=project.fingerprint(),
+                approval='approved-business-scope',document={'architecture':'Existing architecture'}))
+            verdict=dict(decision='changes',reason='Revise this plan',findings=['Preserve the offline boundary in the second package.'])
+            payload=dict(project=project.fingerprint(),plan=proposal,verdict=verdict)
+            conn=sqlite3.connect(root/'board.db');conn.row_factory=sqlite3.Row;self.addCleanup(conn.close)
+            conn.execute('CREATE TABLE task_events(id INTEGER PRIMARY KEY,task_id,run_id,kind,payload)')
+            def event(receipt):
+                conn.execute('DELETE FROM task_events')
+                conn.execute('INSERT INTO task_events VALUES(1,?,?,?,?)',('plan',2,'changes_requested',
+                    json.dumps(dict(reason=json.dumps(dict(summary='Revise this plan',evidence={'plan_review':receipt}))))))
+                conn.commit()
+            api=SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(conn))
+            def read():
+                # New controller objects, no in-memory/session feedback cache.
+                board=Board(project)
+                with patch.object(board,'ensure'),patch.object(board,'input',return_value='approved-business-scope'), \
+                        patch('fabriquinha.board.native',return_value=(None,api,None)):
+                    return board.review_feedback(run,Store(root/'private'))
+            event(store.record('plan_review',reviewer.binding(),payload))
+            result=read()
+            self.assertTrue(result,'Plan author must receive the actual independent findings')
+            self.assertEqual(result[0]['verdict'],verdict)
+            self.assertEqual(result[0]['plan'],proposal)
+            for invalid in (replace(reviewer,task='other'),replace(reviewer,release='other'),
+                            replace(reviewer,number=9),replace(reviewer,actor='lead'),replace(reviewer,contract='other')):
+                event(store.record('plan_review',invalid.binding(),payload))
+                with self.subTest(binding=invalid),self.assertRaises(ValueError):read()
+            for invalid in (replace(author,actor='backend'),replace(author,reviewing=True),replace(author,number=4)):
+                wrong=store.record('work_plan',invalid.binding(),dict(project=project.fingerprint(),
+                    approval='approved-business-scope',document={}))
+                event(store.record('plan_review',reviewer.binding(),{**payload,'plan':wrong}))
+                with self.subTest(author=invalid),self.assertRaises(ValueError):read()
+            wrong=store.record('work_plan',author.binding(),dict(project=project.fingerprint(),approval='different-brief',document={}))
+            event(store.record('plan_review',reviewer.binding(),{**payload,'plan':wrong}))
+            with self.assertRaises(ValueError):read()
+
     def test_complete_review_findings_are_scoped_to_author_contract_and_reviewer_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             store=Store(Path(directory)/'private');work=Path(directory)/'work';work.mkdir()

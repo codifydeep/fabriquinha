@@ -11,6 +11,7 @@ from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.quality import Quality
 from test_delivery_core import configuration
+from fixtures.control_evidence import frozen_evidence
 
 
 class ReviewerConflicts(unittest.TestCase):
@@ -22,8 +23,9 @@ class ReviewerConflicts(unittest.TestCase):
         self.run = Run('implementation',1,'backend','implementation',False,'backend','v1','contract')
         source = Path(folder.name)/'source'; source.mkdir()
         (source/'app.py').write_text('VALUE = 1\n')
-        self.frozen = self.store.record('tests_frozen', {'release':'v1'}, dict(
-            project=self.project.fingerprint(), test_author='lead',snapshot=self.store.capture(source)))
+        snapshot=self.store.capture(source)
+        test_author=Run('tests',1,'lead','tests',False,'lead','v1','test-contract')
+        self.frozen=frozen_evidence(self.store,self.project,test_author,snapshot,snapshot,'cto')
         self.green = self.store.record('green', self.run.binding(), dict(
             project=self.project.fingerprint(), freeze=self.frozen))
         self.controls = self.store.record('controls', self.run.binding(), dict(

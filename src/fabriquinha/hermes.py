@@ -246,17 +246,22 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     from tools.registry import registry
     operations=DeliveryTools(sandbox,quality)
     if sandbox.run.reviewing:
-        from .quality import REVIEW_FINDINGS_CONTRACT
+        from .quality import REVIEW_FINDINGS_CONTRACT,CONTROL_REVIEW_CONTRACT
         name='delivery_review'
         schema=dict(type='object',additionalProperties=False,required=['decision','reason','findings'],properties=dict(
             decision={'type':'string','enum':['approve','changes','escalate'],'description':REVIEW_FINDINGS_CONTRACT},reason={'type':'string','minLength':1,'maxLength':2000},
             findings=dict(type='array',maxItems=8,description=REVIEW_FINDINGS_CONTRACT,items=dict(type='object',additionalProperties=False,
                 required=['path','line','detail'],properties=dict(path={'type':'string'},
                     line={'type':'integer','minimum':1},detail={'type':'string','minLength':1,'maxLength':2000})))))
+        if sandbox.run.kind=='tests':
+            schema['properties']['control_risks']=dict(type='array',maxItems=32,description=CONTROL_REVIEW_CONTRACT,
+                items=dict(type='object',additionalProperties=False,required=['case','reason'],properties=dict(
+                    case=dict(type='string',minLength=1,maxLength=1024),reason=dict(type='string',minLength=1,maxLength=2000))))
         operation=operations.review
         description=('Review the immutable delivery: approve, request concrete changes, or escalate a technical impasse to CTO. '
             'Use escalate instead of repeatedly requesting unsupported work or ending in prose. It never approves delivery. '
             'Never recreate Red or edit author work.')
+        if sandbox.run.kind=='tests':description+=' '+CONTROL_REVIEW_CONTRACT
     else:
         name='delivery_submit'
         schema=dict(type='object',additionalProperties=False,properties={})

@@ -20,22 +20,22 @@ from fabriquinha.runtime import Runtime,bind
 from fabriquinha.kanban_lane import native
 
 
-def configuration(value,model,port,max_calls):
+def configuration(value,model,port,max_calls,*,max_output_tokens=4096):
     project=Project.parse(value)
     if (project.qualification or not project.technical_roles or not project.coordination_roles or not project.delivery_roles
             or project.branch in ('main','master') or type(port) is not int or not 1024<=port<=65535):
         raise ValueError('real isolated delivery project, non-primary branch and explicit loopback port required')
     policy=Policy.parse(dict(version=1,project=project.fingerprint(),model=model,max_calls=max_calls,
-        max_output_tokens=4096,enabled=False,client_token=secrets.token_urlsafe(32)))
+        max_output_tokens=max_output_tokens,enabled=False,client_token=secrets.token_urlsafe(32)))
     profiles=set(project.reviewers)
     for author in project.reviewers:profiles.update(project.reviewers_for(author))
     for roles in (project.technical_roles,project.coordination_roles,project.delivery_roles):profiles.update(roles.values())
     return project,policy,sorted(profiles)
 
 
-def prepare(root,upstream,value,model,port,max_calls):
+def prepare(root,upstream,value,model,port,max_calls,*,max_output_tokens=4096):
     root,upstream=Path(root).absolute(),Path(upstream).resolve()
-    project,policy,profiles=configuration(value,model,port,max_calls)
+    project,policy,profiles=configuration(value,model,port,max_calls,max_output_tokens=max_output_tokens)
     if root.exists() or root.is_symlink():raise ValueError('fresh root required; existing installations must not be overwritten')
     if root.resolve().is_relative_to(ROOT) and subprocess.run(
             ['git','-C',str(ROOT),'check-ignore','--quiet',str(root.resolve())],capture_output=True).returncode:
@@ -59,6 +59,7 @@ def prepare(root,upstream,value,model,port,max_calls):
     write_json(root/'route.json',dict(base_url='http://127.0.0.1:'+str(port)+'/v1',api_key=policy.client_token,
         provider='custom',api_mode='chat_completions',model=policy.model))
     result=dict(prepared=True,project=project.fingerprint(),profiles=profiles,empty_board=True,
+        max_output_tokens=policy.max_output_tokens,
         operational_pause=True,provider_enabled=False,service_started=False,model_calls=0,
         github_mutations=0,delivery_approval=False,complete_installer=False)
     write_json(root/'preparation.json',result)
@@ -70,6 +71,8 @@ if __name__=='__main__':
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--project',type=Path,required=True);parser.add_argument('--model',required=True)
     parser.add_argument('--provider-port',type=int,required=True);parser.add_argument('--max-calls',type=int,required=True)
+    parser.add_argument('--max-output-tokens',type=int,choices=(2048,4096,8192),required=True)
     args=parser.parse_args();path=args.project
     if not path.is_file() or path.stat().st_size>16384:raise ValueError('bounded project configuration required')
-    print(json.dumps(prepare(args.root,args.upstream,json.loads(path.read_bytes()),args.model,args.provider_port,args.max_calls),indent=2))
+    print(json.dumps(prepare(args.root,args.upstream,json.loads(path.read_bytes()),args.model,args.provider_port,args.max_calls,
+        max_output_tokens=args.max_output_tokens),indent=2))

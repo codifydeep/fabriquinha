@@ -32,6 +32,14 @@ class ReleaseContracts(unittest.TestCase):
         self.board=Mock();self.intake=Mock()
         self.releases=Releases(self.project,self.store,self.board,self.intake)
 
+    def test_historical_package_cannot_reach_release_acceptance_under_the_new_contract(self):
+        old=dict(binding={},payload=dict(project=self.project.fingerprint(),control_contract=1))
+        item=dict(cards={'tests':dict(id='tests'),'implementation':dict(id='implementation'),'integration':dict(id='integration')})
+        self.releases.closed=Mock(return_value=('old-freeze',old,{}))
+        with self.assertRaisesRegex(ValueError,'historical control contract'):
+            self.releases.package_evidence(item,{})
+        self.releases.closed.assert_called_once_with('tests','tests','tests_frozen')
+
     def test_delivery_roles_are_explicit_reviewed_and_immutable(self):
         value=configured();parsed=Project.parse(value);value['delivery_roles']['tests']='changed'
         self.assertEqual(parsed.delivery_roles['tests'],'qa')
