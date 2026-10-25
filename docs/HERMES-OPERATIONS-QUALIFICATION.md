@@ -233,3 +233,8 @@ O contexto agora informa o contrato exato de saúde/identidade e o esquema JSON
 do navegador, sem pré-escrever cenários da feature. QA malformado ou sem cobertura
 dos critérios do pacote é recusado antes do Red e novamente antes do freeze.
 Isso evita congelar testes que só seriam descobertos como inválidos após deploy.
+O limite de 20 cenários é explicitamente um teto, não uma meta; a URL publicada
+é fornecida pelo controlador e não fixa a porta externa em 8080. O campo `value`
+da ação `fill` aceita texto vazio/espaços, pois são dados válidos de teste de
+formulário, sem relaxar seletores, IDs ou asserções. Esse ajuste recebeu regressão
+própria antes do aceite do brief; não foi introduzido no meio de uma implementação.

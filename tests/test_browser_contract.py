@@ -43,6 +43,20 @@ class FrozenBrowserContract(unittest.TestCase):
     def test_declarative_actions_are_accepted(self):
         self.assertEqual(contract(scenario())[0]['id'],'greeting')
 
+    def test_empty_and_whitespace_input_are_data_not_missing_scenario_metadata(self):
+        for value in ('','   ','\t\n'):
+            document=scenario();document['checks'][0]['actions'][0]['value']=value
+            self.assertEqual(contract(document)[0]['actions'][0]['value'],value)
+        for value in (None,False,123,'x'*8001):
+            document=scenario();document['checks'][0]['actions'][0]['value']=value
+            with self.assertRaises(ValueError):contract(document)
+        schema=author_protocol()['schema']['properties']['checks']['items']['properties']['actions']['items']['oneOf'][0]['properties']['value']
+        self.assertEqual(schema,dict(type='string',maxLength=8000))
+        context=execution_context(Project.parse(configuration()))
+        self.assertEqual(context['browser_checks']['maximum'],20)
+        self.assertIn('Not a target',context['browser_checks']['required_count'])
+        self.assertIn('dynamic host port',context['deployment'])
+
     def test_shell_script_external_url_or_empty_check_is_not_a_contract(self):
         for change in ({'path':'https://example.org'}, {'path':'//example.org'},
                        {'actions':[dict(action='evaluate',code='anything')]}, {'text':''}):

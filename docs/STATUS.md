@@ -2,7 +2,8 @@
 
 **Estratégia atual:** Hermes + Kanban nativos como único dono do ciclo de vida,
 com executor determinístico pequeno. Sem Temporal, broker ACP ou Multica no novo
-caminho. O legado e as chamadas pagas continuam pausados; nenhuma migração aplicada.
+caminho. O legado continua pausado; o novo S4 iniciou a elaboração do brief com
+modelo real e teto autorizado. Nenhuma migração aplicada.
 
 | Área | Evidência atual | Limite |
 |---|---|---|
@@ -16,7 +17,7 @@ caminho. O legado e as chamadas pagas continuam pausados; nenhuma migração apl
 | [Operação](HERMES-OPERATIONS-QUALIFICATION.md) | Pausa persistente, interrupção, retomada e perfil restaurado sem falso retry | Não libera consumo pago |
 | [Brief/plano](HERMES-INTAKE-QUALIFICATION.md) | Perguntas, aprovação exata do CEO, DAG completo e revisão Lead/CTO; nove atividades SDK | Primeira fatia com dez respostas locais, complementada abaixo |
 | [Ciclo de release](HERMES-INTAKE-QUALIFICATION.md#dag-executável-e-aceite-integral--continuação) | Dois incrementos, seis cards gerados, bases encadeadas, três artefatos, sete atualizações Compose, QA e aceite integral | Terceira tentativa passou; autores/CI sintéticos, não produto autônomo |
-| [Provedor neutro](HERMES-PROVIDER-QUALIFICATION.md) | Admissão/espera conectadas ao worker; dois 402 locais, reinício, sessões/fases/budget preservados e TDD concluído; canário real curto anterior passou | Decisões programadas; instalação paga e S4 ainda não iniciados |
+| [Provedor neutro](HERMES-PROVIDER-QUALIFICATION.md) | Espera/reinício qualificados; rota S4 com contador preservado e consumo autorizado; duas chamadas reais para o brief | Entrega com modelo real ainda não concluída |
 | [CI local e status](HERMES-INTEGRATION-QUALIFICATION.md#status-obrigatório-real--25-de-outubro-de-2026) | Sete jobs com transporte simulado/ACK perdido; primeiro status real verde do seed em branch nova protegida; main preservada | PR de feature e ciclo real completo S4 ainda pendentes |
 
 **S2 permanece parcial.** Materialização e aceite integral passaram no ciclo
@@ -40,8 +41,13 @@ seu primeiro status real passou com dois testes. `main`/`ci` foram preservados.
 Nenhum runner público foi registrado, nem o runner do Truco alterado. Foram
 autorizadas até 64 chamadas adicionais, com limite efetivo próprio preservando o
 contador global. Essa autorização não aprova o brief nem comprova autonomia.
+Produto elaborou e corrigiu o brief com duas chamadas. Antes do aceite houve
+feedback técnico identificado do operador: esclarecer limite de cenários e URL
+dinâmica, além de permitir entrada vazia/espaços no executor QA. A proposta
+original permanece preservada. O CEO aprovou a revisão corrigida; o ensaio sem
+intervenção técnica é medido a partir desse aceite, não dessa preparação assistida.
 
-Checks atuais: 219 testes do caminho novo passaram. A última execução dos 4.523
+Checks atuais: 220 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com
 oito skips preexistentes. A nova prova reproduziu a corrida do preflight SQLite
 e preservou os dados com conexão nativa mantida durante serviço/worker, sem patches.

@@ -16,7 +16,7 @@ def author_protocol():
     check=dict(type='object',additionalProperties=False,required=['id','path','actions','selector','text'],
         properties=dict(id=text,path={**text,'pattern':r'^/(?!/)[^\\]*$'},selector=text,text=text,
             actions=dict(type='array',minItems=1,maxItems=20,items=dict(oneOf=[
-                action('fill',dict(selector=text,value=dict(type='string',minLength=1,maxLength=8000,pattern=r'.*\S.*'))),
+                action('fill',dict(selector=text,value=dict(type='string',maxLength=8000))),
                 action('click',dict(selector=text))]))))
     return dict(schema=dict(type='object',additionalProperties=False,required=['version','checks'],
         properties=dict(version={'const':1},checks=dict(type='array',minItems=1,maxItems=20,items=check))),
@@ -45,7 +45,8 @@ def contract(value):
         for action in check['actions']:
             if (not isinstance(action,dict) or action.get('action') not in ('fill','click')
                     or set(action)!=({'action','selector','value'} if action['action']=='fill' else {'action','selector'})
-                    or not text(action['selector']) or action['action']=='fill' and not text(action['value'],8000)):
+                    or not text(action['selector']) or action['action']=='fill' and
+                    (not isinstance(action['value'],str) or len(action['value'])>8000)):
                 raise ValueError('only bounded declarative fill/click actions allowed')
     return value['checks']
 

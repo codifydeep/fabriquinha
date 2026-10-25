@@ -116,11 +116,12 @@ def execution_context(project):
         workers=project.max_workers,tests_dir=project.tests_dir,iterations=40,
         reviewers={role:list(project.reviewers_for(role)) for role in project.reviewers},
         coordination_roles=dict(project.coordination_roles or {}),delivery_roles=dict(project.delivery_roles or {}),
-        deployment='Local Docker only, HTTP port 8080, GET /health and /identity; immutable reviewed image.',
+        deployment='Local Docker only; container HTTP port 8080, dynamic host port and URL supplied by controller; GET /health and /identity; immutable reviewed image.',
         http_contract=dict(entrypoint=['python','-B','/app/app.py','8080'],
             health=dict(path='/health',status=200,json={'status':'ok'}),
             identity=dict(path='/identity',status=200,json_fields=['source_sha'],
                 source_sha='Exact runtime value of FABRIQUINHA_SOURCE_SHA environment variable; do not hardcode a commit.'),
             assets='Same-origin HTTP only; no CDN/downloads or WebSockets in this qualified stack.'),
         quality='Red -> independent test freeze -> Green -> mutations -> independent delivery review -> integrated suite -> deployed browser QA.',
-        browser_checks=20,network='No network, downloads, infrastructure credentials or Docker socket in product sandboxes.')
+        browser_checks=dict(maximum=20,required_count='Not a target of 20. Use proportionate scenarios covering the approved criterion IDs.'),
+        network='No network, downloads, infrastructure credentials or Docker socket in product sandboxes.')
