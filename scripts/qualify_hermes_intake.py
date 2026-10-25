@@ -99,11 +99,14 @@ def qualify(root,upstream,image,*,neutral_relay=False):
                     sequence=[('plan_review',dict(decision='changes' if index==0 else 'approve',
                         reason='Clarify the dependency acceptance.' if index==0 else 'Independent plan and scope review.',
                         findings=['Make the join dependency explicit.'] if index==0 else []))]
+                    if index==1:sequence.insert(0,('plan_review',dict(decision='approve',reason='Plan matches the brief',findings=['Positive observation, not a defect'])))
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
             if index>=len(sequences[run.number]):self.send_error(400);return
             if run.kind=='plan' and not run.reviewing and index==1:
                 assert any('complete approved brief' in str(m.get('content')) for m in body['messages'] if m.get('role')=='tool')
+            if run.kind=='plan' and run.reviewing and index==1:
+                assert any('approve requires findings=[]' in str(m.get('content')) for m in body['messages'] if m.get('role')=='tool')
             name,args=sequences[run.number][index]
             value=dict(id='local-'+str(run.number)+'-'+str(index),object='chat.completion',created=int(time.time()),model=body['model'],
                 choices=[dict(index=0,finish_reason='tool_calls',message=dict(role='assistant',content=None,
@@ -234,7 +237,7 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             from fabriquinha.provider import inspect,Held
             endpoint='http://127.0.0.1:'+str(port)
             status=inspect(policy,endpoint,runtime.project.fingerprint())
-            assert status['calls']==len(all_requests)==10
+            assert status['calls']==len(all_requests)==11
             assert all(request.get('max_tokens')==policy.max_output_tokens for request in all_requests)
             relay.ledger.pause(status['calls'],402)
             connection=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
@@ -244,8 +247,8 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             try:inspect(policy,endpoint,runtime.project.fingerprint())
             except Held as error:assert error.status==402
             else:raise AssertionError('metadata admission bypassed the financial pause')
-            assert relay.status()['calls']==10 and len(all_requests)==10
-            result.update(neutral_relay=True,relay_calls=10,paused_request_not_forwarded=True,
+            assert relay.status()['calls']==11 and len(all_requests)==11
+            result.update(neutral_relay=True,relay_calls=11,approval_feedback_observed=True,paused_request_not_forwarded=True,
                 sdk_output_budget_aligned=True,plan_schema_constraints_observed=True,legacy_adapters=0)
         write_json(root/'receipt.json',result);return result
     finally:

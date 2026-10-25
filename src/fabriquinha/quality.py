@@ -14,6 +14,8 @@ from .effects import Pending, EffectBlocked, Journal, write_json
 
 PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
+REVIEW_FINDINGS_CONTRACT=('findings lists blocking defects only. approve requires findings=[]; '
+    'put positive observations in reason. changes or escalate requires at least one concrete finding.')
 
 
 def suite_report(value):
@@ -49,9 +51,9 @@ def review_decision(value, manifest, tree):
     if (not isinstance(value, dict) or set(value) != {'decision', 'reason', 'findings'}
             or value['decision'] not in ('approve', 'changes')
             or not isinstance(value['reason'], str) or not 1 <= len(value['reason'].strip()) <= 2000
-            or not isinstance(value['findings'], list) or len(value['findings']) > 8
-            or (value['decision'] == 'approve') != (len(value['findings']) == 0)):
+            or not isinstance(value['findings'], list) or len(value['findings']) > 8):
         raise ValueError('approve or concrete change request required')
+    if (value['decision']=='approve') != (not value['findings']):raise ValueError(REVIEW_FINDINGS_CONTRACT)
     for finding in value['findings']:
         if (not isinstance(finding, dict) or set(finding) != {'path', 'line', 'detail'}
                 or finding['path'] not in manifest or type(finding['line']) is not int

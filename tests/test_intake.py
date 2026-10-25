@@ -133,7 +133,10 @@ class IntakeContracts(unittest.TestCase):
         receipt=self.store.receipt(result['review'],kind='plan_review')
         self.assertEqual(receipt['payload']['plan'],'exact-plan');self.assertEqual(receipt['binding']['actor'],'cto')
         with self.assertRaises(ValueError):tools.submit(work())
-        with self.assertRaises(ValueError):tools.review(dict(decision='changes',reason='Bad',findings=[]))
+        with self.assertRaisesRegex(ValueError,'at least one concrete finding'):tools.review(dict(decision='changes',reason='Bad',findings=[]))
+        with self.assertRaisesRegex(ValueError,r'approve requires findings=\[\]'):
+            tools.review(dict(decision='approve',reason='All good',findings=['Looks good']))
+        self.assertIn('positive observations in reason',draft_schemas(self.project)['plan_review']['findings']['description'])
 
     def test_stale_document_authority_is_checked_before_any_submission(self):
         activity=DraftActivity(self.project,self.store,self.board,self.run)

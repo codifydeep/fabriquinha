@@ -246,10 +246,11 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     from tools.registry import registry
     operations=DeliveryTools(sandbox,quality)
     if sandbox.run.reviewing:
+        from .quality import REVIEW_FINDINGS_CONTRACT
         name='delivery_review'
         schema=dict(type='object',additionalProperties=False,required=['decision','reason','findings'],properties=dict(
-            decision={'type':'string','enum':['approve','changes','escalate']},reason={'type':'string','minLength':1,'maxLength':2000},
-            findings=dict(type='array',maxItems=8,items=dict(type='object',additionalProperties=False,
+            decision={'type':'string','enum':['approve','changes','escalate'],'description':REVIEW_FINDINGS_CONTRACT},reason={'type':'string','minLength':1,'maxLength':2000},
+            findings=dict(type='array',maxItems=8,description=REVIEW_FINDINGS_CONTRACT,items=dict(type='object',additionalProperties=False,
                 required=['path','line','detail'],properties=dict(path={'type':'string'},
                     line={'type':'integer','minimum':1},detail={'type':'string','minLength':1,'maxLength':2000})))))
         operation=operations.review

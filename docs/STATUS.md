@@ -80,6 +80,13 @@ starvation continuam sem comprovação; a proteção de reincidência nativa per
 O proprietário autorizou mais 64 chamadas (teto S4 de 6.420), saída de até 8.192
 tokens e reaplicação do aceite apenas se o novo documento de Produto for idêntico
 ao aprovado. Não há fallback, reset do contador ou importação de evidências antigas.
+Na instalação com navegador, Produto submeteu o documento idêntico e o aceite
+condicional foi aplicado. A tentativa foi contida após cinco chamadas: o CTO
+preencheu `findings` com observações positivas ao aprovar; o erro ambíguo não
+permitiu sua correção, e o run terminou sem ferramenta terminal. Não foi aprovado
+pelo operador. Schema e erro agora dizem explicitamente `approve` → `findings=[]`;
+o protocolo corretivo passou no SDK/relay com 11 respostas locais. Uma nova
+instalação vazia foi preparada dentro do mesmo teto, com 59 chamadas restantes.
 
 Checks atuais: 233 testes do caminho novo passaram. A última execução dos 4.523
 históricos também passou, com

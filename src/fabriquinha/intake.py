@@ -11,6 +11,7 @@ from .artifacts import digest, encoded
 from .effects import Journal
 from .kanban_lane import native
 from .config import execution_context
+from .quality import REVIEW_FINDINGS_CONTRACT
 
 HUMAN_REVIEWER='fabriquinha-ceo'  # Reserved human identity, never an installed model profile.
 WORK_ID_PATTERN=r'^[a-z][a-z0-9_-]{0,31}$'
@@ -317,7 +318,7 @@ class DraftTools:
         if not isinstance(args,dict) or set(args)!={'decision','reason','findings'} or args['decision'] not in ('approve','changes'):
             raise ValueError('structured plan review required')
         text(args['reason']);texts(args['findings'],maximum=8)
-        if (args['decision']=='approve')!= (not args['findings']):raise ValueError('concrete findings required for changes')
+        if (args['decision']=='approve')!= (not args['findings']):raise ValueError(REVIEW_FINDINGS_CONTRACT)
         plan(evidence['plan'],evidence['approved_brief'],self.a.project)
         receipt=self.a.store.record('plan_review',self.run.binding(),dict(project=self.a.project.fingerprint(),verdict=args,
             plan=self.a.board.input(self.run,'plan',review_handoff=True)))
@@ -344,7 +345,8 @@ def draft_schemas(project,criteria_ids=()):
         brief_question=dict(question=string,context=string,options=dict(type='array',minItems=2,maxItems=4,items=string)),
         plan_submit=dict(architecture=dict(type='string',minLength=1,maxLength=12000),tasks=dict(type='array',minItems=1,
             maxItems=24,items=work,description=PACKAGE_CONTRACT),observability=string),
-        plan_review=dict(decision=dict(type='string',enum=['approve','changes']),reason=string,findings=dict(type='array',maxItems=8,items=string)))
+        plan_review=dict(decision=dict(type='string',enum=['approve','changes'],description=REVIEW_FINDINGS_CONTRACT),
+            reason=string,findings=dict(type='array',maxItems=8,items=string,description=REVIEW_FINDINGS_CONTRACT)))
 
 
 def register_draft(activity,on_terminal):

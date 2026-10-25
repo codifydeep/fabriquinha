@@ -48,6 +48,20 @@ técnico. Telegram real ainda não ativado/qualificado.
 
 ### Ferramentas
 
+`findings` contém apenas defeitos bloqueantes. Para `approve`, deve ser `[]`;
+observações positivas ficam em `reason`. Para `changes`, é obrigatório pelo
+menos um achado concreto. Schema e erro do handler agora expõem essa mesma
+condição. O S4 encontrou uma tentativa de aprovação com elogios nessa lista;
+o modelo repetiu o payload e encerrou em texto. Esse run permaneceu bloqueado,
+sem parecer aprovado. A aprovação textual não foi aproveitada.
+
+A repetição offline de 25/10 passou com nove atividades SDK e 11 respostas
+locais através do relay neutro: o payload inválido foi recusado, a orientação
+corretiva chegou ao modelo de fixture e a chamada seguinte aprovou formalmente
+com lista vazia. Zero inferência paga. Isso qualifica feedback/protocolo,
+não garante que um modelo real sempre se corrigirá. Falhas de protocolo nas
+fases documentais ainda não têm o SPIKE de produto usado para testes/código.
+
 Brief: `brief_question`/`brief_submit`. Plano: `plan_submit`. Revisão: `plan_review`.
 Não existem ferramentas de terminal, arquivos, Docker, administração ou aprovação
 de negócio nessas atividades. Usam o registro restrito de handlers e a barreira
