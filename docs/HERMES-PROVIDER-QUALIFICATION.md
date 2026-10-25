@@ -43,6 +43,23 @@ pagos ligados; não basta iniciar este relay.
 
 ## Provas realizadas
 
+### Opção de saída 16384 — preparada, sem ativação real
+
+`OUTPUT_LIMITS` centraliza os limites aceitos pelo preparo, SDK e relay. A nova
+opção 16384 é explícita; não altera instalações antigas, teto de chamadas,
+modelo ou habilitação. O relay conserva o valor solicitado e recusa aumento
+para 32768 antes da reserva. Sua disponibilidade no código não concede consumo.
+
+A prova `qualify_hermes_provider_wait.py --max-output-tokens 16384` passou com
+11 atividades SDK e 19 requisições locais. Conferiu o valor no transporte real,
+402 após edição e na revisão, reinício, preservação dos contadores funcionais,
+workspace e fase, e conclusão TDD. Zero chamadas OpenRouter. A instalação real
+está parada com saída 8192; a proposta maior depende de aceite do operador.
+
+Dois canários sintéticos reais (padrão/low) completaram chamadas de função,
+reportando zero tokens de raciocínio. Eles não reproduziram a falha no contexto
+nativo extenso e não qualificam uma entrega ou alteração de raciocínio.
+
 Os testes locais verificam autenticação, identidade, teto, pausa preservada,
 erro de transporte, exclusão de proprietário, ausência de fallback e nenhuma
 reescrita do conteúdo. Os testes de canário simulam sucesso, novo 402 e recusa

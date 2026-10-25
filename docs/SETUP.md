@@ -38,9 +38,12 @@ O caminho novo é `src/fabriquinha`, com preparação parcial por
 `scripts/prepare_hermes_project.py`. Esse script não instala imagens, provisiona
 GitHub ou inicia relay/serviço. A [revisão atual](EXECUTION-REVIEW-2026-10-25.md)
 documenta os gates a corrigir antes da próxima execução e as lacunas de S6.
-A CLI de preparação exige `--max-output-tokens` explícito: 2048, 4096 ou 8192,
+A CLI de preparação exige `--max-output-tokens` explícito: 2048, 4096, 8192 ou 16384,
 conforme política autorizada. O valor é preservado no preparo e consumido pelo
 relay/SDK; escolhê-lo não habilita o provedor nem aumenta o teto de chamadas.
+O suporte a 16384 passou em provedor local programado. A instalação real ainda
+está desabilitada com teto de saída 8192; a proposta maior aguarda aceite do
+operador. Limite de chamadas e saída por resposta são controles distintos.
 
 Para consultar uma instalação existente, use o Python do SDK já provisionado,
 com `PYTHONPATH=src`, e `python -m fabriquinha.runtime status --root

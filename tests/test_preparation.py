@@ -25,9 +25,15 @@ class PausedPreparation(unittest.TestCase):
         self.assertEqual(policy.max_output_tokens,8192)
         self.assertEqual(policy.max_calls,6420)
         self.assertFalse(policy.enabled)
-        for value in (True,0,8193,16384):
+        for value in (True,0,8193,16385,32768):
             with self.subTest(value=value),self.assertRaises(ValueError):
                 prepare_project.configuration(project(),'example/model',19390,6420,max_output_tokens=value)
+
+    def test_larger_explicit_ceiling_is_prepared_disabled_and_does_not_expand_calls(self):
+        _,policy,_=prepare_project.configuration(project(),'example/model',19390,7000,max_output_tokens=16384)
+        self.assertEqual(policy.max_output_tokens,16384)
+        self.assertEqual(policy.max_calls,7000)
+        self.assertFalse(policy.enabled)
 
     def test_policy_is_disabled_and_no_credentials_or_mutation_are_required_to_plan(self):
         parsed,policy,profiles=prepare_project.configuration(project(),'example/model',19390,10000)

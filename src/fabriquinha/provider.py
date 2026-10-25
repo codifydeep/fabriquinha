@@ -21,6 +21,8 @@ from urllib.parse import urlsplit
 from .artifacts import digest
 from .effects import write_json
 
+OUTPUT_LIMITS=(2048,4096,8192,16384)
+
 
 class Held(RuntimeError):
     def __init__(self,code,status=503):self.code,self.status=code,status;super().__init__(code)
@@ -43,7 +45,7 @@ class Policy:
                 or not isinstance(value['project'],str) or not re.fullmatch('[a-f0-9]{64}',value['project'])
                 or not isinstance(value['model'],str) or not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/-]{1,160}',value['model'])
                 or type(value['max_calls']) is not int or not 1<=value['max_calls']<=1000000
-                or type(value['max_output_tokens']) is not int or value['max_output_tokens'] not in (2048,4096,8192)
+                or type(value['max_output_tokens']) is not int or value['max_output_tokens'] not in OUTPUT_LIMITS
                 or type(value['enabled']) is not bool or not isinstance(value['client_token'],str)
                 or not re.fullmatch('[A-Za-z0-9_-]{20,128}',value['client_token'])):
             raise ValueError('closed operator model/budget policy required')

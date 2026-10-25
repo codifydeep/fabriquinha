@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from fabriquinha.config import Project
 from fabriquinha.effects import write_json
-from fabriquinha.provider import Policy
+from fabriquinha.provider import Policy,OUTPUT_LIMITS
 from fabriquinha.runtime import Runtime,bind
 from fabriquinha.kanban_lane import native
 
@@ -71,7 +71,7 @@ if __name__=='__main__':
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--project',type=Path,required=True);parser.add_argument('--model',required=True)
     parser.add_argument('--provider-port',type=int,required=True);parser.add_argument('--max-calls',type=int,required=True)
-    parser.add_argument('--max-output-tokens',type=int,choices=(2048,4096,8192),required=True)
+    parser.add_argument('--max-output-tokens',type=int,choices=OUTPUT_LIMITS,required=True)
     args=parser.parse_args();path=args.project
     if not path.is_file() or path.stat().st_size>16384:raise ValueError('bounded project configuration required')
     print(json.dumps(prepare(args.root,args.upstream,json.loads(path.read_bytes()),args.model,args.provider_port,args.max_calls,

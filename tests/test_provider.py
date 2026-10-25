@@ -72,6 +72,16 @@ class NeutralProvider(unittest.TestCase):
             self.assertEqual(status,422);self.assertEqual(json.loads(data)['error']['code'],'output_budget_exceeds_policy')
         self.assertEqual(self.app.status()['calls'],7);self.app.forward.assert_not_called()
 
+    def test_explicit_16k_cap_is_preserved_and_a_32k_boost_is_still_refused(self):
+        self.app.policy=Policy.parse({**policy().values(),'max_output_tokens':16384})
+        body=dict(model='example/model',messages=[dict(role='user',content='bounded generation')],max_tokens=16384)
+        self.assertEqual(self.send(body)[0],200)
+        self.assertEqual(self.app.forward.call_args.args[0]['max_tokens'],16384)
+        self.assertEqual(self.app.status()['calls'],8)
+        self.assertEqual(self.send({**body,'max_tokens':32768})[0],422)
+        self.assertEqual(self.app.status()['calls'],8)
+        self.assertEqual(self.app.forward.call_count,1)
+
     def test_attempt_metadata_keeps_budget_and_finish_reason_not_conversations(self):
         response=dict(choices=[dict(finish_reason='length',message={'content':'private model text'})],
             usage=dict(prompt_tokens=100,completion_tokens=4096,total_tokens=4196))

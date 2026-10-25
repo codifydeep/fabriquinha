@@ -10,8 +10,10 @@ Claude Haiku sob cota específica autorizada, com relay isolado e perfis limpos.
 Uma tentativa real anterior chegou ao Green, mas terminou em triagem antes
 da revisão da entrega. O CTO manteve um bloqueio explícito; relay e dispatcher
 foram desligados após drenagem. O feedback dos controles e o limite de exploração
-foram corrigidos e qualificados offline. Outra fronteira limpa está ativa:
-o brief idêntico foi aprovado, o CTO revisou o plano e o QA iniciou o Red.
+foram corrigidos e qualificados offline. Outra fronteira limpa teve brief e
+plano aprovados, mas o QA sofreu duas interrupções por saída acima da política
+e ficou em triagem do CTO. O dispatcher e o relay estão desligados após drenagem.
+Nenhuma entrega foi aprovada por causa dessas interrupções.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -25,7 +27,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais em tentativa anterior; recuperação pelo Lead até concluir testes | Nova fronteira ativa no Red; controles aceitos, revisão da entrega, PR/CI, integração, deploy e QA ainda pendentes |
+| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais em tentativa anterior; recuperação pelo Lead até concluir testes | Tentativa mais recente em triagem por limite de saída; controles, revisão da entrega, PR/CI, integração, deploy e QA completos ainda pendentes |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |
@@ -66,7 +68,7 @@ instalação auditada. Notificações em fila não comprovam visibilidade no Tel
 O núcleo auditado em `98e09069` tinha 19 módulos funcionais mais `__init__`,
 5.060 linhas e 233 testes verdes, sem cobrir a contradição. Os testes novos
 exercitam alvos, risco adicional, imutabilidade, skip, inventário e legado.
-Os **261 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
+Os **263 testes do núcleo passaram**. Provas locais não equivalem a autonomia,
 SLA ou portabilidade.
 
 A revalidação integrada inicialmente encontrou esgotamento dos pools de rede
@@ -103,6 +105,20 @@ exigem nova fronteira, sem importar evidências técnicas das tentativas bloquea
 O teto de chamadas só foi elevado por autorização explícita do proprietário;
 modelo, limite de saída e ausência de fallback permanecem.
 
+A fronteira posterior voltou a ser interrompida no QA por `output_budget_exceeds_policy`.
+Dois canários sintéticos isolados (padrão e esforço baixo) retornaram argumentos
+completos com 1813 e 1747 tokens de saída, ambos com zero tokens de raciocínio
+reportados. Esse contexto curto não reproduziu a falha do SDK; não justifica
+atribuir os cortes ao raciocínio nem mudar sua configuração.
+
+Foi preparada a opção explícita de saída 16384, mantendo o limite de chamadas
+7000 e nenhum fallback. Passou offline com 11 atividades SDK e 19 requisições
+locais, incluindo pausa financeira e retomada; pedidos 32768 continuam recusados
+sem reserva. **Não foi ativada na instalação real.** O próximo experimento,
+dependente de aceite do operador, é uma geração sem execução de ferramentas
+com o último contexto nativo que truncou. Só depois de uma resposta completa
+será considerada outra tentativa S4, sem converter recibos antigos em entrega.
+
 ## Próxima sequência
 
 O [roadmap vigente](ROADMAP.md) detalha R0–R5:
@@ -110,6 +126,8 @@ O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
 - R2 limitado e correção de contexto revalidados offline, inclusive HTTP 422
   através do SDK real; feedback dos controles e exploração limitada qualificados.
+- Obter decisão sobre saída por resposta e validar uma geração com o contexto
+  nativo antes de iniciar outra cadeia paga completa.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 

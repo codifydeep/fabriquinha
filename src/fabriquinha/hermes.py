@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 from .artifacts import digest
 from .effects import Journal, EffectBlocked, write_json
 from .executor import docker, grouping, phase_mounts
+from .provider import OUTPUT_LIMITS
 
 
 def sandbox_context(prompt):
@@ -335,7 +336,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     if (not isinstance(route,dict) or set(route)!={'base_url','api_key','provider','api_mode','model'}
             or any(not isinstance(v,str) or not v for v in route.values())
             or type(run_seconds) is not int or not 1<=run_seconds<=3600
-            or output_limit is not None and (type(output_limit) is not int or output_limit not in (2048,4096,8192))):
+            or output_limit is not None and (type(output_limit) is not int or output_limit not in OUTPUT_LIMITS)):
         raise ValueError('explicit bounded controller model route required')
     url=urlsplit(route['base_url'])
     if url.username or url.password or sandbox.project.qualification and (url.scheme!='http' or url.hostname!='127.0.0.1'):

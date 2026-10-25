@@ -22,11 +22,11 @@ from qualify_hermes_delivery import create_trial,steps
 from fabriquinha.effects import write_json
 from fabriquinha.executor import docker
 from fabriquinha.kanban_lane import native
-from fabriquinha.provider import Policy,Relay,server as relay_server
+from fabriquinha.provider import Policy,Relay,OUTPUT_LIMITS,server as relay_server
 from fabriquinha.runtime import Runtime,recorded_worker,worker_alive
 
 
-def qualify(root,upstream,image):
+def qualify(root,upstream,image,*,max_output_tokens=4096):
     tests,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-provider-wait')
     runtime=Runtime(root,upstream);kb,kbc,dispatch=native();services=[]
     # A real native failed spawn seeds one functional failure. Provider waits
@@ -39,7 +39,7 @@ def qualify(root,upstream,image):
     key=root/'fixture.key';key.write_text('local-fixture-not-a-provider-credential');key.chmod(0o600)
     model='local/provider-wait-fixture';token='local-client-provider-wait-qualification'
     policy=Policy.parse(dict(version=1,project=runtime.project.fingerprint(),model=model,max_calls=80,
-        max_output_tokens=4096,enabled=True,client_token=token))
+        max_output_tokens=max_output_tokens,enabled=True,client_token=token))
     injected={};sequences={};requests={};forwarded=[]
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -48,6 +48,7 @@ def qualify(root,upstream,image):
             self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
         def do_POST(self):
             body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            assert body.get('max_tokens',body.get('max_completion_tokens'))==max_output_tokens
             marker=next((m['content'].splitlines()[0] for m in reversed(body['messages'])
                 if m.get('role')=='user' and isinstance(m.get('content'),str) and m['content'].startswith('Delivery activity ')),None)
             if not marker or body.get('stream'):self.respond(400,{});return
@@ -157,7 +158,7 @@ def qualify(root,upstream,image):
             author_files_preserved=True,review_lane_preserved=True,author_and_reviewer_sessions_resumed=True,
             restart_preserved_financial_hold=True,no_forwarding_or_reservation_during_hold=True,
             complete_tdd_after_recovery=True,local_provider_requests=len(forwarded),model_calls=0,
-            synthetic_decisions=True,delivery_approval=False,migration=False)
+            synthetic_decisions=True,max_output_tokens=max_output_tokens,delivery_approval=False,migration=False)
         write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result
     finally:
         runtime.pause()
@@ -172,8 +173,10 @@ def qualify(root,upstream,image):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    parser.add_argument('--image',required=True);args=parser.parse_args()
-    try:qualify(args.root.resolve(),args.upstream.resolve(),args.image)
+    parser.add_argument('--image',required=True)
+    parser.add_argument('--max-output-tokens',type=int,choices=OUTPUT_LIMITS,default=4096)
+    args=parser.parse_args()
+    try:qualify(args.root.resolve(),args.upstream.resolve(),args.image,max_output_tokens=args.max_output_tokens)
     except BaseException as error:
         write_json(args.root/'failure.json',dict(category=type(error).__name__,delivery_approval=False))
         raise

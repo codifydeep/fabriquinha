@@ -80,9 +80,18 @@ e handler. Passou offline sem dispensar controles ou alterar testes congelados.
 Repetir em fronteira limpa com essas pré-condições, mantendo o modelo e o teto
 de saída e sem importar provas técnicas anteriores.
 
-A nova fronteira foi iniciada após CI inicial verde e igualdade canônica do
-brief. O CTO aprovou seu plano e o QA está produzindo Red. A tentativa anterior
-em triagem permanece preservada; não conta como release entregue.
+A nova fronteira teve CI inicial, brief idêntico e plano aprovados, mas voltou
+à triagem por truncamento no QA. Foi drenada e preservada; nenhum modelo ou
+controle de qualidade foi substituído para ocultar esse resultado.
+
+**Próxima ação limitada:** saída 16384 preparada e validada com provedor HTTP
+local, ainda não habilitada no provedor real. Após aceite específico do operador,
+gerar uma resposta ao último contexto nativo do SDK, sem executar ferramentas,
+alterar cards ou aprovar código. Se terminar completa, iniciar outra fronteira
+S4 com o mesmo brief e todos os gates. Se truncar ou falhar no transporte, parar
+esse experimento; não aumentar novamente, repetir envio incerto ou iniciar outra
+cadeia completa sem evidência nova. Dois canários curtos não reproduziram o
+problema e não motivaram mudança de raciocínio.
 
 **Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
 → `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do
