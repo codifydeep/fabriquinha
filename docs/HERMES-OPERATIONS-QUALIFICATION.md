@@ -266,3 +266,25 @@ O limite de 20 cenários é explicitamente um teto, não uma meta; a URL publica
 da ação `fill` aceita texto vazio/espaços, pois são dados válidos de teste de
 formulário, sem relaxar seletores, IDs ou asserções. Esse ajuste recebeu regressão
 própria antes do aceite do brief; não foi introduzido no meio de uma implementação.
+
+## Mesmo QA congelado antes e depois do merge
+
+Com `browser_tdd=true` e papéis de entrega configurados, os jobs fixos de Green,
+revisão da entrega e CI integrada executam a suíte completa e a prévia do QA
+congelado. O app inicia por `python -B /workspace/app.py 8080` em loopback no
+mesmo sandbox de rede `none`; não publica porta nem recebe credenciais/socket.
+O interpretador é o mesmo do pós-deploy. Seu campo `text` compara o texto
+completo normalizado do locator, nunca substring. A prévia é um campo separado
+no relatório: não inventa casos unittest nem substitui Red, mutações ou QA da
+implantação efetiva.
+
+Reporter e interpretador confiáveis são montados somente leitura e seus hashes
+pertencem à identidade do job. O executor confere mounts/entrypoint/ambiente;
+recibos antigos não adquirem essa evidência retroativamente. Faça alterações
+nesses scripts somente com workers drenados; divergência de hash bloqueia o job.
+Um `browser.py` no produto não substitui o interpretador confiável.
+
+`scripts/qualify_browser_preview.py` passou em sete jobs reais, sem modelo ou
+aprovação de release. A primeira preparação falhou por quoting do próprio
+fixture e ficou preservada; as provas posteriores foram independentes. Detalhes
+e o retrabalho ainda pendente estão no [plano de QA](POST-QA-REWORK-2026-10-26.md).

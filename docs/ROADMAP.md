@@ -7,6 +7,14 @@ Este documento substitui a lista antiga de próximos passos da ponte Multica/ACP
 A estratégia é Hermes + Kanban e uma camada pequena de entrega. Não iniciar outro
 orquestrador, novo banco de memória ou migração de modelo nesta fase.
 
+**Prioridade atual:** [fechar QA e retrabalho da mesma release](POST-QA-REWORK-2026-10-26.md).
+O PR 56 já chegou a deploy, mas o QA congelado o recusou. A prevenção anterior
+ao merge e os fatos completos de diagnóstico passaram em prova isolada. Antes
+de outro ensaio pago, implementar/qualificar o replanejamento nativo versionado,
+preservação da geração anterior, base atual e novo PR corretivo. Não usar outro
+reset como resposta padrão. A tentativa preservada poderá provar recuperação
+assistida; uma fronteira completa sem intervenção ainda será necessária.
+
 O proprietário aprovou F1, registrado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md).
 O contrato 2 e o feedback do plano estão implementados e passaram em provas
 offline delimitadas. A tentativa S4 real mais recente chegou ao Green e terminou

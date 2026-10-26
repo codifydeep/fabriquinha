@@ -14,6 +14,15 @@ from .executor import ROOT, docker
 from .publication import sha
 
 
+class BrowserValidationFailed(ValueError):
+    """Keep the actual negative job available to technical recovery."""
+    def __init__(self,job,report):
+        self.browser_job=job
+        errors=report.get('errors',[]) if isinstance(report,dict) else []
+        super().__init__('Independent deployed browser QA rejected; job '+job+': '+json.dumps(errors[:3])[:1500]+
+                         '. A passing unittest SPIKE does not replace this browser result.')
+
+
 def _network(project,suffix):
     """Observe only the exact, already reserved deployment network."""
     group=project.namespace+'-homologation';name=group+'_'+suffix
@@ -324,7 +333,7 @@ class Deployment:
                 or not isinstance(report,dict) or report.get('status')!='passed' or report.get('source_sha')!=artifact['commit']
                 or report.get('checks')!=[c['id'] for c in expected] or report.get('errors')
                 or not value['screenshot_sha256']):
-            raise ValueError('complete independent deployed browser QA required')
+            raise BrowserValidationFailed(job,report)
         after=self.service(artifact)
         if after!=before:raise EffectBlocked('deployment changed during QA')
         if repository.remote_head(self.project.branch)!=artifact['commit']:

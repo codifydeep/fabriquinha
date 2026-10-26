@@ -137,4 +137,7 @@ def execution_context(project):
             assets='Same-origin HTTP only; no CDN/downloads or WebSockets in this qualified stack.'),
         quality='Red -> independent test freeze -> Green -> mutations -> independent delivery review -> integrated suite -> deployed browser QA.',
         browser_checks=dict(maximum=20,required_count='Not a target of 20. Use proportionate scenarios covering the approved criterion IDs.'),
+        frozen_qa_preview=('The exact frozen browser contract also runs after the full suite in Green, delivery review and integrated CI. '
+            'text is the exact normalized full locator text, never a substring. Unit Green alone cannot satisfy this check. '
+            'It does not replace post-deploy QA or historical Red.' if project.browser_tdd and project.delivery_roles else None),
         network='No network, downloads, infrastructure credentials or Docker socket in product sandboxes.')

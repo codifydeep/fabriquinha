@@ -77,14 +77,15 @@ flowchart TD
     C --> T[QA: testes com Red real]
     T --> F[Revisão independente e freeze]
     F -->|mudanças| T
-    F --> I[Desenvolvedor: implementação e Green]
+    F --> I[Desenvolvedor: suíte Green e QA congelado local]
     I --> N[Controles negativos e revisão da entrega]
     N -->|mudanças| I
     N --> PR[PR e CI no SHA exato]
-    PR --> M[Integração e revalidação]
+    PR --> M[Integração: suíte e mesmo QA congelado]
     M --> D[DevOps: deploy e rollback]
     D --> Q[QA independente do ambiente]
-    Q --> H[HOMOLOGADA com URL e evidências]
+    Q -->|aprovado| H[HOMOLOGADA com URL e evidências]
+    Q -->|falha| X[Diagnóstico com erro real; retrabalho versionado ainda pendente]
 ```
 
 O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
@@ -108,6 +109,9 @@ recuperação, memória entre versões e portabilidade continuam incompletos.
   containers sem credenciais, sem socket e com rede restrita à fase.
 - Aprovações vinculadas a autoria, execução e artefato; integração e QA conferem
   o commit e a imagem efetivamente implantados.
+- Na stack com browser TDD e papéis de entrega, Green, revisão e CI executam
+  também o QA congelado, pelo mesmo interpretador do pós-deploy. Texto esperado
+  significa texto completo normalizado; uma suíte unitária verde não o substitui.
 - Pausa persistente, limites explícitos de consumo, nenhuma troca automática
   de modelo ou ampliação automática de orçamento.
 - Recuperação técnica já foi demonstrada em cenários delimitados. Não há
@@ -151,7 +155,7 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 25/10/2026, os 270 testes do núcleo passaram. As provas S1–S3 e extensões
+Em 26/10/2026, os 285 testes do núcleo passaram. As provas S1–S3 e extensões
 qualificam fronteiras específicas; decisões programadas não são julgamento de
 um agente real. Falta a primeira release S4 completa sem intervenção técnica
 externa, depois uma segunda versão com regressão/memória/recuperação e uma
@@ -161,6 +165,10 @@ Outra prova recuperou revisão do plano e integração por Lead/CTO até conclui
 a mesma cadeia. A triagem mantém bloqueio e responsável quando não existe
 retomada segura; não há promessa de recuperação universal.
 Veja [STATUS](docs/STATUS.md).
+O [plano de retrabalho após QA](docs/POST-QA-REWORK-2026-10-26.md) registra a
+lacuna concreta restante: o PR 56 foi integrado e implantado, mas o navegador
+recusou o comportamento. A nova prevenção passou em sete jobs Docker/Chromium;
+o caminho de correção da mesma release ainda exige implementação e qualificação.
 
 ## Retirada de recursos de teste
 

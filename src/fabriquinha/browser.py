@@ -14,7 +14,8 @@ def author_protocol():
         return dict(type='object',additionalProperties=False,required=['action',*fields],
             properties=dict(action={'const':name},**fields))
     check=dict(type='object',additionalProperties=False,required=['id','path','actions','selector','text'],
-        properties=dict(id=text,path={**text,'pattern':r'^/(?!/)[^\\]*$'},selector=text,text=text,
+        properties=dict(id=text,path={**text,'pattern':r'^/(?!/)[^\\]*$'},selector=text,
+            text={**text,'description':'Expected exact full locator text after whitespace normalization, not a substring or contains match.'},
             actions=dict(type='array',minItems=1,maxItems=20,items=dict(oneOf=[
                 action('fill',dict(selector=text,value=dict(type='string',maxLength=8000))),
                 action('click',dict(selector=text))]))))
@@ -22,7 +23,7 @@ def author_protocol():
         properties=dict(version={'const':1},checks=dict(type='array',minItems=1,maxItems=20,items=check))),
         rules=['Each check ID is an approved acceptance criterion. Reuse existing IDs without adding duplicate scenarios.',
             'Append missing scenarios in new qa.<package>.<release>.json files; never rewrite existing QA files.',
-            'At most 20 unique scenarios across all files. Each check navigates its local path, runs actions in order, then checks locator text.',
+            'At most 20 unique scenarios across all files. Each check navigates its local path, runs actions in order, then compares the exact full locator text (normalized whitespace), not a substring.',
             'Only same-origin HTTP assets/requests; no external CDNs, fonts, downloads or WebSockets.',
             'No browser page/console errors. Serve a favicon or use an embedded data icon.'])
 
@@ -60,19 +61,19 @@ def load_contract(folder):
     return value
 
 
-def main():
+def evaluate(folder, source, target, *, screenshot=False):
+    """One exact interpreter for immutable preview and deployed acceptance."""
     from playwright.sync_api import sync_playwright, expect
-    checks=contract(load_contract(Path('/qa-contracts')))
-    source=os.environ['FABRIQUINHA_SOURCE_SHA']
-    target='http://web:8080'
-    errors=[]; completed=[]; page=None; image=None
+    checks=contract(load_contract(folder))
+    origin=urlsplit(target)
+    errors=[]; completed=[]; page=None; image=None;stage='launch'
     try:
         with sync_playwright() as playwright:
             browser=playwright.chromium.launch(headless=True)
             context=browser.new_context(viewport={'width':1280,'height':720},service_workers='block')
             def route(request):
                 parsed=urlsplit(request.request.url)
-                if (parsed.scheme,parsed.netloc)!=('http','web:8080'):
+                if (parsed.scheme,parsed.netloc)!=(origin.scheme,origin.netloc):
                     errors.append('unexpected browser origin')
                     request.abort()
                 else:request.continue_()
@@ -81,6 +82,7 @@ def main():
                 errors.append('websocket outside the qualified HTTP stack')
                 socket.close()
             context.route_web_socket('**/*',deny_socket)
+            stage='health'
             for path,expected in (('/health',{'status':'ok'}),('/identity',{'source_sha':source})):
                 response=context.request.get(target+path,max_redirects=0,timeout=10000)
                 assert response.status==200 and response.json()==expected, 'deployed health/identity mismatch'
@@ -89,26 +91,68 @@ def main():
             page.on('console',lambda message:errors.append(message.text[:500]) if message.type=='error' else None)
             try:
                 for check in checks:
+                    stage='navigation'
                     page.goto(target+check['path'],wait_until='networkidle',timeout=15000)
+                    stage='actions'
                     for action in check['actions']:
                         locator=page.locator(action['selector'])
                         if action['action']=='fill':locator.fill(action['value'],timeout=5000)
                         else:locator.click(timeout=5000)
+                    stage='assertion'
                     expect(page.locator(check['selector'])).to_have_text(check['text'],timeout=5000)
                     completed.append(check['id'])
+                stage='runtime'
                 assert not errors, 'browser runtime errors'
             finally:
-                if page:
+                if page and screenshot:
                     image=page.screenshot(type='png',full_page=False,timeout=5000)
                     assert len(image)<=1024*1024, 'bounded browser screenshot required'
                 browser.close()
     except Exception as error:
-        print(json.dumps(dict(version=1,status='failed',source_sha=source,checks=completed,
-                              errors=[*errors,str(error)[:1000]])))
-        return 1
-    print(json.dumps(dict(version=1,status='passed',source_sha=source,checks=completed,errors=[],
-                          png_base64=base64.b64encode(image).decode())))
-    return 0
+        return dict(version=1,status='failed',source_sha=source,checks=completed,
+                              errors=[*errors,str(error)[:1000]],phase=stage,
+                              failure_kind='behavior' if stage in ('actions','assertion','runtime') else 'infrastructure')
+    result=dict(version=1,status='passed',source_sha=source,checks=completed,errors=[])
+    if screenshot:result['png_base64']=base64.b64encode(image).decode()
+    return result
+
+
+def preview(root, tests_dir, source):
+    """Fixed local entrypoint, no worker-selected command or host network."""
+    import subprocess
+    import time
+    from urllib.request import urlopen
+    target='http://127.0.0.1:8080'
+    process=None
+    try:
+        process=subprocess.Popen([sys.executable,'-B',str(Path(root)/'app.py'),'8080'],cwd=root,
+            env={**os.environ,'FABRIQUINHA_SOURCE_SHA':source},
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        deadline=time.monotonic()+8
+        while True:
+            if process.poll() is not None:raise RuntimeError('preview application exited before readiness')
+            try:
+                with urlopen(target+'/health',timeout=0.5) as response:
+                    if response.status==200:break
+            except OSError:pass
+            if time.monotonic()>=deadline:raise RuntimeError('preview application readiness timeout')
+            time.sleep(0.05)
+        return evaluate(Path(root)/tests_dir,source,target)
+    except Exception as error:
+        return dict(version=1,status='failed',source_sha=source,checks=[],errors=[str(error)[:1000]],
+                    phase='launch',failure_kind='infrastructure')
+    finally:
+        if process:
+            process.terminate()
+            try:process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill();process.wait(timeout=2)
+
+
+def main():
+    report=evaluate(Path('/qa-contracts'),os.environ['FABRIQUINHA_SOURCE_SHA'],'http://web:8080',screenshot=True)
+    print(json.dumps(report))
+    return 0 if report['status']=='passed' else 1
 
 
 if __name__=='__main__':sys.exit(main())

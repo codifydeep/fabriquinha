@@ -13,6 +13,8 @@ from fabriquinha.artifacts import Store
 from fabriquinha.board import Run
 from fabriquinha.config import Project,execution_context
 from fabriquinha.quality import Quality
+from fabriquinha.quality import suite_report,preview_evidence
+from fabriquinha.executor import preview_drivers
 from test_delivery_core import configuration
 
 
@@ -23,6 +25,24 @@ def scenario():
 
 
 class FrozenBrowserContract(unittest.TestCase):
+    def test_green_unit_suite_cannot_hide_failed_or_missing_frozen_qa_preview(self):
+        report=dict(version=1,tests_run=1,cases=['tests.test_unit'],failures=[],errors=[],skips=[],
+                    expected_failures=[],unexpected_successes=[])
+        identity=dict(qa_preview={'driver':'a'*64,'reporter':'b'*64},snapshot='c'*64)
+        value=dict(identity=identity,report=report,exit_code=0)
+        with self.assertRaisesRegex(ValueError,'preview'):suite_report(value)
+        preview=dict(version=1,status='failed',source_sha='c'*64,checks=[],
+                     errors=['Expected exact Ana; received Hello, Ana!'],phase='assertion',failure_kind='behavior')
+        value=dict(identity=identity,report={**report,'qa_preview':preview},exit_code=1)
+        with self.assertRaisesRegex(ValueError,'preview'):suite_report(value)
+        self.assertEqual(suite_report(value,diagnostic=True)['qa_preview'],preview)
+        with self.assertRaises(ValueError):suite_report({**value,'exit_code':0},diagnostic=True)
+        passed={**preview,'status':'passed','checks':['greeting'],'errors':[]}
+        value=dict(identity=identity,report={**report,'qa_preview':passed},exit_code=0)
+        self.assertEqual(suite_report(value)['cases'],['tests.test_unit'])
+        with self.assertRaises(ValueError):suite_report({**value,'report':{**value['report'],
+            'qa_preview':{**passed,'source_sha':'foreign'}}})
+
     def test_author_receives_actual_protocol_fields_not_a_feature_implementation(self):
         value=author_protocol();schema=value['schema']
         self.assertEqual(set(schema['required']),{'version','checks'})
@@ -31,6 +51,8 @@ class FrozenBrowserContract(unittest.TestCase):
         actions=item['properties']['actions']['items']['oneOf']
         self.assertEqual([action['properties']['action']['const'] for action in actions],['fill','click'])
         self.assertEqual(schema['properties']['checks']['maxItems'],20)
+        self.assertIn('exact',item['properties']['text']['description'].lower())
+        self.assertIn('not a substring',item['properties']['text']['description'].lower())
         self.assertNotIn('Hello, Ada',json.dumps(value))
         self.assertEqual(contract(scenario())[0]['id'],'greeting')
         schema['properties']['checks']['maxItems']=100
@@ -98,6 +120,20 @@ class BrowserBeforeFreeze(unittest.TestCase):
         self.run=Run('task',1,'qa','tests',False,'qa','release','contract')
         self.board=SimpleNamespace(ensure=lambda run:None,criteria=lambda run:('greeting',))
         self.quality=Quality(self.project,self.store,None,self.board);self.quality.observe=Mock()
+
+    def test_historic_green_or_partial_preview_cannot_satisfy_the_current_gate(self):
+        self.project=replace(self.project,browser_tdd=True)
+        (self.work/'tests/qa.json').write_text(json.dumps(scenario()))
+        snapshot=self.store.capture(self.work)
+        value=dict(identity={},report={})
+        with self.assertRaisesRegex(ValueError,'drivers'):
+            preview_evidence(self.project,self.store,value,snapshot,'green')
+        value['identity']['qa_preview']=preview_drivers(self.project,'green')
+        value['report']['qa_preview']=dict(status='passed',checks=[])
+        with self.assertRaisesRegex(ValueError,'complete contract'):
+            preview_evidence(self.project,self.store,value,snapshot,'green')
+        value['report']['qa_preview']['checks']=['greeting']
+        preview_evidence(self.project,self.store,value,snapshot,'green')
 
     def test_malformed_or_uncovered_browser_contract_is_rejected_before_red_jobs(self):
         for document in ({'version':1,'checks':[]},dict(version=1,checks=[{**scenario()['checks'][0],'id':'foreign'}])):

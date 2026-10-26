@@ -314,3 +314,19 @@ longa, repete efeitos ou modifica o upstream.
 Não foi habilitado `tool_choice=required`. A [documentação do fornecedor](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
 informa que a chamada forçada pula o raciocínio no Haiku 5.5. Modelo, raciocínio,
 40 iterações, teto de chamadas e gates foram preservados.
+
+## Recusa de QA implantado com fatos completos
+
+O erro do gate agora referencia o `browser_job` que falhou, em vez de pedir
+genericamente QA completo. O `worker_failure` e o incidente preservam esse
+ponteiro. Antes de expor o relatório a Lead/CTO, o controlador confere projeto,
+execução independente, imagem, snapshot, SHA, sandbox e os fatos negativos.
+Fase/classificação distinguem falha comportamental de infraestrutura nos novos
+relatórios; relatórios históricos sem classificação não ganham essa certeza.
+Um SPIKE unittest verde não substitui a recusa do navegador.
+
+Isso foi testado no núcleo e não equivale a ter resolvido o caso real do PR 56.
+A devolução após merge precisa de um plano de retrabalho e nova entrega na
+mesma release, ainda pendentes conforme [o plano registrado](POST-QA-REWORK-2026-10-26.md).
+Não zerar a triagem, repetir indefinidamente o QA imutável ou pedir ao CEO que
+decida esse problema técnico.

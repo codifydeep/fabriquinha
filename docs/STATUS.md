@@ -3,6 +3,20 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
+**Estado mais recente:** o [PR 56](https://github.com/codifydeep/descartavel2/pull/56)
+foi integrado e implantado, com CI e rollback/restauração. QA recusou o texto
+visível, diferente do contrato congelado. Não houve `HOMOLOGADA`. Dispatcher e
+relay estão desligados; a implantação e todas as evidências permanecem preservadas.
+Consumo final observado: **6.627/7.000 chamadas**.
+
+A correção em fonte transmite o erro real do navegador ao diagnóstico e executa
+o mesmo QA congelado em Green, revisão e CI. Passou em **285 testes do núcleo**
+e em sete jobs reais Docker/Chromium: unidade verde com QA incompatível recusada;
+correção apenas de código passou com testes/QA intactos. Zero chamadas pagas.
+Essa prova não qualifica autonomia. O [plano de retrabalho](POST-QA-REWORK-2026-10-26.md)
+detalha a próxima lacuna: corrigir a mesma release após QA, sem reset ou
+repetição do brief. O histórico abaixo registra as fronteiras anteriores.
+
 **R1/F1 e R2 limitado qualificados offline; S4 real ainda incompleto.**
 O proprietário aprovou o refinamento F1, implementado e validado com
 Chromium/Docker. As provas R1/R2 usaram zero chamadas pagas. O novo S4 usa
@@ -68,7 +82,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Red/freeze, Green, controles corrigidos pela equipe, revisão independente e PR/CI/merge reais | Deploy impedido por esgotamento das redes Docker; homologação e QA pós-deploy ainda pendentes |
+| S4 | Red/freeze, Green, controles, revisão, PR/CI/merge e deploy/rollback reais | QA comportamental recusado; retrabalho da mesma release e primeira homologação autônoma pendentes |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |

@@ -5,6 +5,7 @@ job sandbox; only its controller can create a trusted execution receipt.
 """
 import contextlib
 import io
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -48,6 +49,12 @@ class Result(unittest.TestResult):
 
 def main():
     root = Path('/workspace')
+    preview_driver=None
+    if 'FABRIQUINHA_QA_PREVIEW' in os.environ:
+        # Product modules may also be named browser.py. Never resolve the
+        # trusted read-only mounted interpreter through product sys.path.
+        spec=importlib.util.spec_from_file_location('_fabriquinha_frozen_browser','/opt/fabriquinha/browser.py')
+        preview_driver=importlib.util.module_from_spec(spec);spec.loader.exec_module(preview_driver)
     test_dir = os.environ['FABRIQUINHA_TESTS_DIR']
     path = Path(test_dir)
     if path.is_absolute() or '..' in path.parts or str(path) != test_dir:
@@ -63,8 +70,13 @@ def main():
                   skips=[t.id() for t, _ in result.skipped],
                   expected_failures=[t.id() for t, _ in result.expectedFailures],
                   unexpected_successes=[t.id() for t in result.unexpectedSuccesses])
+    preview_ok=True
+    if 'FABRIQUINHA_QA_PREVIEW' in os.environ:
+        with contextlib.redirect_stdout(Output()), contextlib.redirect_stderr(Output()):
+            report['qa_preview']=preview_driver.preview(root,test_dir,os.environ['FABRIQUINHA_QA_PREVIEW'])
+        preview_ok=report['qa_preview']['status']=='passed'
     print(json.dumps(report, sort_keys=True), flush=True)
-    return 0 if result.wasSuccessful() else 1
+    return 0 if result.wasSuccessful() and preview_ok else 1
 
 
 if __name__ == '__main__':

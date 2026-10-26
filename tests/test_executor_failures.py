@@ -113,6 +113,39 @@ class FailedJobRecovery(unittest.TestCase):
         self.assertIn('/tmp:rw,noexec,nosuid,size=128m',command)
         self.assertTrue(command[-2].endswith(',dst=/workspace,readonly'))
 
+    def test_frozen_preview_binds_trusted_scripts_and_is_mandatory_only_for_delivery_phases(self):
+        value={**configuration(),'browser_tdd':True,'browser_image':'sha256:'+'b'*64,
+            'coordination_roles':{'product':'backend','lead':'lead'},
+            'delivery_roles':{'tests':'backend','integration':'lead'}}
+        self.runner.project=Project.parse(value)
+        for phase in ('green','delivery','integrated','red','control','diagnostic'):
+            with patch.object(self.runner,'_execute',return_value='fixture-job') as execute:
+                self.runner.run(self.run,self.snapshot,phase)
+            _,identity,command=execute.call_args.args
+            if phase not in ('green','delivery','integrated'):
+                self.assertNotIn('qa_preview',identity);continue
+            self.assertEqual(set(identity['qa_preview']),{'reporter','driver'})
+            mounts=[command[i+1] for i,arg in enumerate(command) if arg=='--mount']
+            self.assertEqual(len(mounts),3);self.assertTrue(all(m.endswith(',readonly') for m in mounts))
+            self.assertIn('FABRIQUINHA_QA_PREVIEW='+self.snapshot,command)
+            sources={m.split('dst=')[1].split(',')[0]:m.split('src=')[1].split(',')[0] for m in mounts}
+            info=dict(Image=self.runner.project.validation_image,
+                Config=dict(User='65534:65534',Entrypoint=['python','-B','/opt/fabriquinha/suite.py'],Cmd=None,
+                    Labels={'fabriquinha.job':identity['key'],'com.docker.compose.project':self.runner.project.namespace+'-tests'},
+                    Env=['FABRIQUINHA_TESTS_DIR=tests','FABRIQUINHA_QA_PREVIEW='+self.snapshot]),
+                HostConfig=dict(NetworkMode='none',ReadonlyRootfs=True,CapDrop=['ALL']),
+                Mounts=[dict(Type='bind',Destination=dest,Source=src,RW=False) for dest,src in sources.items()])
+            with patch('fabriquinha.executor.docker',side_effect=lambda *args:json.dumps([info])):
+                self.runner.inspect('fixture',identity)
+                info['Mounts'][0]['RW']=True
+                with self.assertRaises(ValueError):self.runner.inspect('fixture',identity)
+                info['Mounts'][0]['RW']=False
+                info['Config']['Entrypoint']=['sh']
+                with self.assertRaises(ValueError):self.runner.inspect('fixture',identity)
+            with patch('fabriquinha.executor.preview_drivers',return_value={'driver':'foreign'}):
+                with patch('fabriquinha.executor.docker',return_value=json.dumps([info])):
+                    with self.assertRaisesRegex(ValueError,'drivers changed'):self.runner.inspect('fixture',identity)
+
     def test_rejected_start_is_archived_retired_and_never_restarted(self):
         self.failure = 'start'
         self.check_failure()

@@ -3,11 +3,37 @@ import json
 from pathlib import Path
 import tempfile
 import time
+import re
 from .artifacts import digest,encoded
 from .board import Run
 from .effects import Journal, EffectBlocked, Pending,write_json
 from .kanban_lane import native
 from .quality import DeliveryTools, product_mutations, review_decision, suite_report
+
+
+def browser_refusal_context(store,project,binding,key):
+    record=store.receipt(key,kind='browser_job');data=record['payload'];identity=data['identity'];report=data['report']
+    if (binding.get('kind')!='integration' or binding.get('reviewing') is not True
+            or binding.get('actor')==binding.get('author') or record['binding']!=binding or identity['binding']!=binding
+            or identity['project']!=project.fingerprint() or identity['phase']!='browser'
+            or identity['image']!=project.browser_image
+            or not re.fullmatch('[a-f0-9]{40}',str(identity.get('commit')))
+            or data['sandbox']!=dict(network=project.namespace+'-homologation_qa',snapshot='readonly',user='10000:10000')):
+        raise ValueError('browser refusal must match the exact independent deployed QA execution')
+    store.tree(identity['snapshot'])
+    if not data['infrastructure_error']:
+        if (data['exit_code']!=1 or not isinstance(report,dict) or type(report.get('version')) is not int or report.get('version')!=1
+                or report.get('status')!='failed' or report.get('source_sha')!=identity['commit']
+                or not isinstance(report.get('checks'),list) or len(report['checks'])>20
+                or not all(isinstance(check,str) and 1<=len(check)<=1000 for check in report['checks'])
+                or len(set(report['checks']))!=len(report['checks'])
+                or not isinstance(report.get('errors'),list) or not 1<=len(report['errors'])<=100
+                or not all(isinstance(error,str) and 1<=len(error)<=1000 for error in report['errors'])):
+            raise ValueError('complete negative browser facts required; not a delivery approval')
+    classification='infrastructure' if data['infrastructure_error'] else report.get('failure_kind','unclassified')
+    return dict(receipt=key,snapshot=identity['snapshot'],commit=identity['commit'],report=report,
+        infrastructure_error=data['infrastructure_error'],classification=classification,
+        delivery_approval=False,requires_fresh_validation=True)
 
 
 def suite_refusal_context(store,project,binding,key,current_snapshot):
@@ -17,7 +43,7 @@ def suite_refusal_context(store,project,binding,key,current_snapshot):
             or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
         raise ValueError('suite refusal must match the exact failed execution and fixed validator')
     report=suite_report(data,diagnostic=True);store.tree(identity['snapshot'])
-    if not any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes')):
+    if not any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes')) and report.get('qa_preview',{}).get('status')!='failed':
         raise ValueError('negative quality report required, never a passing-job approval')
     return dict(receipt=key,phase=identity['phase'],snapshot=identity['snapshot'],report=report,
         matches_current_snapshot=identity['snapshot']==current_snapshot,delivery_approval=False,requires_fresh_validation=True)
@@ -77,6 +103,9 @@ class Diagnostic:
         if self.incident.get('suite_refusal'):
             result['last_suite_refusal']=suite_refusal_context(self.store,self.q.project,self.original,
                 self.incident['suite_refusal'],self.incident['snapshot'])
+        if self.incident.get('browser_refusal'):
+            result['last_browser_refusal']=browser_refusal_context(self.store,self.q.project,self.original,self.incident['browser_refusal'])
+            result['browser_limits']='A green unittest experiment cannot establish deployed QA success. Use the actual browser error; do not repeat unchanged QA as a substitute for code/contract diagnosis.'
         if self.incident.get('review_escalation'):
             escalation=self.store.receipt(self.incident['review_escalation'],kind='review_escalation')['payload']
             result['review_feedback']=self.store.receipt(escalation['review'])['payload']['verdict']
@@ -294,7 +323,7 @@ class Recovery:
         snapshot=self.snapshot(conn,task,source,handoff)
         failure=row['summary'] or row['error'] or task.result or 'Native worker could not complete'
         payload=json.loads(event['payload'] or '{}')
-        reason=payload.get('reason');escalation_id=None;control_refusal=None;suite_refusal=None
+        reason=payload.get('reason');escalation_id=None;control_refusal=None;suite_refusal=None;browser_refusal=None
         if isinstance(reason,str):
             try:data=json.loads(reason)
             except (ValueError,TypeError):data=None
@@ -307,6 +336,8 @@ class Recovery:
                         if control_refusal:control_refusal_context(self.store,self.project,source.binding(),control_refusal,snapshot)
                         suite_refusal=failure_record['payload'].get('suite_refusal')
                         if suite_refusal:suite_refusal_context(self.store,self.project,source.binding(),suite_refusal,snapshot)
+                        browser_refusal=failure_record['payload'].get('browser_refusal')
+                        if browser_refusal:browser_refusal_context(self.store,self.project,source.binding(),browser_refusal)
                 if data.get('category')=='review_escalation':
                     record=self.store.receipt(data['escalation'],kind='review_escalation')
                     review=self.store.receipt(record['payload']['review'],kind='test_review' if source.kind=='tests' else 'delivery_review')
@@ -331,6 +362,7 @@ class Recovery:
             **({'document_kind':source.kind} if source.kind in ('brief','plan') else {}),
             **({'control_refusal':control_refusal} if control_refusal else {}),
             **({'suite_refusal':suite_refusal} if suite_refusal else {}),
+            **({'browser_refusal':browser_refusal} if browser_refusal else {}),
             workspace=task.workspace_path,**({'review_escalation':escalation_id} if escalation_id else {})))
         # A native idempotent anchor survives restart before stage materialization.
         self.create(conn,incident,stage)

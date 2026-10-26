@@ -51,6 +51,23 @@ class TechnicalRecovery(unittest.TestCase):
         self.assertEqual(recovery.stage_for(False,'lead'),'cto')
         self.assertEqual(recovery.stage_for(False,'backend'),'lead')
 
+    def test_deployed_qa_failure_retains_real_error_and_rejects_foreign_jobs(self):
+        from fabriquinha.recovery import browser_refusal_context
+        from fabriquinha.deployment import BrowserValidationFailed
+        project=replace(self.project,browser_image='sha256:'+'b'*64)
+        run=Run('integration',9,'qa','integration',True,'devops','v1','qa-contract')
+        payload=dict(identity=dict(binding=run.binding(),project=project.fingerprint(),snapshot=self.snapshot,
+            phase='browser',image=project.browser_image,commit='c'*40),exit_code=1,infrastructure_error=None,
+            report=dict(version=1,status='failed',source_sha='c'*40,checks=[],errors=['Expected exact Ana; actual Hello, Ana!'],failure_kind='behavior'),
+            screenshot_sha256=None,sandbox=dict(network=project.namespace+'-homologation_qa',snapshot='readonly',user='10000:10000'))
+        key=self.store.record('browser_job',run.binding(),payload)
+        context=browser_refusal_context(self.store,project,run.binding(),key)
+        self.assertEqual(context['report']['errors'],payload['report']['errors'])
+        self.assertEqual(context['classification'],'behavior');self.assertFalse(context['delivery_approval'])
+        error=BrowserValidationFailed(key,payload['report'])
+        self.assertIn('actual Hello',str(error));self.assertEqual(error.browser_job,key)
+        with self.assertRaises(ValueError):browser_refusal_context(self.store,project,replace(run,number=10).binding(),key)
+
     def test_unconfigured_author_cannot_assume_a_technical_role(self):
         self.sandbox.run=replace(self.run,actor='backend')
         with self.assertRaises(ValueError):Diagnostic(self.sandbox,self.quality)

@@ -11,6 +11,7 @@ import tempfile
 import time
 from .artifacts import protected_unchanged
 from .effects import Pending, EffectBlocked, Journal, write_json
+from .executor import preview_drivers
 
 PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
@@ -35,11 +36,37 @@ def suite_report(value,*,diagnostic=False):
             or not diagnostic and any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes'))):
         raise ValueError('complete real suite without errors or skips required')
     failed={item['case'] for item in report['failures']}
+    preview=report.get('qa_preview');preview_failed=False
+    if value.get('identity',{}).get('qa_preview'):
+        if (not isinstance(preview,dict) or preview.get('version')!=1
+                or preview.get('source_sha')!=value['identity']['snapshot']
+                or preview.get('status') not in ('passed','failed')
+                or not isinstance(preview.get('checks'),list) or len(set(preview['checks']))!=len(preview['checks'])
+                or not all(isinstance(key,str) and key for key in preview['checks'])
+                or not isinstance(preview.get('errors'),list)
+                or not all(isinstance(error,str) for error in preview['errors'])
+                or (preview['status']=='passed')!= (not preview['errors'])):
+            raise ValueError('complete snapshot-bound frozen QA preview required')
+        preview_failed=preview['status']=='failed'
     if (not failed<=set(report['cases'])
             or any(not set(report[field])<=set(report['cases']) for field in ('errors','skips','expected_failures','unexpected_successes'))
-            or value['exit_code']!=(1 if failed or report['errors'] or report['unexpected_successes'] else 0)):
+            or value['exit_code']!=(1 if failed or report['errors'] or report['unexpected_successes'] or preview_failed else 0)):
         raise ValueError('suite exit and assertion facts disagree')
+    if preview_failed and not diagnostic:raise ValueError('frozen QA preview failed: '+json.dumps(preview['errors'])[:1800])
     return report
+
+
+def preview_evidence(project,store,value,snapshot,phase):
+    """Do not let a historic Green/CI receipt silently satisfy a new contract."""
+    drivers=preview_drivers(project,phase)
+    if value['identity'].get('qa_preview')!=drivers:raise ValueError('exact current frozen QA preview drivers required')
+    report=value.get('report')
+    if drivers and not isinstance(report,dict):raise ValueError('complete frozen QA preview report required')
+    if drivers and isinstance(report.get('qa_preview'),dict) and report['qa_preview'].get('status')=='passed':
+        from .browser import load_contract
+        expected=[check['id'] for check in load_contract(store.tree(snapshot)/project.tests_dir)['checks']]
+        if value['report']['qa_preview'].get('checks')!=expected:
+            raise ValueError('frozen QA preview must execute the complete contract')
 
 
 def review_decision(value, manifest, tree):
@@ -106,6 +133,7 @@ class Quality:
                 or identity['image'] != self.project.validation_image
                 or value['sandbox'] != dict(network='none', snapshot='readonly', user='65534:65534')):
             raise ValueError('complete real suite without errors or skips required')
+        preview_evidence(self.project,self.store,value,snapshot,phase)
         # Negative facts must remain visible to a diagnostician. Delivery phases
         # retain the strict default, including Red: errors/skips never qualify.
         try:report=suite_report(value,diagnostic=run.kind=='diagnostic' and phase=='diagnostic')
@@ -117,6 +145,7 @@ class Quality:
             self.suite_refusal=key
             details={field:dict(count=len(facts[field]),cases=facts[field][:8])
                      for field in ('errors','skips','expected_failures','unexpected_successes') if facts[field]}
+            if facts.get('qa_preview',{}).get('status')=='failed':details['qa_preview']=facts['qa_preview']
             raise ValueError(phase+' suite rejected; job '+key+': '+json.dumps(details)+
                 '. Fix the reported cases; this job does not qualify delivery or controls.') from None
         self.board.ensure(run)
@@ -284,6 +313,9 @@ class Quality:
         if green['binding'] != run.binding() or not 1 <= len(mutants) <= 8:
             raise ValueError('controls must belong to the current Green execution')
         data = green['payload']; frozen = self.freeze(run, data['freeze'])
+        if preview_drivers(self.project,'green'):
+            value=self.store.receipt(data['job'],kind='suite_job')['payload']
+            preview_evidence(self.project,self.store,value,data['snapshot'],'green');suite_report(value)
         coverage, jobs = set(), []
         for mutant in mutants:
             if mutant == data['snapshot']:

@@ -582,10 +582,12 @@ class Runtime:
         except BaseException as error:
             control_refusal=getattr(quality,'control_refusal',None)
             suite_refusal=getattr(quality,'suite_refusal',None)
+            browser_refusal=getattr(error,'browser_job',None)
             failure=self.store.record('worker_failure',run.binding(),dict(project=self.project.fingerprint(),
                 category=type(error).__name__,message=str(error)[:2000],
                 **({'control_refusal':control_refusal} if control_refusal else {}),
-                **({'suite_refusal':suite_refusal} if suite_refusal else {})))
+                **({'suite_refusal':suite_refusal} if suite_refusal else {}),
+                **({'browser_refusal':browser_refusal} if browser_refusal else {})))
             with kbc.connect_closing() as conn:
                 kb.block_task(conn,task,reason=json.dumps(dict(category=type(error).__name__,failure=failure)),
                               kind='capability',expected_run_id=number)

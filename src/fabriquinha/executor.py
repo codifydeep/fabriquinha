@@ -15,6 +15,13 @@ sys.path.insert(0, str(ROOT / 'team-delivery-kit'))
 from docker_grouping import args as grouping
 
 
+def preview_drivers(project,phase):
+    if project.browser_tdd and project.delivery_roles and phase in ('green','delivery','integrated'):
+        return {name:hashlib.sha256((ROOT/'src/fabriquinha'/file).read_bytes()).hexdigest()
+                for name,file in (('driver','browser.py'),('reporter','suite.py'))}
+    return None
+
+
 def phase_mounts(workspace, tests_dir, phase, *, baseline_tests=()):
     """OS write boundaries, shared by the author adapter and its qualification."""
     workspace = Path(workspace).resolve()
@@ -64,14 +71,28 @@ class Runner:
         mounts = info.get('Mounts') or []
         binds = [m for m in mounts if m['Type'] != 'tmpfs']
         host, config = info['HostConfig'], info['Config']
+        sources={'/workspace':self.store.tree(expected['snapshot'])}
+        preview=expected.get('qa_preview')
+        if preview:
+            if preview!=preview_drivers(self.project,expected['phase']):raise ValueError('preview drivers changed during execution')
+            sources.update({'/opt/fabriquinha/'+file:ROOT/'src/fabriquinha'/file for file in ('suite.py','browser.py')})
+        by_target={mount['Destination']:mount for mount in binds}
+        env=config.get('Env',[])
         if (info['Image'] != self.project.validation_image or config.get('User') != '65534:65534'
                 or config.get('Labels', {}).get('fabriquinha.job') != expected['key']
                 or config.get('Labels', {}).get('com.docker.compose.project') != self.project.namespace+'-tests'
                 or host.get('NetworkMode') != 'none' or host.get('Privileged')
                 or not host.get('ReadonlyRootfs') or host.get('CapAdd')
                 or 'ALL' not in (host.get('CapDrop') or [])
-                or len(binds) != 1 or binds[0]['Destination'] != '/workspace' or binds[0]['RW']
-                or Path(binds[0]['Source']).resolve() != self.store.tree(expected['snapshot'])
+                or len(binds)!=len(sources) or set(by_target)!=set(sources)
+                or any(by_target[path]['RW'] or Path(by_target[path]['Source']).resolve()!=source.resolve()
+                       for path,source in sources.items())
+                or config.get('Entrypoint')!=['python','-B','/opt/fabriquinha/suite.py']
+                or config.get('Cmd') not in (None,[])
+                or env.count('FABRIQUINHA_TESTS_DIR='+self.project.tests_dir)!=1
+                or ([e for e in env if e.startswith('FABRIQUINHA_QA_PREVIEW=')]
+                    !=['FABRIQUINHA_QA_PREVIEW='+expected['snapshot']] if preview else
+                    any(e.startswith('FABRIQUINHA_QA_PREVIEW=') for e in env))
                 or any(entry.split('=', 1)[0] in {'GH_TOKEN', 'GITHUB_TOKEN', 'OPENROUTER_API_KEY'}
                        for entry in config.get('Env', []))):
             raise ValueError('fixed job sandbox identity rejected')
@@ -127,6 +148,8 @@ class Runner:
             raise ValueError('fixed suite operation required')
         expected = dict(binding=run.binding(), project=self.project.fingerprint(),
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)
+        preview=preview_drivers(self.project,phase)
+        if preview:expected['qa_preview']=preview
         key = digest(expected)
         expected['key'] = key
         name = self.project.namespace+'-'+phase+'-'+key[:16]
@@ -137,8 +160,12 @@ class Runner:
             '--log-opt', 'max-size=1m', '--log-opt', 'max-file=2',
             '--tmpfs', '/tmp:rw,noexec,nosuid,size=128m' if self.project.browser_tdd else '/tmp:rw,noexec,nosuid,size=64m', '--workdir', '/workspace',
             '--env', 'PYTHONDONTWRITEBYTECODE=1', '--env', 'FABRIQUINHA_TESTS_DIR='+self.project.tests_dir,
-            '--mount', f'type=bind,src={self.store.tree(snapshot)},dst=/workspace,readonly',
-            self.project.validation_image]
+            '--mount', f'type=bind,src={self.store.tree(snapshot)},dst=/workspace,readonly']
+        if preview:
+            command+=['--env','FABRIQUINHA_QA_PREVIEW='+snapshot]
+            for file in ('suite.py','browser.py'):
+                command+=['--mount',f'type=bind,src={ROOT/"src/fabriquinha"/file},dst=/opt/fabriquinha/{file},readonly']
+        command+=[self.project.validation_image]
         return self._execute(run,expected,command)
 
     def _execute(self,run,expected,command):

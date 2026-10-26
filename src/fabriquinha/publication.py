@@ -152,7 +152,7 @@ class LocalCI:
         self.project,self.store,self.repo,self.runner=project,store,repository,runner
 
     def validate(self,head,base,*,stage):
-        from .quality import Quality,suite_report
+        from .quality import Quality,suite_report,preview_evidence
         if stage not in ('proposal','integrated'):raise ValueError('explicit CI stage required')
         head,base=sha(head),sha(base)
         expected=base if stage=='proposal' else head
@@ -174,6 +174,7 @@ class LocalCI:
                     or identity['image']!=self.project.validation_image
                     or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
                 raise ValueError('CI must use the exact fixed isolated job and commit snapshot')
+            preview_evidence(self.project,self.store,data,tree,phase)
             return job_id,suite_report(data)
         baseline_job,old=execute(baseline,'baseline',{**binding,'head':base,'base':base,'stage':'baseline'})
         if old['failures']:raise EffectBlocked('CI requires a passing independently executed baseline')
@@ -309,6 +310,14 @@ class LocalStatus:
                 or data['conclusion'] not in ('success','failure')):
             raise ValueError('exact computed CI receipt required')
         self.store.tree(data['snapshot'])
+        from .quality import preview_evidence,suite_report
+        if self.project.browser_tdd and self.project.delivery_roles:
+            job=self.store.receipt(data['job'],kind='suite_job')['payload']
+            job_identity=job['identity']
+            if (job_identity['project']!=self.project.fingerprint() or job_identity['snapshot']!=data['snapshot']
+                    or job_identity['phase']!='integrated' or job_identity['binding']!=value['binding']):
+                raise ValueError('exact CI QA preview provenance required')
+            preview_evidence(self.project,self.store,job,data['snapshot'],'integrated');suite_report(job)
         status=self.github.local_status(identity['head'])
         if status is None:return None
         if (status.get('description')!='Fabriquinha receipt '+receipt
