@@ -67,6 +67,20 @@ class OperationalControl(unittest.TestCase):
         self.assertIn('ValidationRuntimeUnavailable',result['errors'])
         self.assertNotIn('private diagnostic',json.dumps(result))
 
+    def test_real_delivery_cannot_dispatch_without_reserved_networks(self):
+        project=Project.parse({**configuration(),'qualification':False,
+            'coordination_roles':{'product':'backend','lead':'lead'},
+            'delivery_roles':{'tests':'backend','integration':'lead'},'browser_image':'sha256:'+'b'*64})
+        with patch('fabriquinha.operations.missing_profiles',return_value=[]), \
+             patch('fabriquinha.operations.Runner'), \
+             patch('fabriquinha.operations.docker',return_value=project.browser_image), \
+             patch('fabriquinha.operations.shutil.disk_usage',return_value=Mock(free=2**32)), \
+             patch('fabriquinha.deployment.deployment_networks',side_effect=EffectBlocked('private Docker error')):
+            result=doctor(project,self.root,Store(self.root/'private'))
+        self.assertFalse(result['ready'])
+        self.assertEqual(result['errors'],['DeploymentNetworksUnavailable'])
+        self.assertNotIn('private Docker error',json.dumps(result))
+
     def test_pause_before_send_is_retryable_but_unknown_effect_is_never_resent(self):
         clock=[100];journal=Journal(self.root/'effects',clock=lambda:clock[0]);calls=[]
         def send():

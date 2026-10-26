@@ -98,6 +98,15 @@ importar a resposta diagnóstica como implementação ou aprovação. A prova ai
 necessária é a entrega completa pela equipe; não aumentar novamente o teto nem
 repetir envios de transporte incerto por iniciativa automática.
 
+Essa tentativa já produziu controles corrigidos pela equipe, revisão independente
+e PR/CI/merge reais. O deploy falhou por esgotamento das sub-redes Docker. O
+efeito incerto e o ensaio não homologado foram preservados. A correção acrescenta
+reserva explícita das duas redes antes do despacho pago, validação na admissão e
+uso externo no Compose. A próxima fronteira deve usar branch nova a partir da
+mesma base limpa, preservando o PR integrado e o bloqueio anteriores, e comprovar
+deploy/QA/rollback. Limpeza deve retirar somente recursos próprios ociosos;
+nunca zerar o journal do efeito falho para permitir outra mutação.
+
 **Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
 → `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do
 aceite. Reparos externos tornam a tentativa assistida. Não substituir essa prova

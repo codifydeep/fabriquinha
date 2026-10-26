@@ -14,11 +14,62 @@ from .executor import ROOT, docker
 from .publication import sha
 
 
+def _network(project,suffix):
+    """Observe only the exact, already reserved deployment network."""
+    group=project.namespace+'-homologation';name=group+'_'+suffix
+    ids=docker('network','ls','-q','--filter','name=^'+name+'$').split()
+    if not ids:return None
+    if len(ids)!=1:raise EffectBlocked('ambiguous deployment network; preserve it')
+    info=json.loads(docker('network','inspect',ids[0]))[0]
+    labels=info.get('Labels') or {}
+    if (info['Name']!=name or info['Driver']!='bridge' or info['Scope']!='local'
+            or info['Internal'] is not (suffix=='qa') or info.get('Ingress')
+            or labels.get('com.docker.compose.project')!=group
+            or labels.get('com.docker.compose.network')!=suffix
+            or labels.get('fabriquinha.project')!=project.fingerprint()):
+        raise EffectBlocked('deployment network ownership or policy mismatch; preserve it')
+    return dict(id=info['Id'],name=name,internal=info['Internal'])
+
+
+def deployment_networks(project):
+    result=[_network(project,suffix) for suffix in ('default','qa')]
+    if any(value is None for value in result):
+        raise EffectBlocked('reserve both deployment networks before paid dispatch')
+    return result
+
+
+def prepare_networks(project,store):
+    """Explicit paused-install operation, no prune or uncertain-create retry."""
+    journal=Journal(store.root/'effects');group=project.namespace+'-homologation'
+    for suffix in ('default','qa'):
+        def observe():return _network(project,suffix)
+        observe()  # Reject foreign ownership before recording any creation intent.
+        identity=dict(project=project.fingerprint(),group=group,suffix=suffix,version=1)
+        def send():
+            # Revalidate after the journal lock; never replace a foreign network.
+            current=observe()
+            if current is not None:return current
+            args=['network','create','--driver','bridge']
+            for key,value in (('com.docker.compose.project',group),('com.docker.compose.network',suffix),
+                              ('fabriquinha.project',project.fingerprint())):
+                args+=['--label',key+'='+value]
+            if suffix=='qa':args+=['--internal']
+            docker(*args,group+'_'+suffix)
+            return observe()
+        journal.do('deployment-network:'+suffix,identity,send,observe)
+    # Recheck reality even when a previous journaled creation was acknowledged.
+    return deployment_networks(project)
+
+
 def web_spec(project,artifact,effect):
     if (artifact['project']!=project.fingerprint()
             or not re.fullmatch(r'sha256:[a-f0-9]{64}',artifact['image'])):
         raise ValueError('owned content-addressed image required')
     sha(artifact['commit'])
+    networks={'default':dict(driver='bridge'),'qa':dict(internal=True)}
+    if project.delivery_roles and not project.qualification:
+        networks={suffix:dict(external=True,name=project.namespace+'-homologation_'+suffix)
+                  for suffix in ('default','qa')}
     return dict(services={'web':dict(image=artifact['image'],pull_policy='never',
         user='65534:65534',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
         tmpfs=['/tmp:rw,noexec,nosuid,size=32m'],mem_limit='256m',cpus=1,pids_limit=128,
@@ -29,7 +80,7 @@ def web_spec(project,artifact,effect):
         healthcheck=dict(test=['CMD','python','-c',
             'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/health",timeout=2).status==200'],
             interval='2s',timeout='3s',retries=5,start_period='1s'),restart='unless-stopped')},
-        networks={'default':dict(driver='bridge'),'qa':dict(internal=True)})
+        networks=networks)
 
 
 class Deployment:
@@ -172,6 +223,7 @@ class Deployment:
 
     def _up(self,run,artifact,operation):
         self.current(run)
+        if self.project.delivery_roles and not self.project.qualification:deployment_networks(self.project)
         scope=dict(subject=run.subject(),artifact=artifact['receipt'],operation=operation,
                       policy=digest(web_spec(self.project,artifact,'pending')))
         key=digest(scope);folder=self.store.root/'deployments'/key

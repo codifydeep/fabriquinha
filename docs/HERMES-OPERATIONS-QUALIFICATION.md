@@ -70,7 +70,9 @@ fica explícito para o operador.
 ## Admissão sem outro dispatcher
 
 `doctor` consulta o pin/política do validador, presença da imagem de navegador
-quando configurada, pelo menos 1 GiB livre e os perfis configurados. Não baixa
+quando configurada, pelo menos 1 GiB livre e os perfis configurados. Em projetos
+reais com entrega integrada, exige também as duas redes de homologação reservadas,
+conferindo proprietário, driver e isolamento da rede de QA. Não baixa
 dependências, não executa produto e não chama modelo/GitHub/Telegram.
 
 Recursos inválidos suspendem novos spawns, não a reconciliação nativa. São
@@ -195,7 +197,8 @@ python scripts/prepare_hermes_project.py \
   --project /path/to/project.json \
   --model provider/model \
   --provider-port 19390 \
-  --max-calls 10000
+  --max-calls 10000 \
+  --max-output-tokens 8192
 ```
 
 O comando valida configuração, exige branch diferente de `main`/`master`, recusa
@@ -209,6 +212,24 @@ A prova na instalação de referência confirmou nove perfis, zero cards, estado
 pausado/drenado, `provider_disabled` e doctor sem perfil/recurso ausente. A política
 desabilitada é recusada antes até da consulta HTTP ao relay. Isso não concede
 autorização de consumo nem é qualificação S6 de instalação limpa.
+
+Antes de habilitar o provedor de uma entrega real, reservar as redes:
+
+```sh
+python scripts/prepare_hermes_networks.py \
+  --root .local-simplification/my-project \
+  --upstream /path/to/pristine/pinned-hermes
+```
+
+Esse passo exige instalação pausada e drenada. Usa o journal existente para
+criar somente `default` e `qa` do grupo de homologação, com identidade do projeto;
+QA é interna. A admissão permanece somente leitura. O Compose real usa essas
+redes como externas e revalida sua política antes do efeito. Isso detecta falta
+de sub-redes antes da inferência e reserva a capacidade necessária. Não impede
+falhas posteriores do daemon ou remoções externas: elas continuam impedimentos.
+Criação incerta é observada sem reenvio. Nenhuma rede estranha é adotada,
+substituída ou limpa. Após retirar uma implantação, a retirada das redes vazias
+exige conferir o proprietário e preservar qualquer efeito ainda pendente.
 
 O proprietário aprovou substituir o runner por CI local fixo e status no GitHub,
 somente na branch nova. O [bootstrap e seu primeiro CI real](HERMES-INTEGRATION-QUALIFICATION.md#status-obrigatório-real--25-de-outubro-de-2026)

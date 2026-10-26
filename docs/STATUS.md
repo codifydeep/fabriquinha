@@ -18,8 +18,20 @@ Nenhuma entrega foi aprovada por causa dessas interrupções.
 O proprietário autorizou saída de 16.384 tokens, mantendo Haiku, 7.000 chamadas
 e nenhum fallback. Uma geração única com contexto nativo preservado completou
 duas chamadas de ferramenta válidas usando 8.735 tokens; nenhuma ferramenta foi
-executada. O contador foi preservado em 6.484/7.000. A nova fronteira S4 está em
-preparação com perfis limpos e CI local, sem importar evidências técnicas antigas.
+executada. O contador foi preservado em 6.484/7.000 antes do novo ensaio.
+
+O ensaio seguinte completou Red, revisão/freeze, Green de dez testes, correção
+autônoma da cobertura dos controles e revisão independente da entrega. O
+[PR #55](https://github.com/codifydeep/descartavel2/pull/55) foi integrado com CI
+local no SHA exato. **Não houve homologação:** o Docker esgotou suas sub-redes ao
+criar as redes do deploy. A recuperação executou um SPIKE verde e manteve o
+efeito incerto bloqueado, sem repetir a mutação ou aprovar a release. O ensaio
+foi pausado com evidências preservadas; consumo encerrado em 6.522/7.000.
+
+A correção reserva as duas redes antes do despacho pago e faz o deploy real
+reutilizá-las explicitamente. Redes vazias de relays encerrados foram retiradas
+com metadados arquivados; volumes, snapshots e outros projetos foram preservados.
+Outro ensaio deverá comprovar a entrega completa após essas pré-condições.
 
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
@@ -33,7 +45,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais em tentativa anterior; geração diagnóstica completa no limite autorizado de 16.384 | Nova fronteira preparada; controles, revisão da entrega, PR/CI, integração, deploy e QA completos ainda pendentes |
+| S4 | Red/freeze, Green, controles corrigidos pela equipe, revisão independente e PR/CI/merge reais | Deploy impedido por esgotamento das redes Docker; homologação e QA pós-deploy ainda pendentes |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |

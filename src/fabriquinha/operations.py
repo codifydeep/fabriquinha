@@ -100,4 +100,8 @@ def doctor(project,root,store):
         if project.browser_image and docker('image','inspect','--format','{{.Id}}',project.browser_image).strip()!=project.browser_image:
             raise ValueError('browser image missing')
     except (ValueError,OSError,subprocess.SubprocessError):errors.append('ValidationRuntimeUnavailable')
+    if project.delivery_roles and not project.qualification:
+        from .deployment import deployment_networks
+        try:deployment_networks(project)
+        except (ValueError,OSError,subprocess.SubprocessError,EffectBlocked):errors.append('DeploymentNetworksUnavailable')
     return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project))

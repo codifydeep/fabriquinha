@@ -28,6 +28,7 @@ pausa humana ou dependência externa também não significa cancelamento.
 ```mermaid
 flowchart LR
     CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
+    A[Admissão: imagens, disco e redes reservadas] --> K
     K --> W[Agentes via SDK Hermes]
     W --> S[Sandbox por atividade]
     S --> E[Snapshot e recibos imutáveis]
@@ -49,6 +50,10 @@ Kanban é o dono do ciclo de vida. O controlador executa operações fixas e ver
 artefatos; os agentes não recebem credenciais de infraestrutura nem socket Docker.
 O journal de efeitos evita duplicar ações com confirmação incerta e não é um
 segundo gerenciador de tarefas.
+
+Entregas reais exigem as duas redes de homologação reservadas antes do despacho
+pago. O deploy usa essas redes como externas; não aloca sub-redes implicitamente.
+O preparo é explícito e não remove redes desconhecidas ou repete criações incertas.
 
 O suporte atual é limitado a uma stack Python/HTTP local, containers Linux ARM64
 na instalação de referência e uma release ativa por projeto. Não há instalador
