@@ -43,11 +43,20 @@ equipe. Esse checkpoint não é nova homologação; o contador nesse início era
 
 O S5 foi depois drenado por repetição de revisão: múltiplos checks AC7 e remoção
 de AC8 conflitavam com o protocolo instalado. O [reparo do impasse](S5-REVIEW-IMPASSE.md)
-impõe escalonamento ao CTO, mantendo revisão e gates. Passaram 328 testes e uma
+impõe escalonamento ao CTO, mantendo revisão e gates. Passaram 330 testes e uma
 prova nativa de 13 atividades/41 respostas locais, sem chamadas pagas. A manutenção
 externa impede classificar todo esse ciclo como autônomo.
 Na drenagem: 6.857/7.000, com 143 restantes. Das 46 chamadas desde S4, 38 têm vínculo
 com S5 e oito permanecem sem atribuição, incluídas no custo reportado de US$ 0,1736602.
+
+O escalonamento ocorreu no modelo real. O CTO manteve um `hold` técnico; a
+clarificação de caminhos da base/candidatos chegou ao Lead, que encaminhou nova
+orientação ao CTO. A revisão publicada `82b6dac7` corrigiu a identidade desse
+encaminhamento: predecessor novo gera atendimento novo, repetição reutiliza o
+mesmo. O Kanban nativo comprovou compatibilidade, reinício e status do sucessor
+atual sem modelo/Docker. O controlador atualizado retomou o mesmo ciclo e criou
+automaticamente outro diagnóstico CTO. O contador na instalação era 6.873/7.000.
+Os três ajustes de manutenção após o aceite continuam identificados como assistência.
 
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
@@ -94,8 +103,8 @@ zero nem atribuída por horário/prosa.
 O [plano S5](S5-CONTINUITY-PLAN.md) orienta o próximo trabalho. Não repetir outro
 ensaio genérico de saudação. Os contratos de regressão e projeção histórica
 passaram offline; a próxima fronteira é uma segunda versão na mesma aplicação.
-O novo brief foi aprovado; o mesmo ciclo deve continuar após instalar o reparo
-de escalonamento. Não iniciar outra release ou resetar o board para esconder o
+O novo brief foi aprovado; o mesmo ciclo continua após instalar os reparos
+de escalonamento e identidade. Não iniciar outra release ou resetar o board para esconder o
 impasse. Continuidade, recuperação real e nova homologação só serão declaradas
 após a conferência das evidências, identificando a assistência técnica externa.
 

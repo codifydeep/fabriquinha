@@ -66,6 +66,11 @@ homologação ou de recuperação. Aplicar o [escalonamento obrigatório](S5-REV
 e retomar o mesmo ciclo, sem converter a tentativa em qualificação autônoma.
 A equipe ainda deve concluir os passos abaixo.
 
+O escalonamento foi instalado e exercitado pelo modelo real. A clarificação de
+proveniência e a chave sucessora vinculada ao predecessor também foram publicadas
+e instaladas; outro diagnóstico CTO está atendendo o encaminhamento do Lead.
+Preservar os três pontos de assistência, o `hold` anterior e os mesmos cards.
+
 Após os mecanismos anteriores passarem offline:
 
 1. Preparar atualização explícita do código executado em manutenção drenada,
