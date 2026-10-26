@@ -507,6 +507,29 @@ class Quality:
             snapshot=data['snapshot'], validation_job=job, verdict=decision,
             merge_authorized=False, delivery_approval=False))
 
+    def review_recurrence(self,run,verdict):
+        """Escalate review churn, never limit handoffs or infer the root cause."""
+        if verdict['decision']!='changes':return None
+        self.check(run,run.kind,reviewing=True)
+        reader=getattr(self.board,'review_feedback',None)
+        history=reader(run,self.store) if reader else []
+        if not isinstance(history,list):raise ValueError('validated native review history required')
+        if len(history)<2:return None
+        common={f['path'] for f in verdict['findings']};references=[];numbers=[]
+        for item in history[-2:]:
+            record=self.store.receipt(item['receipt'],kind='test_review' if run.kind=='tests' else 'delivery_review')
+            scope,data=record['binding'],record['payload']
+            if (scope['task']!=run.task or scope['contract']!=run.contract or scope['release']!=run.release
+                    or scope['kind']!=run.kind or scope['reviewing'] is not True or scope['author']!=run.author
+                    or scope['actor'] not in self.project.reviewers_for(run.author) or scope['number']>=run.number
+                    or data['project']!=self.project.fingerprint() or data['verdict']['decision']!='changes'
+                    or data['verdict']!=item['verdict'] or data['snapshot']!=item['snapshot']):
+                raise ValueError('repeated findings require exact independent native review evidence')
+            common&={f['path'] for f in data['verdict']['findings']}
+            references.append(item['receipt']);numbers.append(scope['number'])
+        if numbers!=sorted(set(numbers)):raise ValueError('distinct chronological reviews required')
+        return dict(reviews=references,paths=sorted(common)) if common else None
+
 
 def product_mutations(quality,snapshot,proposals):
     """Disposable experiments; never modify the author or protected tests."""
@@ -541,7 +564,7 @@ class DeliveryTools:
             raise ValueError('same controller and current TDD activity required')
         self.sandbox,self.quality,self.run=sandbox,quality,sandbox.run
         self.store,self.board=quality.store,quality.board
-        self.submission=None;self.verdict=None;self.escalating=None;self.reviewed_risks=None
+        self.submission=None;self.verdict=None;self.escalating=None;self.reviewed_risks=None;self.recurrence=None
 
     def wait(self,call,*,jobs=1):
         # These are actual local validation jobs, not model polling or CI waits.
@@ -608,14 +631,16 @@ class DeliveryTools:
                 changes=verdict['decision']=='changes'
                 evidence={'review' if changes else 'delivery':receipt}
             self.verdict=(verdict,evidence,changes)
+            self.recurrence=q.review_recurrence(run,verdict) if changes and not escalate else None
             self.reviewed_risks=json.loads(json.dumps(risks))
         verdict,evidence,changes=self.verdict
         if effective!=verdict or escalate!=self.escalating or risks!=self.reviewed_risks:
             raise ValueError('pending review decision cannot change during retirement')
         self.sandbox.close()
-        if escalate:
+        if escalate or self.recurrence:
             review=self.store.receipt(evidence['review'])
-            receipt=q.record(run,'review_escalation',dict(review=evidence['review'],snapshot=review['payload']['snapshot']))
+            receipt=q.record(run,'review_escalation',dict(review=evidence['review'],snapshot=review['payload']['snapshot'],
+                **({'recurrence':self.recurrence} if self.recurrence else {})))
             self.board.escalate_review(run,receipt)
             return dict(status='technical_diagnosis_requested',task=run.task,escalation=receipt,delivery_approval=False)
         self.board.finish_review(run,verdict['reason'],evidence,changes=changes)

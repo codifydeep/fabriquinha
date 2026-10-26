@@ -25,7 +25,8 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False,pr_in_guidance=False):
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False,pr_in_guidance=False,review_churn=False):
+    if review_churn:review_escalation=True
     if sum((review_escalation,control_refusal,invalid_red))>1 or (invalid_red or terminal_deadline) and provider_error:
         raise ValueError('choose one independent recovery scenario')
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
@@ -39,6 +40,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
+    churn_reviews=[];churn_context=[]
     control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[];negative_reports=[]
     terminal_cids=[];terminal_verified=[]
     reference='https://github.com/example/qualification/pull/58';guidance_seen=[]
@@ -150,10 +152,13 @@ print(json.dumps(rows))'''
                         ('diagnostic_decide',dict(action='resume',reason='Add the approved VALUE=2 behavior test, observe real Red, then request independent review.',
                             findings=[dict(path='tests/test_existing.py',line=3,detail='The baseline checks type, not the required value; write a new behavior test.')]))]
                 elif review_escalation and run.reviewing and run.kind=='tests' and not escalated_reviews:
-                    escalated_reviews.append(run.number)
+                    if review_churn:
+                        churn_reviews.append(run.number)
+                        if len(churn_reviews)==3:escalated_reviews.append(run.number)
+                    else:escalated_reviews.append(run.number)
                     sequence=[('read_file',{'path':'/workspace/tests/test_new.py'}),
-                        ('delivery_review',dict(decision='escalate',reason='Technical impasse needs a CTO experiment',
-                            findings=[dict(path='tests/test_new.py',line=3,detail='Confirm expected value with a disposable CTO experiment before reviewing again')]))]
+                        ('delivery_review',dict(decision='changes' if review_churn else 'escalate',reason='Technical impasse needs a CTO experiment',
+                            findings=[dict(path='tests/test_new.py',line=3,detail='Expect value 2; confirm the expectation with a disposable CTO experiment')]))]
                 else:
                     if run.task==source and not run.reviewing and changes:
                         context=str(body['messages'])
@@ -173,6 +178,13 @@ print(json.dumps(rows))'''
                         assert 'Tests author' in visible['phase_expectation'] and 'Do not require Green' in visible['phase_expectation']
                         assert visible['last_suite_refusal']['report']['errors']==['test_new.NewBehavior.test_value']
                         assert visible['last_suite_refusal']['requires_fresh_validation']
+                if review_churn and run.kind=='diagnostic':
+                    visible=json.loads(native_context.split('Controller-recorded Incident context:\n',1)[1])
+                    if visible['incident'].get('review_escalation'):
+                        assert len(visible['review_recurrence']['reviews'])==2
+                        assert visible['review_recurrence']['paths']==['tests/test_new.py']
+                        assert visible['browser_protocol']['rules'] and 'not a root-cause verdict' in visible['impasse_contract']
+                        churn_context.append(run.number)
                 if terminal_deadline and run.number==1:
                     sequence.insert(3,('terminal',dict(command=deadline_probe,timeout=6)))
                 if pr_in_guidance and run.kind=='diagnostic' and run.actor=='flow-cto':
@@ -320,7 +332,7 @@ print(json.dumps(rows))'''
         stop(service)
         with kbc.connect_closing() as conn:
             runs=[dict(row) for row in conn.execute('SELECT * FROM task_runs ORDER BY id')]
-            assert len(runs)==(12 if control_refusal else 11 if review_escalation else 9) and runs[0]['outcome']=='blocked'
+            assert len(runs)==(13 if review_churn else 12 if control_refusal else 11 if review_escalation else 9) and runs[0]['outcome']=='blocked'
             assert len(runtime.recovery.cards(conn))==(6 if control_refusal else 5 if review_escalation else 4)
             incidents=runtime.recovery.status(conn);assert all(item['state']=='resolved' for item in incidents)
             assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id=? AND kind='unblocked'",(source,)).fetchone()[0]==(2 if review_escalation else 1)
@@ -343,6 +355,10 @@ print(json.dumps(rows))'''
             incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=len(decisions),runs=len(runs),
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
+        if review_churn:
+            assert len(churn_reviews)==3 and len(churn_context)==1
+            proof.update(automatic_review_churn_escalation=True,model_requested_escalation=False,three_independent_changes=True,
+                cto_received_prior_reviews_and_protocol=True)
         if provider_error:proof.update(native_sdk_policy_error_reached_diagnosis=True)
         if invalid_red:
             assert len(set(negative_reports))==2
@@ -413,6 +429,7 @@ if __name__=='__main__':
     parser.add_argument('--image',required=True);parser.add_argument('--notifications',action='store_true')
     scenario=parser.add_mutually_exclusive_group()
     scenario.add_argument('--review-escalation',action='store_true')
+    scenario.add_argument('--review-churn',action='store_true',help='Three real change requests must trigger controller escalation without a model escalation decision')
     scenario.add_argument('--control-refusal',action='store_true')
     scenario.add_argument('--invalid-red',action='store_true',help='Observe test errors in diagnosis, then require author repair and genuine Red/review/Green')
     parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
@@ -421,7 +438,7 @@ if __name__=='__main__':
     args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
     try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
-        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline,pr_in_guidance=args.pr_in_guidance)
+        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline,pr_in_guidance=args.pr_in_guidance,review_churn=args.review_churn)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

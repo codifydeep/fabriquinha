@@ -110,6 +110,42 @@ class ModelDeliveryOperations(unittest.TestCase):
         self.board.escalate_review.assert_called_once_with(self.sandbox.run,result['escalation'])
         self.assertFalse(result['delivery_approval'])
 
+    def review_history(self,*,paths=('app.py','app.py'),foreign=False):
+        result=[]
+        for number,path in zip((2,4),paths):
+            run=replace(self.run,number=number,actor='lead',reviewing=True)
+            verdict=dict(decision='changes',reason='Unresolved independent review concern',findings=[dict(path=path,line=1,detail='Verify the expected behavior')])
+            key=self.store.record('test_review',run.binding(),dict(project='f'*64 if foreign else self.project.fingerprint(),snapshot=self.baseline,verdict=verdict))
+            result.append(dict(receipt=key,run=number,reviewer='lead',verdict=verdict,snapshot=self.baseline))
+        self.board.review_feedback=lambda *args:result
+        return result
+
+    def test_repeated_review_changes_escalate_without_the_model_requesting_it(self):
+        history=self.review_history()
+        red=red_evidence(self.store,self.project,self.run,self.baseline,self.baseline)
+        self.board.input=lambda *args,**kwargs:red
+        self.sandbox.run=replace(self.run,number=6,actor='lead',reviewing=True)
+        self.board.escalate_review=Mock();tools=DeliveryTools(self.sandbox,self.quality)
+        result=tools.review(dict(decision='changes',reason='Still blocked in the same artifact',findings=[dict(path='app.py',line=1,detail='The review issue remains')]))
+        self.assertEqual(result['status'],'technical_diagnosis_requested')
+        record=self.store.receipt(result['escalation'],kind='review_escalation')
+        self.assertEqual(record['payload']['recurrence']['reviews'],[h['receipt'] for h in history])
+        self.assertEqual(record['payload']['recurrence']['paths'],['app.py'])
+        self.board.escalate_review.assert_called_once_with(self.sandbox.run,result['escalation'])
+        self.assertEqual([event[0] for event in self.events],['close'])
+
+    def test_review_churn_is_not_a_handoff_counter_or_permission_to_skip_approval(self):
+        history=self.review_history(paths=('app.py','tests/test_existing.py'))
+        run=replace(self.run,number=6,actor='lead',reviewing=True)
+        changes=dict(decision='changes',reason='A different concern',findings=[dict(path='app.py',line=1,detail='Another issue')])
+        self.assertIsNone(self.quality.review_recurrence(run,changes))
+        self.board.review_feedback=lambda *args:history[:1]
+        self.assertIsNone(self.quality.review_recurrence(run,changes))
+        self.review_history()
+        self.assertIsNone(self.quality.review_recurrence(run,dict(decision='approve',reason='Corrected',findings=[])))
+        self.review_history(foreign=True)
+        with self.assertRaises(ValueError):self.quality.review_recurrence(run,changes)
+
     def test_only_the_test_reviewer_can_freeze_additional_control_risks(self):
         red=red_evidence(self.store,self.project,self.run,self.baseline,self.baseline)
         self.board.input=lambda *args,**kwargs:red

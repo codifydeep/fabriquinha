@@ -127,6 +127,11 @@ class Diagnostic:
         if self.incident.get('review_escalation'):
             escalation=self.store.receipt(self.incident['review_escalation'],kind='review_escalation')['payload']
             result['review_feedback']=self.store.receipt(escalation['review'])['payload']['verdict']
+            if escalation.get('recurrence'):
+                result['review_recurrence']=escalation['recurrence']
+                result['impasse_contract']='Three consecutive independent change requests concern the same files. Diagnose whether the current issue is an unresolved defect, conflicting instructions or a tool limitation. This is not a root-cause verdict, approval or permission to weaken tests. Resume keeps independent review mandatory; hold if no permitted operation can resolve the issue.'
+            from .browser import author_protocol
+            result['browser_protocol']=author_protocol()
         kb,kbc,_=native()
         with kbc.connect_closing() as conn:
             body=json.loads(kb.get_task(conn,self.run.task).body)

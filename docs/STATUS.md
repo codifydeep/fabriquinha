@@ -1,6 +1,6 @@
 # Status do projeto — 26 de outubro de 2026
 
-**S4 técnico qualificado: primeira release completa sem intervenção técnica externa.**
+**S4 técnico qualificado; S5 encontrou um impasse de revisão e permanece não qualificado.**
 O caminho usa Hermes + Kanban nativos e operações determinísticas. Multica e
 Temporal não participam dessa execução. A autonomia geral, a distribuição e a
 retomada do Truco continuam pendentes.
@@ -40,6 +40,14 @@ Produto elaborou o novo brief em uma chamada, com custo reportado de US$ 0,00199
 o CEO aprovou Reset e Undo de um nível. A segunda versão entrou em execução pela
 equipe. Esse checkpoint não é nova homologação; o contador nesse início era
 6.812/7.000, com 188 chamadas restantes.
+
+O S5 foi depois drenado por repetição de revisão: múltiplos checks AC7 e remoção
+de AC8 conflitavam com o protocolo instalado. O [reparo do impasse](S5-REVIEW-IMPASSE.md)
+impõe escalonamento ao CTO, mantendo revisão e gates. Passaram 328 testes e uma
+prova nativa de 13 atividades/41 respostas locais, sem chamadas pagas. A manutenção
+externa impede classificar todo esse ciclo como autônomo.
+Na drenagem: 6.857/7.000, com 143 restantes. Das 46 chamadas desde S4, 38 têm vínculo
+com S5 e oito permanecem sem atribuição, incluídas no custo reportado de US$ 0,1736602.
 
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
@@ -86,9 +94,10 @@ zero nem atribuída por horário/prosa.
 O [plano S5](S5-CONTINUITY-PLAN.md) orienta o próximo trabalho. Não repetir outro
 ensaio genérico de saudação. Os contratos de regressão e projeção histórica
 passaram offline; a próxima fronteira é uma segunda versão na mesma aplicação.
-O novo brief foi aprovado; a equipe conduz planejamento, implementação e
-integrações. Continuidade, recuperação real e nova homologação só serão declaradas
-após a conferência das evidências.
+O novo brief foi aprovado; o mesmo ciclo deve continuar após instalar o reparo
+de escalonamento. Não iniciar outra release ou resetar o board para esconder o
+impasse. Continuidade, recuperação real e nova homologação só serão declaradas
+após a conferência das evidências, identificando a assistência técnica externa.
 
 O [roadmap](ROADMAP.md) mantém o objetivo completo. As revisões de
 [24/10](SIMPLIFICATION-REVIEW-2026-10-24.md),
