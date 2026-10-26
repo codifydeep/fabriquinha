@@ -13,7 +13,8 @@ aprovação humana condicional do mesmo documento de negócio e observou a execu
 Depois do aceite, a equipe conduziu o ciclo inteiro sem correções, orientação
 técnica externa ou reinício do controlador.
 
-Foram conferidos nove testes, seis falhas reais no Red, seis alvos de controles,
+Foram conferidos nove testes, seis falhas reais no Red, três mutações cobrindo
+seis alvos,
 revisões independentes, CI no SHA do PR e do merge, implantação, rollback e QA
 AC1/AC2. Saúde e identidade HTTP coincidiram com o commit integrado. Os dois
 testes de infraestrutura anteriores ficaram intactos e a main permaneceu

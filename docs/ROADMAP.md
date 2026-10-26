@@ -89,7 +89,7 @@ o recibo durável. A prova nativa recupera a orientação integral e a retomada 
 reinício, enquanto PR genuíno continua guardado. Executar a próxima fronteira a
 partir de uma exportação da revisão publicada, evitando imports do checkout mutável.
 
-**Qualificado:** PR 59, nove testes, seis controles, CI no PR/merge, deploy,
+**Qualificado:** PR 59, nove testes, três mutações cobrindo seis alvos, CI no PR/merge, deploy,
 rollback e QA. Os 27 arquivos exportados do runtime ficaram intactos; zero
 reinícios/intervenções técnicas. O brief anterior foi reutilizado com autorização
 condicional exata; isso não qualifica descoberta de produto nova.

@@ -29,7 +29,7 @@ as stacks, recuperação universal ou instalação reproduzível por terceiros.
 | Plano | Tech Lead propôs; CTO revisou independentemente |
 | Red | QA produziu testes; seis falhas comportamentais reais; baseline anterior passou |
 | Freeze | Tech Lead revisou os testes; entrega imutável e testes anteriores preservados |
-| Implementação | Tech Lead obteve Green; nove testes completos e seis alvos cobertos por controles negativos |
+| Implementação | Tech Lead obteve Green; nove testes completos e três jobs de mutação cobrindo seis alvos |
 | Revisão da entrega | CTO aprovou o snapshot exato, com reexecução independente; nenhum autor revisou a própria entrega |
 | GitHub | PR e merge pela equipe; CI local verde no SHA do PR e no commit integrado |
 | Deploy/QA | Compose local, health/identity, rollback/restauração e QA independente AC1/AC2 no mesmo commit |
