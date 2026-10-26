@@ -115,8 +115,45 @@ class Quality:
         prefix = self.project.tests_dir + '/'
         return {p: value for p, value in self.store.manifest(snapshot).items() if p.startswith(prefix)}
 
-    def protect(self, before, after, *, exact_tests=False):
+    def correction_diff(self,before,after,paths):
+        """V1 exception: reviewed expected text only; no actions, code or tests removed."""
+        from .browser import contract
+        left,right=self.store.manifest(before),self.store.manifest(after)
+        if (not isinstance(paths,list) or not paths or len(paths)>20 or len(set(paths))!=len(paths)
+                or any(p not in left or p not in right or not p.startswith(self.project.tests_dir+'/')
+                    or not (p.rsplit('/',1)[-1]=='qa.json' or p.rsplit('/',1)[-1].startswith('qa.') and p.endswith('.json')) for p in paths)):
+            raise ValueError('explicit existing QA contract paths required')
+        changed={p for p in set(left)|set(right) if left.get(p)!=right.get(p)}
+        if not changed or not changed<=set(paths):raise ValueError('correction may change only approved QA expectations')
+        for p in changed:
+            old=json.loads((self.store.tree(before)/p).read_bytes());new=json.loads((self.store.tree(after)/p).read_bytes())
+            contract(old);contract(new)
+            strip=lambda d:[{k:v for k,v in c.items() if k!='text'} for c in d['checks']]
+            if strip(old)!=strip(new):raise ValueError('QA correction cannot remove or change IDs, actions, paths or selectors')
+
+    def test_evidence(self,key):
+        value=self.store.receipt(key)
+        if value['kind'] not in ('red','test_revision'):raise ValueError('actual Red or explicitly reviewed test revision required')
+        return value
+
+    def protect(self, before, after, *, exact_tests=False,allow_revision=False):
         left, right = self.store.manifest(before), self.store.manifest(after)
+        if allow_revision and self.tests(before)!=self.tests(after):
+            for path in (self.store.root/'receipts').glob('*.json'):
+                record=self.store.receipt(path.stem)
+                if record['kind']!='tests_frozen' or not record['payload'].get('revision'):continue
+                data=record['payload']
+                if data['baseline']==before and data['tests']==self.tests(after):
+                    self.frozen_plan(record)
+                    authority=self.store.receipt(self.store.receipt(data['revision'],kind='test_revision')['payload']['authority'],kind='plan_review')
+                    proposal=self.store.receipt(authority['payload']['plan'],kind='work_plan')['payload']['document']
+                    # CI may contain later product edits, but no other test edit.
+                    protected_unchanged(left,right,prefixes=PROTECTED)
+                    permitted=set(proposal['test_paths'])
+                    if any(p not in permitted and left.get(p)!=right.get(p) for p in set(self.tests(before))|set(self.tests(after))):
+                        raise ValueError('CI changed an unapproved test')
+                    return
+            raise ValueError('protected baseline changed: test correction lacks an exact independent freeze')
         protected_unchanged(left, right, prefixes=(*PROTECTED, self.project.tests_dir+'/'))
         protected_unchanged(right, left, prefixes=PROTECTED)
         if exact_tests and self.tests(before) != self.tests(after):
@@ -195,6 +232,22 @@ class Quality:
 
     def red(self, run, baseline, candidate):
         self.check(run, 'tests')
+        from .repairs import repair_authority
+        authority=repair_authority(self.project,self.store,self.board,run)
+        if authority and authority['proposal']['classification']=='test_contract':
+            self.correction_diff(baseline,candidate,authority['proposal']['test_paths'])
+            if baseline!=authority['context']['snapshot']:raise ValueError('test correction base changed')
+            self.browser_tests(run,candidate)
+            base_job,base=self.observe(run,baseline,'baseline')
+            job,report=self.observe(run,candidate,'green')
+            prior=self.frozen_plan(self.store.receipt(authority['context']['tests'],kind='tests_frozen'))
+            if base['failures'] or report['failures'] or set(report['cases'])!=set(prior['cases']):
+                raise ValueError('test correction must preserve and pass the complete existing suite')
+            historical=self.test_evidence(prior['red'])
+            return self.record(run,'test_revision',dict(control_contract=CONTROL_CONTRACT,authority=authority['review'],
+                historical_tests=authority['context']['tests'],historical_red=prior['red'],baseline=baseline,snapshot=candidate,
+                baseline_job=base_job,validation_job=job,red_job=historical['payload']['red_job'],
+                cases=report['cases'],new_cases=prior['new_cases'],control_cases=prior['control_cases']))
         self.protect(baseline, candidate)
         left, right = self.store.manifest(baseline), self.store.manifest(candidate)
         prefix = self.project.tests_dir+'/'
@@ -218,6 +271,17 @@ class Quality:
 
     def control_plan(self,red,risks):
         data=red['payload']
+        if red['kind']=='test_revision':
+            from .repairs import validate_revision
+            validate_revision(self.project,self.store,self,red)
+            required=set(data['control_cases']);extra=set()
+            if not isinstance(risks,list) or len(risks)>32:raise ValueError('bounded control risks required')
+            for risk in risks:
+                if (not isinstance(risk,dict) or set(risk)!={'case','reason'} or risk['case'] not in data['cases']
+                        or risk['case'] in required|extra or not isinstance(risk['reason'],str) or not 1<=len(risk['reason'].strip())<=2000):
+                    raise ValueError('distinct preserved control cases required')
+                extra.add(risk['case'])
+            return sorted(required|extra)
         if data.get('control_contract')!=CONTROL_CONTRACT:
             raise ValueError('new Red evidence required for the approved behavior-control contract; no legacy conversion')
         job=self.store.receipt(data['red_job'],kind='suite_job');value=job['payload'];identity=value['identity']
@@ -254,7 +318,7 @@ class Quality:
         self.check(run, 'tests', reviewing=True)
         if self.board.input(run, 'red', review_handoff=True) != red_id:
             raise ValueError('obsolete test review input')
-        red = self.store.receipt(red_id, kind='red')
+        red = self.test_evidence(red_id)
         data = red['payload']
         if (red['binding']['task'] != run.task or red['binding']['contract'] != run.contract
                 or red['binding']['actor'] != run.author or data['project'] != self.project.fingerprint()):
@@ -271,7 +335,8 @@ class Quality:
         return self.record(run, 'tests_frozen', dict(control_contract=CONTROL_CONTRACT,control_cases=targets,
             red=red_id, review=review, snapshot=snapshot,
             baseline=data['baseline'], tests=self.tests(snapshot), cases=data['cases'],
-            new_cases=data['new_cases'], test_author=red['binding']['actor']))
+            new_cases=data['new_cases'], test_author=red['binding']['actor'],
+            **({'revision':red_id} if red['kind']=='test_revision' else {})))
 
     def freeze(self, run, freeze_id):
         if self.board.input(run, 'tests') != freeze_id:
@@ -287,7 +352,7 @@ class Quality:
         data=receipt['payload']
         if data.get('control_contract')!=CONTROL_CONTRACT or data.get('project')!=self.project.fingerprint():
             raise ValueError('frozen tests use a historical control contract; new independent review required')
-        red=self.store.receipt(data['red'],kind='red');review=self.store.receipt(data['review'],kind='test_review')
+        red=self.test_evidence(data['red']);review=self.store.receipt(data['review'],kind='test_review')
         if (review['binding']!=receipt['binding'] or review['payload']['project']!=self.project.fingerprint()
                 or review['payload']['red']!=data['red'] or review['payload']['snapshot']!=data['snapshot']
                 or review['payload']['verdict']['decision']!='approve' or red['payload']['snapshot']!=data['snapshot']
@@ -482,10 +547,10 @@ class DeliveryTools:
         def report(key):return payload(key,'suite_job')['report']
         context=dict(phase=run.kind,mutations=[],control_review_contract=CONTROL_REVIEW_CONTRACT)
         if run.kind=='tests':
-            red=payload(self.board.input(run,'red',review_handoff=True),'red')
+            evidence=q.test_evidence(self.board.input(run,'red',review_handoff=True));red=evidence['payload']
         else:
             green=payload(self.board.input(run,'green',review_handoff=True),'green')
-            frozen=payload(green['freeze'],'tests_frozen');red=payload(frozen['red'],'red')
+            frozen=payload(green['freeze'],'tests_frozen');evidence=q.test_evidence(frozen['red']);red=evidence['payload']
             context['frozen_control_cases']=frozen['control_cases']
             controls=payload(self.board.input(run,'controls',review_handoff=True),'controls')
             context['green']=report(green['job'])
@@ -504,6 +569,10 @@ class DeliveryTools:
                     changes.append(change)
                 context['mutations'].append(dict(report=data['report'],changes=changes))
         context.update(baseline=report(red['baseline_job']),red=report(red['red_job']))
+        if evidence['kind']=='test_revision':
+            context.update(test_revision=red,historical_red_only=True,
+                correction_validation=report(red['validation_job']),
+                instructions='Review this new expected-text correction against the approved brief and repair authority. Historical Red remains historical; no new failing test is claimed. Preserve every unit test, action and control target.')
         context['mandatory_red_targets']=sorted({failure['case'] for failure in context['red']['failures']})
         context['passing_cases']=sorted(set(context['red']['cases'])-set(context['mandatory_red_targets']))
         return context

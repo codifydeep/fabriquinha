@@ -141,7 +141,8 @@ class Deployment:
             review=self.store.receipt(pub['review'],kind='delivery_review')['payload']
             green=self.store.receipt(review['green'],kind='green')['payload']
             frozen=self.store.receipt(green['freeze'],kind='tests_frozen')['payload']
-            red=self.store.receipt(frozen['red'],kind='red')['payload']
+            from .quality import Quality
+            red=Quality(self.project,self.store,None,self.board).test_evidence(frozen['red'])['payload']
             job=self.store.receipt(red['baseline_job'],kind='suite_job')['payload']
             commit,snapshot,role=pub['base_sha'],red['baseline'],'bootstrap'
             report=job['report']

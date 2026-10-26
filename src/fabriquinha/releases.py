@@ -78,15 +78,15 @@ class Releases:
         self.store.tree(value['snapshot'])
         return self.store.record('release_seed',self.binding(anchor),value)
 
-    def materialize(self,conn,anchor,specification,services):
-        kb,_,_=native();path=self.folder(anchor)/'graph.json';binding=self.binding(anchor)
+    def materialize(self,conn,anchor,specification,services,*,path=None,seed=None):
+        kb,_,_=native();path=path or self.folder(anchor)/'graph.json';binding=self.binding(anchor)
         if path.exists():
             graph_id=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(graph_id,kind='release_graph')
             graph=record['payload']
             if record['binding']!=binding or graph['project']!=self.project.fingerprint() or graph['plan_review']!=specification['review']:
                 raise ValueError('release graph or approved plan changed')
         else:
-            seed=self.seed(anchor,specification,services);baseline=self.store.receipt(seed,kind='release_seed')['payload']
+            seed=seed or self.seed(anchor,specification,services);baseline=self.store.receipt(seed,kind='release_seed')['payload']
             previous=None;by_package={};items=[]
             for package in ordered(specification['document']['tasks']):
                 self.project.reviewer(package['owner'],exclude=(self.project.delivery_roles['tests'],))
@@ -98,8 +98,10 @@ class Releases:
                     owner=(package['owner'] if phase=='implementation' else self.project.delivery_roles[phase])
                     inputs=(test_inputs if phase=='tests' else {'tests':'parent:'+cards['tests']['id']+':tests'}
                             if phase=='implementation' else {'delivery':'parent:'+cards['implementation']['id']+':delivery'})
+                    if specification.get('repair'):inputs={**inputs,'repair_review':specification['repair']['review']}
                     deps=parents if phase=='tests' else [cards['tests' if phase=='implementation' else 'implementation']['id']]
                     body=self.body(phase,binding['release'],anchor.id,specification['review'],package,inputs)
+                    if specification.get('repair'):body['repair_plan']=specification['repair']['plan']
                     workspace=self.store.root.parent/'work'/binding['release']/package['id']/phase
                     workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
                     contract=self.project.repository.removeprefix('https://github.com/') if phase=='integration' else 'local-only'
@@ -123,6 +125,11 @@ class Releases:
                     if self.board.guard:self.board.guard()
                     if not kb.unblock_task(conn,task.id):raise ValueError('native initial graph activation refused')
         return graph_id,graph
+
+    def graph_path(self,anchor,body):
+        repair=body.get('repair_plan')
+        if repair is not None and not re.fullmatch(r't_[a-f0-9]{8}',repair):raise ValueError('native corrective plan identity required')
+        return self.folder(anchor)/(('repair-'+repair+'.json') if repair else 'graph.json')
 
     def check_card(self,conn,card):
         kb,_,_=native();task=kb.get_task(conn,card['id'])
@@ -159,7 +166,7 @@ class Releases:
         with kbc.connect_closing() as conn:
             anchor=kb.get_task(conn,body.get('release_anchor'))
             if not anchor or anchor.status!='blocked':raise ValueError('active release anchor required')
-            graph=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')
+            graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')
             if graph['binding']!=self.binding(anchor) or graph['payload']['project']!=self.project.fingerprint():raise ValueError('graph scope changed')
             card=next((item['cards'][body['kind']] for item in graph['payload']['items'] if item['package']['id']==body.get('package')),None)
             if not card or card['id']!=task.id:raise ValueError('graph-owned assignment required')
@@ -172,7 +179,7 @@ class Releases:
             body=json.loads(kb.get_task(conn,run.task).body)
             anchor=kb.get_task(conn,body.get('release_anchor'))
             if not anchor or anchor.status!='blocked' or self.intake.terminal(anchor):raise ValueError('active release graph required')
-            record=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')
+            record=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')
             if record['binding']!=self.binding(anchor) or record['payload']['project']!=self.project.fingerprint():raise ValueError('foreign graph')
             card=next((item['cards'][run.kind] for item in record['payload']['items']
                        if item['package']['id']==body.get('package')),None)
@@ -181,7 +188,14 @@ class Releases:
         if run.kind=='tests' and not run.reviewing:
             source=self.baseline(run,body);workspace=self.board.workspace(run)
             if not any(workspace.iterdir()):self.store.checkout(source,workspace)
-            else:quality.protect(source,self.store.capture(workspace))
+            else:
+                from .repairs import repair_authority
+                authority=repair_authority(self.project,self.store,self.board,run)
+                if authority and authority['proposal']['classification']=='test_contract':
+                    left,right=self.store.manifest(source),self.store.manifest(self.store.capture(workspace))
+                    if any(p not in authority['proposal']['test_paths'] and left.get(p)!=right.get(p) for p in set(left)|set(right)):
+                        raise ValueError('correction workspace changed an unauthorized file')
+                else:quality.protect(source,self.store.capture(workspace))
         review=self.store.receipt(body['release_plan'],kind='plan_review')
         proposed=self.store.receipt(review['payload']['plan'],kind='work_plan')
         _,brief=self.intake.approved(proposed['payload']['approval'])
@@ -190,14 +204,19 @@ class Releases:
         elif run.kind=='integration':snapshot=self.store.receipt(self.board.input(run,'delivery'),kind='delivery_review')['payload']['snapshot']
         else:
             key='red' if run.kind=='tests' else 'green'
-            snapshot=self.store.receipt(self.board.input(run,key,review_handoff=True),kind=key)['payload']['snapshot']
+            receipt=self.board.input(run,key,review_handoff=True)
+            snapshot=(quality.test_evidence(receipt) if key=='red' else self.store.receipt(receipt,kind=key))['payload']['snapshot']
         folder=self.store.tree(snapshot)/self.project.tests_dir
         try:existing=[item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else []
         except (ValueError,OSError):existing='InvalidBrowserContract: review the immutable files; do not weaken existing scenarios'
         controls=(quality.freeze(run,self.board.input(run,'tests'))['control_cases'] if run.kind=='implementation' else None)
-        return dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
+        from .repairs import repair_authority
+        authority=repair_authority(self.project,self.store,self.board,run)
+        technical=authority['context'] if authority else proposed['payload']['document']
+        result=dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
+            repair=authority,
             required_control_cases=controls,
-            architecture=proposed['payload']['document']['architecture'],observability=proposed['payload']['document']['observability'],
+            architecture=technical['architecture'],observability=technical['observability'],
             execution=execution_context(self.project),baseline=snapshot,existing_qa=existing,
             browser_protocol=author_protocol(),
             acceptance=body['acceptance'],stack='qualified Python HTTP, port 8080, /health and /identity; no downloads/network in workers',
@@ -212,6 +231,10 @@ class Releases:
                 'Use actual browser_protocol operations, not hypothetical unsupported assertions.',
             browser='Add only missing criterion IDs in '+self.project.tests_dir+'/qa.'+body['package']+'-'+run.release[:12]+'.json; '
                 'preserve every old QA contract and avoid duplicate IDs. Follow browser_protocol, including exact field names.')
+        if authority and authority['proposal']['classification']=='test_contract':
+            result['tdd']='Technical QA-expectation correction, not new functionality. Historical Red and every unittest/control target remain preserved. Test author may correct only expected text in repair.proposal.test_paths, citing the approved brief. delivery_submit records test_revision, not a new Red. Reviewer independently checks the correction and freezes a new revision. Implementer uses unchanged frozen tests and must run Green and all required negative controls.'
+            result['browser']='Change only expected text in the explicitly authorized existing QA files; preserve all IDs, actions, selectors, paths and unit tests. Match the brief and deterministic UI wording; do not add requirements or weaken business coverage.'
+        return result
 
     def baseline(self,run,body):
         source=self.board.input(run,'baseline');reference=body['inputs']['baseline']
@@ -225,11 +248,20 @@ class Releases:
         return source
 
     def package_evidence(self,item,previous):
+        if item.get('repair_context'):
+            context=self.store.receipt(item['repair_context'],kind='repair_context')['payload']
+            base=previous;history=context
+            while history['prior'].get('repair_context'):
+                history=self.store.receipt(history['prior']['repair_context'],kind='repair_context')['payload']
+            if history['prior_base_commit']!=base['commit'] or history['prior_base_snapshot']!=base['snapshot']:
+                raise ValueError('corrective history must extend the original integrated package base')
+            frozen=Quality(self.project,self.store,None,self.board).frozen_plan(self.store.receipt(context['tests'],kind='tests_frozen'))
+            previous=dict(snapshot=context['snapshot'],commit=context['commit'],cases=sorted(set(previous.get('cases',[]))|set(frozen['cases'])))
         cards=item['cards'];tests,frozen,_=self.closed(cards['tests']['id'],'tests','tests_frozen')
         frozen_plan=Quality(self.project,self.store,None,self.board).frozen_plan(frozen)
         delivery,review,_=self.closed(cards['implementation']['id'],'delivery','delivery_review')
         qa_id,qa,handoff=self.closed(cards['integration']['id'],'release_evidence','release_evidence')
-        red=self.store.receipt(frozen['payload']['red'],kind='red');green=self.store.receipt(review['payload']['green'],kind='green')
+        red=Quality(self.project,self.store,None,self.board).test_evidence(frozen['payload']['red']);green=self.store.receipt(review['payload']['green'],kind='green')
         controls=self.store.receipt(review['payload']['controls'],kind='controls')
         artifact=self.store.receipt(qa['payload']['artifact'],kind='artifact')
         integrated=self.store.receipt(qa['payload']['integrated'],kind='integrated')
@@ -249,6 +281,7 @@ class Releases:
             raise ValueError('each package requires exact reviewed TDD, integrated base, deployed QA and rollback')
         self.store.tree(artifact['payload']['snapshot'])
         return dict(package=item['package']['id'],criteria=item['package']['criteria'],tests=tests,delivery=delivery,
+            **({'repair_context':item['repair_context']} if item.get('repair_context') else {}),
             qa=qa_id,commit=qa['payload']['commit'],snapshot=artifact['payload']['snapshot'],cases=green['payload']['cases'],
             checks=qa['payload']['checks'],pr=publication['payload']['pr'])
 
@@ -256,6 +289,9 @@ class Releases:
         self.board.ensure(run);kb,kbc,_=native()
         with kbc.connect_closing() as conn:
             body=json.loads(kb.get_task(conn,run.task).body);anchor=kb.get_task(conn,body['release_anchor'])
+        if body.get('repair_plan'):
+            from .repairs import repair_authority
+            return repair_authority(self.project,self.store,self.board,run)['context']['artifact']
         graph=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')['payload']
         for index,item in enumerate(graph['items']):
             if item['cards']['integration']['id']!=run.task:continue
@@ -308,6 +344,10 @@ class Releases:
                     spec=self.specification(conn,anchor)
                     if spec is None:continue
                     graph_id,graph=self.materialize(conn,anchor,spec,services)
+                    from .repairs import Repairs
+                    effective=Repairs(self).reconcile(conn,anchor,spec,graph,services)
+                    if effective!=graph:
+                        graph=effective;graph_id=self.store.record('release_graph',self.binding(anchor),graph)
                     self.accept(conn,anchor,spec,graph_id,graph,services)
                 except (ValueError,KeyError,TypeError,OSError,subprocess.SubprocessError,EffectBlocked,Pending) as error:
                     issues[anchor.id]=dict(category=type(error).__name__,detail=str(error)[:500],owner=self.project.coordination_roles['lead'])

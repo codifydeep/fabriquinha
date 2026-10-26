@@ -1,6 +1,9 @@
 # Revisão crítica da execução — 26 de outubro de 2026
 
-**Estado: auditoria e proposta; desenvolvimento e chamadas pagas permanecem pausados.**
+**Estado da auditoria: proposta apresentada durante a pausa.**
+O proprietário aprovou posteriormente os refinamentos e a retomada em 26/10;
+consulte o [ADR 0004](ADR-0004-SCOPED-REPAIR.md) e o [status atual](STATUS.md).
+O texto abaixo preserva a análise e a situação observada antes desse aceite.
 Esta análise não autoriza ensaio, alteração de gate, correção dos testes congelados
 ou aprovação retroativa. Revisão do código em `c9144c68`, documentos e recibos
 privados preservados. Foram feitas leituras locais e consulta à documentação

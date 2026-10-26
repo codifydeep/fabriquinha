@@ -162,7 +162,7 @@ class LocalCI:
         current()
         baseline,snapshot=self.repo.snapshot(base),self.repo.snapshot(head)
         self.repo.git('merge-base','--is-ancestor',base,head)
-        Quality(self.project,self.store,self.runner,None).protect(baseline,snapshot)
+        Quality(self.project,self.store,self.runner,None).protect(baseline,snapshot,allow_revision=True)
         binding=dict(scope='local_ci',version=1,project=self.project.fingerprint(),head=head,base=base,stage=stage)
         def execute(tree,phase,scope):
             class Execution:
@@ -393,7 +393,8 @@ class Publication:
         data = review['payload']
         green = self.store.receipt(data['green'],kind='green')['payload']
         frozen = Quality(self.project,self.store,None,self.board).frozen_plan(self.store.receipt(green['freeze'],kind='tests_frozen'))
-        red = self.store.receipt(frozen['red'],kind='red')['payload']
+        evidence=Quality(self.project,self.store,None,self.board).test_evidence(frozen['red'])
+        red=evidence['payload']
         controls = self.store.receipt(data['controls'],kind='controls')['payload']
         if (green['snapshot'] != snapshot or controls['green'] != data['green']
                 or controls.get('control_contract')!=CONTROL_CONTRACT
@@ -405,7 +406,9 @@ class Publication:
             '\n\n## TDD evidence\nTrusted command: `python -B /opt/fabriquinha/suite.py`'+
             '\nDiscovery directory: '+self.project.tests_dir+'\nValidator image: '+self.project.validation_image+
             '\nPassing baseline job: '+red['baseline_job']+
-            '\nRed job: '+red['red_job']+'\nRequired behavior controls: '+', '.join(frozen['control_cases'])+
+            '\n'+('Historical Red job (no new Red claimed): ' if evidence['kind']=='test_revision' else 'Red job: ')+red['red_job']+
+            ('\nTest-contract correction: '+frozen['red']+'; independently frozen revision: '+green['freeze'] if evidence['kind']=='test_revision' else '')+
+            '\nRequired behavior controls: '+', '.join(frozen['control_cases'])+
             '\nFrozen tests: '+green['freeze']+'\nGreen job: '+green['job']+
             '\nComplete suite: '+str(len(green['cases']))+' cases'+
             '\nNegative control jobs: '+', '.join(controls['jobs'])+
@@ -425,7 +428,7 @@ class Publication:
         review=self.store.receipt(review_id,kind='delivery_review')['payload']
         green=self.store.receipt(review['green'],kind='green')['payload']
         frozen=self.store.receipt(green['freeze'],kind='tests_frozen')['payload']
-        red=self.store.receipt(frozen['red'],kind='red')['payload']
+        red=Quality(self.project,self.store,None,self.board).test_evidence(frozen['red'])['payload']
         if self.repo.snapshot(base)!=red['baseline']:
             raise EffectBlocked('reviewed work uses an older baseline; rebase and preserve current regression tests')
         identity = dict(binding=inputs['origin'], project=self.project.fingerprint(), review=review_id,

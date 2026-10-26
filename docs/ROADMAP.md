@@ -1,12 +1,14 @@
 # Roadmap vigente — 26 de outubro de 2026
 
-**Desenvolvimento pausado por solicitação do proprietário.** Este documento
-organiza a próxima sequência; não autoriza agentes, consumo ou alteração de gates.
+**Retomada e refinamentos aprovados em 26/10/2026.** O trabalho atual é P1,
+o reparo mínimo da mesma release, sob o [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
+As cotas e o modelo existentes continuam limitando o consumo.
 
 A estratégia aprovada continua [Hermes + Kanban](SIMPLIFICATION-REVIEW-2026-10-24.md).
 O [F1 aprovado](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) continua vigente. A
 [auditoria de 26/10](EXECUTION-REVIEW-2026-10-26.md) propõe mudanças adicionais de
-contrato e um reparo menor; elas não estão instaladas nem aprovadas implicitamente.
+contrato e um reparo menor, agora aprovados explicitamente. A implementação inicial
+é limitada pelo ADR 0004; funcionalidades posteriores não são consideradas prontas.
 O [status](STATUS.md) registra o resultado real mais recente.
 
 ## O que já passou
@@ -26,9 +28,9 @@ S5, S6 e S7 permanecem não qualificados.
 
 ## Próxima sequência proposta
 
-### P0 — Aprovar o refinamento de contrato
+### P0 — Refinamento de contrato aceito
 
-Decidir a autoridade para corrigir teste tecnicamente errado sem alterar o brief,
+Aceite registrado no ADR 0004: autoridade para corrigir teste tecnicamente errado sem alterar o brief,
 sempre com nova revisão independente e histórico preservado. Reservar ao CEO
 mudanças de negócio e exceções que removam cobertura. Separar o futuro Red de
 regressão já detectada do Red de funcionalidade nova.

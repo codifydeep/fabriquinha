@@ -470,6 +470,7 @@ class Runtime:
                 if matching:
                     incident=max(matching,key=lambda i:i['block_event'])
                     card.update(technical_owner=incident['owner'],next_action=incident['next_action'])
+                    if incident.get('corrective_task'):card['corrective_task']=incident['corrective_task']
             control=self.control.read()
             if control['paused']:control={**control,**self.pause_status(conn)}
         return dict(namespace=self.project.namespace,cards=cards,settlement=self.settlement,recovery_issues=self.recovery_issues,

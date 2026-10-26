@@ -145,6 +145,23 @@ class ReleaseContracts(unittest.TestCase):
             self.assertIn(first,second['parents'])
             self.assertEqual(second['body']['inputs']['baseline'],'parent:'+first+':baseline')
             unblocked.clear();self.releases.materialize(conn,anchor,spec,Mock());self.assertEqual(unblocked,[])
+            original=(self.releases.folder(anchor)/'graph.json').read_bytes()
+            repair=dict(task='repair-plan',review='repair-review',document={**work(),'tasks':[work()['tasks'][0]]},
+                repair=dict(review='repair-review',plan='t_abcdef01',context='negative-context'))
+            path=self.releases.folder(anchor)/'repair-t_abcdef01.json'
+            def activate_repair(_,task):
+                self.assertTrue(path.is_file());unblocked.append(task);tasks[task].status='ready';return True
+            kb.unblock_task=activate_repair
+            _,corrective=self.releases.materialize(conn,anchor,repair,Mock(),path=path,seed=seed)
+            self.assertEqual(len(corrective['items']),1)
+            test=corrective['items'][0]['cards']['tests']
+            self.assertEqual(test['parents'],['repair-plan'])
+            self.assertEqual(test['body']['inputs']['repair_review'],'repair-review')
+            self.assertEqual(test['body']['inputs']['baseline'],self.store.receipt(seed)['payload']['snapshot'])
+            self.assertEqual((self.releases.folder(anchor)/'graph.json').read_bytes(),original)
+            count=len(tasks);unblocked.clear()
+            self.releases.materialize(conn,anchor,repair,Mock(),path=path,seed=seed)
+            self.assertEqual(len(tasks),count);self.assertEqual(unblocked,[])
 
     def test_final_qa_must_cover_the_whole_brief_not_only_the_last_package(self):
         seed=self.store.record('release_seed',{},dict(snapshot='baseline',commit='base'))

@@ -8,7 +8,7 @@ from .artifacts import digest,encoded
 from .board import Run
 from .effects import Journal, EffectBlocked, Pending,write_json
 from .kanban_lane import native
-from .quality import DeliveryTools, product_mutations, review_decision, suite_report
+from .quality import Quality, DeliveryTools, product_mutations, review_decision, suite_report
 
 
 def browser_refusal_context(store,project,binding,key):
@@ -282,7 +282,8 @@ class Recovery:
             self.store.tree(record['payload']['snapshot']);return record['payload']['snapshot']
         if source.reviewing:
             kind='red' if source.kind=='tests' else 'green'
-            record=self.store.receipt(handoff[kind],kind=kind)
+            record=(Quality(self.project,self.store,None,self.board).test_evidence(handoff[kind]) if kind=='red'
+                    else self.store.receipt(handoff[kind],kind=kind))
             expected={**source.binding(),'actor':source.author,'reviewing':False}
             if (not Run(**expected).same_subject(record['binding']) or record['payload']['project']!=self.project.fingerprint()):
                 raise ValueError('review diagnostic must match its exact immutable author handoff')
@@ -446,8 +447,8 @@ class Recovery:
 
     def status(self,conn):
         if not self.project.technical_roles:return []
-        kb,_,_=native();incidents={}
-        for task in self.cards(conn):
+        kb,_,_=native();incidents={};tasks=self.cards(conn)
+        for task in tasks:
             body=json.loads(task.body or '{}')
             if body.get('kind')!='diagnostic':continue
             key=body['inputs']['incident'];record=self.store.receipt(key,kind='incident')
@@ -490,6 +491,19 @@ class Recovery:
                     'CTO diagnostic failed: inspect its retained run and repair protocol/capability before another attempt.' if state=='diagnosis_failed' else
                     'Assigned technical diagnosis; inspect recorded failure and execute a permitted experiment.'),
                 delivery_approval=False)
+            for candidate in tasks:
+                correction=json.loads(candidate.body or '{}')
+                if correction.get('repair_of')!=target.id:continue
+                context=self.store.receipt(correction['repair_context'],kind='repair_context')
+                if context['payload']['source']!=target.id or context['payload']['project']!=self.project.fingerprint():
+                    raise ValueError('corrective incident link changed')
+                current=incidents[key]
+                current.update(state='correction_blocked' if candidate.status in ('blocked','triage') else 'repairing',
+                    corrective_task=candidate.id,owner=candidate.assignee,
+                    next_action='Follow corrective card '+candidate.id+' and its reviewed package; the original failure remains preserved.')
+                anchor=kb.get_task(conn,correction['anchor'])
+                from .intake import Intake
+                if Intake(self.project,self.store,self.board).terminal(anchor):current.update(state='resolved_by_repair',next_action='Release homologated with corrective evidence; original failed execution remains historical.')
         return list(incidents.values())
 
 

@@ -356,11 +356,19 @@ def draft_schemas(project,criteria_ids=()):
 def register_draft(activity,on_terminal):
     from tools.registry import registry
     operations=DraftTools(activity)
+    kb,api,_=native()
+    with api.connect_closing() as conn:repair=bool(json.loads(kb.get_task(conn,activity.run.task).body).get('repair_of'))
+    if repair:
+        from .repairs import RepairTools
+        operations=RepairTools(activity)
     names={'plan_review':operations.review} if activity.run.reviewing else (
-        {'brief_submit':operations.submit,'brief_question':operations.question} if activity.run.kind=='brief' else {'plan_submit':operations.submit})
+        {'brief_submit':operations.submit,'brief_question':operations.question} if activity.run.kind=='brief' else
+        {'repair_submit' if repair else 'plan_submit':operations.submit})
     criteria_ids=([item['id'] for item in operations.evidence()['approved_brief']['criteria']]
                   if activity.run.kind=='plan' else ())
     properties=draft_schemas(activity.project,criteria_ids)
+    if repair:properties['repair_submit']=dict(classification=dict(type='string',enum=['product','test_contract','infrastructure','scope']),
+        reason=dict(type='string',minLength=1,maxLength=4000),test_paths=dict(type='array',maxItems=20,uniqueItems=True,items=dict(type='string')))
     for name,operation in names.items():
         def handler(args,operation=operation,**kwargs):
             result=operation(args)

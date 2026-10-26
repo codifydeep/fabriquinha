@@ -5,13 +5,15 @@ das etapas ainda não qualificadas. A presença de um módulo não comprova sua
 ativação no runtime. Não descreve uma arquitetura futura como se Temporal já
 estivesse instalado.
 
-Estado de referência revisto: **25 de outubro de 2026**. Componentes existentes
+Estado de referência revisto: **26 de outubro de 2026**. Componentes existentes
 não significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md) e a
-[auditoria da execução](EXECUTION-REVIEW-2026-10-25.md). O refinamento F1 foi
+[auditoria da execução](EXECUTION-REVIEW-2026-10-26.md). O refinamento F1 foi
 aprovado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) e implementado:
 alvos de controle vêm do Red e de riscos adicionais congelados pelo revisor;
 testes auxiliares permanecem na suíte completa. A recuperação ainda não cobre
-todas as fases. As correções offline foram retomadas; o S4 real continua pausado.
+todas as fases. O [ADR 0004](ADR-0004-SCOPED-REPAIR.md) autoriza o reparo mínimo:
+um pacote corretivo no mesmo Kanban, preservando plano, grafo e falhas anteriores.
+Sua prova isolada não qualifica autonomia; a tentativa preservada será assistida.
 
 ## Caminho Hermes isolado em construção
 

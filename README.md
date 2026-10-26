@@ -85,10 +85,18 @@ flowchart TD
     M --> D[DevOps: deploy e rollback]
     D --> Q[QA independente do ambiente]
     Q -->|aprovado| H[HOMOLOGADA com URL e evidências]
-    Q -->|falha| X[Diagnóstico com erro real; retrabalho versionado ainda pendente]
+    Q -->|falha| X[Lead: classificar erro contra o brief]
+    X --> R[Proposta corretiva e revisão independente]
+    R -->|produto| T
+    R -->|expectativa QA incorreta| RT[Correção restrita; Red histórico preservado]
+    RT --> F
+    R -->|infraestrutura ou escopo| E[Impedimento explícito com responsável]
 ```
 
 O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
+O [reparo mínimo](docs/ADR-0004-SCOPED-REPAIR.md) limita-se ao último pacote
+serializado e, para testes, à expectativa textual QA explicitamente autorizada.
+Não é replanejamento geral nem permissão para remover cobertura.
 Uma tentativa real anterior chegou ao freeze independente e iniciou implementação
 antes da pausa humana. As novas fronteiras do contrato 2 estão descritas no
 [status](docs/STATUS.md). **Ainda não há entrega real completa qualificada.**

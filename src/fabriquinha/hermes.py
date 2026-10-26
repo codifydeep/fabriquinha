@@ -153,7 +153,9 @@ class Sandbox:
             self.workspace=store.tree(record['payload']['snapshot'])
         elif run.reviewing:
             kind='red' if run.kind=='tests' else 'green'
-            record=store.receipt(board.input(run,kind,review_handoff=True),kind=kind)
+            record=store.receipt(board.input(run,kind,review_handoff=True))
+            if record['kind'] not in (('red','test_revision') if kind=='red' else ('green',)):
+                raise ValueError('exact immutable test evidence or Green required')
             binding=record['binding']
             if (binding['task']!=run.task or binding['contract']!=run.contract
                     or binding['release']!=run.release or binding['actor']!=run.author
@@ -165,6 +167,10 @@ class Sandbox:
             if run.kind=='tests':
                 baseline=[p for p in store.manifest(board.input(run,'baseline'))
                           if p.startswith(project.tests_dir+'/')]
+                from .repairs import repair_authority
+                authority=repair_authority(project,store,board,run)
+                if authority and authority['proposal']['classification']=='test_contract':
+                    baseline=[p for p in baseline if p not in authority['proposal']['test_paths']]
         if ',' in str(self.workspace):raise ValueError('Docker bind source cannot contain a comma')
         self.expected=dict(binding=run.binding(),project=project.fingerprint(),
             workspace=str(self.workspace),phase=self.phase,baseline_tests=baseline,image=project.validation_image)
@@ -448,6 +454,10 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
         phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch. Exploratory terminal calls are limited to '+str(min(120,sandbox.project.timeout_seconds))+' seconds. The delivery_submit gate runs the full suite; partial exploratory runs never qualify delivery. Use its covered/missing control feedback rather than repeating unchanged mutation proposals.'
+        if getattr(operations,'repair',False) is True:
+            phase=('Independently review the exact corrective classification, brief authority and explicit QA paths; use plan_review.'
+                   if sandbox.run.reviewing else
+                   'Classify the recorded deployed QA failure against the approved brief using repair_submit. Propose product or test_contract with evidence and explicit existing QA paths. No new brief, whole-release plan, implementation or fabricated evidence.')
         prompt=sandbox_context(prompt)
         if 'terminal' in allowed:terminal_schema(min(120,sandbox.project.timeout_seconds))
         agent=AIAgent(**route,max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],

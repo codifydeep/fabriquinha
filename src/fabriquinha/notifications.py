@@ -243,6 +243,7 @@ def validation_progress(card,store,project):
 
 def alerts(outbox,cards,store,*,now,alert_after=600,escalate_after=1800):
     for card in cards:
+        if card.get('corrective_task'):continue  # Its explicit corrective card owns current alerts; old failure stays visible.
         if card['status'] not in ('ready','review','running','blocked','triage'):continue
         if card['status'] in ('blocked','triage') and card.get('kind') not in ('brief','plan','tests','implementation','integration','diagnostic'):continue
         marker=card.get('run_started_at') if card['status']=='running' else card.get('last_event_at')

@@ -3,11 +3,20 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
-**Auditoria atual:** a [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md) confirmou
+**Retomada autorizada:** o proprietário aprovou os refinamentos de contrato e
+o plano revisado. O [ADR 0004](ADR-0004-SCOPED-REPAIR.md) registra o aceite.
+O reparo mínimo está implementado e sua prova passou em nove jobs Docker/Chromium
+sem chamadas pagas: revisão explícita de expectativa QA, produto/testes Python
+preservados, Green, controles, revisão e validação integrada. As decisões dessa
+fixture são programadas; não provam lifecycle nativo ou autonomia. A suíte do
+núcleo passou em 290 testes. A base e as evidências do caso preservado foram
+conferidas; sua retomada será classificada como recuperação assistida.
+
+**Auditoria preservada:** a [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md) confirmou
 o avanço até deploy e identificou divergência entre o brief e o QA: o brief pede
 uma saudação contendo o nome; o QA exige texto exatamente igual ao nome. Isso não
 prova, por si só, defeito do produto. Recomenda-se reparo limitado e um caminho
-revisado de correção técnica de testes, ainda sujeitos a aceite. A auditoria
+revisado de correção técnica de testes, posteriormente aceitos. A auditoria
 não alterou código, gates, modelo, orçamento ou pausa. Nos quatro últimos ensaios:
 143 chamadas, 2.648.882 tokens de entrada, 172.148 de saída e nenhuma homologação
 autônoma. Custo efetivo em dólares não está registrado. O [roadmap](ROADMAP.md)

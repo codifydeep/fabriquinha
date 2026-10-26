@@ -9,8 +9,8 @@ snapshots e recibos operacionais completos permanecem privados.
 
 1. [Status atual](STATUS.md): o que foi comprovado e o que falta.
 2. [Revisão da execução de 26/10](EXECUTION-REVIEW-2026-10-26.md): evolução,
-   divergência de QA, simplificação do retrabalho e custos; propostas pendentes
-   de aceite, com execução pausada.
+   divergência de QA, simplificação do retrabalho e custos; refinamentos aceitos
+   posteriormente no [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
 3. [Roadmap vigente](ROADMAP.md): próxima sequência e critérios de saída.
 4. [Plano aprovado de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md) e
    [ADR 0001](ADR-0001-HERMES-FIRST.md): estratégia Hermes + Kanban.

@@ -130,6 +130,11 @@ class Board:
             raise ValueError('current reviewed package criteria required')
         return tuple(criteria)
 
+    def repair_input(self,run):
+        self.ensure(run);kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            return json.loads(kb.get_task(conn,run.task).body).get('inputs',{}).get('repair_review')
+
     def input(self, run, name, *, review_handoff=False):
         self.ensure(run)
         kb, kbc, _ = native()
