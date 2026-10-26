@@ -20,6 +20,16 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_qa_correction_diagnosis_executes_the_preview_and_cannot_direct_product_writes(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.repair=dict(proposal=dict(classification='test_contract',test_paths=['tests/qa.json']))
+        self.quality.observe=Mock(return_value=('observed-job',dict(qa_preview={'status':'failed','errors':['AC2 exact text mismatch']})))
+        diagnostic.validate(dict(hypothesis='Reproduce the current QA mismatch without changing source'))
+        self.quality.observe.assert_called_once_with(self.run,self.snapshot,'green')
+        with self.assertRaisesRegex(ValueError,'outside'):
+            diagnostic.decide(dict(action='resume',reason='Change product wording',findings=[dict(path='app.py',line=1,detail='Edit the app')]))
+        self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
+
     def setUp(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         self.root=Path(temporary.name).resolve();self.store=Store(self.root/'private')

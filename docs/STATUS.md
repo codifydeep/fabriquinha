@@ -5,12 +5,22 @@ Temporal não participam do caminho novo; a instalação legada permanece pausad
 
 **Retomada autorizada:** o proprietário aprovou os refinamentos de contrato e
 o plano revisado. O [ADR 0004](ADR-0004-SCOPED-REPAIR.md) registra o aceite.
-O reparo mínimo está implementado e sua prova passou em nove jobs Docker/Chromium
+O reparo mínimo está implementado e sua prova passou em dez jobs Docker/Chromium
 sem chamadas pagas: revisão explícita de expectativa QA, produto/testes Python
 preservados, Green, controles, revisão e validação integrada. As decisões dessa
 fixture são programadas; não provam lifecycle nativo ou autonomia. A suíte do
-núcleo passou em 290 testes. A base e as evidências do caso preservado foram
+núcleo passou em 291 testes. A base e as evidências do caso preservado foram
 conferidas; sua retomada será classificada como recuperação assistida.
+
+A primeira execução corretiva classificou a falha como `test_contract` e recebeu
+revisão CTO, mas QA corrigiu apenas uma expectativa. O diagnóstico seguinte
+ainda recomendava escrita no produto, incompatível com essa autoridade; a
+atividade chegou à triagem. Essa tentativa foi pausada e preservada. A correção
+posterior transmite brief/autoridade ao diagnóstico, executa sua prévia QA e
+recusa orientação de escrita fora dos caminhos permitidos. Nova proposta após
+triagem exige diagnóstico CTO concluído e respeita o limite total de dois pacotes;
+não retoma o card que o breaker recusou. A prova de dez jobs e o teste focado
+cobrem esse limite de diagnóstico, sem alegar recuperação autônoma concluída.
 
 **Auditoria preservada:** a [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md) confirmou
 o avanço até deploy e identificou divergência entre o brief e o QA: o brief pede

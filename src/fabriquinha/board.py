@@ -131,9 +131,14 @@ class Board:
         return tuple(criteria)
 
     def repair_input(self,run):
-        self.ensure(run);kb,kbc,_=native()
+        self.ensure(run)
+        return self.repair_for_task(run.task)
+
+    def repair_for_task(self,task):
+        """Inactive diagnostic context only; never grants a worker claim."""
+        kb,kbc,_=native()
         with kbc.connect_closing() as conn:
-            return json.loads(kb.get_task(conn,run.task).body).get('inputs',{}).get('repair_review')
+            return json.loads(kb.get_task(conn,task).body).get('inputs',{}).get('repair_review')
 
     def input(self, run, name, *, review_handoff=False):
         self.ensure(run)

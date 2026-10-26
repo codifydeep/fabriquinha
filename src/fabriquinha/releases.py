@@ -210,11 +210,11 @@ class Releases:
         try:existing=[item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else []
         except (ValueError,OSError):existing='InvalidBrowserContract: review the immutable files; do not weaken existing scenarios'
         controls=(quality.freeze(run,self.board.input(run,'tests'))['control_cases'] if run.kind=='implementation' else None)
-        from .repairs import repair_authority
+        from .repairs import repair_authority,context_view
         authority=repair_authority(self.project,self.store,self.board,run)
         technical=authority['context'] if authority else proposed['payload']['document']
         result=dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
-            repair=authority,
+            repair=({**authority,'context':context_view(self.store,authority['context'])} if authority else None),
             required_control_cases=controls,
             architecture=technical['architecture'],observability=technical['observability'],
             execution=execution_context(self.project),baseline=snapshot,existing_qa=existing,

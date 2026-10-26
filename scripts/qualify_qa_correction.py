@@ -61,6 +61,12 @@ def qualify(root,image):
     else:raise AssertionError('contradictory QA unexpectedly passed')
     failure=quality.suite_refusal
     assert failure and not suite_report(store.receipt(failure)['payload'],diagnostic=True)['failures']
+    diagnosis=Run('correction-diagnosis',4,'lead','diagnostic',False,'lead','proof','diagnosis-contract')
+    diagnostic_job,negative=wait(lambda:quality.observe(diagnosis,before,'green'))
+    assert negative['qa_preview']['status']=='failed' and not negative['failures']
+    try:quality.green(diagnosis,historical,before)
+    except ValueError:pass
+    else:raise AssertionError('diagnostic acquired implementation authority')
     context=store.record('repair_context',dict(release='proof'),dict(project=project.fingerprint(),snapshot=before,
         tests=historical,qa_paths=['tests/qa.json'],failure_job=failure))
     body=dict(version=1,kind='plan',release='proof',repair_of='failed-integration',repair_context=context)
@@ -95,6 +101,7 @@ def qualify(root,image):
     jobs=[p for p in (store.root/'receipts').glob('*.json') if store.receipt(p.stem)['kind']=='suite_job']
     result=dict(passed=True,real_docker_jobs=len(jobs),historical_red=red,test_revision=revision,freeze=frozen,
         delivery_review=review,unit_green_conflicting_qa_rejected=True,ordinary_exception_denied=True,
+        diagnostic_browser_failure_visible_without_approval=True,diagnostic_job=diagnostic_job,
         existing_unit_tests_unchanged=True,product_unchanged=True,controls_preserved=True,integrated_browser_passed=True,
         paid_calls=0,model_judgment=False,native_lifecycle=False,delivery_approval=False,all_jobs_retired=True)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result

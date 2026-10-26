@@ -173,7 +173,7 @@ class Quality:
         preview_evidence(self.project,self.store,value,snapshot,phase)
         # Negative facts must remain visible to a diagnostician. Delivery phases
         # retain the strict default, including Red: errors/skips never qualify.
-        try:report=suite_report(value,diagnostic=run.kind=='diagnostic' and phase=='diagnostic')
+        try:report=suite_report(value,diagnostic=run.kind=='diagnostic')
         except ValueError as error:
             # Preserve complete negative facts from the existing job, never a
             # new approval. Invalid/partial reports still fail without credit.

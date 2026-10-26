@@ -80,6 +80,12 @@ class Diagnostic:
             raise ValueError('controller-assigned technical diagnosis required')
         self.level=next(level for level,actor in roles.items() if actor==self.run.actor)
         self.experiment=None
+        self.repair=None
+        reader=getattr(self.board,'repair_for_task',None);key=reader(self.incident.get('source')) if reader else None
+        if isinstance(key,str):
+            from .repairs import reviewed
+            self.repair=reviewed(self.q.project,self.store,key)
+            if self.store.receipt(key)['binding']['release']!=self.run.release:raise ValueError('foreign corrective diagnosis')
 
     def actions(self):
         return (['resume'] if self.incident.get('resume_allowed',True) else [])+(['escalate'] if self.level=='lead' else [])+['hold']
@@ -97,6 +103,15 @@ class Diagnostic:
             if self.original['reviewing'] else
             'Diagnose the current implementation/integration phase; preserve frozen tests and its existing delivery gates.')
         result['experiment_semantics']='A complete diagnostic report may contain failures, errors or skips. These are evidence for guidance, not a delivery approval. Resume permits a fresh attempt in the same phase; it does not certify success.'
+        if self.repair and self.repair['proposal']['classification']=='test_contract':
+            from .repairs import context_view
+            result['repair_authority']={**self.repair,'context':context_view(self.store,self.repair['context'])}
+            reviewed=self.store.receipt(self.repair['review'],kind='plan_review')
+            approval=self.store.receipt(reviewed['payload']['plan'],kind='work_plan')['payload'].get('approval')
+            if isinstance(approval,str):
+                from .intake import Intake
+                result['approved_brief']=Intake(self.q.project,self.store,self.board).approved(approval)[1]['payload']['document']
+            result['phase_expectation']='Authorized QA expected-text correction, not a new feature Red. The independent corrective plan permits only its listed QA text paths. Diagnose all frozen-preview failures against the approved brief. Do not tell the author to edit product code or preserve a known incorrect QA expectation; do not silently override the reviewed authority. diagnostic_validate runs both full suite and QA preview; negative results remain observations, not approval.'
         if self.incident.get('control_refusal'):
             result['last_control_refusal']=control_refusal_context(self.store,self.q.project,self.original,
                 self.incident['control_refusal'],self.incident['snapshot'])
@@ -143,8 +158,21 @@ class Diagnostic:
             self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
                 snapshot=snapshot,hypothesis=args['hypothesis'],validator=document_kind,document=candidate,report=report))
             return dict(experiment=self.experiment,report=report,delivery_approval=False)
-        if 'replacements' in args:snapshot=product_mutations(self.q,snapshot,[args['replacements']])[0]
-        job,report=DeliveryTools.wait(self,lambda:self.q.observe(self.run,snapshot,'diagnostic'))
+        correction=self.repair and self.repair['proposal']['classification']=='test_contract'
+        if 'replacements' in args:
+            if correction:
+                with tempfile.TemporaryDirectory(prefix='.diagnostic-qa-',dir=self.store.root.parent) as folder:
+                    work=Path(folder);self.store.checkout(snapshot,work)
+                    replacements=args['replacements']
+                    if (not isinstance(replacements,dict) or not replacements
+                            or not set(replacements)<=set(self.repair['proposal']['test_paths'])
+                            or any(not isinstance(v,str) or len(v)>131072 for v in replacements.values())):
+                        raise ValueError('diagnostic correction may propose only authorized QA expected-text files')
+                    for path,content in replacements.items():(work/path).write_text(content)
+                    snapshot=self.store.capture(work)
+                self.q.correction_diff(self.repair['context']['snapshot'],snapshot,self.repair['proposal']['test_paths'])
+            else:snapshot=product_mutations(self.q,snapshot,[args['replacements']])[0]
+        job,report=DeliveryTools.wait(self,lambda:self.q.observe(self.run,snapshot,'green' if correction else 'diagnostic'))
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
             snapshot=snapshot,hypothesis=args['hypothesis'],job=job,report=report))
         return dict(experiment=self.experiment,report=report,delivery_approval=False)
@@ -171,6 +199,9 @@ class Diagnostic:
                         or not isinstance(finding['detail'],str) or not 1<=len(finding['detail'].strip())<=2000):
                     raise ValueError('finding must cite the current incident or actual experiment')
             else:files.append(finding)
+        if (args['action']=='resume' and self.repair and self.repair['proposal']['classification']=='test_contract'
+                and any(f.get('path') not in self.repair['proposal']['test_paths'] for f in files)):
+            raise ValueError('resume guidance cannot require writes outside the independently authorized QA paths; cite other observations as incident/experiment evidence')
         if files:review_decision(dict(decision='changes',reason=args['reason'],findings=files),self.store.manifest(snapshot),self.store.tree(snapshot))
         verdict=dict(decision='changes',reason=args['reason'],findings=args['findings'])
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),

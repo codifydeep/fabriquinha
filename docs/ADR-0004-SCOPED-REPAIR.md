@@ -35,6 +35,11 @@ negativos, revisão da entrega, PR, CI e QA continuam obrigatórios.
   já vermelho aguardará a qualificação do Red de regressão em S5.
 - No máximo dois pacotes corretivos nessa cadeia; depois, diagnóstico explícito.
   Não resetar breaker ou gerar infinitos planos iguais.
+- Se uma atividade do pacote corretivo chegar à triagem, um diagnóstico CTO
+  concluído pode fundamentar a próxima proposta revisada, dentro do mesmo limite
+  de dois pacotes. O card triado, seus arquivos e suas tentativas permanecem
+  preservados. A nova proposta recebe a falha e o diagnóstico anteriores; não
+  retoma o worker que o breaker recusou.
 - Somente a visão de aceitação seleciona o pacote substituto. Evidências antigas
   continuam negativas; a homologação exige o commit final e serviço atual saudável.
 
@@ -56,10 +61,14 @@ Não fazem parte da alegação de capacidade deste reparo mínimo.
 
 ## Validação
 
+Diagnóstico recebe também o brief e a autoridade corretiva. Em correção de QA,
+seu experimento executa suíte e prévia de navegador; recusa não aprova a entrega.
+Orientação de retomada não pode exigir escrita fora dos caminhos QA autorizados.
+
 Testes do núcleo verificam exceção restrita, revisão independente, proteção de
 testes Python, alvos de controles, não duplicação e preservação do grafo.
-`scripts/qualify_qa_correction.py` exercita Docker/Chromium real com nove jobs:
+`scripts/qualify_qa_correction.py` exercita Docker/Chromium real com dez jobs:
 contradição recusada, correção apenas da expectativa autorizada, Green, controles,
-revisão e validação integrada. Decisões dessa fixture são programadas, não julgamento
+revisão, validação integrada e diagnóstico do QA negativo sem aprovação. Decisões dessa fixture são programadas, não julgamento
 de modelo ou lifecycle nativo. O resultado da recuperação real é registrado no
 status; sua conclusão não qualifica autonomia sem intervenção.

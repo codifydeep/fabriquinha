@@ -51,6 +51,15 @@ def repair_document(value,context):
     return value
 
 
+def context_view(store,value):
+    """Model context needs failure facts, not private graph/workspace copies."""
+    keys=('source','source_run','snapshot','commit','tests','browser_job','failure','package','qa_paths','failed_stage','retry_rule','prior_authority')
+    result={k:value[k] for k in keys if k in value}
+    if value.get('reviewed_diagnosis'):
+        result['prior_diagnosis']=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')['payload']['verdict']
+    return result
+
+
 def validate_revision(project,store,quality,record):
     data=record['payload'];authority=reviewed(project,store,data['authority']);context=authority['context']
     if (record['kind']!='test_revision' or data['project']!=project.fingerprint()
@@ -81,7 +90,7 @@ class RepairTools(DraftTools):
     def evidence(self):
         result=super().evidence();context=self.a.store.receipt(self.body()['repair_context'],kind='repair_context')
         if context['binding']['release']!=self.run.release:raise ValueError('foreign corrective context')
-        result.update(repair=context['payload'],contract='Classify the actual QA failure against the approved brief. Submit only classification, reason and test_paths using repair_submit. No new brief or release plan. Product corrections preserve tests; technical corrections may revise only expected text in explicitly listed QA files. Infrastructure/scope classifications are explicit holds, never permission to alter product or business scope. Review independently; never remove coverage.')
+        result.update(repair=context_view(self.a.store,context['payload']),contract='Classify the actual QA failure against the approved brief. Submit only classification, reason and test_paths using repair_submit. No new brief or release plan. Product corrections preserve tests; technical corrections may revise only expected text in explicitly listed QA files. Infrastructure/scope classifications are explicit holds, never permission to alter product or business scope. Review independently; never remove coverage.')
         return result
 
     def submit(self,args):
@@ -153,14 +162,46 @@ class Repairs:
                       and (p.rsplit('/',1)[-1]=='qa.json' or p.rsplit('/',1)[-1].startswith('qa.') and p.endswith('.json'))])
         return self.store.record('repair_context',self.r.binding(anchor),result)
 
+    def retry_context(self,conn,item,anchor,failed):
+        """A new reviewed package after native triage, not a reset of that task."""
+        kb,_,_=native();recovery=Recovery(self.project,self.store,self.r.board)
+        if recovery.expired_effects(failed.id):raise EffectBlocked('settle failed corrective activity effects first')
+        diagnosis=None
+        for task in recovery.cards(conn):
+            body=json.loads(task.body or '{}')
+            if body.get('kind')!='diagnostic' or body.get('source')!=failed.id or body.get('stage')!='cto' or task.status!='done':continue
+            row=kb.latest_run(conn,task.id)
+            if row and row.metadata and row.metadata.get('diagnosis'):
+                key=row.metadata['diagnosis'];record=self.store.receipt(key,kind='diagnostic_decision')
+                incident=self.store.receipt(record['payload']['incident'],kind='incident')
+                current=kb.latest_run(conn,failed.id)
+                if (record['binding']['actor']==self.project.technical_roles['cto']
+                        and record['payload']['project']==self.project.fingerprint()
+                        and incident['payload']['source']==failed.id and current and current.ended_at
+                        and incident['payload']['source_run']==current.id):diagnosis=key
+        if not diagnosis:return None
+        previous=self.store.receipt(item['repair_context'],kind='repair_context')
+        latest=kb.latest_run(conn,failed.id)
+        prior_review=json.loads(failed.body)['inputs']['repair_review'];authority=reviewed(self.project,self.store,prior_review)
+        data={**previous['payload'],'source':failed.id,'source_run':latest.id,'source_contract':digest(json.loads(failed.body)),
+              'prior':item,'failed_stage':json.loads(failed.body)['kind'],'reviewed_diagnosis':diagnosis,
+              'prior_authority':dict(review=prior_review,proposal=authority['proposal']),
+              'failed_workspace_snapshot':self.store.capture(failed.workspace_path),
+              'retry_rule':'Prior package remains triaged. Review the diagnosis against the corrective authority; it cannot silently revoke approved QA-text correction. Reclassify and review a new bounded package, never repeat the old worker or declare success.'}
+        return self.store.record('repair_context',self.r.binding(anchor),data)
+
     def reconcile(self,conn,anchor,spec,graph,services):
         """Replace only a failed final package in the acceptance view, never history."""
         kb,_,_=native();item=graph['items'][-1]
+        failed=next((kb.get_task(conn,item['cards'][phase]['id']) for phase in ('tests','implementation')
+                     if item.get('repair_context') and phase in item['cards']
+                     and kb.get_task(conn,item['cards'][phase]['id']).status=='triage'),None)
+        source=failed.id if failed else item['cards']['integration']['id']
         # Existing corrective cards remain discoverable after QA succeeds.
         rows=conn.execute('SELECT id,body FROM tasks ORDER BY created_at,id').fetchall()
-        existing=[kb.get_task(conn,row['id']) for row in rows if json.loads(row['body'] or '{}').get('repair_of')==item['cards']['integration']['id']]
+        existing=[kb.get_task(conn,row['id']) for row in rows if json.loads(row['body'] or '{}').get('repair_of')==source]
         if not existing:
-            context=self.context(conn,item,anchor,services,spec)
+            context=self.retry_context(conn,item,anchor,failed) if failed else self.context(conn,item,anchor,services,spec)
             if not context:return graph
             if item.get('repair_depth',0)>=2:raise EffectBlocked('two corrective packages reached; CTO diagnosis required, no identical automatic repetition')
             data=self.store.receipt(context)['payload']
