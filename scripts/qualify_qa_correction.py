@@ -38,7 +38,7 @@ def qualify(root,image):
     (work/'tests/qa.json').write_text(json.dumps(dict(version=1,checks=[check])))
     candidate=store.capture(work);inputs={};authority=[None]
     board=SimpleNamespace(ensure=lambda run:None,input=lambda run,name,**kw:inputs[name],criteria=lambda run:('NAME',),
-        repair_input=lambda run:authority[0])
+        repair_input=lambda run:authority[0],review=lambda run,summary,evidence,**kwargs:inputs.update(evidence))
     quality=Quality(project,store,runner,board)
     def wait(call):
         until=time.monotonic()+project.timeout_seconds*3+45
@@ -79,6 +79,7 @@ def qualify(root,image):
     corrected=store.capture(work)
     current=Run('correction-tests',6,'qa','tests',False,'qa','proof','correction-contract')
     revision=wait(lambda:quality.red(current,before,corrected));inputs['red']=revision
+    quality.handoff(current,'Scripted native-boundary handoff without lifecycle claim',{'red':revision})
     assert store.receipt(revision)['kind']=='test_revision'
     assert store.receipt(revision)['payload']['historical_red']==red
     frozen=quality.tests_review(replace(current,number=7,actor='lead',reviewing=True),revision,verdict);inputs['tests']=frozen

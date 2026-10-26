@@ -33,11 +33,15 @@ negativos, revisão da entrega, PR, CI e QA continuam obrigatórios.
 - Para `product`, os testes anteriores permanecem imutáveis e aplica-se o Red
   de funcionalidade atualmente suportado. Reparo que dependa de um teste existente
   já vermelho aguardará a qualificação do Red de regressão em S5.
-- No máximo dois pacotes corretivos nessa cadeia; depois, diagnóstico explícito.
+- No máximo dois pacotes corretivos equivalentes sob a mesma revisão do protocolo.
+  Depois, exigir diagnóstico e mudança comprovada de pré-condições. Uma correção
+  qualificada do controlador pode abrir nova proposta sob revisão explícita do
+  protocolo; não altera contadores, cards ou evidências anteriores. O marcador
+  pertence ao código do controlador e não pode ser fornecido pelo modelo.
   Não resetar breaker ou gerar infinitos planos iguais.
 - Se uma atividade do pacote corretivo chegar à triagem, um diagnóstico CTO
   concluído pode fundamentar a próxima proposta revisada, dentro do mesmo limite
-  de dois pacotes. O card triado, seus arquivos e suas tentativas permanecem
+  por revisão do protocolo. O card triado, seus arquivos e suas tentativas permanecem
   preservados. A nova proposta recebe a falha e o diagnóstico anteriores; não
   retoma o worker que o breaker recusou.
 - Somente a visão de aceitação seleciona o pacote substituto. Evidências antigas
@@ -72,3 +76,9 @@ contradição recusada, correção apenas da expectativa autorizada, Green, cont
 revisão, validação integrada e diagnóstico do QA negativo sem aprovação. Decisões dessa fixture são programadas, não julgamento
 de modelo ou lifecycle nativo. O resultado da recuperação real é registrado no
 status; sua conclusão não qualifica autonomia sem intervenção.
+
+A implementação inicial limitava dois pacotes no total, o que impediria retomar
+após corrigir uma falha comprovada do próprio controlador. Esse limite foi
+alinhado à regra aprovada: suspender repetições sem evidência nova, preservando
+a possibilidade de retomar após mudança técnica qualificada. Não é limite de
+handoffs ou dispensa de qualquer gate de qualidade.

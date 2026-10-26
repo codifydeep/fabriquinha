@@ -12,6 +12,10 @@ from .kanban_lane import native
 from .quality import Quality,suite_report,preview_evidence
 from .recovery import Recovery,browser_refusal_context
 
+# Controller source revision, never model-supplied. Changed only for a qualified
+# repair-protocol fix, not for documents, timeouts or another identical retry.
+REPAIR_PROTOCOL='qa-text-handoff-1'
+
 
 def reviewed(project,store,key):
     record=store.receipt(key,kind='plan_review');scope=record['binding']
@@ -203,10 +207,11 @@ class Repairs:
         if not existing:
             context=self.retry_context(conn,item,anchor,failed) if failed else self.context(conn,item,anchor,services,spec)
             if not context:return graph
-            if item.get('repair_depth',0)>=2:raise EffectBlocked('two corrective packages reached; CTO diagnosis required, no identical automatic repetition')
+            attempts=item.get('repair_attempts',0) if item.get('repair_protocol')==REPAIR_PROTOCOL else 0
+            if attempts>=2:raise EffectBlocked('two corrective packages under the same protocol; new technical evidence/preconditions required, no identical automatic repetition')
             data=self.store.receipt(context)['payload']
             body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
-                repair_of=data['source'],repair_context=context,inputs={'approved_brief':spec['approval']})
+                repair_of=data['source'],repair_context=context,repair_protocol=REPAIR_PROTOCOL,inputs={'approved_brief':spec['approval']})
             task_id=kb.create_task(conn,title='REPAIR '+data['package']['title'],body=json.dumps(body),
                 assignee=self.project.coordination_roles['lead'],workspace_kind='scratch',completion_contract='local-only',
                 parents=[spec['task']],max_retries=2,max_runtime_seconds=600,
@@ -229,6 +234,9 @@ class Repairs:
             document=dict(architecture=spec['document']['architecture'],observability=spec['document']['observability'],tasks=[package]),
             repair=dict(review=key,context=authority['context_id'],plan=task.id))
         _,replacement=self.r.materialize(conn,anchor,revised,services,path=path,seed=seed)
-        replacement['items'][0].update(repair_context=authority['context_id'],repair_depth=item.get('repair_depth',0)+1)
+        protocol=json.loads(task.body).get('repair_protocol','legacy')
+        attempts=item.get('repair_attempts',0) if item.get('repair_protocol')==protocol else 0
+        replacement['items'][0].update(repair_context=authority['context_id'],repair_depth=item.get('repair_depth',0)+1,
+            repair_protocol=protocol,repair_attempts=attempts+1)
         effective={**graph,'items':[*graph['items'][:-1],replacement['items'][0]]}
         return self.reconcile(conn,anchor,spec,effective,services)

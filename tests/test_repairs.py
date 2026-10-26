@@ -15,8 +15,9 @@ from fabriquinha.config import Project
 from fabriquinha.quality import Quality
 from fabriquinha.board import Run
 from fabriquinha.artifacts import digest
-from fabriquinha.repairs import reviewed,repair_document,Repairs
+from fabriquinha.repairs import reviewed,repair_document,Repairs,REPAIR_PROTOCOL
 from fabriquinha.releases import Releases
+from fabriquinha.effects import EffectBlocked
 from fixtures.control_evidence import frozen_evidence
 from test_delivery_core import configuration
 from test_releases import configured
@@ -75,7 +76,7 @@ class RepairBoundaries(unittest.TestCase):
         old=Run('old-tests',1,'qa','tests',False,'qa','execution','old-contract')
         prior=frozen_evidence(self.store,self.project,old,self.before,self.before,'lead')
         authority=self.authority(prior);inputs={'repair_review':authority}
-        board=SimpleNamespace(ensure=lambda run:None,repair_input=lambda run:authority,
+        board=SimpleNamespace(ensure=lambda run:None,repair_input=lambda run:authority,review=Mock(),
             input=lambda run,name,**kw:inputs[name])
         def execute(run,snapshot,phase):
             failures=[dict(case='new',assertion=True,frames=[dict(file='tests/test_existing.py',function='test_behavior')])] if phase=='control' else []
@@ -90,6 +91,8 @@ class RepairBoundaries(unittest.TestCase):
         receipt=self.store.receipt(revision)
         self.assertEqual(receipt['kind'],'test_revision')
         self.assertEqual(receipt['payload']['historical_tests'],prior)
+        quality.handoff(author,'Independent review of the explicit test revision',{'red':revision})
+        self.assertEqual(board.review.call_args.args[2],{'red':revision})
         inputs['tests']=quality.tests_review(replace(author,number=8,actor='lead',reviewing=True),revision,
             dict(decision='approve',reason='Expected text now follows approved wording; all checks remain.',findings=[]))
         with self.assertRaises(ValueError):quality.protect(self.before,after)
@@ -126,10 +129,17 @@ class RepairBoundaries(unittest.TestCase):
         conn=Mock();conn.execute.side_effect=lambda *a,**kw:SimpleNamespace(fetchall=lambda:[{'id':key,'body':task.body} for key,task in records.items()])
         kb=SimpleNamespace(create_task=create,get_task=lambda conn,key:records[key],unblock_task=Mock())
         with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch.object(Repairs,'context',return_value=context):
+            item.update(repair_depth=2,repair_protocol='legacy',repair_attempts=2)
             self.assertEqual(repairs.reconcile(conn,anchor,dict(task='original-plan',approval='approved'),graph,Mock()),graph)
             self.assertEqual(Repairs(releases).reconcile(conn,anchor,dict(task='original-plan',approval='approved'),graph,Mock()),graph)
         self.assertEqual(len(created),1);self.assertEqual(created[0]['parents'],['original-plan'])
+        self.assertEqual(json.loads(created[0]['body'])['repair_protocol'],REPAIR_PROTOCOL)
         self.assertEqual(source.status,'triage');kb.unblock_task.assert_not_called()
+        records.clear();item.update(repair_protocol=REPAIR_PROTOCOL,repair_attempts=2)
+        with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch.object(Repairs,'context',return_value=context):
+            with self.assertRaisesRegex(EffectBlocked,'same protocol'):
+                repairs.reconcile(conn,anchor,dict(task='original-plan',approval='approved'),graph,Mock())
+        self.assertEqual(len(created),1)
 
 
 if __name__=='__main__':unittest.main()

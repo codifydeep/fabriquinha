@@ -18,7 +18,7 @@ ainda recomendava escrita no produto, incompatível com essa autoridade; a
 atividade chegou à triagem. Essa tentativa foi pausada e preservada. A correção
 posterior transmite brief/autoridade ao diagnóstico, executa sua prévia QA e
 recusa orientação de escrita fora dos caminhos permitidos. Nova proposta após
-triagem exige diagnóstico CTO concluído e respeita o limite total de dois pacotes;
+triagem exige diagnóstico CTO concluído e respeita o limite de duas tentativas equivalentes por revisão do protocolo;
 não retoma o card que o breaker recusou. A prova de dez jobs e o teste focado
 cobrem esse limite de diagnóstico, sem alegar recuperação autônoma concluída.
 
@@ -236,3 +236,13 @@ tentativas assistidas, pausas e requisitos ainda sem evidência.
 
 O único sucesso terminal continua sendo `HOMOLOGADA`, com brief coberto,
 revisão, PR/CI, commit/imagem implantados, QA, rollback e URL verificáveis.
+
+## Correção posterior do handoff de revisão
+
+A proposta seguinte foi revisada e o QA corrigiu as duas expectativas. A passagem
+para revisão ainda exigia tipo `red` e recusou o recibo legítimo `test_revision`.
+O erro foi reproduzido no teste do handoff e corrigido, preservando a identidade
+e o projeto da execução. O ensaio foi pausado e drenado antes da atualização.
+Nenhum arquivo de produto foi alterado pelo operador. As tentativas triadas
+permanecem históricas; uma nova proposta requer diagnóstico CTO e uma revisão
+qualificada do protocolo, sem reset de contadores ou importação de aprovações.

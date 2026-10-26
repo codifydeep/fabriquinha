@@ -218,7 +218,8 @@ class Quality:
         required = {'red'} if run.kind == 'tests' else {'green', 'controls'}
         if not isinstance(evidence, dict) or set(evidence) != required:
             raise ValueError('exact TDD handoff evidence required')
-        records = {key:self.store.receipt(value,kind=key) for key,value in evidence.items()}
+        records = {key:(self.test_evidence(value) if key=='red' else self.store.receipt(value,kind=key))
+                   for key,value in evidence.items()}
         if any(record['binding'] != run.binding()
                or record['payload']['project'] != self.project.fingerprint() for record in records.values()):
             raise ValueError('handoff must belong to the current execution')
