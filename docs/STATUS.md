@@ -1,4 +1,4 @@
-# Status do projeto — 25 de outubro de 2026
+# Status do projeto — 26 de outubro de 2026
 
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
@@ -15,6 +15,12 @@ plano aprovados, mas o QA sofreu duas interrupções por saída acima da políti
 e ficou em triagem do CTO. O dispatcher e o relay estão desligados após drenagem.
 Nenhuma entrega foi aprovada por causa dessas interrupções.
 
+O proprietário autorizou saída de 16.384 tokens, mantendo Haiku, 7.000 chamadas
+e nenhum fallback. Uma geração única com contexto nativo preservado completou
+duas chamadas de ferramenta válidas usando 8.735 tokens; nenhuma ferramenta foi
+executada. O contador foi preservado em 6.484/7.000. A nova fronteira S4 está em
+preparação com perfis limpos e CI local, sem importar evidências técnicas antigas.
+
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
 continua sendo a estratégia aprovada. O [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
@@ -27,7 +33,7 @@ registra o aceite e os limites do contrato F1; recibos antigos permanecem histó
 | S0/S1 | Referência e integração Hermes/Kanban qualificados, upstream sem patches | Não constitui entrega de produto |
 | S2 | Contrato 2 deriva alvos do Red e riscos independentes; prova Chromium preserva teste auxiliar | Julgamento semântico real e entrega S4 ainda necessários |
 | S3 | Cadeia revalidada no contrato 2: dois incrementos, 11 atividades SDK, 17 respostas locais, Git/deploy/QA/rollback | PR e integração de feature por agentes reais; GitHub/CI ainda simulados nesta prova |
-| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais em tentativa anterior; recuperação pelo Lead até concluir testes | Tentativa mais recente em triagem por limite de saída; controles, revisão da entrega, PR/CI, integração, deploy e QA completos ainda pendentes |
+| S4 | Brief e plano aprovados; Red corrigido/revisado, freeze e Green reais em tentativa anterior; geração diagnóstica completa no limite autorizado de 16.384 | Nova fronteira preparada; controles, revisão da entrega, PR/CI, integração, deploy e QA completos ainda pendentes |
 | S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação |
 | S6 | Preparação parcial | Instalação limpa em outro repo e troca do caminho ativo |
 | S7 | Não iniciado | Retomada do Truco após qualificação |
@@ -123,10 +129,11 @@ atribuir os cortes ao raciocínio nem mudar sua configuração.
 Foi preparada a opção explícita de saída 16384, mantendo o limite de chamadas
 7000 e nenhum fallback. Passou offline com 11 atividades SDK e 19 requisições
 locais, incluindo pausa financeira e retomada; pedidos 32768 continuam recusados
-sem reserva. **Não foi ativada na instalação real.** O próximo experimento,
-dependente de aceite do operador, é uma geração sem execução de ferramentas
-com o último contexto nativo que truncou. Só depois de uma resposta completa
-será considerada outra tentativa S4, sem converter recibos antigos em entrega.
+sem reserva. Após o aceite explícito, uma geração com o contexto nativo
+preservado disponível terminou completa com 8.735 tokens de saída. Esse contexto
+é de uma tentativa anterior: a mais recente não preservou um dump equivalente.
+Nenhuma ferramenta foi executada. O resultado permite outra tentativa S4;
+recibos antigos e a resposta diagnóstica não contam como evidência de entrega.
 
 ## Próxima sequência
 
@@ -135,8 +142,7 @@ O [roadmap vigente](ROADMAP.md) detalha R0–R5:
 - F1 aprovado, corrigido e revalidado fisicamente e na cadeia integrada offline.
 - R2 limitado e correção de contexto revalidados offline, inclusive HTTP 422
   através do SDK real; feedback dos controles e exploração limitada qualificados.
-- Obter decisão sobre saída por resposta e validar uma geração com o contexto
-  nativo antes de iniciar outra cadeia paga completa.
+- Saída maior autorizada e geração nativa completa; orçamento preservado.
 - Executar uma tentativa S4 completa, com a equipe conduzindo os handoffs.
 - Provar S5 e S6 antes de liberar S7.
 

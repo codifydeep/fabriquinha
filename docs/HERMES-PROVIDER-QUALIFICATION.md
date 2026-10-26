@@ -43,7 +43,7 @@ pagos ligados; não basta iniciar este relay.
 
 ## Provas realizadas
 
-### Opção de saída 16384 — preparada, sem ativação real
+### Opção de saída 16384 — geração real completa, entrega ainda pendente
 
 `OUTPUT_LIMITS` centraliza os limites aceitos pelo preparo, SDK e relay. A nova
 opção 16384 é explícita; não altera instalações antigas, teto de chamadas,
@@ -53,8 +53,16 @@ para 32768 antes da reserva. Sua disponibilidade no código não concede consumo
 A prova `qualify_hermes_provider_wait.py --max-output-tokens 16384` passou com
 11 atividades SDK e 19 requisições locais. Conferiu o valor no transporte real,
 402 após edição e na revisão, reinício, preservação dos contadores funcionais,
-workspace e fase, e conclusão TDD. Zero chamadas OpenRouter. A instalação real
-está parada com saída 8192; a proposta maior depende de aceite do operador.
+workspace e fase, e conclusão TDD. Zero chamadas OpenRouter nessa prova.
+
+Após autorização explícita, uma única geração real com um contexto nativo
+preservado terminou em `tool_calls`: 8.735 tokens de saída, incluindo 6.033 de
+raciocínio, e duas chamadas com argumentos JSON completos e válidos no schema.
+Nenhuma ferramenta foi executada. O contador foi preservado em 6.484/7.000.
+Isso demonstra que o teto anterior de 8.192 era insuficiente para essa resposta;
+não comprova aprovação de testes, correção do código ou entrega autônoma.
+Uma nova fronteira S4 usa 16.384 explicitamente, o mesmo modelo e todos os gates,
+sem importar código gerado ou evidências das tentativas anteriores.
 
 Dois canários sintéticos reais (padrão/low) completaram chamadas de função,
 reportando zero tokens de raciocínio. Eles não reproduziram a falha no contexto
