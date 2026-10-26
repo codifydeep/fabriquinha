@@ -33,12 +33,14 @@ flowchart LR
     W --> S[Sandbox por atividade e deadline interno]
     S --> E[Snapshot e recibos imutáveis]
     E --> V[Validação fixa em Docker]
+    VB[Bundle imutável da instalação] --> V
     V --> K
     K --> G[PR e CI local no GitHub]
     G --> D[Compose local e QA]
     D --> H[Gate de homologação]
     H --> K
     K --> O[Outbox persistente e status]
+    W --> U[Relay: consumo por atividade]
     K --> R[Diagnóstico técnico Lead / CTO]
     V -.->|recusa vinculada ao diagnóstico| R
     R --> X[Experimento fixo e evidência]
@@ -97,9 +99,10 @@ O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
 O [reparo mínimo](docs/ADR-0004-SCOPED-REPAIR.md) limita-se ao último pacote
 serializado e, para testes, à expectativa textual QA explicitamente autorizada.
 Não é replanejamento geral nem permissão para remover cobertura.
-Uma tentativa real anterior chegou ao freeze independente e iniciou implementação
-antes da pausa humana. As novas fronteiras do contrato 2 estão descritas no
-[status](docs/STATUS.md). **Ainda não há entrega real completa qualificada.**
+O [PR 57](https://github.com/codifydeep/descartavel2/pull/57) completou homologação
+assistida, incluindo CI, implantação, rollback e QA. Houve correção externa do
+controlador durante a execução; portanto, ainda falta uma entrega completa
+**sem intervenção técnica externa**. Veja o [status](docs/STATUS.md).
 
 A [auditoria](docs/EXECUTION-REVIEW-2026-10-25.md) encontrou um gate de mutações
 incompatível com um teste auxiliar congelado. O [contrato 2 aprovado](docs/ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
@@ -113,6 +116,8 @@ recuperação, memória entre versões e portabilidade continuam incompletos.
 - Testes existentes e descoberta protegidos; nenhum skip ou aprovação textual
   substitui execução. Correções legítimas exigem outra revisão, nunca alteração
   silenciosa do snapshot.
+- Instalações novas fixam os scripts de validação em snapshot imutável; edição
+  do checkout não altera os jobs nem reinterpreta provas anteriores.
 - Revisores leem entregas imutáveis. Validações executam comandos fixos em
   containers sem credenciais, sem socket e com rede restrita à fase.
 - Aprovações vinculadas a autoria, execução e artefato; integração e QA conferem
@@ -163,20 +168,19 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 26/10/2026, os 285 testes do núcleo passaram. As provas S1–S3 e extensões
-qualificam fronteiras específicas; decisões programadas não são julgamento de
-um agente real. Falta a primeira release S4 completa sem intervenção técnica
-externa, depois uma segunda versão com regressão/memória/recuperação e uma
-instalação em outro repositório. O contrato 2 também percorreu dois incrementos
-dependentes no SDK/Kanban, com Git/deploy/QA reais e GitHub/CI simulados.
-Outra prova recuperou revisão do plano e integração por Lead/CTO até concluir
-a mesma cadeia. A triagem mantém bloqueio e responsável quando não existe
-retomada segura; não há promessa de recuperação universal.
-Veja [STATUS](docs/STATUS.md).
-O [plano de retrabalho após QA](docs/POST-QA-REWORK-2026-10-26.md) registra a
-lacuna concreta restante: o PR 56 foi integrado e implantado, mas o navegador
-recusou o comportamento. A nova prevenção passou em sete jobs Docker/Chromium;
-o caminho de correção da mesma release ainda exige implementação e qualificação.
+Em 26/10/2026, o núcleo passou em 303 testes. O reparo mínimo completou uma
+homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
+específicas; decisões programadas não são julgamento de um agente real.
+
+O [ADR 0005](docs/ADR-0005-VALIDATION-AND-ACCOUNTING.md) fixa os validadores das
+instalações novas e contabiliza campos de custo/cache retornados pelo provedor,
+sem estimar gasto ausente. Foi qualificado em dez jobs Docker/Chromium e nove
+atividades SDK com respostas locais, sem chamadas pagas. O comando `runtime
+costs` consulta o relay local autenticado e não libera pausas nem faz inferência.
+
+Faltam S4 sem intervenção, uma segunda versão com regressão/memória/recuperação
+e uma instalação em outro repositório. O [roadmap](docs/ROADMAP.md) separa essas
+qualificações da homologação assistida já demonstrada.
 
 ## Retirada de recursos de teste
 

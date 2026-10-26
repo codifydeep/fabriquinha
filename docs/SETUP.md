@@ -53,6 +53,20 @@ com `PYTHONPATH=src`, e `python -m fabriquinha.runtime status --root
 dispatch. Os caminhos são inputs privados do operador; não copie instalações
 ou credenciais de outra máquina.
 
+### Validação fixada e consulta de consumo
+
+A preparação de uma instalação nova grava `validation_bundle` e `control_contract`
+em `installation.json`, usando scripts capturados em snapshot imutável. Não edite
+esses campos para promover uma instalação legada ou reaproveitar suas aprovações.
+Trabalho real exige esse pin; instalações antigas permanecem consultáveis como
+história. Migração geral de upgrades ainda depende de S6.
+
+Com o relay local já iniciado pelo operador, use a mesma CLI de status trocando
+`status` por `costs`. A consulta funciona com política de inferência desabilitada;
+não inicia o serviço, faz chamadas ao modelo nem arquiva pausas financeiras.
+Custos ausentes não são zero, e contadores históricos sem atribuição continuam
+visíveis. Veja os campos e os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
+
 **As seções numeradas abaixo preservam procedimentos do legado.** Os comandos
 Multica, port2 e da ponte de revisão não são a instalação do caminho Hermes.
 Para testes offline atuais, use os comandos do [README](../README.md).

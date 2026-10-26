@@ -11,7 +11,7 @@ import tempfile
 import time
 from .artifacts import protected_unchanged
 from .effects import Pending, EffectBlocked, Journal, write_json
-from .executor import preview_drivers
+from .executor import preview_drivers,validation_files
 
 PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
@@ -58,7 +58,9 @@ def suite_report(value,*,diagnostic=False):
 
 def preview_evidence(project,store,value,snapshot,phase):
     """Do not let a historic Green/CI receipt silently satisfy a new contract."""
-    drivers=preview_drivers(project,phase)
+    bundle,_=validation_files(project,store)
+    if value['identity'].get('validation_bundle')!=bundle:raise ValueError('exact installed validation bundle required')
+    drivers=preview_drivers(project,phase,store)
     if value['identity'].get('qa_preview')!=drivers:raise ValueError('exact current frozen QA preview drivers required')
     report=value.get('report')
     if drivers and not isinstance(report,dict):raise ValueError('complete frozen QA preview report required')
@@ -286,6 +288,7 @@ class Quality:
         if data.get('control_contract')!=CONTROL_CONTRACT:
             raise ValueError('new Red evidence required for the approved behavior-control contract; no legacy conversion')
         job=self.store.receipt(data['red_job'],kind='suite_job');value=job['payload'];identity=value['identity']
+        preview_evidence(self.project,self.store,value,data['snapshot'],'red')
         if (job['binding']!=red['binding'] or identity['binding']!=red['binding']
                 or identity['snapshot']!=data['snapshot'] or identity['phase']!='red'
                 or identity['project']!=self.project.fingerprint() or identity['image']!=self.project.validation_image):

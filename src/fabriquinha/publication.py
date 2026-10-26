@@ -311,7 +311,8 @@ class LocalStatus:
             raise ValueError('exact computed CI receipt required')
         self.store.tree(data['snapshot'])
         from .quality import preview_evidence,suite_report
-        if self.project.browser_tdd and self.project.delivery_roles:
+        from .executor import validation_files
+        if validation_files(self.project,self.store)[0] or self.project.browser_tdd and self.project.delivery_roles:
             job=self.store.receipt(data['job'],kind='suite_job')['payload']
             job_identity=job['identity']
             if (job_identity['project']!=self.project.fingerprint() or job_identity['snapshot']!=data['snapshot']

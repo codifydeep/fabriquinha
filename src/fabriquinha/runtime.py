@@ -20,8 +20,8 @@ import time
 from .artifacts import Store, digest
 from .board import Board
 from .config import Project
-from .effects import EffectBlocked, Pending, write_json
-from .executor import Runner
+from .effects import EffectBlocked, Pending, Journal, write_json
+from .executor import Runner,seal_validation,validation_files
 from .hermes import Sandbox, run_activity
 from .kanban_lane import native, UPSTREAM_COMMIT
 from .quality import Quality
@@ -32,7 +32,7 @@ from .deployment import Deployment
 from .operations import Control, ActivityPaused, doctor
 from .intake import Intake, DraftActivity
 from .releases import Releases
-from .provider import Policy, Held, inspect as inspect_provider
+from .provider import Policy, Held, inspect as inspect_provider,inspect_usage
 
 
 class IntegrationRunner(Runner):
@@ -89,7 +89,7 @@ def Owner(root):
         finally:fcntl.flock(file,fcntl.LOCK_UN)
 
 
-def model_route(project,path):
+def model_route(project,path,*,require_ready=True):
     path=Path(path)
     if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o077 or path.stat().st_size>4096:
         raise ValueError('private controller route file required')
@@ -110,8 +110,9 @@ def model_route(project,path):
         policy=Policy.parse(json.loads(policy_path.read_bytes()))
         if policy.project!=project.fingerprint() or route['model']!=policy.model or route['api_key']!=policy.client_token:
             raise ValueError('route must match exact operator provider policy')
-        if not policy.enabled:raise Held('provider_disabled')
-        inspect_provider(policy,'http://127.0.0.1:'+str(url.port),project.fingerprint())
+        if require_ready:
+            if not policy.enabled:raise Held('provider_disabled')
+            inspect_provider(policy,'http://127.0.0.1:'+str(url.port),project.fingerprint())
     return route
 
 
@@ -141,10 +142,20 @@ class Runtime:
         self.project=Project.parse(json.loads((self.root/'project.json').read_bytes()))
         binding=dict(project=self.project.fingerprint(),upstream=UPSTREAM_COMMIT)
         installation=self.root/'installation.json'
-        if installation.exists() and json.loads(installation.read_bytes())!=binding:
-            raise ValueError('installation contract changed; explicit reconfiguration required')
-        if not installation.exists():write_json(installation,binding)
-        self.store=Store(self.root/'private');self.control=Control(self.root,self.project)
+        self.store=Store(self.root/'private')
+        with Journal(self.store.root/'effects').lock(['installation',self.project.fingerprint()]):
+            if installation.exists():
+                existing=json.loads(installation.read_bytes())
+                if 'validation_bundle' in existing:
+                    from .quality import CONTROL_CONTRACT
+                    binding.update(validation_bundle=existing['validation_bundle'],control_contract=CONTROL_CONTRACT)
+                if existing!=binding:raise ValueError('installation contract changed; explicit reconfiguration required')
+            else:
+                from .quality import CONTROL_CONTRACT
+                binding.update(validation_bundle=seal_validation(self.store),control_contract=CONTROL_CONTRACT)
+                write_json(installation,binding)
+            validation_files(self.project,self.store)
+        self.control=Control(self.root,self.project)
         self.board=Board(self.project,guard=self.control.ensure)
         self.children=[];self.settlement={};self.recovery_issues={};self.integration_issues={}
         self.admission=None;self._next_admission=0
@@ -240,6 +251,19 @@ class Runtime:
         except Held as error:self.provider=dict(ready=False,reason=error.code,status=error.status)
         except (ValueError,KeyError,TypeError,OSError):self.provider=dict(ready=False,reason='InvalidProviderConfiguration')
         return self.provider
+
+    def costs(self):
+        route=model_route(self.project,self.root/'route.json',require_ready=False)
+        policy=Policy.parse(json.loads((self.root/'provider-policy.json').read_bytes()))
+        value=inspect_usage(policy,route['base_url'].removesuffix('/v1'))
+        for activity,data in value['activities'].items():
+            try:
+                record=self.store.receipt(activity,kind='model_activity')
+                if record['payload']['project']!=self.project.fingerprint():raise ValueError('foreign activity')
+                data['execution']=record['binding']
+                data['validation_bundle']=record['payload'].get('validation_bundle')
+            except (ValueError,OSError,TypeError,KeyError):data['execution']=None
+        return {**value,'accounting_only':True,'policy_changed':False}
 
     def settle_provider(self,conn):
         """Verified-dead held runs use the pinned native infrastructure deferral.
@@ -599,7 +623,7 @@ class Runtime:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume'))
+    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume','costs'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--task');parser.add_argument('--run',type=int);parser.add_argument('--interval',type=float,default=15)
     parser.add_argument('--expect-pause')
@@ -617,7 +641,7 @@ def main():
         runtime=Runtime(args.root,args.upstream)
         value=(runtime.pause() if args.operation=='pause' else runtime.resume(args.expect_pause)
                if args.operation=='resume' else runtime.check_admission(force=True)
-               if args.operation=='doctor' else runtime.status())
+               if args.operation=='doctor' else runtime.costs() if args.operation=='costs' else runtime.status())
         print(json.dumps(value,indent=2))
 
 

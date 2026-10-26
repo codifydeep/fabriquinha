@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import tempfile
 from .artifacts import digest
 from .effects import Journal, Pending, EffectBlocked, write_json
 
@@ -15,9 +16,39 @@ sys.path.insert(0, str(ROOT / 'team-delivery-kit'))
 from docker_grouping import args as grouping
 
 
-def preview_drivers(project,phase):
+def seal_validation(store):
+    """Copy trusted checkout scripts once; no product files or runtime imports."""
+    with tempfile.TemporaryDirectory(prefix='.validation-bundle-',dir=store.root.parent) as folder:
+        for name in ('suite.py','browser.py'):
+            source=ROOT/'src/fabriquinha'/name
+            if source.is_symlink() or not source.is_file() or source.stat().st_size>65536:
+                raise ValueError('bounded trusted validator source required')
+            (Path(folder)/name).write_bytes(source.read_bytes())
+        return store.capture(Path(folder))
+
+
+def validation_files(project,store=None):
+    """The installation pin is authority; legacy roots remain explicitly legacy."""
+    if store is not None:
+        path=store.root.parent/'installation.json'
+        if path.is_symlink():raise ValueError('unsafe validation bundle authority')
+        if path.exists():
+            if path.stat().st_size>4096:raise ValueError('bounded installation contract required')
+            installation=json.loads(path.read_bytes());bundle=installation.get('validation_bundle')
+            if bundle is not None:
+                from .quality import CONTROL_CONTRACT
+                if installation.get('project')!=project.fingerprint() or installation.get('control_contract')!=CONTROL_CONTRACT:
+                    raise ValueError('validation bundle project/quality contract changed; explicit migration required')
+                tree=store.tree(bundle)
+                if set(store.manifest(bundle))!={'suite.py','browser.py'}:raise ValueError('fixed validation bundle contents required')
+                return bundle,{name:tree/name for name in ('suite.py','browser.py')}
+    return None,{name:ROOT/'src/fabriquinha'/name for name in ('suite.py','browser.py')}
+
+
+def preview_drivers(project,phase,store=None):
     if project.browser_tdd and project.delivery_roles and phase in ('green','delivery','integrated'):
-        return {name:hashlib.sha256((ROOT/'src/fabriquinha'/file).read_bytes()).hexdigest()
+        _,paths=validation_files(project,store)
+        return {name:hashlib.sha256(paths[file].read_bytes()).hexdigest()
                 for name,file in (('driver','browser.py'),('reporter','suite.py'))}
     return None
 
@@ -73,9 +104,11 @@ class Runner:
         host, config = info['HostConfig'], info['Config']
         sources={'/workspace':self.store.tree(expected['snapshot'])}
         preview=expected.get('qa_preview')
+        bundle,paths=validation_files(self.project,self.store)
+        if expected.get('validation_bundle')!=bundle:raise ValueError('validation bundle changed during execution')
         if preview:
-            if preview!=preview_drivers(self.project,expected['phase']):raise ValueError('preview drivers changed during execution')
-            sources.update({'/opt/fabriquinha/'+file:ROOT/'src/fabriquinha'/file for file in ('suite.py','browser.py')})
+            if preview!=preview_drivers(self.project,expected['phase'],self.store):raise ValueError('preview drivers changed during execution')
+        if preview or bundle:sources.update({'/opt/fabriquinha/'+file:paths[file] for file in ('suite.py','browser.py')})
         by_target={mount['Destination']:mount for mount in binds}
         env=config.get('Env',[])
         if (info['Image'] != self.project.validation_image or config.get('User') != '65534:65534'
@@ -101,7 +134,9 @@ class Runner:
     def inspect_browser(self,info,expected):
         config,host=info['Config'],info['HostConfig']
         mounts={m['Destination']:m for m in info.get('Mounts',[]) if m['Type']!='tmpfs'}
-        sources={'/qa.py':ROOT/'src/fabriquinha/browser.py',
+        bundle,paths=validation_files(self.project,self.store)
+        if expected.get('validation_bundle')!=bundle:raise ValueError('browser validation bundle changed')
+        sources={'/qa.py':paths['browser.py'],
                  '/qa-contracts':self.store.tree(expected['snapshot'])/self.project.tests_dir}
         if (info['Image']!=self.project.browser_image or config.get('User')!='10000:10000'
                 or config.get('Labels',{}).get('fabriquinha.job')!=expected['key']
@@ -114,7 +149,7 @@ class Runner:
                 or any(e.split('=',1)[0] in {'GH_TOKEN','GITHUB_TOKEN','OPENROUTER_API_KEY','TELEGRAM_BOT_TOKEN'}
                        for e in config.get('Env',[]))):
             raise ValueError('fixed browser job sandbox rejected')
-        if hashlib.sha256((ROOT/'src/fabriquinha/browser.py').read_bytes()).hexdigest()!=expected['driver']:
+        if hashlib.sha256(paths['browser.py'].read_bytes()).hexdigest()!=expected['driver']:
             raise ValueError('browser driver changed during execution')
         return info
 
@@ -128,9 +163,11 @@ class Runner:
         network=json.loads(docker('network','inspect',self.project.namespace+'-homologation_qa'))[0]
         if not network['Internal'] or network.get('Labels',{}).get('com.docker.compose.project')!=self.project.namespace+'-homologation':
             raise ValueError('owned internal browser network required')
+        bundle,paths=validation_files(self.project,self.store)
         expected=dict(binding=run.binding(),project=self.project.fingerprint(),snapshot=snapshot,
                       phase='browser',image=self.project.browser_image,commit=commit,
-                      driver=hashlib.sha256((ROOT/'src/fabriquinha/browser.py').read_bytes()).hexdigest())
+                      driver=hashlib.sha256(paths['browser.py'].read_bytes()).hexdigest())
+        if bundle:expected['validation_bundle']=bundle
         key=digest(expected);expected['key']=key
         command=['create','--name',self.project.namespace+'-browser-'+key[:16],
             *grouping('browser',self.project.namespace),'--label','fabriquinha.job='+key,
@@ -138,7 +175,7 @@ class Runner:
             '--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','512m','--cpus','1',
             '--pids-limit','256','--log-opt','max-size=1m','--log-opt','max-file=2',
             '--tmpfs','/tmp:rw,nosuid,size=256m','--env','FABRIQUINHA_SOURCE_SHA='+commit,
-            '--mount',f'type=bind,src={ROOT/"src/fabriquinha/browser.py"},dst=/qa.py,readonly',
+            '--mount',f'type=bind,src={paths["browser.py"]},dst=/qa.py,readonly',
             '--mount',f'type=bind,src={self.store.tree(snapshot)/self.project.tests_dir},dst=/qa-contracts,readonly',
             self.project.browser_image,'-B','/qa.py']
         return self._execute(run,expected,command)
@@ -148,7 +185,9 @@ class Runner:
             raise ValueError('fixed suite operation required')
         expected = dict(binding=run.binding(), project=self.project.fingerprint(),
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)
-        preview=preview_drivers(self.project,phase)
+        bundle,paths=validation_files(self.project,self.store)
+        if bundle:expected['validation_bundle']=bundle
+        preview=preview_drivers(self.project,phase,self.store)
         if preview:expected['qa_preview']=preview
         key = digest(expected)
         expected['key'] = key
@@ -163,8 +202,9 @@ class Runner:
             '--mount', f'type=bind,src={self.store.tree(snapshot)},dst=/workspace,readonly']
         if preview:
             command+=['--env','FABRIQUINHA_QA_PREVIEW='+snapshot]
+        if preview or bundle:
             for file in ('suite.py','browser.py'):
-                command+=['--mount',f'type=bind,src={ROOT/"src/fabriquinha"/file},dst=/opt/fabriquinha/{file},readonly']
+                command+=['--mount',f'type=bind,src={paths[file]},dst=/opt/fabriquinha/{file},readonly']
         command+=[self.project.validation_image]
         return self._execute(run,expected,command)
 

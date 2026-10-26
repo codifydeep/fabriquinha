@@ -11,10 +11,12 @@ snapshots e recibos operacionais completos permanecem privados.
 2. [Revisão da execução de 26/10](EXECUTION-REVIEW-2026-10-26.md): evolução,
    divergência de QA, simplificação do retrabalho e custos; refinamentos aceitos
    posteriormente no [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
-3. [Roadmap vigente](ROADMAP.md): próxima sequência e critérios de saída.
-4. [Plano aprovado de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md) e
+3. [Validação fixada e custos](ADR-0005-VALIDATION-AND-ACCOUNTING.md): bundle
+   imutável, atribuição por atividade e tratamento de custos desconhecidos.
+4. [Roadmap vigente](ROADMAP.md): próxima sequência e critérios de saída.
+5. [Plano aprovado de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md) e
    [ADR 0001](ADR-0001-HERMES-FIRST.md): estratégia Hermes + Kanban.
-5. [Arquitetura](ARCHITECTURE.md) e [instalação/limites](SETUP.md):
+6. [Arquitetura](ARCHITECTURE.md) e [instalação/limites](SETUP.md):
    distinguir caminho novo e referência histórica.
 
 O [README principal](../README.md) apresenta os diagramas atuais. O aceite

@@ -14,7 +14,7 @@ import threading
 from urllib.parse import urlsplit
 from .artifacts import digest
 from .effects import Journal, EffectBlocked, write_json
-from .executor import docker, grouping, phase_mounts
+from .executor import docker, grouping, phase_mounts,validation_files
 from .provider import OUTPUT_LIMITS
 
 
@@ -460,7 +460,11 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                    'Classify the recorded deployed QA failure against the approved brief using repair_submit. Propose product or test_contract with evidence and explicit existing QA paths. No new brief, whole-release plan, implementation or fabricated evidence.')
         prompt=sandbox_context(prompt)
         if 'terminal' in allowed:terminal_schema(min(120,sandbox.project.timeout_seconds))
+        bundle=validation_files(sandbox.project,sandbox.store)[0]
+        activity=sandbox.store.record('model_activity',sandbox.run.binding(),{'project':sandbox.project.fingerprint(),
+            **({'validation_bundle':bundle} if bundle else {})})
         agent=AIAgent(**route,max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
+            request_overrides={'extra_headers':{'X-Fabriquinha-Activity':activity}},
             quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
             session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,
             fallback_model=None,ephemeral_system_prompt=phase)

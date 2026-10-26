@@ -1,9 +1,8 @@
 # Roadmap vigente — 26 de outubro de 2026
 
-**Retomada e refinamentos aprovados em 26/10/2026.** O trabalho atual é P1,
-o reparo mínimo da mesma release, sob o [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
-P1/P3 agora têm recuperação assistida homologada pelo PR 57; P2 e o S4 limpo
-continuam pendentes. A prova assistida não será reclassificada como autonomia.
+**Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57.
+P2 foi qualificado offline sob o [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md);
+o próximo trabalho é P4/S4 limpo. A prova assistida não será reclassificada como autonomia.
 As cotas e o modelo existentes continuam limitando o consumo.
 
 A estratégia aprovada continua [Hermes + Kanban](SIMPLIFICATION-REVIEW-2026-10-24.md).
@@ -59,8 +58,11 @@ do controlador de mudança semântica do gate; revalidar explicitamente o que fo
 afetado, sem reinterpretar recibos históricos. Registrar metadados de custo/cache
 já retornados pelo provedor, sem prompts ou credenciais.
 
-**Saída:** provas offline, campos ausentes tratados como desconhecidos e nenhuma
-ativação paga. Cache universal, novo dashboard e troca de modelo ficam fora.
+**Qualificado:** 303 testes do núcleo; dez jobs Docker/Chromium com scripts
+fixados, inclusive após edição do checkout; nove atividades SDK e onze respostas
+HTTP locais com atribuição, custo sintético, autenticação e pausa preservada.
+Zero chamadas pagas. Campos ausentes continuam desconhecidos. Cache universal,
+novo dashboard e troca de modelo ficam fora.
 
 ### P3 — Fechar uma recuperação assistida
 

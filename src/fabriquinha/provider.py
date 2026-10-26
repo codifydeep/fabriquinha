@@ -6,6 +6,7 @@ old calls.json/provider-pause.json formats are retained; no reset/unpause API.
 import argparse
 from contextlib import contextmanager
 from dataclasses import asdict,dataclass
+from decimal import Decimal,InvalidOperation
 import fcntl
 import hmac
 import http.client
@@ -22,6 +23,29 @@ from .artifacts import digest
 from .effects import write_json
 
 OUTPUT_LIMITS=(2048,4096,8192,16384)
+
+
+def response_usage(reply):
+    """Allowlisted provider accounting only; never messages or arbitrary fields."""
+    usage=reply.get('usage');usage=usage if isinstance(usage,dict) else {}
+    counts={k:v for k,v in usage.items() if k in ('prompt_tokens','completion_tokens','total_tokens')
+            and type(v) is int and 0<=v<=10**10}
+    for group,names in (('prompt_tokens_details',('cached_tokens','cache_write_tokens')),
+                        ('completion_tokens_details',('reasoning_tokens',))):
+        details=usage.get(group)
+        if isinstance(details,dict):
+            counts.update({k:details[k] for k in names if type(details.get(k)) is int and 0<=details[k]<=10**10})
+    cost=usage.get('cost');reported=None
+    if type(cost) in (int,float,Decimal):
+        try:
+            value=Decimal(str(cost))
+            if value.is_finite() and 0<=value<=10**6 and (value==0 or value.adjusted()>=-32) and len(value.as_tuple().digits)<=64:
+                reported='0' if value==0 else format(value,'f')
+        except InvalidOperation:pass
+    result=dict(usage=counts,reported_cost=reported,cost_currency='USD',cost_status='reported' if reported is not None else 'unknown')
+    generation=reply.get('id')
+    if isinstance(generation,str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,256}',generation):result['generation_id']=generation
+    return result
 
 
 class Held(RuntimeError):
@@ -114,6 +138,46 @@ class Ledger:
             if not value['remaining']:raise Held('budget_exhausted',429)
             number=value['calls']+1;self.save('calls.json',{'calls':number});return number
 
+    def usage(self,project):
+        """Recorded calls only. Gaps and absent billing stay visible, never estimated."""
+        through=self.state()['calls'];groups={};valid=0;invalid=0
+        def empty():return dict(attempts=0,reported_cost_calls=0,unknown_cost_calls=0,known_cost_usd='0',tokens={},token_reporting_calls={},outcomes={})
+        total=empty()
+        for path in sorted((self.root/'attempts').glob('*.json')):
+            if not re.fullmatch(r'[1-9][0-9]*',path.stem) or int(path.stem)>through:continue
+            try:
+                value=self.read('attempts/'+path.name)
+                if not isinstance(value,dict) or value.get('call_number')!=int(path.stem) or not re.fullmatch('[a-f0-9]{64}',str(value.get('project'))):raise ValueError('scope')
+            except (ValueError,OSError,TypeError):invalid+=1;continue
+            valid+=1
+            if value['project']!=project:continue
+            activity=value.get('activity')
+            if not isinstance(activity,str) or not re.fullmatch('[a-f0-9]{64}',activity):activity='unattributed'
+            if activity not in groups and len(groups)>=128:activity='overflow'
+            group=groups.setdefault(activity,empty())
+            for bucket in (total,group):
+                bucket['attempts']+=1
+                category=value.get('category');category=category if category in ('reserved','returned','transport_unknown') else 'other'
+                bucket['outcomes'][category]=bucket['outcomes'].get(category,0)+1
+                try:
+                    raw=value['reported_cost']
+                    if not isinstance(raw,str) or not re.fullmatch(r'[0-9]{1,7}(?:\.[0-9]{1,96})?',raw):raise ValueError('unknown cost')
+                    cost=Decimal(raw)
+                    if value.get('cost_status')!='reported' or not cost.is_finite() or not 0<=cost<=10**6:raise ValueError('unknown cost')
+                except (KeyError,ValueError,TypeError,InvalidOperation):bucket['unknown_cost_calls']+=1
+                else:
+                    bucket['known_cost_usd']=format(Decimal(bucket['known_cost_usd'])+cost,'f');bucket['reported_cost_calls']+=1
+                usage=value.get('usage');usage=usage if isinstance(usage,dict) else {}
+                for key,count in usage.items():
+                    if key in ('prompt_tokens','completion_tokens','total_tokens','cached_tokens','cache_write_tokens','reasoning_tokens') and type(count) is int and count>=0:
+                        bucket['tokens'][key]=bucket['tokens'].get(key,0)+count
+                        bucket['token_reporting_calls'][key]=bucket['token_reporting_calls'].get(key,0)+1
+        for bucket in (total,*groups.values()):
+            bucket['recorded_cost_complete']=bucket['unknown_cost_calls']==0
+            bucket['recorded_total_cost_usd']=bucket['known_cost_usd'] if bucket['recorded_cost_complete'] else None
+        return dict(project=project,through_call=through,global_unrecorded_calls=max(0,through-valid),invalid_records=invalid,
+            scope='recorded_attempts_only',currency='USD',total=total,activities=groups)
+
     def pause(self,number,status):
         with self.lock('counter'):
             if type(number) is not int or not 1<=number<=self.state()['calls'] or status not in (401,402,403):raise ValueError('actual failed attempt required')
@@ -171,7 +235,7 @@ class Relay:
         except (ValueError,OSError,TypeError):result['error']='InvalidMeter'
         return result
 
-    def handle(self,authorization,raw):
+    def handle(self,authorization,raw,activity=None):
         number=None
         try:
             if not isinstance(authorization,str) or not hmac.compare_digest(authorization,'Bearer '+self.policy.client_token):raise Held('unauthorized',401)
@@ -194,6 +258,7 @@ class Relay:
             evidence=dict(project=self.policy.project,model=self.policy.model,request_hash=digest(body),
                 output_cap=self.policy.max_output_tokens,requested_output=body.get('max_tokens',body.get('max_completion_tokens')),
                 call_number=number,category='reserved')
+            if isinstance(activity,str) and re.fullmatch('[a-f0-9]{64}',activity):evidence['activity']=activity
             path=f'attempts/{number}.json';self.ledger.save(path,evidence)
             try:status,data=self.forward(body)  # One upstream attempt; never repair/rewrite its schema.
             except Exception as error:
@@ -201,11 +266,10 @@ class Relay:
                 self.ledger.uncertain(number);raise Held('transport_unknown') from None
             metadata={}
             try:
-                reply=json.loads(data)
+                reply=json.loads(data,parse_float=Decimal)
                 reasons=[item.get('finish_reason') for item in reply.get('choices',[])]
                 metadata['finish_reasons']=[r if r in ('stop','length','tool_calls','content_filter',None) else 'other' for r in reasons[:16]]
-                metadata['usage']={k:v for k,v in (reply.get('usage') or {}).items()
-                    if k in ('prompt_tokens','completion_tokens','total_tokens') and type(v) is int}
+                metadata.update(response_usage(reply))
             except (ValueError,TypeError,AttributeError):metadata['response_metadata_unavailable']=True
             self.ledger.save(path,{**evidence,'category':'returned','upstream_status':status,**metadata})
             if status in (401,402,403):self.ledger.pause(number,status)
@@ -278,6 +342,22 @@ def inspect(policy,endpoint,project):
     finally:connection.close()
 
 
+def inspect_usage(policy,endpoint):
+    """Authenticated local accounting only; no provider request or policy change."""
+    url=urlsplit(endpoint)
+    if (url.scheme!='http' or url.hostname!='127.0.0.1' or not url.port or url.username or url.password
+            or url.path not in ('','/') or url.query or url.fragment):raise ValueError('fixed local usage endpoint required')
+    connection=http.client.HTTPConnection('127.0.0.1',url.port,timeout=10)
+    try:
+        connection.request('GET','/usage',headers={'Authorization':'Bearer '+policy.client_token})
+        response=connection.getresponse();raw=response.read(256*1024+1)
+        if response.status!=200 or len(raw)>256*1024:raise ValueError('bounded authenticated usage response required')
+        value=json.loads(raw)
+        if value.get('project')!=policy.project or value.get('scope')!='recorded_attempts_only':raise ValueError('foreign accounting scope')
+        return value
+    finally:connection.close()
+
+
 def server(app,host,port):
     class Handler(BaseHTTPRequestHandler):
         def setup(self):super().setup();self.connection.settimeout(15)
@@ -286,6 +366,10 @@ def server(app,host,port):
             self.send_response(status);self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
         def do_GET(self):
+            if self.path=='/usage':
+                if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+app.policy.client_token):
+                    self.send(401,b'{}');return
+                self.send(200,json.dumps(app.ledger.usage(app.policy.project)).encode());return
             if self.path!='/status':self.send(404,b'{}');return
             self.send(200,json.dumps(app.status()).encode())
         def do_POST(self):
@@ -293,7 +377,7 @@ def server(app,host,port):
             try:size=int(self.headers.get('Content-Length','0'))
             except ValueError:self.send(400,b'{}');return
             if not 0<size<=2*1024*1024:self.send(413,b'{}');return
-            self.send(*app.handle(self.headers.get('Authorization'),self.rfile.read(size)))
+            self.send(*app.handle(self.headers.get('Authorization'),self.rfile.read(size),self.headers.get('X-Fabriquinha-Activity')))
     service=ThreadingHTTPServer((host,port),Handler);service.daemon_threads=False
     return service
 

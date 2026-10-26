@@ -11,7 +11,7 @@ import subprocess
 import time
 import uuid
 from .effects import EffectBlocked, NotSent, write_json
-from .executor import Runner, docker
+from .executor import Runner, docker,validation_files
 from .kanban_lane import UPSTREAM_COMMIT
 
 
@@ -92,6 +92,9 @@ def missing_profiles(project):
 
 def doctor(project,root,store):
     errors=[]
+    try:
+        if not project.qualification and validation_files(project,store)[0] is None:errors.append('ValidationBundleRequired')
+    except (ValueError,OSError,TypeError):errors.append('ValidationBundleInvalid')
     try:
         if shutil.disk_usage(root).free<1024**3:errors.append('LowDiskSpace')
     except OSError:errors.append('StorageUnavailable')

@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 import time
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
@@ -18,18 +19,21 @@ from fabriquinha.artifacts import Store,digest
 from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.effects import Pending,write_json
-from fabriquinha.executor import Runner,docker
-from fabriquinha.quality import Quality,suite_report
+from fabriquinha.executor import Runner,docker,seal_validation
+from fabriquinha.quality import Quality,suite_report,CONTROL_CONTRACT
 
 
-def qualify(root,image):
+def qualify(root,image,*,pinned=False):
     if root.exists():raise ValueError('fresh private proof root required')
     root.mkdir(mode=0o700,parents=True)
     project=Project.parse(dict(version=1,namespace='delivery-kit-qa-correction',repository='https://github.com/example/correction-proof',
         branch='release/proof',validation_image=image,browser_image=image,tests_dir='tests',qualification=True,browser_tdd=True,
         coordination_roles={'product':'product','lead':'lead'},delivery_roles={'tests':'qa','integration':'devops'},
         reviewers={'qa':'lead','author':'lead','lead':'cto','devops':'qa'}))
-    store=Store(root/'private');runner=Runner(project,store);work=root/'work';(work/'tests').mkdir(parents=True)
+    store=Store(root/'private')
+    if pinned:write_json(root/'installation.json',dict(project=project.fingerprint(),control_contract=CONTROL_CONTRACT,
+        validation_bundle=seal_validation(store)))
+    runner=Runner(project,store);work=root/'work';(work/'tests').mkdir(parents=True)
     (work/'app.py').write_text(APP.replace('DISPLAY','Nothing'))
     (work/'tests/test_existing.py').write_text('import unittest\nclass Existing(unittest.TestCase):\n def test_existing(self):self.assertTrue(True)\n')
     initial=store.capture(work)
@@ -93,7 +97,11 @@ def qualify(root,image):
     mutant=store.capture(work)
     controls=wait(lambda:quality.controls(implementer,green,[mutant]));inputs['controls']=controls
     review=wait(lambda:quality.delivery_review(replace(implementer,number=9,actor='lead',reviewing=True),green,controls,verdict))
-    integrated=wait(lambda:quality.observe(implementer,corrected,'integrated'))
+    if pinned:
+        checkout=root/'changed-checkout';folder=checkout/'src/fabriquinha';folder.mkdir(parents=True)
+        for name in ('browser.py','suite.py'):(folder/name).write_text('raise RuntimeError("mutable checkout must not execute")\n')
+        with patch('fabriquinha.executor.ROOT',checkout):integrated=wait(lambda:quality.observe(implementer,corrected,'integrated'))
+    else:integrated=wait(lambda:quality.observe(implementer,corrected,'integrated'))
     assert integrated[1]['qa_preview']['status']=='passed'
     assert (store.tree(before)/'app.py').read_bytes()==(store.tree(corrected)/'app.py').read_bytes()
     assert all(p.name=='qa.json' or p.read_bytes()==content for p,content in old_files.items())
@@ -103,6 +111,7 @@ def qualify(root,image):
     result=dict(passed=True,real_docker_jobs=len(jobs),historical_red=red,test_revision=revision,freeze=frozen,
         delivery_review=review,unit_green_conflicting_qa_rejected=True,ordinary_exception_denied=True,
         diagnostic_browser_failure_visible_without_approval=True,diagnostic_job=diagnostic_job,
+        pinned_validation=pinned,changed_checkout_ignored=pinned,
         existing_unit_tests_unchanged=True,product_unchanged=True,controls_preserved=True,integrated_browser_passed=True,
         paid_calls=0,model_judgment=False,native_lifecycle=False,delivery_approval=False,all_jobs_retired=True)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result
@@ -110,4 +119,5 @@ def qualify(root,image):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--root',type=Path,required=True);parser.add_argument('--image',required=True)
-    args=parser.parse_args();qualify(args.root.absolute(),args.image)
+    parser.add_argument('--pinned',action='store_true')
+    args=parser.parse_args();qualify(args.root.absolute(),args.image,pinned=args.pinned)

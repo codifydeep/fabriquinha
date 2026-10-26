@@ -13,6 +13,7 @@ from .deployment import Deployment
 from .config import execution_context
 from .browser import load_contract,author_protocol
 from .quality import Quality, CONTROL_CONTRACT
+from .executor import validation_files
 
 
 def ordered(tasks):
@@ -80,10 +81,12 @@ class Releases:
 
     def materialize(self,conn,anchor,specification,services,*,path=None,seed=None):
         kb,_,_=native();path=path or self.folder(anchor)/'graph.json';binding=self.binding(anchor)
+        bundle=validation_files(self.project,self.store)[0]
         if path.exists():
             graph_id=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(graph_id,kind='release_graph')
             graph=record['payload']
-            if record['binding']!=binding or graph['project']!=self.project.fingerprint() or graph['plan_review']!=specification['review']:
+            if (record['binding']!=binding or graph['project']!=self.project.fingerprint() or graph['plan_review']!=specification['review']
+                    or graph.get('validation_bundle')!=bundle):
                 raise ValueError('release graph or approved plan changed')
         else:
             seed=seed or self.seed(anchor,specification,services);baseline=self.store.receipt(seed,kind='release_seed')['payload']
@@ -113,7 +116,8 @@ class Releases:
                 previous=cards['integration']['id'];by_package[package['id']]=previous
                 items.append(dict(package=package,cards=cards))
             graph=dict(project=self.project.fingerprint(),plan_review=specification['review'],seed=seed,items=items,
-                serialized_integrations=True,qualification=self.project.qualification)
+                serialized_integrations=True,qualification=self.project.qualification,
+                **({'validation_bundle':bundle} if bundle else {}))
             graph_id=self.store.record('release_graph',binding,graph);write_json(path,{'receipt':graph_id})
         # Every card starts parked. Publish the whole immutable graph before
         # activating any card, so a crash cannot dispatch half-built dependencies.
@@ -168,6 +172,7 @@ class Releases:
             if not anchor or anchor.status!='blocked':raise ValueError('active release anchor required')
             graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')
             if graph['binding']!=self.binding(anchor) or graph['payload']['project']!=self.project.fingerprint():raise ValueError('graph scope changed')
+            if graph['payload'].get('validation_bundle')!=validation_files(self.project,self.store)[0]:raise ValueError('release validation bundle changed')
             card=next((item['cards'][body['kind']] for item in graph['payload']['items'] if item['package']['id']==body.get('package')),None)
             if not card or card['id']!=task.id:raise ValueError('graph-owned assignment required')
             self.check_card(conn,card)
@@ -181,6 +186,7 @@ class Releases:
             if not anchor or anchor.status!='blocked' or self.intake.terminal(anchor):raise ValueError('active release graph required')
             record=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')
             if record['binding']!=self.binding(anchor) or record['payload']['project']!=self.project.fingerprint():raise ValueError('foreign graph')
+            if record['payload'].get('validation_bundle')!=validation_files(self.project,self.store)[0]:raise ValueError('release validation bundle changed')
             card=next((item['cards'][run.kind] for item in record['payload']['items']
                        if item['package']['id']==body.get('package')),None)
             if not card or card['id']!=run.task or card['owner']!=run.author:raise ValueError('current graph-owned assignment required')
@@ -327,6 +333,7 @@ class Releases:
         if self.board.guard:self.board.guard()
         acceptance=self.store.record('release_acceptance',self.binding(anchor),dict(project=self.project.fingerprint(),
             state='HOMOLOGADA',qualification=self.project.qualification,delivery_approval=not self.project.qualification,
+            **({'validation_bundle':graph['validation_bundle']} if graph.get('validation_bundle') else {}),
             brief=specification['approval'],plan_review=specification['review'],graph=graph_id,packages=evidence,
             criteria=sorted(criteria),final_qa=final['qa'],commit=final['commit'],image=qa['image'],url=qa['url'],ci=ci))
         if not kb.complete_task(conn,anchor.id,summary='HOMOLOGADA'+(' — deterministic qualification only' if self.project.qualification else ''),

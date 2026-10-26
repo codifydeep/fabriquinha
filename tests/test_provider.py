@@ -92,6 +92,51 @@ class NeutralProvider(unittest.TestCase):
         self.assertEqual(evidence['usage']['completion_tokens'],4096)
         self.assertNotIn('messages',evidence);self.assertNotIn('private model text',json.dumps(evidence))
 
+    def test_reported_cost_cache_and_reasoning_are_retained_without_response_text(self):
+        response=dict(id='gen-fixture-123',choices=[dict(finish_reason='stop',message={'content':'private answer'})],
+            usage=dict(prompt_tokens=100,completion_tokens=30,total_tokens=130,cost=0.0012,
+                prompt_tokens_details=dict(cached_tokens=80,cache_write_tokens=10),completion_tokens_details=dict(reasoning_tokens=12)))
+        self.app.forward.return_value=(200,json.dumps(response).encode())
+        status,data=self.send();self.assertEqual(status,200);self.assertEqual(json.loads(data),response)
+        value=json.loads((self.meter/'attempts/8.json').read_bytes())
+        self.assertEqual(value['generation_id'],'gen-fixture-123')
+        self.assertEqual(value['reported_cost'],'0.0012');self.assertEqual(value['cost_status'],'reported')
+        self.assertEqual(value['usage']['cached_tokens'],80);self.assertEqual(value['usage']['reasoning_tokens'],12)
+        self.assertNotIn('private answer',json.dumps(value))
+
+    def test_absent_invalid_or_zero_cost_are_distinct(self):
+        for number,cost in enumerate((None,-1,0),8):
+            self.app.forward.return_value=(200,json.dumps(dict(choices=[],usage={'cost':cost})).encode())
+            self.send();value=json.loads((self.meter/('attempts/'+str(number)+'.json')).read_bytes())
+            self.assertEqual(value['cost_status'],'reported' if cost==0 else 'unknown')
+            self.assertEqual(value['reported_cost'],'0' if cost==0 else None)
+
+    def test_accounting_is_decimal_partial_and_does_not_spend_or_clear_a_pause(self):
+        for cost in (0.1,0.2,None):
+            self.app.forward.return_value=(200,json.dumps(dict(choices=[],usage=dict(cost=cost,prompt_tokens=10))).encode())
+            self.app.handle('Bearer local-client-token-for-tests',json.dumps(dict(model='example/model',messages=[{'role':'user','content':'private'}])).encode(),'b'*64)
+        self.app.ledger.pause(10,402)
+        value=self.app.ledger.usage('a'*64)
+        self.assertEqual(value['total']['known_cost_usd'],'0.3')
+        self.assertIsNone(value['total']['recorded_total_cost_usd'])
+        self.assertEqual(value['total']['unknown_cost_calls'],1)
+        self.assertEqual(value['total']['token_reporting_calls']['prompt_tokens'],3)
+        self.assertNotIn('cached_tokens',value['total']['tokens'])
+        self.assertEqual(value['activities']['b'*64]['attempts'],3)
+        self.assertEqual(value['global_unrecorded_calls'],7)
+        self.assertEqual(self.app.status()['calls'],10);self.assertIsNotNone(self.app.status()['provider_pause'])
+        self.assertEqual(self.app.forward.call_count,3)
+        self.assertNotIn('private',json.dumps(value));self.assertNotIn('local-client-token',json.dumps(value))
+
+    def test_accounting_keeps_transport_unknown_and_old_missing_usage_as_unknown(self):
+        self.app.forward.side_effect=TimeoutError('possibly sent')
+        self.app.handle('Bearer local-client-token-for-tests',json.dumps(dict(model='example/model',messages=[{}])).encode(),'c'*64)
+        result=self.app.ledger.usage('a'*64)
+        self.assertEqual(result['total']['outcomes'],{'transport_unknown':1})
+        self.assertEqual(result['total']['unknown_cost_calls'],1)
+        self.assertIsNone(result['total']['recorded_total_cost_usd'])
+        self.assertEqual(self.app.status()['calls'],8);self.assertIsNotNone(self.app.status()['relay_hold'])
+
     def test_transport_metadata_preserves_cause_and_never_retries_unknown_call(self):
         self.app.forward.side_effect=TimeoutError('private error details')
         self.assertEqual(self.send()[0],503)

@@ -118,7 +118,8 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             value=dict(id='local-'+str(run.number)+'-'+str(index),object='chat.completion',created=int(time.time()),model=body['model'],
                 choices=[dict(index=0,finish_reason='tool_calls',message=dict(role='assistant',content=None,
                     tool_calls=[dict(id='intake-'+str(run.number)+'-'+str(index),type='function',
-                        function=dict(name=name,arguments=json.dumps(args)))]))],usage=dict(prompt_tokens=100,completion_tokens=50,total_tokens=150))
+                        function=dict(name=name,arguments=json.dumps(args)))]))],usage=dict(prompt_tokens=100,completion_tokens=50,total_tokens=150,
+                            cost=0.00015,prompt_tokens_details=dict(cached_tokens=40),completion_tokens_details=dict(reasoning_tokens=5)))
             raw=json.dumps(value).encode();self.send_response(200);self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
     server=ThreadingHTTPServer(('127.0.0.1',0),Response);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
@@ -141,6 +142,7 @@ def qualify(root,upstream,image,*,neutral_relay=False):
         relay=LocalRelay(policy,meter,key);relay_owner=relay.ledger.owner();relay_owner.__enter__()
         relay_server=relay_factory(relay,'127.0.0.1',0);port=relay_server.server_port
         relay_thread=threading.Thread(target=relay_server.serve_forever,daemon=True);relay_thread.start()
+        write_json(root/'provider-policy.json',policy.values())
     write_json(root/'route.json',dict(base_url='http://127.0.0.1:'+str(port)+'/v1',api_key=client_key,
         provider='custom',api_mode='chat_completions',model=model))
     services=[]
@@ -257,8 +259,20 @@ def qualify(root,upstream,image,*,neutral_relay=False):
             except Held as error:assert error.status==402
             else:raise AssertionError('metadata admission bypassed the financial pause')
             assert relay.status()['calls']==11 and len(all_requests)==11
+            accounting=runtime.costs()
+            assert accounting['total']['known_cost_usd']=='0.00165'
+            assert accounting['total']['unknown_cost_calls']==0
+            assert accounting['total']['tokens']['cached_tokens']==440
+            assert accounting['total']['tokens']['reasoning_tokens']==55
+            assert 'unattributed' not in accounting['activities']
+            assert all(group['execution'] in [item['binding'] for item in all_requests] for group in accounting['activities'].values())
+            connection=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
+            connection.request('GET','/usage');response=connection.getresponse();assert response.status==401;response.read();connection.close()
+            assert relay.status()['calls']==11 and len(all_requests)==11
             result.update(neutral_relay=True,relay_calls=11,approval_feedback_observed=True,paused_request_not_forwarded=True,
-                sdk_output_budget_aligned=True,plan_schema_constraints_observed=True,legacy_adapters=0)
+                sdk_output_budget_aligned=True,plan_schema_constraints_observed=True,legacy_adapters=0,
+                sdk_activity_header_verified=True,accounting_did_not_spend_or_clear_pause=True,
+                synthetic_cost_only=True,synthetic_reported_cost_usd='0.00165')
         write_json(root/'receipt.json',result);return result
     finally:
         if relay_server:
