@@ -5,6 +5,7 @@ gateway process. The controller owns Docker lifecycle; the backend only execs.
 """
 from functools import wraps
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -15,6 +16,73 @@ from .artifacts import digest
 from .effects import Journal, EffectBlocked, write_json
 from .executor import docker, grouping, phase_mounts
 from .provider import OUTPUT_LIMITS
+
+
+# Runs inside the existing lease, not on the host. A Linux subreaper owns only
+# this command's descendants, including detached browser/server processes.
+EXEC_GUARD = '''import ctypes, os, signal, subprocess, sys, time
+libc = ctypes.CDLL(None, use_errno=True)
+if libc.prctl(36, 1, 0, 0, 0) != 0:
+    raise OSError(ctypes.get_errno(), 'subreaper unavailable')
+interrupted = [False]
+def interrupt(*args): interrupted[0] = True
+signal.signal(signal.SIGTERM, interrupt)
+signal.signal(signal.SIGINT, interrupt)
+process = subprocess.Popen(sys.argv[2:], start_new_session=True)
+deadline = time.monotonic() + float(sys.argv[1])
+while process.poll() is None and not interrupted[0] and time.monotonic() < deadline:
+    time.sleep(.02)
+code = process.poll()
+if code is None: code = 130 if interrupted[0] else 124
+def children():
+    with open('/proc/self/task/' + str(os.getpid()) + '/children') as stream:
+        return [int(pid) for pid in stream.read().split()]
+def reap():
+    while True:
+        try:
+            if os.waitpid(-1, os.WNOHANG)[0] == 0: break
+        except ChildProcessError: break
+def stop_children(sig):
+    # Unreaped direct children cannot have their PIDs recycled. No host PID,
+    # sibling exec, global process scan or process-group guess is signalled.
+    for pid in children():
+        try: os.kill(pid, sig)
+        except ProcessLookupError: pass
+leftovers = bool(children())
+for sig, grace in ((signal.SIGTERM, 2), (signal.SIGKILL, 5)):
+    until = time.monotonic() + grace
+    while children() and time.monotonic() < until:
+        stop_children(sig)
+        reap()
+        time.sleep(.02)
+    reap()
+if children():
+    print('[Sandbox could not reap command descendants]', file=sys.stderr)
+    sys.exit(125)
+if code == 124: print('[Sandbox command deadline exceeded]', file=sys.stderr)
+elif leftovers: print('[Sandbox command descendants retired]', file=sys.stderr)
+sys.exit(code if code >= 0 else 128 - code)
+'''
+
+
+def bounded_exec(cid,argv,timeout,*,stdin=False):
+    """The deadline must survive loss of the host's docker-exec client."""
+    if (not isinstance(cid,str) or not re.fullmatch('[a-f0-9]{64}',cid)
+            or not isinstance(argv,(list,tuple)) or not argv or any(not isinstance(a,str) for a in argv)
+            or type(timeout) not in (int,float) or not math.isfinite(timeout) or timeout<=0):
+        raise ValueError('exact sandbox, argv and finite positive deadline required')
+    return ['docker','exec',*(['-i'] if stdin else []),cid,'python','-B','-c',EXEC_GUARD,
+            format(min(timeout,120),'g'),*argv]
+
+
+def activity_anchor(project,run,route,recovery_epoch=None):
+    identity=dict(project=project.fingerprint(),subject=run.subject(),model=route['model'],
+                  provider=route['provider'],api_mode=route['api_mode'])
+    if recovery_epoch is not None:
+        if not isinstance(recovery_epoch,str) or not re.fullmatch('[a-f0-9]{64}',recovery_epoch):
+            raise ValueError('controller-validated diagnostic receipt required for context refresh')
+        identity['recovery_epoch']=recovery_epoch
+    return 'fabriquinha-'+digest(identity)[:32]
 
 
 def sandbox_context(prompt):
@@ -229,8 +297,8 @@ def install_backend(sandbox):
 
         def _run_bash(self,text,*,login=False,timeout=120,stdin_data=None):
             sandbox.ensure()
-            return _popen_bash(['docker','exec',*(['-i'] if stdin_data is not None else []),
-                sandbox.cid,*bash_argv(text,login)],stdin_data,start_new_session=True)
+            return _popen_bash(bounded_exec(sandbox.cid,bash_argv(text,login),timeout,stdin=stdin_data is not None),
+                               stdin_data,start_new_session=True)
 
         def cleanup(self):
             # Native cache eviction must not delete a controller-owned lease.
@@ -326,7 +394,7 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     return {name},operations
 
 
-def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None,provider_check=None,output_limit=None):
+def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None,provider_check=None,output_limit=None,recovery_epoch=None):
     """Trusted SDK adapter; no lifecycle inference from the assistant's prose.
 
     Route comes from controller configuration, not a model tool argument.
@@ -354,8 +422,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     gates,operations=register_delivery_tools(sandbox,quality,on_terminal=finished)
     allowed=tool_names(sandbox)|gates
     create_custom_toolset('fabriquinha_activity','Controller-selected delivery activity',tools=sorted(allowed))
-    anchor='fabriquinha-'+digest(dict(project=sandbox.project.fingerprint(),subject=sandbox.run.subject(),
-        model=route['model'],provider=route['provider'],api_mode=route['api_mode']))[:32]
+    anchor=activity_anchor(sandbox.project,sandbox.run,route,recovery_epoch)
     session=db.resolve_resume_session_id(anchor);previous=db.get_session(session)
     try:
         history=None
@@ -422,7 +489,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
             from .operations import ActivityPaused
             raise ActivityPaused('SDK activity interrupted by operational pause')
         if not terminal:raise incomplete_activity(result,output_limit)
-        return dict(transition=terminal,session=agent.session_id,resumed=bool(previous),
+        return dict(transition=terminal,session=agent.session_id,resumed=bool(previous),recovery_epoch=recovery_epoch,
                     sdk_exit=result.get('turn_exit_reason',result.get('exit_reason')),delivery_approval=False)
     finally:
         watch_done.set()

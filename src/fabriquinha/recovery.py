@@ -7,7 +7,20 @@ from .artifacts import digest,encoded
 from .board import Run
 from .effects import Journal, EffectBlocked, Pending,write_json
 from .kanban_lane import native
-from .quality import DeliveryTools, product_mutations, review_decision
+from .quality import DeliveryTools, product_mutations, review_decision, suite_report
+
+
+def suite_refusal_context(store,project,binding,key,current_snapshot):
+    record=store.receipt(key,kind='suite_job');data=record['payload'];identity=data['identity']
+    if (record['binding']!=binding or identity['binding']!=binding or identity['project']!=project.fingerprint()
+            or identity['image']!=project.validation_image or identity['phase']=='diagnostic'
+            or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
+        raise ValueError('suite refusal must match the exact failed execution and fixed validator')
+    report=suite_report(data,diagnostic=True);store.tree(identity['snapshot'])
+    if not any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes')):
+        raise ValueError('negative quality report required, never a passing-job approval')
+    return dict(receipt=key,phase=identity['phase'],snapshot=identity['snapshot'],report=report,
+        matches_current_snapshot=identity['snapshot']==current_snapshot,delivery_approval=False,requires_fresh_validation=True)
 
 
 def control_refusal_context(store,project,binding,key,current_snapshot):
@@ -61,6 +74,9 @@ class Diagnostic:
         if self.incident.get('control_refusal'):
             result['last_control_refusal']=control_refusal_context(self.store,self.q.project,self.original,
                 self.incident['control_refusal'],self.incident['snapshot'])
+        if self.incident.get('suite_refusal'):
+            result['last_suite_refusal']=suite_refusal_context(self.store,self.q.project,self.original,
+                self.incident['suite_refusal'],self.incident['snapshot'])
         if self.incident.get('review_escalation'):
             escalation=self.store.receipt(self.incident['review_escalation'],kind='review_escalation')['payload']
             result['review_feedback']=self.store.receipt(escalation['review'])['payload']['verdict']
@@ -278,7 +294,7 @@ class Recovery:
         snapshot=self.snapshot(conn,task,source,handoff)
         failure=row['summary'] or row['error'] or task.result or 'Native worker could not complete'
         payload=json.loads(event['payload'] or '{}')
-        reason=payload.get('reason');escalation_id=None;control_refusal=None
+        reason=payload.get('reason');escalation_id=None;control_refusal=None;suite_refusal=None
         if isinstance(reason,str):
             try:data=json.loads(reason)
             except (ValueError,TypeError):data=None
@@ -289,6 +305,8 @@ class Recovery:
                         failure=failure_record['payload']['message']
                         control_refusal=failure_record['payload'].get('control_refusal')
                         if control_refusal:control_refusal_context(self.store,self.project,source.binding(),control_refusal,snapshot)
+                        suite_refusal=failure_record['payload'].get('suite_refusal')
+                        if suite_refusal:suite_refusal_context(self.store,self.project,source.binding(),suite_refusal,snapshot)
                 if data.get('category')=='review_escalation':
                     record=self.store.receipt(data['escalation'],kind='review_escalation')
                     review=self.store.receipt(record['payload']['review'],kind='test_review' if source.kind=='tests' else 'delivery_review')
@@ -305,13 +323,14 @@ class Recovery:
         allowed=task.status=='blocked' and not effects
         category=('native_triage' if task.status=='triage' else 'controller_effect' if effects else
                   'technical_impasse' if escalation_id else 'document_activity' if source.kind in ('brief','plan') else
-                  'integration_activity' if source.kind=='integration' else 'quality_gate' if control_refusal else 'worker_activity')
+                  'integration_activity' if source.kind=='integration' else 'quality_gate' if control_refusal or suite_refusal else 'worker_activity')
         incident=self.store.record('incident',source.binding(),dict(project=self.project.fingerprint(),snapshot=snapshot,
             source=task.id,source_run=row['id'],block_event=event['id'],cause=cause,failure=failure,category=category,
             source_state=task.status,resume_allowed=allowed,controller_effects=effects,
             recovery_limit=None if allowed else 'Native triage or expired controller effect requires a scoped technical repair; preserve phase and breaker, never repeat the mutation.',
             **({'document_kind':source.kind} if source.kind in ('brief','plan') else {}),
             **({'control_refusal':control_refusal} if control_refusal else {}),
+            **({'suite_refusal':suite_refusal} if suite_refusal else {}),
             workspace=task.workspace_path,**({'review_escalation':escalation_id} if escalation_id else {})))
         # A native idempotent anchor survives restart before stage materialization.
         self.create(conn,incident,stage)

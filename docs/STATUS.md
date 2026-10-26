@@ -42,6 +42,20 @@ corrigida sem relaxar os gates de entrega: 278 testes do núcleo verdes e prova
 SDK/Docker de nove atividades/31 requisições locais até TDD revisado. Falta
 revalidar a equipe real e completar homologação.
 
+Outra tentativa concluiu Red/freeze e Green de nove testes, mas o autor parou
+após recusas genéricas dos controles. Lead executou SPIKE e retomou a fase; a
+conversa herdada encerrou novamente em texto, e o CTO preservou a triagem.
+Consumo encerrado em 6.595/7.000, sem PR ou homologação nessa fronteira. A revisão
+dos registros encontrou também subprocessos exploratórios sobrevivendo ao
+timeout do cliente Docker, todos aposentados com o sandbox ao final da atividade.
+
+O conjunto posterior corrige contexto após diagnóstico, deadline interno dos
+descendentes, feedback concreto dos jobs recusados e a primeira abertura WAL.
+Passou em 281 testes do núcleo, prova SDK/Chromium de nove atividades/32 chamadas
+locais e revalidação financeira de onze atividades/19 chamadas locais. Zero
+OpenRouter nessas provas. A nova fronteira real continua necessária; nenhum
+bloqueio anterior foi zerado nem convertido em aprovação.
+
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
 continua sendo a estratégia aprovada. O [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)

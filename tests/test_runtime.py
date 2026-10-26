@@ -24,6 +24,22 @@ from test_delivery_core import configuration
 
 
 class NativeRuntime(unittest.TestCase):
+    def test_bootstrap_read_lease_closes_native_wal_preflight_race(self):
+        from fabriquinha.runtime import native_keepalive
+        path=self.root/'bootstrap.db'
+        writer=sqlite3.connect(path);writer.execute('PRAGMA journal_mode=WAL')
+        writer.execute('CREATE TABLE tasks (id TEXT)');writer.execute("INSERT INTO tasks VALUES ('preserved')");writer.commit()
+        sidecar=Path(str(path)+'-wal');self.assertTrue(sidecar.exists())
+        @contextmanager
+        def native_connection():
+            writer.close()  # Last writer closes between the native file check and os.access.
+            self.assertTrue(sidecar.exists(),'bootstrap reader must prevent sidecar deletion in this window')
+            with closing(sqlite3.connect(path)) as connection:yield connection
+        with native_keepalive(path,SimpleNamespace(connect_closing=native_connection)) as keeper:
+            self.assertEqual(keeper.execute('SELECT id FROM tasks').fetchall(),[('preserved',)])
+            self.assertFalse(keeper.in_transaction)
+            self.assertEqual(keeper.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0],0)
+
     def test_human_pause_does_not_generate_stalled_work_alerts(self):
         self.runtime.control.pause();stop=threading.Event()
         api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()))

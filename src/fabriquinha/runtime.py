@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -54,6 +55,29 @@ def bind(root,upstream):
     os.environ.update(HERMES_HOME=str(root/'home'),HERMES_KANBAN_DB=str(root/'home/kanban.db'),
         HERMES_KANBAN_BOARD='default',HERMES_DISABLE_LAZY_INSTALLS='1',PYTHONDONTWRITEBYTECODE='1',
         PYTHONPATH=os.pathsep.join([str(Path(__file__).resolve().parents[1]),str(upstream)]))
+
+
+@contextmanager
+def native_keepalive(path,kbc):
+    """Bridge a disappearing-WAL preflight race; never chmod, delete or retry.
+
+    A short read transaction protects initialized WAL sidecars until the native
+    keeper has opened. Release it before dispatch so checkpoints are not pinned.
+    Missing DBs and actual access problems remain with native initialization.
+    """
+    path=Path(path).absolute();bootstrap=None
+    try:
+        if path.is_file() and os.access(path,os.R_OK|os.W_OK) and os.access(path.parent,os.R_OK|os.W_OK|os.X_OK):
+            bootstrap=sqlite3.connect(path.as_uri()+'?mode=rw',uri=True,timeout=5)
+            if bootstrap.execute('PRAGMA journal_mode').fetchone()[0]=='wal':
+                bootstrap.execute('BEGIN')
+                bootstrap.execute('SELECT name FROM sqlite_master LIMIT 1').fetchall()
+        with kbc.connect_closing() as keeper:
+            keeper.execute('SELECT id FROM tasks LIMIT 1').fetchone()
+            if bootstrap:bootstrap.close();bootstrap=None
+            yield keeper
+    finally:
+        if bootstrap:bootstrap.close()
 
 
 @contextmanager
@@ -458,8 +482,7 @@ class Runtime:
         # Keep WAL sidecars present across short native API connections. This
         # is a connection lifetime, not an open write txn or an error retry.
         _,kbc,_=native()
-        with kbc.connect_closing() as keeper:
-            keeper.execute('SELECT id FROM tasks LIMIT 1').fetchone()
+        with native_keepalive(self.root/'home/kanban.db',kbc) as keeper:
             return self._serve(stop,interval=interval)
 
     def _serve(self,stop,*,interval=15):
@@ -544,7 +567,7 @@ class Runtime:
             policy=self.root/'provider-policy.json'
             output_limit=Policy.parse(json.loads(policy.read_bytes())).max_output_tokens if policy.exists() else None
             result=run_activity(sandbox,quality,route,prompt,stop_requested=lambda:self.control.read()['paused'],provider_check=provider_check,
-                output_limit=output_limit)
+                output_limit=output_limit,recovery_epoch=guidance[-1]['receipt'] if guidance else None)
             write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
         except Held as error:
             wait=self.store.record('provider_wait',run.binding(),dict(project=self.project.fingerprint(),
@@ -558,9 +581,11 @@ class Runtime:
             # then reclaims it natively, without changing author/review phase.
         except BaseException as error:
             control_refusal=getattr(quality,'control_refusal',None)
+            suite_refusal=getattr(quality,'suite_refusal',None)
             failure=self.store.record('worker_failure',run.binding(),dict(project=self.project.fingerprint(),
                 category=type(error).__name__,message=str(error)[:2000],
-                **({'control_refusal':control_refusal} if control_refusal else {})))
+                **({'control_refusal':control_refusal} if control_refusal else {}),
+                **({'suite_refusal':suite_refusal} if suite_refusal else {})))
             with kbc.connect_closing() as conn:
                 kb.block_task(conn,task,reason=json.dumps(dict(category=type(error).__name__,failure=failure)),
                               kind='capability',expected_run_id=number)

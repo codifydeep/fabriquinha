@@ -86,6 +86,21 @@ class TechnicalRecovery(unittest.TestCase):
             sandbox=dict(network='none',snapshot='readonly',user='65534:65534')))
         self.quality.runner.run.return_value=author_job
         with self.assertRaises(ValueError):self.quality.observe(self.original,self.snapshot,'diagnostic')
+        # The author sees concrete cases; its rejected job survives as negative
+        # diagnostic context without changing Red or independent review rules.
+        author_identity['phase']='red'
+        author_job=self.store.record('suite_job',self.original.binding(),dict(**value,identity=author_identity,
+            sandbox=dict(network='none',snapshot='readonly',user='65534:65534')))
+        self.quality.runner.run.return_value=author_job
+        with self.assertRaisesRegex(ValueError,'red suite rejected.*new'):
+            self.quality.observe(self.original,self.snapshot,'red')
+        self.assertEqual(self.quality.suite_refusal,author_job)
+        from fabriquinha.recovery import suite_refusal_context
+        context=suite_refusal_context(self.store,self.project,self.original.binding(),author_job,self.snapshot)
+        self.assertEqual(context['report']['errors'],['new']);self.assertFalse(context['delivery_approval'])
+        self.assertFalse(suite_refusal_context(self.store,self.project,self.original.binding(),author_job,'other')['matches_current_snapshot'])
+        with self.assertRaises(ValueError):
+            suite_refusal_context(self.store,self.project,replace(self.original,number=99).binding(),author_job,self.snapshot)
 
     def test_spike_mutation_is_disposable_and_cannot_weaken_tests(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)

@@ -30,7 +30,7 @@ flowchart LR
     CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
     A[Admissão: imagens, disco e redes reservadas] --> K
     K --> W[Agentes via SDK Hermes]
-    W --> S[Sandbox por atividade]
+    W --> S[Sandbox por atividade e deadline interno]
     S --> E[Snapshot e recibos imutáveis]
     E --> V[Validação fixa em Docker]
     V --> K
@@ -53,6 +53,10 @@ segundo gerenciador de tarefas.
 
 Diagnósticos podem observar relatórios com erros para orientar reparos; esses
 relatórios continuam impedindo aprovação em todos os gates de entrega.
+
+Uma orientação técnica aplicada abre contexto SDK novo, reconstituído pelos
+artefatos e achados duráveis. O histórico anterior permanece arquivado. Pausas
+financeiras mantêm a sessão e a fase; não são tratadas como uma falha técnica nova.
 
 Entregas reais exigem as duas redes de homologação reservadas antes do despacho
 pago. O deploy usa essas redes como externas; não aloca sub-redes implicitamente.

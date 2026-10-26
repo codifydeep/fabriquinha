@@ -25,8 +25,8 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False):
-    if sum((review_escalation,control_refusal,invalid_red))>1 or invalid_red and provider_error:
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False):
+    if sum((review_escalation,control_refusal,invalid_red))>1 or (invalid_red or terminal_deadline) and provider_error:
         raise ValueError('choose one independent recovery scenario')
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
     kb,kbc,_=native()
@@ -40,6 +40,27 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
     control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[];negative_reports=[]
+    terminal_cids=[];terminal_verified=[]
+    deadline_probe='''python - <<'PY'
+import signal, subprocess, sys, time
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+subprocess.Popen([sys.executable, '-c', 'import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(60)', 'fabriquinha-detached-child'], start_new_session=True)
+pw=sync_playwright().start()
+browser=pw.chromium.launch()
+Path('/workspace/tests/deadline-browser-started.txt').write_text('ready')
+time.sleep(60)
+PY'''
+    process_probe='''import json,os
+rows=[]
+for name in os.listdir('/proc'):
+ if not name.isdigit() or int(name) in (1,os.getpid()):continue
+ try:
+  text=open('/proc/'+name+'/cmdline','rb').read().decode(errors='replace')
+ except OSError:continue
+ if text:rows.append(dict(pid=int(name),sibling='fabriquinha-sibling-control' in text))
+print(json.dumps(rows))'''
     sink=None;sink_thread=None;sink_data=dict(accepted={},attempts={},accepted_at={},lookups=0,lost=None)
     if notifications:
         class Sink(BaseHTTPRequestHandler):
@@ -149,6 +170,10 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                     elif run.kind=='diagnostic':
                         visible=json.loads(native_context.split('Controller-recorded Incident context:\n',1)[1])
                         assert 'Tests author' in visible['phase_expectation'] and 'Do not require Green' in visible['phase_expectation']
+                        assert visible['last_suite_refusal']['report']['errors']==['test_new.NewBehavior.test_value']
+                        assert visible['last_suite_refusal']['requires_fresh_validation']
+                if terminal_deadline and run.number==1:
+                    sequence.insert(3,('terminal',dict(command=deadline_probe,timeout=6)))
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
             if invalid_red and run.kind=='diagnostic':
@@ -171,10 +196,32 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                 data=json.dumps(dict(error=dict(code='output_budget_exceeds_policy',message='output_budget_exceeds_policy'))).encode()
                 self.send_response(422);self.send_header('Content-Type','application/json')
                 self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
+            if terminal_deadline and run.number==1 and index==3:
+                ids=docker('ps','-q','--filter','label=fabriquinha.task='+source,
+                    '--filter','label=com.docker.compose.project='+project['namespace']+'-tests').split()
+                assert len(ids)==1
+                cid=json.loads(docker('inspect',ids[0]))[0]['Id'];terminal_cids.append(cid)
+                docker('exec','-d',cid,'python','-c','import time;time.sleep(120)','fabriquinha-sibling-control')
+            if terminal_deadline and run.number==1 and index==4:
+                result=str(body['messages'][-1].get('content'))
+                assert '124' in result and ('timed out' in result.lower() or 'deadline' in result.lower())
+                until=time.monotonic()+12;stable=0
+                while True:
+                    rows=json.loads(docker('exec',terminal_cids[0],'python','-c',process_probe))
+                    assert sum(row['sibling'] for row in rows)==1,'a different exec must survive'
+                    stable=stable+1 if all(row['sibling'] for row in rows) else 0
+                    if stable>=2:break
+                    if time.monotonic()>until:raise TimeoutError('command descendants survived internal deadline')
+                    time.sleep(.2)
+                assert (runtime.board.workspace(run)/'tests/deadline-browser-started.txt').read_text()=='ready'
+                terminal_verified.append(run.number)
             if run.kind=='diagnostic' and run.actor=='flow-lead' and index==1:
                 assert 'VALUE' in str(body['messages'][-1].get('content')),'diagnostic must actually read the mounted source'
             if index>=len(sequences[run.number]):self.send_error(400);return
             if run.task==source and run.number!=1 and not run.reviewing and not resumed.is_set():
+                assert not any(m.get('role')=='assistant' and m.get('content')=='I will finish the task later.'
+                               for m in body['messages']),'failed final prose must not poison the diagnosed retry'
+                assert 'Controller-recorded diagnostic guidance' in native_context
                 resumed.set();release.wait()
             name,args=sequences[run.number][index]
             if name:
@@ -290,6 +337,11 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
             assert experiment['payload']['report']['errors']==['test_new.NewBehavior.test_value']
             proof.update(negative_reports_reached_lead_and_cto=True,invalid_red_not_approved=True,
                 test_author_resumed_without_requiring_green=True,diagnosis_did_not_replace_red_or_freeze=True)
+        if terminal_deadline:
+            assert terminal_verified==[1]
+            proof.update(real_browser_started_before_deadline=True,detached_sigterm_ignoring_child_reaped=True,
+                host_docker_client_timeout_did_not_leave_descendants=True,independent_sibling_exec_preserved=True)
+        proof.update(diagnosed_retry_did_not_reuse_failed_final_prose=True)
         if control_refusal:
             assert len(control_failed)==1 and len(control_seen)==2
             failed=next(r for r in runs if r['id']==control_failed[0])
@@ -340,10 +392,11 @@ if __name__=='__main__':
     scenario.add_argument('--control-refusal',action='store_true')
     scenario.add_argument('--invalid-red',action='store_true',help='Observe test errors in diagnosis, then require author repair and genuine Red/review/Green')
     parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
+    parser.add_argument('--terminal-deadline',action='store_true',help='Qualify actual browser/detached-child retirement after host exec client timeout')
     args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
     try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
-        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red)
+        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

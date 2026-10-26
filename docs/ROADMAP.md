@@ -115,6 +115,13 @@ sem aprovação de erro ou dispensa de qualidade. A nova fronteira real deve
 conferir esse julgamento e a entrega; não reiniciar a tentativa preservada como
 se ela já tivesse produzido Red válido.
 
+Antes da próxima fronteira, o conjunto foi revalidado offline: contexto novo
+após orientação técnica, conversa preservada em pausa financeira, supervisão
+real dos descendentes do terminal, feedback de erros ligado ao job e proteção
+da abertura WAL. Não alterar o raciocínio para forçar ferramentas nem ampliar
+o orçamento. Conferir os mesmos mecanismos na equipe real; testes de mecanismo
+não bastam para declarar S4 concluído.
+
 **Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
 → `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do
 aceite. Reparos externos tornam a tentativa assistida. Não substituir essa prova

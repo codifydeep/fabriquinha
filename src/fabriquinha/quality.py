@@ -75,6 +75,7 @@ class Quality:
         self.project, self.store, self.runner, self.board = project, store, runner, board
         self.observed_jobs=set()
         self.control_refusal=None
+        self.suite_refusal=None
 
     def check(self, run, kind, *, reviewing=False):
         self.board.ensure(run)
@@ -107,7 +108,17 @@ class Quality:
             raise ValueError('complete real suite without errors or skips required')
         # Negative facts must remain visible to a diagnostician. Delivery phases
         # retain the strict default, including Red: errors/skips never qualify.
-        report=suite_report(value,diagnostic=run.kind=='diagnostic' and phase=='diagnostic')
+        try:report=suite_report(value,diagnostic=run.kind=='diagnostic' and phase=='diagnostic')
+        except ValueError as error:
+            # Preserve complete negative facts from the existing job, never a
+            # new approval. Invalid/partial reports still fail without credit.
+            try:facts=suite_report(value,diagnostic=True)
+            except ValueError:raise error
+            self.suite_refusal=key
+            details={field:dict(count=len(facts[field]),cases=facts[field][:8])
+                     for field in ('errors','skips','expected_failures','unexpected_successes') if facts[field]}
+            raise ValueError(phase+' suite rejected; job '+key+': '+json.dumps(details)+
+                '. Fix the reported cases; this job does not qualify delivery or controls.') from None
         self.board.ensure(run)
         self.store.tree(snapshot)
         self.observed_jobs.add(key)

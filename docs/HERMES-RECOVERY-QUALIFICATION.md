@@ -273,3 +273,44 @@ freeze, Green e revisão da entrega. O incidente só foi resolvido com evidênci
 de entrega. O verificador anterior tinha uma comparação textual incorreta e foi
 encerrado sem qualificação; sua evidência permanece preservada. Decisões nessa
 prova eram programadas: julgamento do modelo real ainda precisa de nova fronteira.
+
+## Contexto após diagnóstico, timeout efetivo e feedback
+
+Uma recuperação técnica aplicada passa a identificar uma nova sessão SDK pela
+identidade de seu recibo. A conversa fracassada é preservada, mas não reaparece
+como contexto ativo. Artefatos, testes congelados, achados e orientação validada
+continuam disponíveis. Sem nova orientação técnica, o identificador fica estável:
+pausas operacionais ou financeiras não apagam a conversa nem zeram falhas.
+
+Recusas de suíte agora identificam fase, job e casos com erros/skips. O worker
+falho referencia esse job existente; Lead/CTO recebem o relatório completo com
+vínculo à execução e indicação de snapshot atual ou histórico. Isso não aprova
+mutantes inválidos e não transforma um relatório negativo em Green.
+
+O timeout anterior encerrava o cliente `docker exec`, permitindo que filhos
+continuassem no contêiner. O backend agora executa um supervisor Python fixo
+dentro da mesma lease, usando o subreaper Linux para encerrar e recolher
+somente seus próprios descendentes, inclusive navegadores destacados. Há graça
+limitada para TERM/KILL; não sinaliza PID do host nem outro `exec`. Não exige
+outra imagem, serviço, banco ou patch no Hermes. Se o mecanismo não estiver
+disponível, a exploração falha antes de executar o comando.
+
+`qualify_hermes_recovery.py --invalid-red --terminal-deadline` passou com nove
+atividades SDK e 32 requisições locais. Um Chromium real iniciou; o cliente
+expirou, um filho destacado que ignorava TERM foi encerrado, e um `exec`
+independente sobreviveu. A prova também conferiu erros visíveis a Lead/CTO,
+contexto sem a resposta final fracassada e TDD completo após retomada. Zero
+OpenRouter; decisões programadas. Isso qualifica o mecanismo, não o julgamento
+da equipe real ou uma release homologada.
+
+A revalidação de pausa financeira com saída 16384 passou com onze atividades e
+19 requisições locais: sessões do autor/revisor retomadas, fase preservada e
+nenhum envio durante o bloqueio. O primeiro ensaio dessa revalidação encontrou
+uma corrida na abertura WAL e permanece não qualificado. O bootstrap agora
+protege os sidecars com leitura curta até abrir a conexão nativa, liberando a
+transação antes do serviço. Não apaga WAL, muda permissões, mantém transação
+longa, repete efeitos ou modifica o upstream.
+
+Não foi habilitado `tool_choice=required`. A [documentação do fornecedor](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools)
+informa que a chamada forçada pula o raciocínio no Haiku 5.5. Modelo, raciocínio,
+40 iterações, teto de chamadas e gates foram preservados.

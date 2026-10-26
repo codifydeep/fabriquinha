@@ -25,6 +25,28 @@ class NativeBackendPolicy(unittest.TestCase):
         self.assertEqual(terminal_arguments({'command':'short experiment'},120)['timeout'],120)
         self.assertEqual(terminal_arguments({'command':'short experiment','timeout':10},120)['timeout'],10)
 
+    def test_terminal_deadline_is_inside_container_even_if_docker_client_dies(self):
+        from fabriquinha.hermes import bounded_exec, EXEC_GUARD
+        args=bounded_exec('c'*64,['bash','-c','sleep 999'],5,stdin=True)
+        self.assertEqual(args[:4],['docker','exec','-i','c'*64])
+        self.assertEqual(args[4:9],['python','-B','-c',EXEC_GUARD,'5'])
+        self.assertEqual(args[9:],['bash','-c','sleep 999'])
+        self.assertEqual(bounded_exec('c'*64,['bash','-c','true'],300)[-4],'120')
+        for value in (0,-1,True,float('nan'),float('inf')):
+            with self.subTest(timeout=value),self.assertRaises(ValueError):bounded_exec('c'*64,['bash','-c','true'],value)
+
+    def test_applied_diagnosis_refreshes_context_but_ordinary_resume_keeps_anchor(self):
+        from dataclasses import replace
+        from fabriquinha.hermes import activity_anchor
+        route=dict(model='same-model',provider='custom',api_mode='chat_completions')
+        original=activity_anchor(self.project,self.run,route)
+        self.assertEqual(original,activity_anchor(self.project,replace(self.run,number=2),route))
+        recovered=activity_anchor(self.project,self.run,route,'d'*64)
+        self.assertNotEqual(original,recovered)
+        self.assertEqual(recovered,activity_anchor(self.project,replace(self.run,number=3),route,'d'*64))
+        self.assertNotEqual(recovered,activity_anchor(self.project,self.run,route,'e'*64))
+        with self.assertRaises(ValueError):activity_anchor(self.project,self.run,route,'model-declared-recovery')
+
     def test_native_host_workspace_is_not_advertised_as_tool_filesystem(self):
         context='Task: t_example\nWorkspace: dir @ /controller/private/work/card\n## Body\nKeep every criterion.'
         visible=sandbox_context(context)

@@ -86,6 +86,13 @@ O relatório `doctor` é uma consulta atual. O campo `admission` do serviço é 
 e pode ser `null` em uma instância nova do comando `status`; isso significa que
 esse processo ainda não executou o preflight, não que os recursos foram aprovados.
 
+A primeira abertura de um Kanban WAL já inicializado usa uma leitura curta para
+impedir que o último observador remova o sidecar entre as verificações nativas.
+Ela termina assim que a conexão nativa permanente abre, antes de despachar.
+O teste intercala o fechamento do último escritor, confere os dados preservados
+e um checkpoint livre após o bootstrap. Não há transação longa, chmod, exclusão
+de WAL, patch no upstream ou retry genérico de erro de permissão.
+
 ## Uso em uma instalação qualificada
 
 Use a raiz específica, nunca o home legado. Os comandos abaixo não são instrução
