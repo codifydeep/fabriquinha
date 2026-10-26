@@ -82,9 +82,12 @@ de preços ou desconto de cache presumido no código.
 
 - Testes cobrem edição do checkout, adulteração do bundle, evidência obsoleta,
   mounts de todas as fases e continuidade da observação de CI sob o mesmo pin.
-- `qualify_qa_correction.py --pinned` executa dez jobs Docker/Chromium e recusa
+- `qualify_qa_correction.py --pinned` executa treze jobs Docker/Chromium e recusa
   uma contradição QA; a CI integrada continua usando o snapshot fixado mesmo
   quando o checkout simulado passa a conter scripts que falhariam ao executar.
+  A prova passa pela entrada `LocalCI.validate` com Git real, tanto com testes
+  novos adicionados quanto com uma expectativa QA preexistente corrigida e
+  revisada. A adição normal não recebe nem exige a exceção corretiva.
 - `qualify_hermes_intake.py --neutral-relay` exercita nove atividades SDK nativas
   e onze respostas HTTP locais. Verifica o header, a atribuição e custo sintético,
   preservando uma pausa financeira e recusando leitura sem autenticação.

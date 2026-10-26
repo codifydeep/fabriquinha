@@ -168,15 +168,20 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 26/10/2026, o núcleo passou em 303 testes. O reparo mínimo completou uma
+Em 26/10/2026, o núcleo passou em 306 testes. O reparo mínimo completou uma
 homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
 específicas; decisões programadas não são julgamento de um agente real.
 
 O [ADR 0005](docs/ADR-0005-VALIDATION-AND-ACCOUNTING.md) fixa os validadores das
 instalações novas e contabiliza campos de custo/cache retornados pelo provedor,
-sem estimar gasto ausente. Foi qualificado em dez jobs Docker/Chromium e nove
+sem estimar gasto ausente. Foi qualificado em treze jobs Docker/Chromium e nove
 atividades SDK com respostas locais, sem chamadas pagas. O comando `runtime
 costs` consulta o relay local autenticado e não libera pausas nem faz inferência.
+
+Um S4 novo chegou à revisão aprovada da implementação e recuperou sozinho um
+handoff incompleto. A integração foi bloqueada por uma regressão do controlador
+que confundia testes adicionados com testes antigos alterados. A correção passou
+na CI real da fixture; esse ensaio permanece sem qualificação de autonomia.
 
 Faltam S4 sem intervenção, uma segunda versão com regressão/memória/recuperação
 e uma instalação em outro repositório. O [roadmap](docs/ROADMAP.md) separa essas

@@ -140,7 +140,10 @@ class Quality:
 
     def protect(self, before, after, *, exact_tests=False,allow_revision=False):
         left, right = self.store.manifest(before), self.store.manifest(after)
-        if allow_revision and self.tests(before)!=self.tests(after):
+        # New test files are normal feature work. Only changes/removals of
+        # pre-existing protected tests need the independently frozen exception.
+        old_tests,new_tests=self.tests(before),self.tests(after)
+        if allow_revision and any(new_tests.get(path)!=value for path,value in old_tests.items()):
             for path in (self.store.root/'receipts').glob('*.json'):
                 record=self.store.receipt(path.stem)
                 if record['kind']!='tests_frozen' or not record['payload'].get('revision'):continue

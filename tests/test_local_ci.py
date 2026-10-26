@@ -63,6 +63,31 @@ class LocalCIBoundaries(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'protected baseline changed'):self.ci.validate(self.propose(),self.base,stage='proposal')
         self.runner.run.assert_not_called()
 
+    def test_additive_feature_tests_pass_proposal_and_integrated_ci_without_a_correction(self):
+        (self.work/'tests/test_new.py').write_text('import unittest\n')
+        self.report['cases'].append('test_new.Case.test_new_behavior');self.report['tests_run']=2
+        head=self.propose()
+        proposal=self.store.receipt(self.ci.validate(head,self.base,stage='proposal'))['payload']
+        self.assertEqual(proposal['conclusion'],'success');self.assertEqual(proposal['tests_run'],2)
+        self.repo.push(self.project.branch,head)
+        integrated=self.store.receipt(self.ci.validate(head,self.base,stage='integrated'))['payload']
+        self.assertEqual(integrated['conclusion'],'success');self.assertEqual(integrated['snapshot'],proposal['snapshot'])
+        self.assertFalse(integrated['delivery_approval'])
+
+    def test_new_test_does_not_authorize_modifying_an_existing_test(self):
+        (self.work/'tests/test_new.py').write_text('import unittest\n')
+        (self.work/'tests/test_existing.py').write_text('import unittest\n# weakened\n')
+        with self.assertRaisesRegex(ValueError,'protected baseline changed'):
+            self.ci.validate(self.propose(),self.base,stage='proposal')
+        self.runner.run.assert_not_called()
+
+    def test_replacing_an_old_test_with_a_new_file_does_not_count_as_an_addition(self):
+        (self.work/'tests/test_existing.py').unlink()
+        (self.work/'tests/test_new.py').write_text('import unittest\n')
+        with self.assertRaisesRegex(ValueError,'protected baseline changed'):
+            self.ci.validate(self.propose(),self.base,stage='proposal')
+        self.runner.run.assert_not_called()
+
     def test_skips_empty_or_foreign_job_cannot_pass(self):
         head=self.propose();original=json.loads(json.dumps(self.report))
         for update in (dict(skips=['old']),dict(tests_run=0,cases=[]),dict(errors=['old'])):

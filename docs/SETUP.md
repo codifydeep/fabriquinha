@@ -17,12 +17,12 @@ O [serviço contínuo TDD](HERMES-RUNTIME-QUALIFICATION.md) já passou em isolam
 com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
 as rotas de fixture expiram e não devem ser reutilizadas como produção. Provedores
 reais exigem política privada explicitamente habilitada e limite de consumo.
-As instalações S4 antigas permanecem pausadas. Uma nova tentativa foi preparada
-após R2 e autorização específica, mas ficou bloqueada e foi preservada com relay
-desligado. Uma fronteira posterior chegou ao Green e também ficou em triagem;
-feedback e limite de exploração foram corrigidos antes de preparar outra
-execução limpa. Não reutilize sessões ou evidências históricas para reproduzi-la.
-A auditoria sozinha não autoriza ativação.
+Instalações históricas não são entradas de reprodução. A recuperação do PR 57
+chegou à homologação assistida. Um S4 posterior recuperou automaticamente um
+handoff, mas ficou bloqueado na CI por uma regressão do controlador; essa fronteira
+continua não qualificada para autonomia. Consulte o status atual antes de ativar
+serviços e não reutilize sessões ou evidências históricas para fabricar uma nova
+qualificação. A auditoria sozinha não autoriza ativação.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
 explícita de Lead/CTO e cards nativos de recuperação com SPIKE. Sua prova também
 usa respostas locais; não constitui ativação dos nove perfis em produção.

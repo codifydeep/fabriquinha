@@ -8,6 +8,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import sys
+import subprocess
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -21,6 +22,7 @@ from fabriquinha.config import Project
 from fabriquinha.effects import Pending,write_json
 from fabriquinha.executor import Runner,docker,seal_validation
 from fabriquinha.quality import Quality,suite_report,CONTROL_CONTRACT
+from fabriquinha.publication import Repository,LocalCI
 
 
 def qualify(root,image,*,pinned=False):
@@ -51,6 +53,21 @@ def qualify(root,image,*,pinned=False):
             except Pending:
                 if time.monotonic()>until:raise
                 time.sleep(.1)
+    # Exercise the actual CI entry point, not merely its underlying suite job.
+    # Both the ordinary additive feature and the exceptional correction must work.
+    remote=root/'remote.git';seed=root/'git-seed';remote.mkdir();store.checkout(initial,seed)
+    def git(folder,*args):
+        return subprocess.run(['git','-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false','-C',str(folder),*args],
+                              check=True,capture_output=True,text=True).stdout.strip()
+    git(remote,'init','--bare','--initial-branch=main');git(seed,'init','--initial-branch=main');git(seed,'add','.')
+    git(seed,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','Isolated CI fixture')
+    git(seed,'remote','add','origin',str(remote));git(seed,'push','origin','HEAD:refs/heads/'+project.branch)
+    repository=Repository(project,store,remote=remote);base=repository.base();ci=LocalCI(project,store,repository,runner)
+    normal=root/'normal-feature';store.checkout(candidate,normal);(normal/'app.py').write_text(APP.replace('DISPLAY','Ana'))
+    feature=store.capture(normal);head=repository.propose(feature,base,'fixture/feature','fixture');repository.push('fixture/feature',head)
+    normal_ci=wait(lambda:ci.validate(head,base,stage='proposal'))
+    assert store.receipt(normal_ci)['payload']['conclusion']=='success'
+    repository.push(project.branch,head)
     author=Run('old-tests',1,'qa','tests',False,'qa','proof','old-tests-contract')
     red=wait(lambda:quality.red(author,initial,candidate));inputs['red']=red
     verdict=dict(decision='approve',reason='Scripted independent fixture judgment; no autonomy claim.',findings=[])
@@ -97,11 +114,17 @@ def qualify(root,image,*,pinned=False):
     mutant=store.capture(work)
     controls=wait(lambda:quality.controls(implementer,green,[mutant]));inputs['controls']=controls
     review=wait(lambda:quality.delivery_review(replace(implementer,number=9,actor='lead',reviewing=True),green,controls,verdict))
+    # Seed the known contradictory old release as fixture input, without claiming
+    # CI or delivery approval for it. Then qualify the reviewed correction by CI.
+    bad_base=repository.propose(before,head,'fixture/contradiction','fixture');repository.push(project.branch,bad_base)
+    fixed_head=repository.propose(corrected,bad_base,'fixture/correction','fixture');repository.push('fixture/correction',fixed_head)
     if pinned:
         checkout=root/'changed-checkout';folder=checkout/'src/fabriquinha';folder.mkdir(parents=True)
         for name in ('browser.py','suite.py'):(folder/name).write_text('raise RuntimeError("mutable checkout must not execute")\n')
-        with patch('fabriquinha.executor.ROOT',checkout):integrated=wait(lambda:quality.observe(implementer,corrected,'integrated'))
-    else:integrated=wait(lambda:quality.observe(implementer,corrected,'integrated'))
+        with patch('fabriquinha.executor.ROOT',checkout):correction_ci=wait(lambda:ci.validate(fixed_head,bad_base,stage='proposal'))
+    else:correction_ci=wait(lambda:ci.validate(fixed_head,bad_base,stage='proposal'))
+    ci_data=store.receipt(correction_ci)['payload'];job=store.receipt(ci_data['job'])['payload']
+    integrated=(ci_data['job'],suite_report(job));assert ci_data['conclusion']=='success'
     assert integrated[1]['qa_preview']['status']=='passed'
     assert (store.tree(before)/'app.py').read_bytes()==(store.tree(corrected)/'app.py').read_bytes()
     assert all(p.name=='qa.json' or p.read_bytes()==content for p,content in old_files.items())
@@ -112,6 +135,7 @@ def qualify(root,image,*,pinned=False):
         delivery_review=review,unit_green_conflicting_qa_rejected=True,ordinary_exception_denied=True,
         diagnostic_browser_failure_visible_without_approval=True,diagnostic_job=diagnostic_job,
         pinned_validation=pinned,changed_checkout_ignored=pinned,
+        normal_additive_ci_passed=True,reviewed_correction_ci_passed=True,normal_ci=normal_ci,correction_ci=correction_ci,
         existing_unit_tests_unchanged=True,product_unchanged=True,controls_preserved=True,integrated_browser_passed=True,
         paid_calls=0,model_judgment=False,native_lifecycle=False,delivery_approval=False,all_jobs_retired=True)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result

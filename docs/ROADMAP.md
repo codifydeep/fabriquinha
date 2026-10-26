@@ -58,10 +58,11 @@ do controlador de mudança semântica do gate; revalidar explicitamente o que fo
 afetado, sem reinterpretar recibos históricos. Registrar metadados de custo/cache
 já retornados pelo provedor, sem prompts ou credenciais.
 
-**Qualificado:** 303 testes do núcleo; dez jobs Docker/Chromium com scripts
+**Qualificado:** 306 testes do núcleo; treze jobs Docker/Chromium com scripts
 fixados, inclusive após edição do checkout; nove atividades SDK e onze respostas
 HTTP locais com atribuição, custo sintético, autenticação e pausa preservada.
-Zero chamadas pagas. Campos ausentes continuam desconhecidos. Cache universal,
+A CI da fixture cobre funcionalidade nova com testes adicionados e correção QA
+revisada. Zero chamadas pagas. Campos ausentes continuam desconhecidos. Cache universal,
 novo dashboard e troca de modelo ficam fora.
 
 ### P3 — Fechar uma recuperação assistida
