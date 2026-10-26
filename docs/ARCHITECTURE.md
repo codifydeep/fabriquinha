@@ -13,24 +13,28 @@ alvos de controle vêm do Red e de riscos adicionais congelados pelo revisor;
 testes auxiliares permanecem na suíte completa. A recuperação ainda não cobre
 todas as fases. O [ADR 0004](ADR-0004-SCOPED-REPAIR.md) autoriza o reparo mínimo:
 um pacote corretivo no mesmo Kanban, preservando plano, grafo e falhas anteriores.
-Sua prova isolada não qualifica autonomia; a tentativa preservada foi homologada
-como recuperação assistida pelo PR 57. O S4 limpo continua pendente.
+Sua prova isolada não qualifica autonomia; as tentativas dos PRs 57/58 continuam
+assistidas. O [S4 limpo](HERMES-S4-QUALIFICATION.md) qualificou depois a entrega
+do PR 59 sem intervenção técnica externa. Continuidade e distribuição permanecem
+abertas; ver [plano S5](S5-CONTINUITY-PLAN.md).
 
 ## Caminho Hermes isolado em construção
 
 [S0/S1](HERMES-S1-QUALIFICATION.md) qualificaram dispatcher, recuperação nativa
 e isolamento. A [fatia S2](HERMES-S2-QUALIFICATION.md) acrescentou o fluxo abaixo
-com autores/revisores programados. O S4 posterior usa agentes reais e chegou ao
-freeze dos testes; ainda não completou a entrega. Não houve migração do Multica.
+com autores/revisores programados. O S4 posterior usa agentes reais e completou
+PR, CI, implantação, rollback e QA. O legado Multica continua preservado e pausado;
+não participa dessa cadeia. O corte definitivo depende de S6.
 
 ```mermaid
 flowchart LR
     K[Hermes Kanban: único ciclo de vida] --> B[board.py: run autenticado]
     B --> N[hermes.py: backend nativo em worker isolado]
+    SRC[Exportação Git fixada antes do ciclo] --> N
     N --> W[Sandbox do autor ou revisor]
     W --> A[artifacts.py: snapshot e recibos privados]
     A --> E[executor.py: validação fixa em Docker]
-    E --> Q[quality.py: Red, freeze, Green e controles]
+    E --> Q[quality.py: Red novo ou regressão exata, freeze, Green e controles]
     Q --> B
     B --> I[recovery.py: DIAG Lead/CTO para testes e implementação]
     I --> X[SPIKE descartável; orientação validada]
@@ -43,15 +47,18 @@ flowchart LR
     M --> D[deployment.py: build e Compose]
     D --> R[Rollback e retorno por ID de imagem]
     R --> Q2[browser.py: QA real com contrato congelado]
-    Q2 -. Pendente .-> A2[Conexão integral ao serviço e agentes reais]
+    Q2 --> H[Gate de homologação do commit implantado]
+    H --> K
+    H -.-> HM[Última decisão: contexto histórico limitado]
+    HM -.-> N
 ```
 
 O journal não mantém tarefas ou releases. O store não é montado nos workers;
 somente o snapshot necessário atravessa a fronteira. Não há import do broker
 histórico, ACP ou um segundo scheduler no caminho novo. A [prova S3](HERMES-S3-QUALIFICATION.md)
 usa Git real e transporte GitHub simulado, com checks processados pelo Hermes
-upstream. Não foi exercitada publicação GitHub real. Conexão integral ao serviço,
-Telegram real e os agentes reais continuam pendentes.
+upstream. O S4 posterior exercitou GitHub real e a cadeia conectada aos agentes.
+Telegram real continua pendente: a outbox não comprova entrega nesse canal.
 Build/deploy/rollback e QA em Chromium já passaram na stack Python/HTTP local.
 O navegador tem rede interna própria; só o web publica porta em loopback e
 pode ter egress pela bridge. Não se afirma airgap do produto; ver
@@ -368,7 +375,20 @@ instalado ou despachado. Essa política pura não altera
 essa fronteira: não autentica por si só a proveniência nativa, não cria um
 revisor, não executa validação e não concede merge.
 
-## Fontes de verdade e responsabilidade
+## Fontes de verdade ativas e memória
+
+No caminho novo, Hermes Kanban mantém tarefas, releases, claims e dependências.
+Store mantém snapshots e recibos privados; GitHub mantém commits, PRs e checks.
+O controlador executa operações fixas e publica projeções de status/outbox, sem
+introduzir outro scheduler. Texto e sessões não substituem esses registros.
+
+`Intake.previous` recupera somente a última decisão homologada do mesmo projeto,
+com referências, autoria e revisão. Produto, planejador e revisor recebem contexto
+histórico limitado, sem importar sessões ou conceder autoridade. A projeção foi
+testada contra o S4 real; uso na segunda versão deve ser conferido separadamente.
+Ver [contratos S5](S5-CONTRACT-QUALIFICATION.md).
+
+## Referência histórica: fontes de verdade do legado
 
 Multica apresenta issues, atribuições e sessões. Os controladores mantêm ledgers e recibos; GitHub mantém commits, PRs e checks. Snapshots preservam a entrega que o revisor examinou. Texto de um agente não substitui nenhum desses registros.
 

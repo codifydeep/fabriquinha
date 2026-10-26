@@ -59,6 +59,11 @@ prompt, sem evidência de uso, não basta. Não instalar um banco vetorial agora
 
 ## 3. Segunda versão real, na mesma aplicação
 
+**Em execução:** controlador atualizado em manutenção drenada, com backup nativo
+verificado e exportação publicada `2bd47470`. Produto apresentou Reset e Undo de
+um nível; CEO aprovou o novo brief. Não reutilizar esse checkpoint como prova de
+homologação ou de recuperação. A equipe ainda deve concluir os passos abaixo.
+
 Após os mecanismos anteriores passarem offline:
 
 1. Preparar atualização explícita do código executado em manutenção drenada,

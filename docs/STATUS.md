@@ -32,8 +32,17 @@ Todas têm custo e atribuição de atividade resolvidos. O contador encerrou em
 **6.811/7.000**, com 189 chamadas restantes. Não houve aumento de teto ou fallback;
 seguem Haiku, 40 iterações por atividade, dois workers e saída máxima 16.384.
 
-A entrega está preservada em Docker local. A execução concluída não tem cards
-pendentes nem gera chamadas ao modelo por mero polling. A outbox contém a entrega,
+Depois da qualificação offline dos contratos S5, o controlador foi atualizado
+em manutenção drenada para a revisão publicada `2bd47470`, em outra exportação
+verificada de 27 arquivos. O banco foi salvo e sua restauração conferida; código,
+recibos, sessões e deploy S4 ficaram preservados. Não houve reset de board ou quota.
+Produto elaborou o novo brief em uma chamada, com custo reportado de US$ 0,0019945;
+o CEO aprovou Reset e Undo de um nível. A segunda versão entrou em execução pela
+equipe. Esse checkpoint não é nova homologação; o contador nesse início era
+6.812/7.000, com 188 chamadas restantes.
+
+A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
+terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
 mas Telegram real não está configurado: fila não comprova recebimento nesse canal.
 
 ## Mecanismos qualificados
@@ -76,8 +85,10 @@ zero nem atribuída por horário/prosa.
 
 O [plano S5](S5-CONTINUITY-PLAN.md) orienta o próximo trabalho. Não repetir outro
 ensaio genérico de saudação. Os contratos de regressão e projeção histórica
-passaram offline; a próxima fronteira é uma segunda versão na mesma aplicação,
-com aprovação do novo brief pelo CEO antes de execução técnica.
+passaram offline; a próxima fronteira é uma segunda versão na mesma aplicação.
+O novo brief foi aprovado; a equipe conduz planejamento, implementação e
+integrações. Continuidade, recuperação real e nova homologação só serão declaradas
+após a conferência das evidências.
 
 O [roadmap](ROADMAP.md) mantém o objetivo completo. As revisões de
 [24/10](SIMPLIFICATION-REVIEW-2026-10-24.md),
