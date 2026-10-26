@@ -19,8 +19,9 @@ as rotas de fixture expiram e não devem ser reutilizadas como produção. Prove
 reais exigem política privada explicitamente habilitada e limite de consumo.
 Instalações históricas não são entradas de reprodução. A recuperação do PR 57
 chegou à homologação assistida. Um S4 posterior recuperou automaticamente um
-handoff, mas ficou bloqueado na CI por uma regressão do controlador; essa fronteira
-continua não qualificada para autonomia. Consulte o status atual antes de ativar
+handoff, ficou bloqueado na CI por uma regressão do controlador e foi homologado
+após correção assistida pelo PR 58; essa fronteira continua não qualificada para
+autonomia. Consulte o status atual antes de ativar
 serviços e não reutilize sessões ou evidências históricas para fabricar uma nova
 qualificação. A auditoria sozinha não autoriza ativação.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração

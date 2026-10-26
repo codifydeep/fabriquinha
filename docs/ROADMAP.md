@@ -1,6 +1,7 @@
 # Roadmap vigente — 26 de outubro de 2026
 
-**Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57.
+**Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57. O PR 58 também chegou
+à homologação assistida após recuperar um handoff e corrigir a regressão CI.
 P2 foi qualificado offline sob o [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md);
 o próximo trabalho é P4/S4 limpo. A prova assistida não será reclassificada como autonomia.
 As cotas e o modelo existentes continuam limitando o consumo.
@@ -80,6 +81,10 @@ Contrato/runtime fixos, preparação e orçamento conferidos. Produto refina o b
 CEO aprova uma vez; equipe conduz testes, revisão, implementação, PR, CI, deploy e
 QA. O operador observa. Reparo externo invalida a qualificação de autonomia daquela
 execução, mas não apaga seu valor como evidência assistida.
+
+Antes do novo ciclo: comentários de diagnóstico devem referenciar o recibo
+durável, em vez de copiar a prosa integral que pode conter URLs e acionar
+heurísticas nativas de PR. Qualificar a retomada sem desativar esses guards.
 
 **Saída:** uma homologação completa sem intervenção técnica externa. Não repetir
 brief/planejamento a cada ajuste operacional apenas para investigar outra fase.

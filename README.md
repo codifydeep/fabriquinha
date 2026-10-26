@@ -99,7 +99,7 @@ O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
 O [reparo mínimo](docs/ADR-0004-SCOPED-REPAIR.md) limita-se ao último pacote
 serializado e, para testes, à expectativa textual QA explicitamente autorizada.
 Não é replanejamento geral nem permissão para remover cobertura.
-O [PR 57](https://github.com/codifydeep/descartavel2/pull/57) completou homologação
+O [PR 58](https://github.com/codifydeep/descartavel2/pull/58) completou homologação
 assistida, incluindo CI, implantação, rollback e QA. Houve correção externa do
 controlador durante a execução; portanto, ainda falta uma entrega completa
 **sem intervenção técnica externa**. Veja o [status](docs/STATUS.md).
@@ -181,7 +181,8 @@ costs` consulta o relay local autenticado e não libera pausas nem faz inferênc
 Um S4 novo chegou à revisão aprovada da implementação e recuperou sozinho um
 handoff incompleto. A integração foi bloqueada por uma regressão do controlador
 que confundia testes adicionados com testes antigos alterados. A correção passou
-na CI real da fixture; esse ensaio permanece sem qualificação de autonomia.
+na CI real da fixture e no SHA exato do PR 58, que depois foi homologado de forma
+assistida. Esse ensaio permanece sem qualificação de autonomia.
 
 Faltam S4 sem intervenção, uma segunda versão com regressão/memória/recuperação
 e uma instalação em outro repositório. O [roadmap](docs/ROADMAP.md) separa essas
