@@ -129,7 +129,7 @@ class Diagnostic:
             result['review_feedback']=self.store.receipt(escalation['review'])['payload']['verdict']
             if escalation.get('recurrence'):
                 result['review_recurrence']=escalation['recurrence']
-                result['impasse_contract']='Three consecutive independent change requests concern the same files. Diagnose whether the current issue is an unresolved defect, conflicting instructions or a tool limitation. This is not a root-cause verdict, approval or permission to weaken tests. Resume keeps independent review mandatory; hold if no permitted operation can resolve the issue.'
+                result['impasse_contract']='Three consecutive independent change requests concern the same files. Diagnose whether the current issue is an unresolved defect, conflicting instructions or a tool limitation. This is not a root-cause verdict, approval or permission to weaken tests. CTO owns resolution of conflicting technical review instructions using the actual protocol and complete evidence. Guidance may explain aggregate coverage or request a new author revision of unfrozen candidate files; it cannot waive accepted behavior, baseline tests, CI or independent review. Do not transfer this technical decision to the CEO. Resume keeps independent review mandatory; hold if no permitted operation can resolve the issue.'
             from .browser import author_protocol
             result['browser_protocol']=author_protocol()
             if self.original['kind']=='tests' and not self.qa_correction():
@@ -338,14 +338,34 @@ class Recovery:
 
     def create(self,conn,incident,stage,*,previous=None):
         kb,_,_=native();record=self.store.receipt(incident,kind='incident');data=record['payload']
+        if data['project']!=self.project.fingerprint():raise ValueError('diagnostic incident belongs to another project')
         actor=self.project.technical_roles[stage]
+        body=dict(version=1,kind='diagnostic',release=record['binding']['release'],stage=stage,
+            source=data['source'],source_run=data['source_run'],block_event=data['block_event'],
+            cause=data['cause'],inputs={'incident':incident},escalated_from=previous)
+        if previous:
+            parent=kb.get_task(conn,previous);prior=json.loads(parent.body) if parent else {}
+            if (not parent or parent.status!='done' or prior.get('kind')!='diagnostic' or prior.get('version')!=1
+                    or prior.get('inputs',{}).get('incident')!=incident or prior.get('release')!=body['release']
+                    or prior.get('stage') not in self.project.technical_roles or prior['stage']==stage
+                    or parent.assignee!=self.project.technical_roles[prior['stage']]):
+                raise ValueError('completed scoped predecessor diagnosis required')
+        legacy=digest([self.project.fingerprint(),data['source'],data['source_run'],data['block_event'],'diagnostic',stage])
+        row=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(legacy,)).fetchone()
+        if row:
+            existing=json.loads(kb.get_task(conn,row['id']).body)
+            if existing==body:return row['id']
+            if not previous or {**existing,'escalated_from':previous}!=body:
+                raise ValueError('diagnostic anchor contract drift')
+        key=digest([legacy,'predecessor',previous]) if previous else legacy
+        row=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        if row:
+            if json.loads(kb.get_task(conn,row['id']).body)!=body:raise ValueError('diagnostic successor contract drift')
+            return row['id']
         return kb.create_task(conn,title='DIAG '+stage+' — '+data['source'],assignee=actor,priority=100,
-            body=json.dumps(dict(version=1,kind='diagnostic',release=record['binding']['release'],stage=stage,
-                source=data['source'],source_run=data['source_run'],block_event=data['block_event'],
-                cause=data['cause'],inputs={'incident':incident},escalated_from=previous)),
+            body=json.dumps(body),
             workspace_kind='dir',workspace_path=str(self.store.tree(data['snapshot'])),completion_contract='local-only',
-            max_retries=2,max_runtime_seconds=600,idempotency_key=digest([
-                self.project.fingerprint(),data['source'],data['source_run'],data['block_event'],'diagnostic',stage]))
+            max_retries=2,max_runtime_seconds=600,idempotency_key=key)
 
     def discover(self,conn,task,settle):
         kb,_,_=native();body=json.loads(task.body)
@@ -362,6 +382,11 @@ class Recovery:
         key=digest([self.project.fingerprint(),task.id,row['id'],event['id'],'diagnostic',stage])
         existing=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
         if existing:return
+        for candidate in self.cards(conn):
+            anchor=json.loads(candidate.body or '{}')
+            if (anchor.get('kind')=='diagnostic' and anchor.get('version')==1 and anchor.get('release')==body['release']
+                    and anchor.get('source')==task.id and anchor.get('source_run')==row['id']
+                    and anchor.get('block_event')==event['id'] and anchor.get('stage')==stage):return
         settle(task.id,conn=conn)
         author=row['profile'];origin,handoff=self.handoff(conn,task)
         if reviewing:
@@ -495,7 +520,16 @@ class Recovery:
 
     def status(self,conn):
         if not self.project.technical_roles:return []
-        kb,_,_=native();incidents={};tasks=self.cards(conn)
+        kb,_,_=native();incidents={};tasks=self.cards(conn);ranks={}
+        bodies={task.id:json.loads(task.body or '{}') for task in tasks}
+        def depth(task_id,seen=frozenset()):
+            if task_id in seen:raise ValueError('diagnostic predecessor cycle')
+            body=bodies[task_id];parent=body.get('escalated_from')
+            if not parent:return 0
+            prior=bodies.get(parent,{})
+            if prior.get('kind')!='diagnostic' or prior.get('inputs',{}).get('incident')!=body['inputs']['incident']:
+                raise ValueError('diagnostic predecessor scope changed')
+            return 1+depth(parent,seen|{task_id})
         for task in tasks:
             body=json.loads(task.body or '{}')
             if body.get('kind')!='diagnostic':continue
@@ -528,8 +562,9 @@ class Recovery:
                 if decision['incident']!=key:raise ValueError('diagnostic outcome belongs to another incident')
                 if decision['action']=='hold' and state!='resolved':state='held'
             if task.status in ('blocked','triage') and state!='resolved':state='diagnosis_failed'
-            previous=incidents.get(key)
-            if previous and previous['stage']=='cto' and body['stage']=='lead':continue
+            rank=(depth(task.id),int(body['stage']=='cto'))
+            if key in ranks and ranks[key]>rank:continue
+            ranks[key]=rank
             incidents[key]=dict(source=target.id,diagnostic=task.id,stage=body['stage'],state=state,
                 category=record['payload'].get('category','worker_activity'),
                 source_run=record['payload']['source_run'],block_event=record['payload']['block_event'],

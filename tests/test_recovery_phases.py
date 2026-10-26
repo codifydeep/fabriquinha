@@ -46,6 +46,42 @@ class RecoveryPhases(unittest.TestCase):
         self.board=SimpleNamespace(ensure=lambda r:None)
         self.recovery=Recovery(self.project,self.store,self.board)
 
+    def predecessor_fixture(self):
+        incident=self.store.record('incident',dict(release='v1'),dict(project=self.project.fingerprint(),snapshot=self.snapshot,
+            source='source',source_run=1,block_event=3,cause='cause'))
+        create=self.kb.create_task
+        def idempotent(conn,**values):
+            existing=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(values['idempotency_key'],)).fetchone()
+            return existing['id'] if existing else create(conn,**values)
+        self.kb.create_task=idempotent
+        return incident
+
+    def test_new_lead_handoff_wakes_a_new_cto_after_prior_hold_but_not_twice(self):
+        incident=self.predecessor_fixture()
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,None,None)):
+            old=self.recovery.create(self.conn,incident,'cto')
+            self.conn.execute("UPDATE tasks SET status='done' WHERE id=?",(old,))
+            lead=self.recovery.create(self.conn,incident,'lead',previous=old)
+            self.conn.execute("UPDATE tasks SET status='done' WHERE id=?",(lead,))
+            new=self.recovery.create(self.conn,incident,'cto',previous=lead)
+            self.assertNotEqual(old,new)
+            self.assertEqual(new,self.recovery.create(self.conn,incident,'cto',previous=lead))
+            self.assertEqual(json.loads(self.kb.get_task(self.conn,new).body)['escalated_from'],lead)
+            self.assertEqual(len(self.created),3)
+
+    def test_legacy_predecessor_key_is_reused_and_foreign_parent_is_rejected(self):
+        incident=self.predecessor_fixture()
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,None,None)):
+            lead=self.recovery.create(self.conn,incident,'lead')
+            self.conn.execute("UPDATE tasks SET status='done' WHERE id=?",(lead,))
+            old=self.recovery.create(self.conn,incident,'cto',previous=lead)
+            legacy=digest([self.project.fingerprint(),'source',1,3,'diagnostic','cto'])
+            self.conn.execute('UPDATE tasks SET idempotency_key=? WHERE id=?',(legacy,old))
+            self.assertEqual(old,self.recovery.create(self.conn,incident,'cto',previous=lead))
+            body=json.loads(self.kb.get_task(self.conn,lead).body);body['inputs']['incident']='another'
+            self.conn.execute('UPDATE tasks SET body=? WHERE id=?',(json.dumps(body),lead))
+            with self.assertRaises(ValueError):self.recovery.create(self.conn,incident,'cto',previous=lead)
+
     def failed(self,kind,*,reviewing=False,triage=False,inputs=None):
         actor='cto' if reviewing and kind=='plan' else 'lead' if kind=='plan' else 'backend'
         body=dict(version=1,kind=kind,release='v1',inputs=inputs or {})

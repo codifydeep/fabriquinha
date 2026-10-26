@@ -60,7 +60,7 @@ permanece preservado. O próximo atendimento deve seguir a decisão técnica
 registrada e a clarificação instalada, com novo experimento e revisão, sem
 desbloquear diretamente o card ou converter manutenção em autonomia.
 
-328 testes passaram. `scripts/qualify_hermes_recovery.py --review-churn` executou
+330 testes passaram. `scripts/qualify_hermes_recovery.py --review-churn` executou
 13 atividades nativas, 41 respostas locais programadas e três diagnósticos,
 com Docker real. Três pareceres `changes` acionaram o CTO sem o modelo pedir
 `escalate`; houve SPIKE, retomada da revisão, revalidação e recuperação após
@@ -71,3 +71,22 @@ Aplicar a revisão publicada em manutenção drenada e retomar o mesmo ciclo, se
 resetar história ou pedir novo aceite de negócio. Observar a decisão real do CTO
 antes de ampliar o protocolo ou mudar um gate. Resolver limitações como tais,
 preservando evidência e distinguindo entrega assistida de autonomia.
+
+## Identidade da continuação técnica
+
+O Lead reconheceu a distinção de caminhos, mas encaminhou a questão restante ao
+CTO. O encaminhamento reutilizou o CTO antigo em `hold`: a chave de criação não
+incluía o predecessor. Assim, idempotência confundia repetir uma solicitação com
+uma solicitação técnica nova.
+
+A chave sucessora agora inclui o predecessor nativo concluído e do mesmo
+incidente. Uma repetição desse predecessor reutiliza a tarefa; outro predecessor
+cria outro atendimento. Chaves antigas são reutilizadas quando já correspondem
+ao mesmo predecessor. Nenhum diagnóstico ou veredito antigo é reescrito.
+O status segue a cadeia de atendimento atual, inclusive Lead após CTO, em vez
+de manter prioridade fixa no diagnóstico antigo.
+
+`scripts/qualify_diagnostic_successors.py` comprovou no Kanban real: novo CTO após
+novo encaminhamento, ausência de duplicação após reinício, compatibilidade de
+chave anterior e status do sucessor atual. Decisões são fixtures programadas;
+zero modelo, zero Docker e nenhum claim aberto. Isso não aprova a entrega S5.
