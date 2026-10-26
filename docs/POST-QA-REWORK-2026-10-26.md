@@ -4,6 +4,12 @@ Estado: A e B implementados em fonte e qualificados no escopo abaixo; C e sua
 qualificação continuam pendentes. Não concede aprovação de entrega ou exceção aos testes. Continua
 o objetivo de autonomia; não é outro orquestrador nem uma migração de modelo.
 
+**Revisão posterior, ainda proposta:** a [auditoria de 26/10](EXECUTION-REVIEW-2026-10-26.md)
+recomenda substituir C por um pacote corretivo limitado, sem regerar todo o plano,
+e classificar a divergência entre o brief e o QA antes de corrigir o produto.
+A/B permanecem implementados; C abaixo preserva a proposta anterior para comparação.
+Nenhuma alteração de contrato ou retomada foi executada pela auditoria.
+
 ## Evidência que motivou a mudança
 
 O mesmo brief aprovado chegou a Red/freeze, Green de oito testes, seis alvos

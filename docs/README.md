@@ -1,6 +1,6 @@
 # Documentação da Fabriquinha
 
-Referência: **25 de outubro de 2026**. Plataforma experimental; autonomia
+Referência: **26 de outubro de 2026**. Plataforma experimental; autonomia
 completa ainda não qualificada. Documentos públicos descrevem contratos,
 arquitetura, resultados agregados e limites. Instalações, transcrições, bancos,
 snapshots e recibos operacionais completos permanecem privados.
@@ -8,8 +8,9 @@ snapshots e recibos operacionais completos permanecem privados.
 ## Ordem de leitura
 
 1. [Status atual](STATUS.md): o que foi comprovado e o que falta.
-2. [Revisão da execução de 25/10](EXECUTION-REVIEW-2026-10-25.md): achados
-   prioritários e plano detalhado R0–R5 para Sol.
+2. [Revisão da execução de 26/10](EXECUTION-REVIEW-2026-10-26.md): evolução,
+   divergência de QA, simplificação do retrabalho e custos; propostas pendentes
+   de aceite, com execução pausada.
 3. [Roadmap vigente](ROADMAP.md): próxima sequência e critérios de saída.
 4. [Plano aprovado de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md) e
    [ADR 0001](ADR-0001-HERMES-FIRST.md): estratégia Hermes + Kanban.

@@ -1,174 +1,115 @@
 # Roadmap vigente — 26 de outubro de 2026
 
-Referências: [plano aprovado](SIMPLIFICATION-REVIEW-2026-10-24.md),
-[revisão da execução](EXECUTION-REVIEW-2026-10-25.md) e [status](STATUS.md).
+**Desenvolvimento pausado por solicitação do proprietário.** Este documento
+organiza a próxima sequência; não autoriza agentes, consumo ou alteração de gates.
 
-Este documento substitui a lista antiga de próximos passos da ponte Multica/ACP.
-A estratégia é Hermes + Kanban e uma camada pequena de entrega. Não iniciar outro
-orquestrador, novo banco de memória ou migração de modelo nesta fase.
+A estratégia aprovada continua [Hermes + Kanban](SIMPLIFICATION-REVIEW-2026-10-24.md).
+O [F1 aprovado](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) continua vigente. A
+[auditoria de 26/10](EXECUTION-REVIEW-2026-10-26.md) propõe mudanças adicionais de
+contrato e um reparo menor; elas não estão instaladas nem aprovadas implicitamente.
+O [status](STATUS.md) registra o resultado real mais recente.
 
-**Prioridade atual:** [fechar QA e retrabalho da mesma release](POST-QA-REWORK-2026-10-26.md).
-O PR 56 já chegou a deploy, mas o QA congelado o recusou. A prevenção anterior
-ao merge e os fatos completos de diagnóstico passaram em prova isolada. Antes
-de outro ensaio pago, implementar/qualificar o replanejamento nativo versionado,
-preservação da geração anterior, base atual e novo PR corretivo. Não usar outro
-reset como resposta padrão. A tentativa preservada poderá provar recuperação
-assistida; uma fronteira completa sem intervenção ainda será necessária.
+## O que já passou
 
-O proprietário aprovou F1, registrado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md).
-O contrato 2 e o feedback do plano estão implementados e passaram em provas
-offline delimitadas. A tentativa S4 real mais recente chegou ao Green e terminou
-em triagem nos controles. Foi preservada; feedback e exploração foram corrigidos
-e qualificados offline para outra fronteira. Este roadmap não amplia a cota.
+- S0/S1: referência preservada e integração Hermes/Kanban qualificada, sem patches
+  upstream. Multica/Temporal não participam do caminho novo.
+- S2/S3: qualidade e operações determinísticas têm provas isoladas; modelos reais
+  já atravessaram Red/freeze, Green, controles, revisão, PR/CI/merge e implantação.
+- A/B do [plano pós-QA](POST-QA-REWORK-2026-10-26.md): erro real propagado e mesmo
+  QA congelado executado antes do merge; 285 testes do núcleo e sete jobs reais
+  Docker/Chromium qualificados. Zero chamadas pagas nessa prova específica.
 
-## Antes do próximo ensaio pago
+O PR 56 foi implantado com rollback/restauração, mas o QA congelado falhou.
+**S4 não está concluído.** A divergência entre brief, testes Python e contrato
+JSON deve ser classificada antes de presumir defeito de implementação.
+S5, S6 e S7 permanecem não qualificados.
 
-### R0 — Fixar contrato e referência
+## Próxima sequência proposta
 
-Aceite de F1 registrado; referência anterior preservada. A retomada do ensaio
-real exige nova fronteira, sem importar aprovações do contrato antigo.
+### P0 — Aprovar o refinamento de contrato
 
-Preservar os recibos, testes e fronteiras atuais. Registrar o aceite do refinamento
-de controles derivados do Red e riscos revisados, distinguindo testes auxiliares. A pausa
-humana não desqualifica sozinha a tentativa. Uma mudança de runtime ou gate
-exige outra fronteira e novas evidências, sem aprovação retroativa.
+Decidir a autoridade para corrigir teste tecnicamente errado sem alterar o brief,
+sempre com nova revisão independente e histórico preservado. Reservar ao CEO
+mudanças de negócio e exceções que removam cobertura. Separar o futuro Red de
+regressão já detectada do Red de funcionalidade nova.
 
-**Saída:** política inequívoca, referência recuperável e escopo de correção limitado.
+A proposta substitui o replanejamento integral de C por um pacote corretivo
+ligado à integração falha. Não aceitar implicitamente testes modificados nem
+zerar triagem, breaker ou recibos. Detalhes e limites estão na auditoria.
 
-### R1 — Eliminar a contradição do gate de controles
+### P1 — Implementar e qualificar o reparo mínimo
 
-Concluído no escopo offline: quatro jobs Docker/Chromium passaram com teste
-auxiliar imutável na suíte completa e alvo comportamental derivado do Red.
-A cadeia integrada passou com dois incrementos, regressão, 11 atividades SDK,
-17 respostas locais, Git/deploy/QA/rollback e retirada dos recursos da prova.
-Decisões programadas e GitHub/CI simulados não substituem S4 real.
+Usar o erro real para classificar produto, teste, infraestrutura ou escopo.
+Criar somente o reparo e dependências afetadas, com base atual, revisão, novo PR,
+CI e QA. Preservar o plano e os resultados anteriores como história, registrando
+qual pacote é substituído para aceitação. Não criar outro banco ou serviço.
 
-Derivar os alvos obrigatórios das falhas reais do Red e congelar os adicionais
-justificados pelo revisor. Revisão independente deve confirmar a cobertura dos
-comportamentos de aceite e riscos. Reutilizar os IDs e recibos existentes.
-Testes auxiliares continuam na suíte completa, mas não precisam falhar por
-mutação do aplicativo quando não dependem dele.
+**Saída:** fixture do caso exato completa o reparo; reinício não duplica cards ou
+PR; aprovação obsoleta, alteração silenciosa de teste e falso sucesso são recusados.
+Não implementar replanejamento universal antes dessa prova.
 
-**Saída:** caso comportamento + teste auxiliar aceito sob o contrato novo;
-remoção unilateral de alvo, critério sem cobertura, skip, teste alterado, descoberta
-reduzida e mutante sem efeito rejeitados. Sem seleção parcial de suíte ou
-dispensa de revisão independente.
+### P2 — Estabilizar a evidência e medir custo
 
-### R2 — Completar feedback e destinos de impedimentos conhecidos
+Fixar bundle imutável de validação por execução. Distinguir mudança operacional
+do controlador de mudança semântica do gate; revalidar explicitamente o que for
+afetado, sem reinterpretar recibos históricos. Registrar metadados de custo/cache
+já retornados pelo provedor, sem prompts ou credenciais.
 
-Concluído no escopo delimitado offline. A cadeia com dois incrementos recuperou
-revisão do plano e integração Lead → CTO, preservou fase e orientação completa,
-e concluiu deploy/QA/rollback: 15 atividades SDK, 24 respostas locais, zero
-chamadas pagas. GitHub/CI e decisões foram programados. A prova separada de
-triagem recusou retomada indevida e preservou o bloqueio com responsável CTO
-após reinício, sem novas chamadas. Não há reset do breaker nem reparação
-universal; retrabalho versionado de testes continua em S5.
+**Saída:** provas offline, campos ausentes tratados como desconhecidos e nenhuma
+ativação paga. Cache universal, novo dashboard e troca de modelo ficam fora.
 
-Transmitir achados completos de revisão do plano, tratar bloqueios de
-planejamento/integração e `triage`, preservar a fase e impedir repetição idêntica
-sem diagnóstico. Cada impedimento deve ter responsável e próxima operação
-possível. Conferir schema/handler/prompt/configuração preparados.
+### P3 — Fechar uma recuperação assistida
 
-Recusas de cobertura dos controles agora sobrevivem à saída do worker e ao
-reinício do supervisor com vínculo ao Green/freeze e listas completas de alvos.
-A prova offline passou até correção e revisão independente, sem transformar
-essa informação negativa em aprovação ou resolver a release real bloqueada.
+Após autorização de retomada, verificar se o caso preservado pode continuar sem
+transplantar aprovações. A equipe deve diagnosticar e corrigir pelo novo caminho.
+Se necessário, usar uma fixture assistida nova, com justificativa explícita.
 
-**Saída:** testes determinísticos de devolução de plano, falha de integração,
-segundo bloqueio, reinício e espera humana correta. Não precisa completar toda
-S5; uma reparação sem operação segura deve ser declarada como limite visível.
+**Saída:** novo SHA homologado com todas as provas, identificado como assistido.
+Isso fecha a integração do mecanismo; não aprova S4 nem oculta intervenção.
 
-## Provas de autonomia e reutilização
+### P4 / S4 — Uma entrega completa sem condução do operador
 
-### R3 / S4 — Uma entrega completa pequena
+Contrato/runtime fixos, preparação e orçamento conferidos. Produto refina o brief;
+CEO aprova uma vez; equipe conduz testes, revisão, implementação, PR, CI, deploy e
+QA. O operador observa. Reparo externo invalida a qualificação de autonomia daquela
+execução, mas não apaga seu valor como evidência assistida.
 
-Mesmo brief aprovado, stack qualificada e modelo. Preparação e orçamento
-verificados antes de liberar; o operador observa, a equipe executa os handoffs.
+**Saída:** uma homologação completa sem intervenção técnica externa. Não repetir
+brief/planejamento a cada ajuste operacional apenas para investigar outra fase.
 
-A recuperação real pelo Lead levou o QA até o freeze independente e a
-implementação até Green. Os controles ainda não foram aceitos; a triagem manteve
-responsável CTO, sem encerrar a release. A correção posterior informa casos
-cobertos/ausentes e impede lotes exploratórios acima de 120 segundos no schema
-e handler. Passou offline sem dispensar controles ou alterar testes congelados.
-Repetir em fronteira limpa com essas pré-condições e o mesmo modelo,
-usando somente o teto de saída explicitamente autorizado e sem importar provas
-técnicas anteriores.
+### P5 / S5 — Continuidade, regressão, memória e recuperação
 
-A nova fronteira teve CI inicial, brief idêntico e plano aprovados, mas voltou
-à triagem por truncamento no QA. Foi drenada e preservada; nenhum modelo ou
-controle de qualidade foi substituído para ocultar esse resultado.
+Segunda versão na mesma aplicação, dois cards dependentes, outro perfil usando
+uma decisão versionada e pelo menos uma falha recuperada pela própria equipe.
+Qualificar o Red de regressão antes de usá-lo. Todos os testes anteriores continuam
+protegidos e executados. Falhas de transporte/permissão podem usar fixtures
+separadas; não exigem um ensaio pago completo por caso.
 
-**Próxima ação limitada:** o proprietário autorizou saída 16384, mantendo Haiku,
-7.000 chamadas e nenhum fallback. A geração única com contexto nativo preservado
-terminou completa com 8.735 tokens e argumentos válidos; nenhuma ferramenta foi
-executada. Iniciar outra fronteira S4 com o mesmo brief e todos os gates. Não
-importar a resposta diagnóstica como implementação ou aprovação. A prova ainda
-necessária é a entrega completa pela equipe; não aumentar novamente o teto nem
-repetir envios de transporte incerto por iniciativa automática.
+**Saída:** segunda homologação com regressão preservada e recuperação real.
+Verificar slots livres durante espera e progresso de tarefa independente; uma
+espera humana legítima não é promessa de ausência universal de starvation.
 
-Essa tentativa já produziu controles corrigidos pela equipe, revisão independente
-e PR/CI/merge reais. O deploy falhou por esgotamento das sub-redes Docker. O
-efeito incerto e o ensaio não homologado foram preservados. A correção acrescenta
-reserva explícita das duas redes antes do despacho pago, validação na admissão e
-uso externo no Compose. A próxima fronteira deve usar branch nova a partir da
-mesma base limpa, preservando o PR integrado e o bloqueio anteriores, e comprovar
-deploy/QA/rollback. Limpeza deve retirar somente recursos próprios ociosos;
-nunca zerar o journal do efeito falho para permitir outra mutação.
+### P6 / S6 — Reutilização por terceiros e corte do legado
 
-No ensaio com redes reservadas, a recuperação rejeitou um relatório contendo
-erro real de teste e confundiu o objetivo Red com Green. A correção limita a
-observação de fatos negativos ao diagnóstico e explicita a fase. A prova SDK
-offline completou erro → Lead/CTO → correção do autor → Red/freeze/Green/revisão,
-sem aprovação de erro ou dispensa de qualidade. A nova fronteira real deve
-conferir esse julgamento e a entrega; não reiniciar a tentativa preservada como
-se ela já tivesse produzido Red válido.
+Instalar do Git em outro diretório/repo sem bancos, sessões ou UUIDs históricos.
+Provar setup, doctor, start, pause, status, resume, upgrade/rollback e limpeza
+com propriedade qualificada. Declarar somente stacks e plataformas testadas.
+Depois, retirar os serviços legados do caminho ativo preservando recuperação.
 
-Antes da próxima fronteira, o conjunto foi revalidado offline: contexto novo
-após orientação técnica, conversa preservada em pausa financeira, supervisão
-real dos descendentes do terminal, feedback de erros ligado ao job e proteção
-da abertura WAL. Não alterar o raciocínio para forçar ferramentas nem ampliar
-o orçamento. Conferir os mesmos mecanismos na equipe real; testes de mecanismo
-não bastam para declarar S4 concluído.
+**Saída:** entrega reproduzível por instruções públicas. Só então iniciar S7,
+a retomada do Truco e a ampliação gradual de papéis/observabilidade de produto.
 
-**Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
-→ `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do
-aceite. Reparos externos tornam a tentativa assistida. Não substituir essa prova
-por outro ensaio genérico de pré-Red.
+## Regras de escopo
 
-### R4 / S5 — Segunda versão, memória e recuperação
+- Manter revisão independente, TDD, proteção de regressões e QA do commit implantado.
+- Não criar outra infraestrutura de orquestração, memória ou observabilidade agora.
+- Uma correção operacional não torna um resultado antigo válido sob outro contrato.
+- Duas falhas equivalentes sem evidência nova suspendem aquela ação; não geram
+  infinitas chamadas ou replanejamentos.
+- O Red de regressão é necessário para S5; não deve bloquear o reparo atual se ele
+  não depender dessa ampliação.
+- Acompanhar entrega, intervenções e custo conhecido; não usar número de testes do
+  controlador como medida de autonomia.
 
-Dois incrementos dependentes, regressão preservada e outro perfil com sessão
-nova usando decisões/interfaces versionadas em Git. Qualificar substituição de
-ADR e pelo menos uma recuperação real conduzida por Lead/CTO.
-
-Implementar a operação limitada de retrabalho de testes congelados: nova autoria,
-revisão e freeze, preservando a versão antiga e invalidando provas dependentes.
-Não usar edição direta de cards/arquivos para contornar o contrato.
-
-**Saída:** segunda release funcional, memória útil entre perfis e recuperação
-com evidência nova. Infraestrutura repetitiva pode usar falhas determinísticas.
-
-### R5 / S6 — Instalação por terceiros e caminho único
-
-Imagem reconstruível sem base local histórica; configuração única; preparação e
-operação documentadas; segundo repo por configuração, sem alteração de código
-específico. Provar restauração e rollback. Retirar o caminho antigo só depois.
-
-**Saída:** reprodução a partir de um clone e inputs privados do novo operador,
-sem copiar bancos, conversas, snapshots ou credenciais da instalação de referência.
-
-### S7 — Retomar Truco
-
-Avançar por fatias reais, ampliando a stack somente conforme demanda e qualificação.
-A primeira fatia não encerra toda a versão de produto. Não declarar suporte
-universal a stacks a partir da demonstração Python/HTTP.
-
-## Regras de foco
-
-- Preservar TDD, revisão independente, proteção da baseline, PR e CI no SHA exato.
-- Zero novo serviço ou framework para corrigir uma lacuna de contrato.
-- Duas tentativas da mesma classe sem evidência nova: rever o mecanismo antes
-  de gastar mais; não aumentar limites automaticamente.
-- Medir entregas e intervenções, não quantidade de módulos ou testes do kit.
-- Atualizar este roadmap quando uma etapa mudar; manter diários privados e
-  histórico no Git, sem acrescentar cada incidente ao README.
+As sequências R0–R5 e instruções anteriores de iniciar novas fronteiras permanecem
+no histórico Git e na auditoria de 25/10. Não são ordens concorrentes a esta lista.

@@ -1,6 +1,6 @@
 # Instalação segura e limites
 
-Estado de referência revisto: **25 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
+Estado de referência revisto: **26 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
 antes de ativar agentes. O kit continua experimental; não há instalação completa
 e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
@@ -36,14 +36,15 @@ explicitamente configurado, sem reativar os gateways antigos por consequência.
 
 O caminho novo é `src/fabriquinha`, com preparação parcial por
 `scripts/prepare_hermes_project.py`. Esse script não instala imagens, provisiona
-GitHub ou inicia relay/serviço. A [revisão atual](EXECUTION-REVIEW-2026-10-25.md)
-documenta os gates a corrigir antes da próxima execução e as lacunas de S6.
+GitHub ou inicia relay/serviço. A [revisão atual](EXECUTION-REVIEW-2026-10-26.md)
+documenta os achados, as mudanças propostas e as lacunas de S6; não autoriza retomada.
 A CLI de preparação exige `--max-output-tokens` explícito: 2048, 4096, 8192 ou 16384,
 conforme política autorizada. O valor é preservado no preparo e consumido pelo
 relay/SDK; escolhê-lo não habilita o provedor nem aumenta o teto de chamadas.
-O suporte a 16384 passou em provedor local programado. A instalação real ainda
-está desabilitada com teto de saída 8192; a proposta maior aguarda aceite do
-operador. Limite de chamadas e saída por resposta são controles distintos.
+O suporte a 16384 foi autorizado e usado no último ensaio real. A política
+preservada continua desabilitada, com saída máxima 16384 e teto específico de
+7.000 chamadas. Esse estado privado não é uma autorização de consumo para novas
+instalações. Limite de chamadas e saída por resposta são controles distintos.
 
 Para consultar uma instalação existente, use o Python do SDK já provisionado,
 com `PYTHONPATH=src`, e `python -m fabriquinha.runtime status --root

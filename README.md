@@ -9,7 +9,7 @@ qualidade, publicação e implantação. Multica e Temporal não são dependênc
 desse caminho. A instalação legada está preservada e pausada.
 
 [Status atual](docs/STATUS.md) · [Próximos passos](docs/ROADMAP.md) ·
-[Revisão crítica de 25/10/2026](docs/EXECUTION-REVIEW-2026-10-25.md) ·
+[Revisão crítica de 26/10/2026](docs/EXECUTION-REVIEW-2026-10-26.md) ·
 [Documentação](docs/README.md)
 
 ## O que queremos construir

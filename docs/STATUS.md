@@ -3,6 +3,16 @@
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
+**Auditoria atual:** a [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md) confirmou
+o avanço até deploy e identificou divergência entre o brief e o QA: o brief pede
+uma saudação contendo o nome; o QA exige texto exatamente igual ao nome. Isso não
+prova, por si só, defeito do produto. Recomenda-se reparo limitado e um caminho
+revisado de correção técnica de testes, ainda sujeitos a aceite. A auditoria
+não alterou código, gates, modelo, orçamento ou pausa. Nos quatro últimos ensaios:
+143 chamadas, 2.648.882 tokens de entrada, 172.148 de saída e nenhuma homologação
+autônoma. Custo efetivo em dólares não está registrado. O [roadmap](ROADMAP.md)
+separa a sequência proposta das qualificações já realizadas.
+
 **Estado mais recente:** o [PR 56](https://github.com/codifydeep/descartavel2/pull/56)
 foi integrado e implantado, com CI e rollback/restauração. QA recusou o texto
 visível, diferente do contrato congelado. Não houve `HOMOLOGADA`. Dispatcher e
@@ -70,8 +80,8 @@ locais e revalidação financeira de onze atividades/19 chamadas locais. Zero
 OpenRouter nessas provas. A nova fronteira real continua necessária; nenhum
 bloqueio anterior foi zerado nem convertido em aprovação.
 
-A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
-achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
+A [revisão da execução de 25/10](EXECUTION-REVIEW-2026-10-25.md) preserva os
+achados e próximos passos daquela data. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
 continua sendo a estratégia aprovada. O [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
 registra o aceite e os limites do contrato F1; recibos antigos permanecem históricos.
 
