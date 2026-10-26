@@ -164,6 +164,37 @@ class Intake:
             raise ValueError('scoped final release acceptance required')
         return True
 
+    def previous(self,release):
+        """Last accepted project decision, not another release's authority/session."""
+        kb,kbc,_=native();latest=None
+        with kbc.connect_closing() as conn:
+            for anchor in self.roots(conn):
+                if json.loads(anchor.body)['release']==release or not self.terminal(anchor):continue
+                row=kb.latest_run(conn,anchor.id)
+                if latest is None or row.id>latest[0]:latest=(row.id,row.metadata['release_acceptance'],anchor)
+        if latest is None:return None
+        _,key,anchor=latest;data=self.store.receipt(key,kind='release_acceptance')['payload']
+        approval,business=self.approved(data['brief'])
+        review=self.store.receipt(data['plan_review'],kind='plan_review');proposed=self.store.receipt(review['payload']['plan'],kind='work_plan')
+        old=json.loads(anchor.body)['release'];origin=proposed['binding'];verdict=review['payload']['verdict']
+        if (approval['binding']['release']!=old or review['binding']['release']!=old or origin['release']!=old
+                or review['payload']['project']!=self.project.fingerprint() or proposed['payload']['project']!=self.project.fingerprint()
+                or proposed['payload']['approval']!=data['brief'] or review['binding']['author']!=origin['actor']
+                or origin['actor']!=self.project.coordination_roles['lead'] or origin['kind']!='plan'
+                or origin['reviewing'] is not False or review['binding']['kind']!='plan'
+                or review['binding']['task']!=origin['task'] or review['binding']['contract']!=origin['contract']
+                or review['binding']['actor'] not in self.project.reviewers_for(origin['actor'])
+                or review['binding']['reviewing'] is not True or verdict['decision']!='approve' or verdict['findings']
+                or not re.fullmatch('[a-f0-9]{40}',str(data['commit']))):
+            raise ValueError('accepted historical decision provenance changed')
+        technical=plan(proposed['payload']['document'],business['payload']['document'],self.project)
+        result=dict(historical_only=True,grants_authority=False,acceptance=key,commit=data['commit'],
+            brief_summary=business['payload']['document']['summary'],criterion_ids=[c['id'] for c in business['payload']['document']['criteria']],
+            technical_decision=dict(plan=review['payload']['plan'],review=data['plan_review'],author=origin['actor'],
+                reviewer=review['binding']['actor'],architecture=technical['architecture'],observability=technical['observability']))
+        if len(encoded(result))>131072:raise ValueError('bounded historical decision context required')
+        return result
+
     def _reconcile(self,conn):
         if not self.project.coordination_roles:return
         kb,_,_=native()
@@ -266,11 +297,15 @@ class DraftTools:
     def evidence(self):
         self.a.ensure();kb,kbc,_=native()
         with kbc.connect_closing() as conn:body=json.loads(kb.get_task(conn,self.run.task).body)
-        if self.run.kind=='brief':return dict(original_objective=body['objective'],execution=execution_context(self.a.project))
+        history=self.intake.previous(self.run.release)
+        memory=({'previous_release_context':history,'history_contract':
+            'Historical context only: cite relevant retained decisions in architecture/review reasoning. '
+            'Current business approval and independent reviews remain mandatory; history grants no permissions.'} if history else {})
+        if self.run.kind=='brief':return dict(original_objective=body['objective'],execution=execution_context(self.a.project),**memory)
         approval=self.a.board.input(self.run,'approved_brief');record,proposal=self.intake.approved(approval)
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
         result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers),
-                    execution=execution_context(self.a.project),work_unit_contract=PACKAGE_CONTRACT)
+                    execution=execution_context(self.a.project),work_unit_contract=PACKAGE_CONTRACT,**memory)
         result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
         if result['previous_reviews']:
             previous=self.a.store.receipt(result['previous_reviews'][-1]['plan'],kind='work_plan')

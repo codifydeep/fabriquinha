@@ -38,6 +38,12 @@ mas Telegram real não está configurado: fila não comprova recebimento nesse c
 
 ## Mecanismos qualificados
 
+- Os [contratos S5](S5-CONTRACT-QUALIFICATION.md) acrescentam regressão conhecida
+  sem duplicar testes: quatro atividades SDK, Git/Docker e CI reais, decisões
+  programadas e zero chamadas pagas. Outra base ou snapshot não reutiliza a aprovação.
+  A memória recupera somente a última decisão homologada; uso real por outro
+  perfil continua pendente.
+
 - O [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md) fixa scripts de validação em
   snapshots imutáveis e contabiliza custo/cache/raciocínio sem estimar ausências.
 - 306 testes do núcleo e treze jobs Docker/Chromium qualificaram adição normal de
@@ -69,9 +75,9 @@ zero nem atribuída por horário/prosa.
 | P7/S7 | Não iniciado | Retomar Truco após qualificação |
 
 O [plano S5](S5-CONTINUITY-PLAN.md) orienta o próximo trabalho. Não repetir outro
-ensaio genérico de saudação. Primeiro qualificar offline o Red de regressão já
-existente e a recuperação de decisões anteriores; depois uma segunda versão na
-mesma aplicação, com nova aprovação se o brief de negócio mudar.
+ensaio genérico de saudação. Os contratos de regressão e projeção histórica
+passaram offline; a próxima fronteira é uma segunda versão na mesma aplicação,
+com aprovação do novo brief pelo CEO antes de execução técnica.
 
 O [roadmap](ROADMAP.md) mantém o objetivo completo. As revisões de
 [24/10](SIMPLIFICATION-REVIEW-2026-10-24.md),

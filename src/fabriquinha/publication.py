@@ -162,7 +162,8 @@ class LocalCI:
         current()
         baseline,snapshot=self.repo.snapshot(base),self.repo.snapshot(head)
         self.repo.git('merge-base','--is-ancestor',base,head)
-        Quality(self.project,self.store,self.runner,None).protect(baseline,snapshot,allow_revision=True)
+        quality=Quality(self.project,self.store,self.runner,None)
+        quality.protect(baseline,snapshot,allow_revision=True)
         binding=dict(scope='local_ci',version=1,project=self.project.fingerprint(),head=head,base=base,stage=stage)
         def execute(tree,phase,scope):
             class Execution:
@@ -177,12 +178,13 @@ class LocalCI:
             preview_evidence(self.project,self.store,data,tree,phase)
             return job_id,suite_report(data)
         baseline_job,old=execute(baseline,'baseline',{**binding,'head':base,'base':base,'stage':'baseline'})
-        if old['failures']:raise EffectBlocked('CI requires a passing independently executed baseline')
+        regression=quality.regression_ci(base,baseline,snapshot,old) if old['failures'] else None
         job_id,report=execute(snapshot,'integrated',binding)
         if not set(old['cases'])<=set(report['cases']):raise ValueError('CI discovery omitted pre-existing test cases')
         self.store.tree(snapshot);current()
         return self.store.record('ci_validation',binding,dict(project=self.project.fingerprint(),head=head,base=base,
             stage=stage,snapshot=snapshot,baseline_job=baseline_job,job=job_id,conclusion='failure' if report['failures'] else 'success',
+            **({'regression_review':regression} if regression else {}),
             tests_run=report['tests_run'],qualification=self.project.qualification,merge_authorized=False,delivery_approval=False))
 
 
@@ -406,9 +408,10 @@ class Publication:
             '\nSnapshot: '+snapshot+'\nReview receipt: '+review_id+
             '\n\n## TDD evidence\nTrusted command: `python -B /opt/fabriquinha/suite.py`'+
             '\nDiscovery directory: '+self.project.tests_dir+'\nValidator image: '+self.project.validation_image+
-            '\nPassing baseline job: '+red['baseline_job']+
+            '\n'+('Known failing regression baseline job: ' if evidence['kind']=='regression_red' else 'Passing baseline job: ')+red['baseline_job']+
             '\n'+('Historical Red job (no new Red claimed): ' if evidence['kind']=='test_revision' else 'Red job: ')+red['red_job']+
             ('\nTest-contract correction: '+frozen['red']+'; independently frozen revision: '+green['freeze'] if evidence['kind']=='test_revision' else '')+
+            ('\nKnown regression base SHA: '+red['base_commit']+'; existing tests unchanged' if evidence['kind']=='regression_red' else '')+
             '\nRequired behavior controls: '+', '.join(frozen['control_cases'])+
             '\nFrozen tests: '+green['freeze']+'\nGreen job: '+green['job']+
             '\nComplete suite: '+str(len(green['cases']))+' cases'+
@@ -429,7 +432,9 @@ class Publication:
         review=self.store.receipt(review_id,kind='delivery_review')['payload']
         green=self.store.receipt(review['green'],kind='green')['payload']
         frozen=self.store.receipt(green['freeze'],kind='tests_frozen')['payload']
-        red=Quality(self.project,self.store,None,self.board).test_evidence(frozen['red'])['payload']
+        test_evidence=Quality(self.project,self.store,None,self.board).test_evidence(frozen['red']);red=test_evidence['payload']
+        if test_evidence['kind']=='regression_red' and red['base_commit']!=base:
+            raise EffectBlocked('regression review belongs to another exact base SHA')
         if self.repo.snapshot(base)!=red['baseline']:
             raise EffectBlocked('reviewed work uses an older baseline; rebase and preserve current regression tests')
         identity = dict(binding=inputs['origin'], project=self.project.fingerprint(), review=review_id,

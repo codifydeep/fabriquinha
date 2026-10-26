@@ -57,7 +57,8 @@ class IntakeContracts(unittest.TestCase):
         kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body='{}'))
         api=SimpleNamespace(connect_closing=lambda:nullcontext(None))
         with patch('fabriquinha.intake.native',return_value=(kb,api,None)), \
-                patch.object(tools.intake,'approved',return_value=({'binding':{'release':run.release}}, {'payload':{'document':document()}})):
+                patch.object(tools.intake,'approved',return_value=({'binding':{'release':run.release}}, {'payload':{'document':document()}})), \
+                patch.object(tools.intake,'previous',return_value=None,create=True):
             evidence=tools.evidence()
         self.assertIn('previous_reviews',evidence)
         self.assertEqual(evidence['previous_reviews'],feedback)

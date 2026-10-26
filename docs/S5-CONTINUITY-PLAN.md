@@ -7,6 +7,10 @@ seus testes e provar memória/recuperação, antes da distribuição e do Truco.
 
 ## 1. Preparar os contratos antes de gastar mais chamadas
 
+**Implementado e qualificado localmente:** ver [contratos e prova](S5-CONTRACT-QUALIFICATION.md).
+O caminho nativo SDK/Git/Docker passou com decisões programadas e zero chamadas
+pagas. Ainda não é uma nova release autônoma.
+
 Implementar a distinção aprovada na seção A2 da
 [auditoria de 26/10](EXECUTION-REVIEW-2026-10-26.md):
 
@@ -31,6 +35,9 @@ controles, CI verde; recusar SHA/falha/inventário divergentes e revisão obsole
 Decisões programadas devem permanecer identificadas como fixtures.
 
 ## 2. Memória de projeto mínima e verificável
+
+**Projeção implementada e testada:** origem e revisão foram lidas dos recibos do
+S4 real. Falta comprovar uso por outro perfil na segunda versão, conforme abaixo.
 
 O código atual guarda decisões duráveis, mas o contexto de planejamento contém
 somente o brief/plano atuais. Não concluir que memória entre versões existe

@@ -95,7 +95,8 @@ class Releases:
                 self.project.reviewer(package['owner'],exclude=(self.project.delivery_roles['tests'],))
                 parents=[specification['task'],*[by_package[key] for key in package['depends_on']]]
                 if previous and previous not in parents:parents.append(previous)
-                test_inputs={'baseline':'parent:'+previous+':baseline' if previous else baseline['snapshot']}
+                test_inputs={'baseline':'parent:'+previous+':baseline' if previous else baseline['snapshot'],
+                    'base_commit':'parent:'+previous+':base_commit' if previous else baseline['commit']}
                 cards={}
                 for phase in ('tests','implementation','integration'):
                     owner=(package['owner'] if phase=='implementation' else self.project.delivery_roles[phase])
@@ -227,6 +228,8 @@ class Releases:
             browser_protocol=author_protocol(),
             acceptance=body['acceptance'],stack='qualified Python HTTP, port 8080, /health and /identity; no downloads/network in workers',
             tdd='Tests author: change tests only; Red requires a real failing assertion in a new test body, not import/discovery/runtime errors. '
+                'If existing baseline tests already fail, submit the UNCHANGED baseline to confirm a known regression at the controller SHA; '
+                'independent review must validate all exact existing failures before a product-only fix. Never duplicate tests to bypass baseline failure. '
                 'Never change old tests/configs or reduce discovery. Implementer: Green uses the exact frozen inventory. '
                 'delivery_submit mutations are disposable full replacements of existing product files, not patches; never tests/configs. '
                 'Controls must fail by assertions and collectively cover every required_control_cases target frozen by independent review. '

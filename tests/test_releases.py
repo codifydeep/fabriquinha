@@ -144,6 +144,8 @@ class ReleaseContracts(unittest.TestCase):
             first=graph['items'][0]['cards']['integration']['id']
             self.assertIn(first,second['parents'])
             self.assertEqual(second['body']['inputs']['baseline'],'parent:'+first+':baseline')
+            self.assertEqual(second['body']['inputs']['base_commit'],'parent:'+first+':base_commit')
+            self.assertEqual(graph['items'][0]['cards']['tests']['body']['inputs']['base_commit'],self.store.receipt(seed)['payload']['commit'])
             unblocked.clear();self.releases.materialize(conn,anchor,spec,Mock());self.assertEqual(unblocked,[])
             original=(self.releases.folder(anchor)/'graph.json').read_bytes()
             repair=dict(task='repair-plan',review='repair-review',document={**work(),'tasks':[work()['tasks'][0]]},

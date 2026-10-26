@@ -153,9 +153,11 @@ class Sandbox:
             self.workspace=store.tree(record['payload']['snapshot'])
         elif run.reviewing:
             kind='red' if run.kind=='tests' else 'green'
-            record=store.receipt(board.input(run,kind,review_handoff=True))
-            if record['kind'] not in (('red','test_revision') if kind=='red' else ('green',)):
-                raise ValueError('exact immutable test evidence or Green required')
+            key=board.input(run,kind,review_handoff=True)
+            if kind=='red':
+                from .quality import Quality
+                record=Quality(project,store,None,board).test_evidence(key)
+            else:record=store.receipt(key,kind='green')
             binding=record['binding']
             if (binding['task']!=run.task or binding['contract']!=run.contract
                     or binding['release']!=run.release or binding['actor']!=run.author

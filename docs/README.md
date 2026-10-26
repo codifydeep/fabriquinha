@@ -31,6 +31,7 @@ as correções offline não autorizam consumo adicional nem homologam o S4.
 | [S2](HERMES-S2-QUALIFICATION.md) | Mecanismos Red, freeze, Green e controles |
 | [S3](HERMES-S3-QUALIFICATION.md) | Cadeia determinística de integração, deploy e QA |
 | [S4](HERMES-S4-QUALIFICATION.md) | Primeira entrega técnica por agentes reais, sem intervenção externa, com limites explícitos |
+| [Contratos S5](S5-CONTRACT-QUALIFICATION.md) | Regressão existente com CI restrita e projeção histórica de decisões; segunda versão real ainda pendente |
 | [Agentes](HERMES-AGENT-QUALIFICATION.md) | SDK, ferramentas e sessões |
 | [Runtime](HERMES-RUNTIME-QUALIFICATION.md) | Serviço, reinício e worker órfão |
 | [Recuperação](HERMES-RECOVERY-QUALIFICATION.md) | Diagnóstico Lead/CTO em cenários delimitados |

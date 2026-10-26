@@ -4,6 +4,7 @@ No worker-supplied pass flags or receipt imports. Store and Runner live only in
 the controller; model output is limited to a review decision with findings.
 """
 import json
+import re
 import difflib
 from itertools import islice
 from pathlib import Path
@@ -135,8 +136,40 @@ class Quality:
 
     def test_evidence(self,key):
         value=self.store.receipt(key)
-        if value['kind'] not in ('red','test_revision'):raise ValueError('actual Red or explicitly reviewed test revision required')
+        if value['kind'] not in ('red','regression_red','test_revision'):raise ValueError('actual Red or explicitly reviewed test revision required')
         return value
+
+    def failures(self,report):
+        """Stable assertion identities; never accept an arbitrary failing exit."""
+        failures=report['failures'];prefix=self.project.tests_dir+'/'
+        if (not failures or len({f['case'] for f in failures})!=len(failures)
+                or any(f.get('assertion') is not True or not any(
+                    frame['file'].startswith(prefix) and frame['function'].startswith('test')
+                    for frame in f.get('frames',[])) for f in failures)):
+            raise ValueError('known regression requires real existing-test assertion failures')
+        return sorted((dict(case=f['case'],frames=f['frames'],detail=f.get('detail')) for f in failures),key=lambda f:f['case'])
+
+    def known_regression(self,record):
+        """Recheck immutable evidence without granting a current worker claim."""
+        data=record['payload'];scope=record['binding']
+        if (record['kind']!='regression_red' or data.get('control_contract')!=CONTROL_CONTRACT
+                or data['project']!=self.project.fingerprint() or scope['kind']!='tests' or scope['reviewing']
+                or not re.fullmatch('[a-f0-9]{40}',str(data['base_commit']))
+                or data['baseline']!=data['snapshot'] or data['new_cases']):
+            raise ValueError('exact controller-bound regression base required')
+        facts=[]
+        for field,phase in (('baseline_job','baseline'),('red_job','red')):
+            job=self.store.receipt(data[field],kind='suite_job');value=job['payload'];identity=value['identity']
+            if (job['binding']!=scope or identity['binding']!=scope or identity['phase']!=phase
+                    or identity['snapshot']!=data['baseline'] or identity['project']!=self.project.fingerprint()
+                    or identity['image']!=self.project.validation_image
+                    or value['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
+                raise ValueError('exact isolated regression jobs required')
+            preview_evidence(self.project,self.store,value,data['baseline'],phase)
+            report=suite_report(value);facts.append((sorted(report['cases']),self.failures(report)))
+        if facts[0]!=facts[1] or facts[0][0]!=data['cases']:
+            raise ValueError('regression baseline and Red must reproduce the exact existing failures and inventory')
+        return facts[0]
 
     def protect(self, before, after, *, exact_tests=False,allow_revision=False):
         left, right = self.store.manifest(before), self.store.manifest(after)
@@ -262,7 +295,15 @@ class Quality:
         self.browser_tests(run,candidate)
         base_job, base = self.observe(run, baseline, 'baseline')
         if base['failures']:
-            raise ValueError('baseline must pass before Red')
+            if candidate!=baseline:raise ValueError('regression baseline failed: submit unchanged existing tests, never duplicate or alter them')
+            commit=self.board.input(run,'base_commit')
+            if not re.fullmatch('[a-f0-9]{40}',commit):raise ValueError('controller baseline commit required for known regression')
+            self.failures(base)
+            red_job,report=self.observe(run,baseline,'red')
+            if sorted(base['cases'])!=sorted(report['cases']) or self.failures(base)!=self.failures(report):
+                raise ValueError('regression failures or discovery changed during confirmation')
+            return self.record(run,'regression_red',dict(control_contract=CONTROL_CONTRACT,baseline=baseline,snapshot=baseline,
+                base_commit=commit,baseline_job=base_job,red_job=red_job,cases=sorted(base['cases']),new_cases=[]))
         red_job, report = self.observe(run, candidate, 'red')
         old, all_cases = set(base['cases']), set(report['cases'])
         new, failing = all_cases-old, {f['case'] for f in report['failures']}
@@ -288,6 +329,7 @@ class Quality:
                     raise ValueError('distinct preserved control cases required')
                 extra.add(risk['case'])
             return sorted(required|extra)
+        if red['kind']=='regression_red':self.known_regression(red)
         if data.get('control_contract')!=CONTROL_CONTRACT:
             raise ValueError('new Red evidence required for the approved behavior-control contract; no legacy conversion')
         job=self.store.receipt(data['red_job'],kind='suite_job');value=job['payload'];identity=value['identity']
@@ -300,9 +342,10 @@ class Quality:
         for failure in report['failures']:
             if not failure['assertion'] or not any(f['file'].startswith(self.project.tests_dir+'/') and
                     f['function'].startswith('test') for f in failure['frames']):
-                raise ValueError('mutation targets require actual Red assertions in new test bodies')
+                raise ValueError('mutation targets require actual Red assertions in protected test bodies')
             required.add(failure['case'])
-        if (not required or not required<=set(data['new_cases']) or set(report['cases'])!=set(data['cases'])
+        eligible=data['cases'] if red['kind']=='regression_red' else data['new_cases']
+        if (not required or not required<=set(eligible) or set(report['cases'])!=set(data['cases'])
                 or not isinstance(risks,list) or len(risks)>32):
             raise ValueError('validated Red cases and bounded independently reviewed risks required')
         extra=set()
@@ -360,6 +403,14 @@ class Quality:
         if data.get('control_contract')!=CONTROL_CONTRACT or data.get('project')!=self.project.fingerprint():
             raise ValueError('frozen tests use a historical control contract; new independent review required')
         red=self.test_evidence(data['red']);review=self.store.receipt(data['review'],kind='test_review')
+        if red['kind']=='regression_red':
+            origin,scope=red['binding'],receipt['binding']
+            if (scope['kind']!='tests' or scope['reviewing'] is not True or scope['task']!=origin['task']
+                    or scope['release']!=origin['release'] or scope['contract']!=origin['contract']
+                    or scope['author']!=origin['actor'] or scope['actor'] not in self.project.reviewers_for(origin['actor'])
+                    or scope['number']<=origin['number'] or data['tests']!=self.tests(data['snapshot'])
+                    or data['baseline']!=red['payload']['baseline']):
+                raise ValueError('independent exact regression freeze required')
         if (review['binding']!=receipt['binding'] or review['payload']['project']!=self.project.fingerprint()
                 or review['payload']['red']!=data['red'] or review['payload']['snapshot']!=data['snapshot']
                 or review['payload']['verdict']['decision']!='approve' or red['payload']['snapshot']!=data['snapshot']
@@ -369,6 +420,30 @@ class Quality:
             raise ValueError('exact independently frozen behavior-control targets required')
         self.store.tree(data['snapshot'])
         return data
+
+    def regression_ci(self,commit,baseline,snapshot,report):
+        """Only an independently reviewed fix may reuse known failing base facts."""
+        for path in sorted((self.store.root/'receipts').glob('*.json')):
+            review=self.store.receipt(path.stem)
+            if review['kind']!='delivery_review':continue
+            scope,data=review['binding'],review['payload']
+            if data['project']!=self.project.fingerprint() or data['snapshot']!=snapshot:continue
+            green=self.store.receipt(data['green'],kind='green');freeze=self.store.receipt(green['payload']['freeze'],kind='tests_frozen')
+            red=self.test_evidence(freeze['payload']['red'])
+            if red['kind']!='regression_red' or red['payload']['base_commit']!=commit or red['payload']['baseline']!=baseline:continue
+            frozen=self.frozen_plan(freeze);author=green['binding']
+            if (scope['kind']!='implementation' or scope['reviewing'] is not True or scope['author']!=author['actor']
+                    or scope['actor'] not in self.project.reviewers_for(author['actor']) or scope['actor']==frozen['test_author']
+                    or scope['task']!=author['task'] or scope['contract']!=author['contract'] or scope['release']!=author['release']
+                    or scope['number']<=author['number'] or author['release']!=freeze['binding']['release']
+                    or data['verdict']['decision']!='approve' or data['verdict']['findings']
+                    or green['payload']['snapshot']!=snapshot or self.tests(snapshot)!=frozen['tests']):
+                raise ValueError('exact independently reviewed product-only regression fix required')
+            if (sorted(report['cases']),self.failures(report))!=self.known_regression(red):
+                raise ValueError('CI baseline differs from the exact reviewed regression failures or inventory')
+            self.protect(baseline,snapshot,exact_tests=True)
+            return path.stem
+        raise EffectBlocked('CI failing base lacks an exact independently reviewed regression fix')
 
     def green(self, run, freeze_id, snapshot):
         self.check(run, 'implementation')
@@ -580,6 +655,8 @@ class DeliveryTools:
             context.update(test_revision=red,historical_red_only=True,
                 correction_validation=report(red['validation_job']),
                 instructions='Review this new expected-text correction against the approved brief and repair authority. Historical Red remains historical; no new failing test is claimed. Preserve every unit test, action and control target.')
+        elif evidence['kind']=='regression_red':
+            context.update(regression_red=red,instructions='Known regression at the controller base SHA: independently confirm the existing expectation and every exact assertion failure. No new test is claimed. Preserve all tests and require a product-only fix, full Green and negative controls before independent delivery approval.')
         context['mandatory_red_targets']=sorted({failure['case'] for failure in context['red']['failures']})
         context['passing_cases']=sorted(set(context['red']['cases'])-set(context['mandatory_red_targets']))
         return context

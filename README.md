@@ -40,6 +40,8 @@ flowchart LR
     G --> D[Compose local e QA]
     D --> H[Gate de homologação]
     H --> K
+    H -.-> HM[Última decisão homologada: contexto histórico limitado]
+    HM -.-> W
     K --> O[Outbox persistente e status]
     W --> U[Relay: consumo por atividade]
     K --> R[Diagnóstico técnico Lead / CTO]
@@ -77,7 +79,7 @@ flowchart TD
     B[Produto: brief aprovado pelo proprietário] --> P[Tech Lead: plano]
     P --> C[CTO: revisão técnica]
     C -->|mudanças| P
-    C --> T[QA: testes com Red real]
+    C --> T[QA: Red novo ou regressão existente no SHA exato]
     T --> F[Revisão independente e freeze]
     F -->|mudanças| T
     F --> I[Desenvolvedor: suíte Green e QA congelado local]
@@ -119,6 +121,9 @@ recuperação, memória entre versões e portabilidade continuam incompletos.
 - Testes existentes e descoberta protegidos; nenhum skip ou aprovação textual
   substitui execução. Correções legítimas exigem outra revisão, nunca alteração
   silenciosa do snapshot.
+- [Regressões conhecidas](docs/S5-CONTRACT-QUALIFICATION.md) usam o teste existente
+  vermelho, revisão e freeze, produto corrigido e cabeça verde. A CI admite somente
+  as falhas de base revisadas no SHA e inventário exatos.
 - Instalações novas fixam os scripts de validação em snapshot imutável; edição
   do checkout não altera os jobs nem reinterpreta provas anteriores.
 - Revisores leem entregas imutáveis. Validações executam comandos fixos em
@@ -171,7 +176,7 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 26/10/2026, o núcleo passou em 306 testes. O reparo mínimo completou uma
+Em 26/10/2026, o núcleo passou em 326 testes. O reparo mínimo completou uma
 homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
 específicas; decisões programadas não são julgamento de um agente real.
 

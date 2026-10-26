@@ -109,6 +109,16 @@ class NativeBackendPolicy(unittest.TestCase):
         invalid=Run('integration',3,'backend','integration',False,'backend','v1','contract')
         with self.assertRaises(ValueError):Sandbox(self.project,self.store,self.board,invalid)
 
+    def test_regression_review_uses_the_same_central_immutable_evidence_policy(self):
+        key=self.store.record('regression_red',self.run.binding(),dict(project=self.project.fingerprint(),snapshot=self.snapshot))
+        self.board.input=lambda *args,**kwargs:key
+        reviewing=Run('tests',2,'lead','tests',True,'backend','v1','contract')
+        sandbox=Sandbox(self.project,self.store,self.board,reviewing)
+        self.assertEqual(sandbox.workspace,self.store.tree(self.snapshot))
+        self.assertEqual(command(self.project,sandbox.expected).count('--mount'),1)
+        self.board.input=lambda *args,**kwargs:self.store.record('unrelated',self.run.binding(),dict(snapshot=self.snapshot))
+        with self.assertRaises(ValueError):Sandbox(self.project,self.store,self.board,reviewing)
+
     def test_close_observes_uncertain_creation_without_repeating_or_forcing_removal(self):
         sandbox=Sandbox(self.project,self.store,self.board,self.run)
         cid='c'*64;exists=[False];calls=[]
