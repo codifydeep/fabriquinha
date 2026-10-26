@@ -30,6 +30,16 @@ class TechnicalRecovery(unittest.TestCase):
             diagnostic.decide(dict(action='resume',reason='Change product wording',findings=[dict(path='app.py',line=1,detail='Edit the app')]))
         self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
 
+    def test_implementation_diagnosis_keeps_product_experiments_and_frozen_tests(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.original={**diagnostic.original,'kind':'implementation'}
+        diagnostic.repair=dict(proposal=dict(classification='test_contract',test_paths=['tests/qa.json']))
+        self.quality.observe=Mock(return_value=('observed-job',dict(failures=[])))
+        diagnostic.validate(dict(hypothesis='Check a product-only negative control',replacements={'app.py':'VALUE = -1\n'}))
+        self.assertEqual(self.quality.observe.call_args.args[2],'diagnostic')
+        self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
+        self.assertEqual((self.work/'tests/test_existing.py').read_text(),'baseline test\n')
+
     def setUp(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         self.root=Path(temporary.name).resolve();self.store=Store(self.root/'private')

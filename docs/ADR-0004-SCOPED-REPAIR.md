@@ -65,9 +65,11 @@ Não fazem parte da alegação de capacidade deste reparo mínimo.
 
 ## Validação
 
-Diagnóstico recebe também o brief e a autoridade corretiva. Em correção de QA,
+Diagnóstico recebe também o brief e a autoridade corretiva. Na atividade de testes QA,
 seu experimento executa suíte e prévia de navegador; recusa não aprova a entrega.
 Orientação de retomada não pode exigir escrita fora dos caminhos QA autorizados.
+Diagnóstico da implementação conserva experimentos descartáveis no produto e
+testes congelados; não herda a permissão de corrigir expectativas QA.
 
 Testes do núcleo verificam exceção restrita, revisão independente, proteção de
 testes Python, alvos de controles, não duplicação e preservação do grafo.

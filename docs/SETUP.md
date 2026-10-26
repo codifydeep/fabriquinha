@@ -41,9 +41,10 @@ documenta os achados, as mudanças propostas e as lacunas de S6; não autoriza r
 A CLI de preparação exige `--max-output-tokens` explícito: 2048, 4096, 8192 ou 16384,
 conforme política autorizada. O valor é preservado no preparo e consumido pelo
 relay/SDK; escolhê-lo não habilita o provedor nem aumenta o teto de chamadas.
-O suporte a 16384 foi autorizado e usado no último ensaio real. A política
-preservada continua desabilitada, com saída máxima 16384 e teto específico de
-7.000 chamadas. Esse estado privado não é uma autorização de consumo para novas
+O suporte a 16384 foi autorizado e usado no ensaio real. A política de referência
+tem saída máxima 16384 e teto específico de 7.000 chamadas; sua ativação segue a
+pausa/retomada explícita do proprietário, consultável no status local. Esses
+valores privados não são uma autorização de consumo para novas
 instalações. Limite de chamadas e saída por resposta são controles distintos.
 
 Para consultar uma instalação existente, use o Python do SDK já provisionado,

@@ -9,7 +9,7 @@ O reparo mínimo está implementado e sua prova passou em dez jobs Docker/Chromi
 sem chamadas pagas: revisão explícita de expectativa QA, produto/testes Python
 preservados, Green, controles, revisão e validação integrada. As decisões dessa
 fixture são programadas; não provam lifecycle nativo ou autonomia. A suíte do
-núcleo passou em 291 testes. A base e as evidências do caso preservado foram
+núcleo passou em 292 testes. A base e as evidências do caso preservado foram
 conferidas; sua retomada será classificada como recuperação assistida.
 
 A primeira execução corretiva classificou a falha como `test_contract` e recebeu
@@ -246,3 +246,11 @@ e o projeto da execução. O ensaio foi pausado e drenado antes da atualização
 Nenhum arquivo de produto foi alterado pelo operador. As tentativas triadas
 permanecem históricas; uma nova proposta requer diagnóstico CTO e uma revisão
 qualificada do protocolo, sem reset de contadores ou importação de aprovações.
+
+## Avanço confirmado do reparo
+
+Com o handoff corrigido, a equipe completou a revisão independente dos testes
+e avançou automaticamente à implementação e à revisão da entrega. Nenhum arquivo
+de produto foi corrigido pelo operador. Os controles negativos foram executados
+novamente; a passagem de etapa não reutilizou sua aprovação histórica.
+A validação final de PR/CI/deploy/QA continua necessária.
