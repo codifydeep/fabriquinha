@@ -106,6 +106,7 @@ class Quality:
         self.observed_jobs=set()
         self.control_refusal=None
         self.suite_refusal=None
+        self.review_after=0  # Last applied diagnostic run, not a reset of history/retries.
 
     def check(self, run, kind, *, reviewing=False):
         self.board.ensure(run)
@@ -514,6 +515,7 @@ class Quality:
         reader=getattr(self.board,'review_feedback',None)
         history=reader(run,self.store) if reader else []
         if not isinstance(history,list):raise ValueError('validated native review history required')
+        history=[item for item in history if item['run']>self.review_after]
         if len(history)<2:return None
         common={f['path'] for f in verdict['findings']};references=[];numbers=[]
         for item in history[-2:]:
@@ -528,7 +530,7 @@ class Quality:
             common&={f['path'] for f in data['verdict']['findings']}
             references.append(item['receipt']);numbers.append(scope['number'])
         if numbers!=sorted(set(numbers)):raise ValueError('distinct chronological reviews required')
-        return dict(reviews=references,paths=sorted(common)) if common else None
+        return dict(reviews=references,paths=sorted(common),after_diagnosis=self.review_after) if common else None
 
 
 def product_mutations(quality,snapshot,proposals):

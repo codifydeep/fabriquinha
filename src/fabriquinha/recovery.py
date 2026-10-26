@@ -132,6 +132,13 @@ class Diagnostic:
                 result['impasse_contract']='Three consecutive independent change requests concern the same files. Diagnose whether the current issue is an unresolved defect, conflicting instructions or a tool limitation. This is not a root-cause verdict, approval or permission to weaken tests. Resume keeps independent review mandatory; hold if no permitted operation can resolve the issue.'
             from .browser import author_protocol
             result['browser_protocol']=author_protocol()
+            if self.original['kind']=='tests' and not self.qa_correction():
+                review=self.store.receipt(escalation['review'],kind='test_review')
+                red=self.q.test_evidence(review['payload']['red'])
+                baseline=self.q.tests(red['payload']['baseline']);candidate=self.q.tests(self.incident['snapshot'])
+                result['test_revision_contract']=dict(protected_baseline=red['payload']['baseline'],protected_paths=sorted(baseline),
+                    candidate_only_paths=sorted(set(candidate)-set(baseline)),
+                    rule='The current tests are not frozen yet. Only the original tests author may revise candidate-only paths after changes are requested, followed by another independent review. Diagnostic SPIKE refusal to rewrite tests limits this diagnostic phase, not the author. Baseline tests stay protected. Do not request duplicate criterion IDs; evaluate coverage together with the complete unittest/browser suite and retained QA.')
         kb,kbc,_=native()
         with kbc.connect_closing() as conn:
             body=json.loads(kb.get_task(conn,self.run.task).body)

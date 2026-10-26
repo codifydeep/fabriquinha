@@ -573,6 +573,7 @@ class Runtime:
                 write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
                 return
             guidance=self.recovery.guidance(run)
+            if guidance:quality.review_after=self.store.receipt(guidance[-1]['receipt'],kind='diagnostic_decision')['binding']['number']
             if guidance:prompt+='\nController-recorded diagnostic guidance:\n'+json.dumps(guidance)
             try:route=model_route(self.project,self.root/'route.json')
             except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None

@@ -143,6 +143,9 @@ class ModelDeliveryOperations(unittest.TestCase):
         self.assertIsNone(self.quality.review_recurrence(run,changes))
         self.review_history()
         self.assertIsNone(self.quality.review_recurrence(run,dict(decision='approve',reason='Corrected',findings=[])))
+        self.quality.review_after=5
+        self.assertIsNone(self.quality.review_recurrence(run,changes))
+        self.quality.review_after=0
         self.review_history(foreign=True)
         with self.assertRaises(ValueError):self.quality.review_recurrence(run,changes)
 

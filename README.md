@@ -85,6 +85,10 @@ flowchart TD
     F --> I[Desenvolvedor: suíte Green e QA congelado local]
     I --> N[Controles negativos e revisão da entrega]
     N -->|mudanças| I
+    F -->|devoluções recorrentes| ER[CTO: SPIKE e orientação]
+    N -->|devoluções recorrentes| ER
+    ER -->|revisão de testes| F
+    ER -->|revisão da entrega| N
     N --> PR[PR e CI no SHA exato]
     PR --> M[Integração: suíte e mesmo QA congelado]
     M --> D[DevOps: deploy e rollback]

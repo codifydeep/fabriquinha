@@ -37,6 +37,29 @@ não é promovida a incidente por haver revisões anteriores.
 
 ## Qualificação e próxima fronteira
 
+O guard foi instalado e acionou o CTO no ensaio real. Ele executou um SPIKE e
+manteve `hold`: confundiu a proibição de escrever testes na fase de diagnóstico
+com uma proibição de o autor corrigir seus novos candidatos antes do freeze.
+O texto “não reescrever QA existente” não distinguia esses candidatos da base.
+
+A clarificação fornece caminhos da base protegida e caminhos presentes somente
+na entrega candidata, derivados do Red exato. O autor pode corrigir apenas os
+novos caminhos, seguido de outra revisão; revisor e diagnóstico continuam sem
+escrita. A cobertura é avaliada pela suíte completa e QA retido/novo em conjunto,
+sem pedir IDs duplicados. O DSL, seus checks e os testes antigos não mudam.
+
+Uma orientação técnica realmente aplicada delimita a próxima janela de
+recorrência pelo número do seu run nativo. As devoluções antigas continuam no
+histórico, mas não são contadas como tentativas sob a orientação nova. Retries,
+triagem, breaker e evidências não são zerados. A retomada já abre contexto SDK
+novo pelo recibo de orientação existente; não foi criado outro motor de memória.
+
+O mesmo ensaio descartável de 13 atividades passou também com esse contexto:
+o CTO distinguiu o teste antigo protegido do candidato novo. Seu `hold` real
+permanece preservado. O próximo atendimento deve seguir a decisão técnica
+registrada e a clarificação instalada, com novo experimento e revisão, sem
+desbloquear diretamente o card ou converter manutenção em autonomia.
+
 328 testes passaram. `scripts/qualify_hermes_recovery.py --review-churn` executou
 13 atividades nativas, 41 respostas locais programadas e três diagnósticos,
 com Docker real. Três pareceres `changes` acionaram o CTO sem o modelo pedir

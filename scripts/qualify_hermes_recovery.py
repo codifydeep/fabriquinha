@@ -184,6 +184,8 @@ print(json.dumps(rows))'''
                         assert len(visible['review_recurrence']['reviews'])==2
                         assert visible['review_recurrence']['paths']==['tests/test_new.py']
                         assert visible['browser_protocol']['rules'] and 'not a root-cause verdict' in visible['impasse_contract']
+                        assert visible['test_revision_contract']['candidate_only_paths']==['tests/test_new.py']
+                        assert visible['test_revision_contract']['protected_paths']==['tests/test_existing.py']
                         churn_context.append(run.number)
                 if terminal_deadline and run.number==1:
                     sequence.insert(3,('terminal',dict(command=deadline_probe,timeout=6)))

@@ -22,7 +22,8 @@ def author_protocol():
     return dict(schema=dict(type='object',additionalProperties=False,required=['version','checks'],
         properties=dict(version={'const':1},checks=dict(type='array',minItems=1,maxItems=20,items=check))),
         rules=['Each check ID is an approved acceptance criterion. Reuse existing IDs without adding duplicate scenarios.',
-            'Append missing scenarios in new qa.<package>.<release>.json files; never rewrite existing QA files.',
+            'Preserve every QA file in the protected baseline. The tests author may revise QA files introduced by the current card until independent freeze, then submit a new revision. Reviewers and diagnosticians never edit author files.',
+            'One deployed check per criterion ID: do not request duplicate IDs. Assess acceptance coverage across the complete browser unittest suite, retained QA and new QA together; this declarative check is not the sole proof of every intermediate state.',
             'At most 20 unique scenarios across all files. Each check navigates its local path, runs actions in order, then compares the exact full locator text (normalized whitespace), not a substring.',
             'Only same-origin HTTP assets/requests; no external CDNs, fonts, downloads or WebSockets.',
             'No browser page/console errors. Serve a favicon or use an embedded data icon.'])
