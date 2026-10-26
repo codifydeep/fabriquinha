@@ -23,7 +23,7 @@ CONTROL_REVIEW_CONTRACT=('Check approved acceptance coverage before approving te
     'or any Red failure that cannot be fixed by implementing product behavior with the tests/configuration unchanged.')
 
 
-def suite_report(value):
+def suite_report(value,*,diagnostic=False):
     """Shared full-suite facts; caller must separately verify job provenance."""
     report=value.get('report')
     if (not isinstance(report,dict) or report.get('version')!=1
@@ -32,10 +32,12 @@ def suite_report(value):
             or report['tests_run']!=len(report['cases']) or len(set(report['cases']))!=len(report['cases'])
             or any(not isinstance(case,str) or not case for case in report['cases'])
             or any(not isinstance(report.get(field),list) for field in ('failures','errors','skips','expected_failures','unexpected_successes'))
-            or any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes'))):
+            or not diagnostic and any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes'))):
         raise ValueError('complete real suite without errors or skips required')
     failed={item['case'] for item in report['failures']}
-    if not failed<=set(report['cases']) or value['exit_code']!=(1 if failed else 0):
+    if (not failed<=set(report['cases'])
+            or any(not set(report[field])<=set(report['cases']) for field in ('errors','skips','expected_failures','unexpected_successes'))
+            or value['exit_code']!=(1 if failed or report['errors'] or report['unexpected_successes'] else 0)):
         raise ValueError('suite exit and assertion facts disagree')
     return report
 
@@ -103,7 +105,9 @@ class Quality:
                 or identity['image'] != self.project.validation_image
                 or value['sandbox'] != dict(network='none', snapshot='readonly', user='65534:65534')):
             raise ValueError('complete real suite without errors or skips required')
-        report=suite_report(value)
+        # Negative facts must remain visible to a diagnostician. Delivery phases
+        # retain the strict default, including Red: errors/skips never qualify.
+        report=suite_report(value,diagnostic=run.kind=='diagnostic' and phase=='diagnostic')
         self.board.ensure(run)
         self.store.tree(snapshot)
         self.observed_jobs.add(key)

@@ -13,7 +13,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.artifacts import Store, digest
 from fabriquinha.board import Run
 from fabriquinha.config import Project
-from fabriquinha.quality import Quality
+from fabriquinha.quality import Quality, suite_report
 from fabriquinha.effects import EffectBlocked
 from fabriquinha.recovery import Diagnostic, Recovery
 from test_delivery_core import configuration
@@ -61,6 +61,31 @@ class TechnicalRecovery(unittest.TestCase):
         with self.assertRaises(ValueError):diagnostic.decide(decision)
         with self.assertRaises(ValueError):diagnostic.validate(dict(passed=True,hypothesis='invented'))
         self.sandbox.close.assert_not_called()
+
+    def test_diagnostic_retains_test_errors_without_qualifying_delivery(self):
+        report=dict(version=1,tests_run=2,cases=['existing','new'],failures=[],errors=['new'],
+                    skips=[],expected_failures=[],unexpected_successes=[])
+        value=dict(exit_code=1,report=report)
+        with self.assertRaises(ValueError):suite_report(value)
+        self.assertEqual(suite_report(value,diagnostic=True),report)
+        with self.assertRaises(ValueError):suite_report({**value,'exit_code':0},diagnostic=True)
+        with self.assertRaises(ValueError):suite_report({**value,'report':{**report,'errors':['foreign']}},diagnostic=True)
+        identity=dict(binding=self.run.binding(),snapshot=self.snapshot,phase='diagnostic',
+                      project=self.project.fingerprint(),image=self.project.validation_image)
+        job=self.store.record('suite_job',self.run.binding(),dict(**value,identity=identity,
+            sandbox=dict(network='none',snapshot='readonly',user='65534:65534')))
+        self.quality.runner=Mock();self.quality.runner.run.return_value=job
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        result=diagnostic.validate(dict(hypothesis='The new test errors before asserting; return to its author, not implementation'))
+        self.assertEqual(result['report']['errors'],['new'])
+        self.assertFalse(result['delivery_approval'])
+        self.assertEqual(self.store.receipt(result['experiment'])['payload']['job'],job)
+        # The phase string alone cannot grant relaxed observation to an author.
+        author_identity={**identity,'binding':self.original.binding()}
+        author_job=self.store.record('suite_job',self.original.binding(),dict(**value,identity=author_identity,
+            sandbox=dict(network='none',snapshot='readonly',user='65534:65534')))
+        self.quality.runner.run.return_value=author_job
+        with self.assertRaises(ValueError):self.quality.observe(self.original,self.snapshot,'diagnostic')
 
     def test_spike_mutation_is_disposable_and_cannot_weaken_tests(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)

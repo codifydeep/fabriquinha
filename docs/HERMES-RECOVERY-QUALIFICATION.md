@@ -250,3 +250,26 @@ sem contar testes/upstream. Dois módulos além do alvo orientativo inicial são
 entrada operacional e a recuperação comum, não novos bancos/workflows nem um
 adaptador por causa de erro. A contagem continua sendo limite de revisão de
 complexidade, não medida de autonomia.
+
+## Relatórios negativos no diagnóstico — 26/10
+
+O caminho de diagnóstico agora distingue observar uma execução de aprovar uma
+entrega. `Quality.observe` aceita um relatório completo com erros ou skips
+somente quando tanto o run nativo quanto a fase são `diagnostic`. Mantém vínculo
+ao job, snapshot, imagem, autor e execução. Os gates de Red, Green, controles e
+revisão continuam recusando esses resultados. A saída do processo precisa ser
+coerente com as falhas e erros; um relatório parcial não vira evidência válida.
+
+O contexto explica a fase do impedimento: o autor dos testes deve produzir Red
+por assertions, não implementar o produto para obter Green antes do freeze.
+Um erro de teste deve voltar ao autor. Experimento negativo permite orientar
+uma nova tentativa; não comprova Red, não aprova testes e não conclui incidente.
+
+A prova `qualify_hermes_recovery.py --invalid-red` passou em raiz limpa com nove
+atividades SDK e 31 requisições HTTP locais, sem OpenRouter. O gate recusou um
+teste com erro; Lead e CTO observaram esse mesmo erro em jobs reais, o autor
+retomou e corrigiu o teste, e a cadeia completou Red, revisão com mudanças,
+freeze, Green e revisão da entrega. O incidente só foi resolvido com evidência
+de entrega. O verificador anterior tinha uma comparação textual incorreta e foi
+encerrado sem qualificação; sua evidência permanece preservada. Decisões nessa
+prova eram programadas: julgamento do modelo real ainda precisa de nova fronteira.

@@ -25,8 +25,9 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False):
-    if review_escalation and control_refusal:raise ValueError('choose one independent recovery scenario')
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False):
+    if sum((review_escalation,control_refusal,invalid_red))>1 or invalid_red and provider_error:
+        raise ValueError('choose one independent recovery scenario')
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
     kb,kbc,_=native()
     from hermes_cli.profiles import create_profile
@@ -38,7 +39,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
-    control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[]
+    control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[];negative_reports=[]
     sink=None;sink_thread=None;sink_data=dict(accepted={},attempts={},accepted_at={},lookups=0,lost=None)
     if notifications:
         class Sink(BaseHTTPRequestHandler):
@@ -139,8 +140,26 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
                     sequence=steps(run,changes)
                     if control_refusal and run.reviewing and run.kind=='tests' and sequence[-1][1]['decision']=='approve':
                         sequence[-1][1]['control_risks']=[dict(case='test_existing.Existing.test_type',reason='The product value must remain numeric; preserve and witness this existing behavior.')]
+                if invalid_red:
+                    if run.number==1:
+                        sequence[-1:-1]=[
+                            ('write_file',dict(path='/workspace/tests/test_new.py',content=
+                                'import unittest, app\nclass NewBehavior(unittest.TestCase):\n def test_value(self): self.assertEqual(app.MISSING,2)\n')),
+                            ('delivery_submit',{})]
+                    elif run.kind=='diagnostic':
+                        visible=json.loads(native_context.split('Controller-recorded Incident context:\n',1)[1])
+                        assert 'Tests author' in visible['phase_expectation'] and 'Do not require Green' in visible['phase_expectation']
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
+            if invalid_red and run.kind=='diagnostic':
+                last=body['messages'][-1].get('content')
+                if isinstance(last,str):
+                    try:observed=json.loads(last)
+                    except ValueError:observed={}
+                    if isinstance(observed,dict) and observed.get('experiment'):
+                        assert observed['report']['errors']==['test_new.NewBehavior.test_value']
+                        assert observed['delivery_approval'] is False
+                        negative_reports.append(run.number)
             if run.number==1:
                 schema=next(t['function']['parameters'] for t in body['tools'] if t['function']['name']=='terminal')
                 assert schema['properties']['timeout']['maximum']==120
@@ -266,6 +285,11 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
         if provider_error:proof.update(native_sdk_policy_error_reached_diagnosis=True)
+        if invalid_red:
+            assert len(set(negative_reports))==2
+            assert experiment['payload']['report']['errors']==['test_new.NewBehavior.test_value']
+            proof.update(negative_reports_reached_lead_and_cto=True,invalid_red_not_approved=True,
+                test_author_resumed_without_requiring_green=True,diagnosis_did_not_replace_red_or_freeze=True)
         if control_refusal:
             assert len(control_failed)==1 and len(control_seen)==2
             failed=next(r for r in runs if r['id']==control_failed[0])
@@ -314,11 +338,12 @@ if __name__=='__main__':
     scenario=parser.add_mutually_exclusive_group()
     scenario.add_argument('--review-escalation',action='store_true')
     scenario.add_argument('--control-refusal',action='store_true')
+    scenario.add_argument('--invalid-red',action='store_true',help='Observe test errors in diagnosis, then require author repair and genuine Red/review/Green')
     parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
     args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
     try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
-        provider_error=args.provider_error,control_refusal=args.control_refusal)
+        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

@@ -107,6 +107,14 @@ mesma base limpa, preservando o PR integrado e o bloqueio anteriores, e comprova
 deploy/QA/rollback. Limpeza deve retirar somente recursos próprios ociosos;
 nunca zerar o journal do efeito falho para permitir outra mutação.
 
+No ensaio com redes reservadas, a recuperação rejeitou um relatório contendo
+erro real de teste e confundiu o objetivo Red com Green. A correção limita a
+observação de fatos negativos ao diagnóstico e explicita a fase. A prova SDK
+offline completou erro → Lead/CTO → correção do autor → Red/freeze/Green/revisão,
+sem aprovação de erro ou dispensa de qualidade. A nova fronteira real deve
+conferir esse julgamento e a entrega; não reiniciar a tentativa preservada como
+se ela já tivesse produzido Red válido.
+
 **Saída:** Green → controles → revisão → PR/CI → integração → Docker → QA/rollback
 → `HOMOLOGADA`, com URL e evidências, sem intervenção técnica externa depois do
 aceite. Reparos externos tornam a tentativa assistida. Não substituir essa prova

@@ -51,6 +51,9 @@ artefatos; os agentes não recebem credenciais de infraestrutura nem socket Dock
 O journal de efeitos evita duplicar ações com confirmação incerta e não é um
 segundo gerenciador de tarefas.
 
+Diagnósticos podem observar relatórios com erros para orientar reparos; esses
+relatórios continuam impedindo aprovação em todos os gates de entrega.
+
 Entregas reais exigem as duas redes de homologação reservadas antes do despacho
 pago. O deploy usa essas redes como externas; não aloca sub-redes implicitamente.
 O preparo é explícito e não remove redes desconhecidas ou repete criações incertas.

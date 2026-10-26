@@ -50,6 +50,14 @@ class Diagnostic:
         result=dict(incident={**self.incident,'workspace':'/workspace'},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
+        result['phase_expectation']=(
+            'Tests author: product behavior is not implemented yet. Assertion failures are expected Red; test errors need author repair. '
+            'Do not require Green or start implementation before independent test freeze.'
+            if self.original['kind']=='tests' and not self.original['reviewing'] else
+            'Review the existing immutable handoff; do not reproduce Red or edit the author.'
+            if self.original['reviewing'] else
+            'Diagnose the current implementation/integration phase; preserve frozen tests and its existing delivery gates.')
+        result['experiment_semantics']='A complete diagnostic report may contain failures, errors or skips. These are evidence for guidance, not a delivery approval. Resume permits a fresh attempt in the same phase; it does not certify success.'
         if self.incident.get('control_refusal'):
             result['last_control_refusal']=control_refusal_context(self.store,self.q.project,self.original,
                 self.incident['control_refusal'],self.incident['snapshot'])

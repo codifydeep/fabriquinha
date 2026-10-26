@@ -33,6 +33,15 @@ reutilizá-las explicitamente. Redes vazias de relays encerrados foram retiradas
 com metadados arquivados; volumes, snapshots e outros projetos foram preservados.
 Outro ensaio deverá comprovar a entrega completa após essas pré-condições.
 
+A tentativa com redes reservadas passou pela revisão e correção do plano, mas
+QA encerrou sem handoff. O SPIKE seguinte encontrou um erro de teste além das
+assertions esperadas do Red. O diagnóstico rejeitava esse relatório negativo e
+o Lead manteve o bloqueio; nenhuma implementação ou entrega foi aprovada. Foi
+preservada e encerrada em 6.553/7.000 chamadas. A observação diagnóstica foi
+corrigida sem relaxar os gates de entrega: 278 testes do núcleo verdes e prova
+SDK/Docker de nove atividades/31 requisições locais até TDD revisado. Falta
+revalidar a equipe real e completar homologação.
+
 A [revisão da execução](EXECUTION-REVIEW-2026-10-25.md) é a referência atual para
 achados e próximos passos. O [plano de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md)
 continua sendo a estratégia aprovada. O [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)

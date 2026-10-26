@@ -373,6 +373,8 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                'Specify outcomes, owners and dependencies, not prewritten code or fabricated TDD evidence.' if sandbox.run.kind=='plan' else
                'Diagnose the recorded technical incident. Read immutable evidence; run diagnostic_validate for a real SPIKE. '
                'Use diagnostic_decide with concrete findings: lead may escalate to CTO; resume needs a real experiment. '
+               'Diagnostic failures/errors are observations, never delivery approval. Follow phase_expectation: a tests author needs valid Red, not Green; return test errors to that author. '
+               'Escalate an inconclusive technical diagnosis to CTO rather than demanding implementation before test freeze. '
                'Follow allowed_actions; preserve triage and expired effects, holding with a concrete repair action when resume is unavailable. '
                'Never edit the author, approve delivery, bypass tests or send technical choices to the CEO.'
                if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
