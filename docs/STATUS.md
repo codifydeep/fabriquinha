@@ -1,97 +1,79 @@
 # Status do projeto — 26 de outubro de 2026
 
-**Homologação assistida concluída; autonomia ponta a ponta ainda não qualificada.**
-O caminho atual usa Hermes + Kanban nativos e operações determinísticas. Multica
-e Temporal não participam dessa execução. O legado permanece preservado.
+**S4 técnico qualificado: primeira release completa sem intervenção técnica externa.**
+O caminho usa Hermes + Kanban nativos e operações determinísticas. Multica e
+Temporal não participam dessa execução. A autonomia geral, a distribuição e a
+retomada do Truco continuam pendentes.
 
 ## Evidência mais recente
 
-O [PR 58](https://github.com/codifydeep/descartavel2/pull/58) chegou a `HOMOLOGADA`
-no commit `122176a2e424ca6306b2aea41fa091287f98fd9e`. Foram comprovados os oito
-testes, controles negativos, revisão independente, CI local no SHA do PR e no
-commit integrado, implantação, rollback/restauração e QA AC1/AC2. Saúde e
-identidade HTTP foram conferidas novamente; a main do produto ficou inalterada.
-O mesmo bundle imutável foi referenciado até a aceitação final.
+O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) chegou a `HOMOLOGADA`
+no commit `5fef1cd40cb05bcaf60db1b42b450d19ca08f473`. O operador apenas aplicou a
+aprovação humana condicional do mesmo documento de negócio e observou a execução.
+Depois do aceite, a equipe conduziu o ciclo inteiro sem correções, orientação
+técnica externa ou reinício do controlador.
 
-A equipe recuperou autonomamente um handoff incompleto do frontend. A integração
-exigiu reparo externo de uma regressão da CI; portanto, **não conta como S4 sem
-intervenção**. As provas, diagnósticos e contadores anteriores foram preservados.
-O [PR 57](https://github.com/codifydeep/descartavel2/pull/57) já havia demonstrado a
-correção restrita de expectativa QA. O [ADR 0004](ADR-0004-SCOPED-REPAIR.md)
-continua delimitando essa autoridade; adições normais não usam essa exceção.
+Foram conferidos nove testes, seis falhas reais no Red, seis alvos de controles,
+revisões independentes, CI no SHA do PR e do merge, implantação, rollback e QA
+AC1/AC2. Saúde e identidade HTTP coincidiram com o commit integrado. Os dois
+testes de infraestrutura anteriores ficaram intactos e a main permaneceu
+inalterada. Não havia worker, claim, sandbox ou efeito pendente ao encerrar.
 
-## P2 — Validação e custos
+O runtime foi executado de uma exportação da revisão publicada, com 27 arquivos
+inalterados até o final. Jobs e aceitação usaram o mesmo bundle de validação.
+O [documento S4](HERMES-S4-QUALIFICATION.md) registra prova, autoria e limites.
+Reutilizar um brief completo não comprova descoberta autônoma de novos requisitos.
 
-O [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md) está implementado e qualificado:
+## Consumo e operação
 
-- Instalações novas capturam os scripts de validação num bundle imutável. Jobs,
-  grafo da release, aceitação e atividades de modelo referenciam esse pin.
-- O relay preserva custo, cache e raciocínio informados pelo provedor. O SDK
-  atribui consumo à atividade por recibo local; nenhum prompt é analisado para
-  essa finalidade. Dados ausentes continuam desconhecidos.
-- `runtime costs` lê o relatório autenticado sem inferência, alteração de
-  política, reset do contador ou remoção de pausa.
-- 306 testes do núcleo passaram. A prova física executou treze jobs
-  Docker/Chromium; o checkout foi alterado durante a fixture e os validadores
-  fixados continuaram sendo usados. Todos esses jobs foram aposentados.
-- Nove atividades SDK/11 respostas HTTP locais validaram atribuição, custos
-  sintéticos, autenticação e preservação de pausa financeira. Zero chamadas
-  pagas nessas provas; decisões programadas não qualificam autonomia.
+O ciclo usou **31 chamadas**, com **US$ 0,074938** reportados pelo provedor.
+Todas têm custo e atribuição de atividade resolvidos. O contador encerrou em
+**6.811/7.000**, com 189 chamadas restantes. Não houve aumento de teto ou fallback;
+seguem Haiku, 40 iterações por atividade, dois workers e saída máxima 16.384.
 
-O novo S4 submeteu o mesmo brief autorizado, obteve revisão do plano, Red/freeze,
-Green, controles e revisão da entrega. O frontend encerrou uma atividade sem
-handoff; Lead executou SPIKE e o controlador retomou a fase, que depois recebeu
-aprovação independente. Essa recuperação ocorreu sem intervenção externa.
+A entrega está preservada em Docker local. A execução concluída não tem cards
+pendentes nem gera chamadas ao modelo por mero polling. A outbox contém a entrega,
+mas Telegram real não está configurado: fila não comprova recebimento nesse canal.
 
-O PR 58 foi inicialmente bloqueado na integração: a CI confundiu adição de testes com alteração de testes preexistentes.
-Lead/CTO mantiveram o impedimento, sem aprovação fictícia. **Esse ensaio não
-qualifica S4 autônomo**, pois exigiu reparo externo do controlador. Após a correção,
-a integração foi retomada de forma assistida e homologada; o diagnóstico CTO e
-os contadores foram preservados.
+## Mecanismos qualificados
 
-A regressão foi reproduzida por teste antes da correção. A condição agora exige
-a exceção de revisão somente quando um teste antigo muda ou desaparece. Adições
-normais continuam passando pela revisão/freeze e pela suíte completa. As provas
-recusam adicionar um teste junto com alteração, remoção ou substituição de um
-antigo. A fixture executa agora a entrada real da CI com Git local nos dois
-caminhos: funcionalidade nova e correção QA revisada. Passou em treze jobs
-Docker/Chromium, sem modelo ou GitHub, retirando todos os jobs ao final.
+- O [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md) fixa scripts de validação em
+  snapshots imutáveis e contabiliza custo/cache/raciocínio sem estimar ausências.
+- 306 testes do núcleo e treze jobs Docker/Chromium qualificaram adição normal de
+  testes e correção restrita de expectativa QA, pela entrada real da CI com Git.
+- A orientação de recuperação referencia somente seu recibo. A prova nativa
+  percorreu nove atividades/29 respostas locais, com reinício e parecer completo;
+  comentários genuínos de PR continuam ativando a proteção contra duplicação.
+- As provas locais usaram decisões programadas e zero chamadas pagas; são
+  mecanismos, não julgamento autônomo. O S4 real é uma evidência separada.
 
-O contador real mais recente é **6.780/7.000**, com 220 chamadas restantes;
-modelo Claude Haiku, saída máxima 16.384 tokens e nenhum fallback. O ciclo novo
-usou 57 chamadas e registrou US$ 0,147579 em custos retornados pelo provedor.
-56 chamadas têm vínculo de atividade resolvido; uma permanece sem atribuição,
-com custo incluído no total e sem inferência por horário ou prosa.
-Esse valor não estima custos históricos ausentes nem substitui fatura. O relay
-está parado e não há workers, claims, sandboxes pendentes ou efeitos incertos.
-A retomada não acrescentou chamadas ao modelo. O ciclo concluído está em
-manutenção; sua homologação permanece disponível. Antes do próximo ciclo limpo,
-a formatação de comentários técnicos foi corrigida: diagnóstico referencia
-somente seu recibo, evitando que URLs incidentais acionem `active_pr`. A prova
-SDK/Kanban/Docker passou em nove atividades e 29 respostas locais, preservando
-a orientação integral, o reinício e o guard de PR genuíno. Não houve chamada paga.
+Os [PRs 57](https://github.com/codifydeep/descartavel2/pull/57) e
+[58](https://github.com/codifydeep/descartavel2/pull/58) permanecem homologações
+assistidas. As falhas e os reparos não foram apagados nem reclassificados. No
+ciclo do PR 58, 57 chamadas custaram US$ 0,147579 reportados; uma ficou sem vínculo
+explícito de atividade, com custo incluído no total. Ausência não foi tratada como
+zero nem atribuída por horário/prosa.
 
-## Evolução comprovada e próximas fronteiras
+## Próximas fronteiras
 
-| Marco | O que passou | O que falta |
+| Marco | Evidência | Pendência |
 |---|---|---|
-| S0/S1 | Referência e integração Hermes/Kanban; upstream sem patches | Não constitui entrega de produto |
-| S2/S3 | TDD, revisão, operações e recuperação delimitada em provas isoladas | Julgamento real completo continua separado das fixtures |
-| P1/P3 | Recuperação assistida até homologação pelo PR 57 | Não qualifica autonomia |
-| P2 | Bundle fixado até homologação; custos reais observados | Uma chamada sem vínculo explícito de atividade |
-| P4/S4 | Recuperação automática e homologação assistida do PR 58 | Brief aprovado → homologação sem intervenção técnica externa |
-| P5/S5 | Mecanismos parciais | Segunda versão, regressão, memória entre perfis e recuperação real |
-| P6/S6 | Preparação parcial | Instalação reproduzível em outro repo e corte do legado |
+| S0/S1 | Integração Hermes/Kanban; upstream sem patches | Não constitui entrega de produto |
+| S2/S3 | TDD, revisão, operações e recuperação delimitada em isolamento | Não equivale a julgamento real universal |
+| P1/P3 | Reparo até homologação assistida dos PRs 57/58 | História preservada; não é autonomia |
+| P2 | Bundle e custos reais conferidos até homologação | Atribuição completa de chamadas auxiliares não é garantida |
+| P4/S4 | PR 59: ciclo técnico completo sem intervenção externa | Escopo Python/HTTP e brief já aprovado |
+| P5/S5 | Ainda não qualificado | Segunda versão, dois pacotes dependentes, regressão e memória entre perfis |
+| P6/S6 | Preparação parcial | Instalação reproduzível em outro repo, canais e corte do legado |
 | P7/S7 | Não iniciado | Retomar Truco após qualificação |
 
-Não há promessa de recuperação universal ou ausência universal de starvation.
-Um bloqueio preservado com responsável é preferível a sucesso fictício; ele
-continua sendo uma pendência de entrega. A outbox foi qualificada localmente,
-mas não há transporte Telegram real configurado nesta instalação.
+O [plano S5](S5-CONTINUITY-PLAN.md) orienta o próximo trabalho. Não repetir outro
+ensaio genérico de saudação. Primeiro qualificar offline o Red de regressão já
+existente e a recuperação de decisões anteriores; depois uma segunda versão na
+mesma aplicação, com nova aprovação se o brief de negócio mudar.
 
-O [roadmap](ROADMAP.md) rege a sequência. As revisões de
+O [roadmap](ROADMAP.md) mantém o objetivo completo. As revisões de
 [24/10](SIMPLIFICATION-REVIEW-2026-10-24.md),
 [25/10](EXECUTION-REVIEW-2026-10-25.md) e
-[26/10](EXECUTION-REVIEW-2026-10-26.md) preservam a análise e os contratos.
-Versões anteriores deste status continuam no Git; não são ordens para reativar
-ensaios históricos nem evidências de qualificações ainda pendentes.
+[26/10](EXECUTION-REVIEW-2026-10-26.md) preservam sua análise histórica.
+Não há promessa de recuperação universal ou ausência universal de starvation.

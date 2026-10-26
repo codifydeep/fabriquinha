@@ -1,7 +1,7 @@
 # Documentação da Fabriquinha
 
-Referência: **26 de outubro de 2026**. Plataforma experimental; autonomia
-completa ainda não qualificada. Documentos públicos descrevem contratos,
+Referência: **26 de outubro de 2026**. Plataforma experimental; S4 técnico
+qualificado, autonomia geral e distribuição ainda não concluídas. Documentos públicos descrevem contratos,
 arquitetura, resultados agregados e limites. Instalações, transcrições, bancos,
 snapshots e recibos operacionais completos permanecem privados.
 
@@ -30,6 +30,7 @@ as correções offline não autorizam consumo adicional nem homologam o S4.
 | [S1](HERMES-S1-QUALIFICATION.md) | Kanban/dispatcher nativos e fronteira Docker |
 | [S2](HERMES-S2-QUALIFICATION.md) | Mecanismos Red, freeze, Green e controles |
 | [S3](HERMES-S3-QUALIFICATION.md) | Cadeia determinística de integração, deploy e QA |
+| [S4](HERMES-S4-QUALIFICATION.md) | Primeira entrega técnica por agentes reais, sem intervenção externa, com limites explícitos |
 | [Agentes](HERMES-AGENT-QUALIFICATION.md) | SDK, ferramentas e sessões |
 | [Runtime](HERMES-RUNTIME-QUALIFICATION.md) | Serviço, reinício e worker órfão |
 | [Recuperação](HERMES-RECOVERY-QUALIFICATION.md) | Diagnóstico Lead/CTO em cenários delimitados |

@@ -3,8 +3,8 @@
 Uma equipe de agentes para transformar um brief em software revisado, testado e
 entregue em homologação, com GitHub e infraestrutura própria.
 
-**Experimental. Autonomia ponta a ponta ainda não qualificada.** O caminho em
-validação usa **Hermes + Kanban nativos**, com operações determinísticas para
+**Experimental. Primeiro ciclo técnico completo sem intervenção externa qualificado.**
+O caminho em validação usa **Hermes + Kanban nativos**, com operações determinísticas para
 qualidade, publicação e implantação. Multica e Temporal não são dependências
 desse caminho. A instalação legada está preservada e pausada.
 
@@ -29,7 +29,8 @@ pausa humana ou dependência externa também não significa cancelamento.
 flowchart LR
     CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
     A[Admissão: imagens, disco e redes reservadas] --> K
-    K --> W[Agentes via SDK Hermes]
+    SRC[Revisão Git publicada e exportada] --> W[Agentes via SDK Hermes]
+    K --> W
     W --> S[Sandbox por atividade e deadline interno]
     S --> E[Snapshot e recibos imutáveis]
     E --> V[Validação fixa em Docker]
@@ -99,10 +100,12 @@ O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
 O [reparo mínimo](docs/ADR-0004-SCOPED-REPAIR.md) limita-se ao último pacote
 serializado e, para testes, à expectativa textual QA explicitamente autorizada.
 Não é replanejamento geral nem permissão para remover cobertura.
-O [PR 58](https://github.com/codifydeep/descartavel2/pull/58) completou homologação
-assistida, incluindo CI, implantação, rollback e QA. Houve correção externa do
-controlador durante a execução; portanto, ainda falta uma entrega completa
-**sem intervenção técnica externa**. Veja o [status](docs/STATUS.md).
+O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) completou a primeira
+entrega técnica sem intervenção externa: nove testes, controles, revisão,
+PR/CI, deploy, rollback e QA. O ensaio reutilizou explicitamente um brief já
+aprovado; não comprova descoberta de requisitos novos. Veja o
+[escopo da qualificação S4](docs/HERMES-S4-QUALIFICATION.md). Continuidade entre
+versões, distribuição e canais de comunicação ainda exigem validação.
 
 A [auditoria](docs/EXECUTION-REVIEW-2026-10-25.md) encontrou um gate de mutações
 incompatível com um teste auxiliar congelado. O [contrato 2 aprovado](docs/ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
@@ -178,15 +181,12 @@ sem estimar gasto ausente. Foi qualificado em treze jobs Docker/Chromium e nove
 atividades SDK com respostas locais, sem chamadas pagas. O comando `runtime
 costs` consulta o relay local autenticado e não libera pausas nem faz inferência.
 
-Um S4 novo chegou à revisão aprovada da implementação e recuperou sozinho um
-handoff incompleto. A integração foi bloqueada por uma regressão do controlador
-que confundia testes adicionados com testes antigos alterados. A correção passou
-na CI real da fixture e no SHA exato do PR 58, que depois foi homologado de forma
-assistida. Esse ensaio permanece sem qualificação de autonomia.
-
-Faltam S4 sem intervenção, uma segunda versão com regressão/memória/recuperação
-e uma instalação em outro repositório. O [roadmap](docs/ROADMAP.md) separa essas
-qualificações da homologação assistida já demonstrada.
+O [S4](docs/HERMES-S4-QUALIFICATION.md) foi concluído sem correção externa do
+controlador ou dos artefatos após o aceite do brief. Foram 31 chamadas e
+US$ 0,074938 reportados. Os PRs 57/58 permanecem assistidos. Falta a segunda
+versão com regressão/memória/recuperação e uma instalação reproduzível em outro
+repositório. Telegram real ainda não está configurado nesta fronteira.
+Veja o [roadmap](docs/ROADMAP.md).
 
 ## Retirada de recursos de teste
 

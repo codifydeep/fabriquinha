@@ -2,8 +2,10 @@
 
 **Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57. O PR 58 também chegou
 à homologação assistida após recuperar um handoff e corrigir a regressão CI.
-P2 foi qualificado offline sob o [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md);
-o próximo trabalho é P4/S4 limpo. A prova assistida não será reclassificada como autonomia.
+P2 foi qualificado sob o [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
+P4/S4 chegou à primeira homologação técnica sem intervenção externa pelo PR 59;
+veja o [escopo e as evidências](HERMES-S4-QUALIFICATION.md). O próximo trabalho é
+P5/S5; não repetir outro S4 genérico. Os ensaios assistidos não foram reclassificados.
 As cotas e o modelo existentes continuam limitando o consumo.
 
 A estratégia aprovada continua [Hermes + Kanban](SIMPLIFICATION-REVIEW-2026-10-24.md).
@@ -25,10 +27,10 @@ O [status](STATUS.md) registra o resultado real mais recente.
 
 O PR 56 foi implantado com rollback/restauração, mas o QA congelado falhou.
 O PR 57 corrigiu a divergência por revisão técnica do contrato QA e chegou à
-homologação assistida. **S4 sem intervenção não está concluído.**
+homologação assistida. O PR 59 qualificou o S4 técnico sem intervenção.
 S5, S6 e S7 permanecem não qualificados.
 
-## Próxima sequência proposta
+## Marcos e sequência de execução
 
 ### P0 — Refinamento de contrato aceito
 
@@ -87,10 +89,17 @@ o recibo durável. A prova nativa recupera a orientação integral e a retomada 
 reinício, enquanto PR genuíno continua guardado. Executar a próxima fronteira a
 partir de uma exportação da revisão publicada, evitando imports do checkout mutável.
 
+**Qualificado:** PR 59, nove testes, seis controles, CI no PR/merge, deploy,
+rollback e QA. Os 27 arquivos exportados do runtime ficaram intactos; zero
+reinícios/intervenções técnicas. O brief anterior foi reutilizado com autorização
+condicional exata; isso não qualifica descoberta de produto nova.
+
 **Saída:** uma homologação completa sem intervenção técnica externa. Não repetir
 brief/planejamento a cada ajuste operacional apenas para investigar outra fase.
 
 ### P5 / S5 — Continuidade, regressão, memória e recuperação
+
+Executar o [plano S5](S5-CONTINUITY-PLAN.md), preservando a entrega S4.
 
 Segunda versão na mesma aplicação, dois cards dependentes, outro perfil usando
 uma decisão versionada e pelo menos uma falha recuperada pela própria equipe.

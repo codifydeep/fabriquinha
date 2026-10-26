@@ -18,10 +18,10 @@ com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
 as rotas de fixture expiram e não devem ser reutilizadas como produção. Provedores
 reais exigem política privada explicitamente habilitada e limite de consumo.
 Instalações históricas não são entradas de reprodução. A recuperação do PR 57
-chegou à homologação assistida. Um S4 posterior recuperou automaticamente um
-handoff, ficou bloqueado na CI por uma regressão do controlador e foi homologado
-após correção assistida pelo PR 58; essa fronteira continua não qualificada para
-autonomia. Consulte o status atual antes de ativar
+chegou à homologação assistida. O PR 58 também foi homologado após correção
+externa da CI. O [S4 seguinte](HERMES-S4-QUALIFICATION.md), PR 59, completou o ciclo
+técnico sem intervenção externa; isso ainda não qualifica o instalador para terceiros.
+Consulte o status atual antes de ativar
 serviços e não reutilize sessões ou evidências históricas para fabricar uma nova
 qualificação. A auditoria sozinha não autoriza ativação.
 O [diagnóstico técnico](HERMES-RECOVERY-QUALIFICATION.md) acrescenta configuração
@@ -77,7 +77,8 @@ necessário para os mounts, o agrupamento Docker e a receita de build:
 ```bash
 fabriquinha_revision=$(git rev-parse HEAD)
 git archive --format=tar --output <privado>/runtime.tar "$fabriquinha_revision" \
-  src team-delivery-kit/docker_grouping.py Dockerfile.web scripts/hermes_s1_worker.py
+  src team-delivery-kit/docker_grouping.py Dockerfile.web scripts/hermes_s1_worker.py \
+  examples/python-http/compose.provider.yml LICENSE THIRD_PARTY_NOTICES.md
 tar -xf <privado>/runtime.tar -C <privado>/runtime-source
 ```
 
