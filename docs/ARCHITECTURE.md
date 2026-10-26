@@ -13,7 +13,8 @@ alvos de controle vêm do Red e de riscos adicionais congelados pelo revisor;
 testes auxiliares permanecem na suíte completa. A recuperação ainda não cobre
 todas as fases. O [ADR 0004](ADR-0004-SCOPED-REPAIR.md) autoriza o reparo mínimo:
 um pacote corretivo no mesmo Kanban, preservando plano, grafo e falhas anteriores.
-Sua prova isolada não qualifica autonomia; a tentativa preservada será assistida.
+Sua prova isolada não qualifica autonomia; a tentativa preservada foi homologada
+como recuperação assistida pelo PR 57. O S4 limpo continua pendente.
 
 ## Caminho Hermes isolado em construção
 

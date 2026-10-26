@@ -2,7 +2,8 @@
 
 Estado: **aceito pelo proprietário em 26/10/2026** ao aprovar os refinamentos e
 o plano da [auditoria](EXECUTION-REVIEW-2026-10-26.md). Não aprova retroativamente
-o PR 56, seus testes ou QA. A recuperação dessa tentativa será assistida.
+o PR 56, seus testes ou QA. A recuperação dessa tentativa foi assistida e homologada pelo PR 57; não qualifica
+autonomia sem intervenção.
 
 ## Decisão
 

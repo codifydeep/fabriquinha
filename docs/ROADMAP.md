@@ -2,6 +2,8 @@
 
 **Retomada e refinamentos aprovados em 26/10/2026.** O trabalho atual é P1,
 o reparo mínimo da mesma release, sob o [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
+P1/P3 agora têm recuperação assistida homologada pelo PR 57; P2 e o S4 limpo
+continuam pendentes. A prova assistida não será reclassificada como autonomia.
 As cotas e o modelo existentes continuam limitando o consumo.
 
 A estratégia aprovada continua [Hermes + Kanban](SIMPLIFICATION-REVIEW-2026-10-24.md).
@@ -22,8 +24,8 @@ O [status](STATUS.md) registra o resultado real mais recente.
   Docker/Chromium qualificados. Zero chamadas pagas nessa prova específica.
 
 O PR 56 foi implantado com rollback/restauração, mas o QA congelado falhou.
-**S4 não está concluído.** A divergência entre brief, testes Python e contrato
-JSON deve ser classificada antes de presumir defeito de implementação.
+O PR 57 corrigiu a divergência por revisão técnica do contrato QA e chegou à
+homologação assistida. **S4 sem intervenção não está concluído.**
 S5, S6 e S7 permanecem não qualificados.
 
 ## Próxima sequência proposta

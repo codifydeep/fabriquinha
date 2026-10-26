@@ -1,5 +1,30 @@
 # Status do projeto — 26 de outubro de 2026
 
+**Resultado atual: recuperação assistida concluída e release `HOMOLOGADA`.**
+O [PR 57](https://github.com/codifydeep/descartavel2/pull/57) foi integrado no commit
+`c19934d3850456f0eb48bad95948241f50591c94`. CI local no SHA final, suíte completa,
+controles negativos, revisão independente, implantação, rollback/restauração e QA
+AC1/AC2 passaram. Saúde e identidade do ambiente foram conferidas novamente.
+O único arquivo alterado em relação ao PR 56 é o contrato QA; código do produto
+e testes Python permaneceram intactos. A main do produto permaneceu inalterada.
+
+A equipe executou os handoffs e recebeu/corrigiu solicitações de revisão.
+O operador corrigiu o controlador durante o ensaio; portanto, **isto não qualifica
+S4 sem intervenção nem autonomia completa**. As tentativas em triagem não foram
+zeradas, concluídas artificialmente ou apagadas. A aceitação usa o pacote corretivo
+vigente e preserva os anteriores como história.
+
+Ao final: contador **6.723/7.000**, 277 chamadas restantes; sem workers, claims,
+sandboxes não aposentados ou efeitos pendentes. Controlador e relay continuam
+ativos, ociosos, sem novas chamadas ao modelo por mero polling. Modelo continua
+Claude Haiku, sem fallback. O núcleo passou em **292 testes** e a prova focada em
+dez jobs Docker/Chromium; decisões dessa fixture foram programadas.
+
+**Próximo marco:** estabilizar bundle/métricas de custo (P2) e executar S4 limpo,
+com protocolo fixado e zero intervenção técnica após aprovação do brief. Depois,
+segunda versão com regressão/recuperação e instalação reproduzível. Os parágrafos
+abaixo preservam a evolução e os limites anteriores, não uma ordem de reativá-los.
+
 **Caminho atual:** Hermes + Kanban nativos e executor determinístico. Multica e
 Temporal não participam do caminho novo; a instalação legada permanece pausada.
 
@@ -32,7 +57,7 @@ não alterou código, gates, modelo, orçamento ou pausa. Nos quatro últimos en
 autônoma. Custo efetivo em dólares não está registrado. O [roadmap](ROADMAP.md)
 separa a sequência proposta das qualificações já realizadas.
 
-**Estado mais recente:** o [PR 56](https://github.com/codifydeep/descartavel2/pull/56)
+**Resultado anterior ao reparo:** o [PR 56](https://github.com/codifydeep/descartavel2/pull/56)
 foi integrado e implantado, com CI e rollback/restauração. QA recusou o texto
 visível, diferente do contrato congelado. Não houve `HOMOLOGADA`. Dispatcher e
 relay estão desligados; a implantação e todas as evidências permanecem preservadas.
@@ -253,4 +278,5 @@ Com o handoff corrigido, a equipe completou a revisão independente dos testes
 e avançou automaticamente à implementação e à revisão da entrega. Nenhum arquivo
 de produto foi corrigido pelo operador. Os controles negativos foram executados
 novamente; a passagem de etapa não reutilizou sua aprovação histórica.
-A validação final de PR/CI/deploy/QA continua necessária.
+Naquela observação, PR/CI/deploy/QA ainda estavam pendentes; o resultado final
+está registrado no topo deste documento.
