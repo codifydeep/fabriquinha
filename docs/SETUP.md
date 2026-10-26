@@ -68,6 +68,28 @@ não inicia o serviço, faz chamadas ao modelo nem arquiva pausas financeiras.
 Custos ausentes não são zero, e contadores históricos sem atribuição continuam
 visíveis. Veja os campos e os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
 
+### Revisão de execução isolada do checkout
+
+Para uma fronteira de qualificação, o operador pode exportar a revisão publicada
+já testada para um diretório privado vazio. Manter a estrutura relativa é
+necessário para os mounts, o agrupamento Docker e a receita de build:
+
+```bash
+fabriquinha_revision=$(git rev-parse HEAD)
+git archive --format=tar --output <privado>/runtime.tar "$fabriquinha_revision" \
+  src team-delivery-kit/docker_grouping.py Dockerfile.web scripts/hermes_s1_worker.py
+tar -xf <privado>/runtime.tar -C <privado>/runtime-source
+```
+
+O diretório de destino deve existir e estar vazio. Registrar revisão e hashes dos
+arquivos, remover o tar após conferir a extração e usar exclusivamente
+`PYTHONPATH=<privado>/runtime-source/src` no serviço e nas consultas desse ciclo.
+O Python do SDK e o checkout upstream continuam explicitamente fixados. Não
+copiar homes, chaves, bancos ou configurações de uma instalação antiga. A cópia
+não recebe edições em voo; uma correção exige manutenção e outra qualificação.
+Isso isola o código executado sem outro serviço ou banco. Não substitui o pin de
+validadores nem qualifica, por si só, o instalador e upgrades de S6.
+
 **As seções numeradas abaixo preservam procedimentos do legado.** Os comandos
 Multica, port2 e da ponte de revisão não são a instalação do caminho Hermes.
 Para testes offline atuais, use os comandos do [README](../README.md).

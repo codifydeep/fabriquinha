@@ -82,9 +82,10 @@ CEO aprova uma vez; equipe conduz testes, revisão, implementação, PR, CI, dep
 QA. O operador observa. Reparo externo invalida a qualificação de autonomia daquela
 execução, mas não apaga seu valor como evidência assistida.
 
-Antes do novo ciclo: comentários de diagnóstico devem referenciar o recibo
-durável, em vez de copiar a prosa integral que pode conter URLs e acionar
-heurísticas nativas de PR. Qualificar a retomada sem desativar esses guards.
+Qualificado antes do novo ciclo: comentários de diagnóstico referenciam somente
+o recibo durável. A prova nativa recupera a orientação integral e a retomada após
+reinício, enquanto PR genuíno continua guardado. Executar a próxima fronteira a
+partir de uma exportação da revisão publicada, evitando imports do checkout mutável.
 
 **Saída:** uma homologação completa sem intervenção técnica externa. Não repetir
 brief/planejamento a cada ajuste operacional apenas para investigar outra fase.

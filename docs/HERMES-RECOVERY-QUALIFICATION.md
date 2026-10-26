@@ -1,6 +1,6 @@
 # Diagnóstico técnico executável pelo Kanban
 
-Atualizado em 25/10/2026. Continuação do [serviço nativo](HERMES-RUNTIME-QUALIFICATION.md)
+Atualizado em 26/10/2026. Continuação do [serviço nativo](HERMES-RUNTIME-QUALIFICATION.md)
 e do [plano aprovado](SIMPLIFICATION-REVIEW-2026-10-24.md).
 
 **Passou em ambiente isolado:** um bloqueio de protocolo criou cards nativos de
@@ -8,6 +8,14 @@ diagnóstico, houve escalonamento Tech Lead → CTO, SPIKE real em Docker, orien
 ao autor e nova passagem pelos gates TDD. Foram nove runs e 27 respostas HTTP
 locais programadas. Zero chamadas pagas, GitHub real, migração ou homologação.
 Isso qualifica o mecanismo, não o raciocínio de um modelo real.
+
+A revalidação `--pr-in-guidance` reproduziu primeiro o bloqueio `active_pr`
+causado por uma URL incidental na orientação. Com a correção, passou em nove
+atividades e 29 respostas locais: o comentário contém somente `DIAG <recibo>`,
+o autor recebe o parecer completo pelo recibo, reiniciar não duplica a retomada
+e um comentário genuíno de PR em outro card continua ativando o guard. Nenhum
+patch ou desligamento do guard upstream foi necessário. O card negativo fica
+explicitamente bloqueado e não conta como entrega. Zero chamadas pagas.
 
 ## Fluxo implementado
 

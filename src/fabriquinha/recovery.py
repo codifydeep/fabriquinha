@@ -448,7 +448,9 @@ class Recovery:
             if (incident['binding']['kind'] in ('tests','implementation') and not incident['binding']['reviewing']
                     and self.store.capture(Path(target.workspace_path))!=source['snapshot']):
                 raise EffectBlocked('source workspace changed after the diagnostic snapshot')
-        guidance='DIAG '+receipt_id+' '+json.dumps(data['verdict'],sort_keys=True)
+        # Full guidance is resolved from the receipt. Copying model prose here
+        # can turn an incidental PR URL into a native duplicate-work guard.
+        guidance='DIAG '+receipt_id
         def comment_observed():
             row=conn.execute('SELECT id FROM task_comments WHERE task_id=? AND author=? AND body=?',
                 (source['source'],task.assignee,guidance)).fetchone()

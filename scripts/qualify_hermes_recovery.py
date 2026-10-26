@@ -25,7 +25,7 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False):
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False,pr_in_guidance=False):
     if sum((review_escalation,control_refusal,invalid_red))>1 or (invalid_red or terminal_deadline) and provider_error:
         raise ValueError('choose one independent recovery scenario')
     source,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-recovery')
@@ -41,6 +41,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
     control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[];negative_reports=[]
     terminal_cids=[];terminal_verified=[]
+    reference='https://github.com/example/qualification/pull/58';guidance_seen=[]
     deadline_probe='''python - <<'PY'
 import signal, subprocess, sys, time
 from pathlib import Path
@@ -174,6 +175,11 @@ print(json.dumps(rows))'''
                         assert visible['last_suite_refusal']['requires_fresh_validation']
                 if terminal_deadline and run.number==1:
                     sequence.insert(3,('terminal',dict(command=deadline_probe,timeout=6)))
+                if pr_in_guidance and run.kind=='diagnostic' and run.actor=='flow-cto':
+                    sequence[-1][1]['reason']+=' Reference: '+reference
+                if pr_in_guidance and run.task==source and not run.reviewing and run.number>1:
+                    assert reference in str(body['messages']),'full guidance must be resolved from the immutable receipt'
+                    guidance_seen.append(run.number)
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
             if invalid_red and run.kind=='diagnostic':
@@ -250,6 +256,12 @@ print(json.dumps(rows))'''
         first=time.monotonic();reported=False;unattended=None
         while not predicate():
             if process.poll() is not None:raise RuntimeError('continuous service failed; inspect private log')
+            if pr_in_guidance:
+                with kbc.connect_closing() as conn:
+                    current=kb.get_task(conn,source)
+                    if current.status=='ready':
+                        from hermes_cli.kanban_db_dispatch import check_respawn_guard
+                        assert check_respawn_guard(conn,source,lane='ready')!='active_pr','diagnostic prose incorrectly activated the duplicate-PR guard'
             status_path=root/'status.json'
             if status_path.is_file():
                 status=json.loads(status_path.read_bytes())['board']
@@ -342,6 +354,18 @@ print(json.dumps(rows))'''
             proof.update(real_browser_started_before_deadline=True,detached_sigterm_ignoring_child_reaped=True,
                 host_docker_client_timeout_did_not_leave_descendants=True,independent_sibling_exec_preserved=True)
         proof.update(diagnosed_retry_did_not_reuse_failed_final_prose=True)
+        if pr_in_guidance:
+            assert guidance_seen
+            with kbc.connect_closing() as conn:
+                comments=conn.execute("SELECT body FROM task_comments WHERE task_id=? AND body LIKE 'DIAG %'",(source,)).fetchall()
+                assert comments and all(reference not in row['body'] for row in comments)
+                # A genuine PR comment on an unrelated fixture card still guards.
+                negative=kb.create_task(conn,title='Duplicate-PR guard negative control',assignee='flow-author',completion_contract='local-only')
+                kb.add_comment(conn,negative,'fixture','Existing PR: '+reference)
+                from hermes_cli.kanban_db_dispatch import check_respawn_guard
+                assert check_respawn_guard(conn,negative,lane='ready')=='active_pr'
+                kb.block_task(conn,negative,reason='Intentional duplicate-PR negative control; never delivery approval')
+            proof.update(guidance_reference_only=True,full_guidance_from_receipt=True,native_duplicate_pr_guard_preserved=True)
         if control_refusal:
             assert len(control_failed)==1 and len(control_seen)==2
             failed=next(r for r in runs if r['id']==control_failed[0])
@@ -393,10 +417,11 @@ if __name__=='__main__':
     scenario.add_argument('--invalid-red',action='store_true',help='Observe test errors in diagnosis, then require author repair and genuine Red/review/Green')
     parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
     parser.add_argument('--terminal-deadline',action='store_true',help='Qualify actual browser/detached-child retirement after host exec client timeout')
+    parser.add_argument('--pr-in-guidance',action='store_true')
     args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
     try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
-        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline)
+        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline,pr_in_guidance=args.pr_in_guidance)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

@@ -66,9 +66,10 @@ Esse valor não estima custos históricos ausentes nem substitui fatura. O relay
 está parado e não há workers, claims, sandboxes pendentes ou efeitos incertos.
 A retomada não acrescentou chamadas ao modelo. O ciclo concluído está em
 manutenção; sua homologação permanece disponível. Antes do próximo ciclo limpo,
-rever a formatação de comentários técnicos: URLs de PR em prosa administrativa
-podem acionar o guard nativo `active_pr`. Referências de recibos preservam a
-evidência sem duplicar dados ou desabilitar esse guard.
+a formatação de comentários técnicos foi corrigida: diagnóstico referencia
+somente seu recibo, evitando que URLs incidentais acionem `active_pr`. A prova
+SDK/Kanban/Docker passou em nove atividades e 29 respostas locais, preservando
+a orientação integral, o reinício e o guard de PR genuíno. Não houve chamada paga.
 
 ## Evolução comprovada e próximas fronteiras
 
