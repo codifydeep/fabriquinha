@@ -36,7 +36,9 @@ aplicou essa decisão. A instalação não desbloqueou o card diretamente.
 
 ## Consumo e operação
 
-O contador encerrou em **6.951/7.000**, com 49 chamadas restantes. Na janela
+O S5 encerrou em **6.951/7.000**, com 49 chamadas restantes. Para S6, o proprietário
+autorizou elevar o teto específico para **7.064**, sem reset do contador.
+Na janela
 após S4 houve 140 chamadas: 125 atribuídas por recibo a S5 e 15 sem vínculo
 comprovado. O custo total reportado nessa janela foi **US$ 0,4845305**, incluindo
 US$ 0,0633779 dessas chamadas sem atribuição. Não houve reset, desconto ou
@@ -61,7 +63,7 @@ nem medem a autonomia por porcentagem de testes verdes.
 | P2 | Bundle fixado e custo reportado contabilizado | Atribuição auxiliar integral ainda não garantida |
 | P4/S4 | PR 59 sem intervenção técnica após o aceite | Stack Python/HTTP e brief reutilizado por autorização |
 | P5/S5 | Segunda homologação, memória e recuperação reais | Sete intervenções; ainda não é um ciclo inteiro limpo |
-| P6/S6 | Fonte/operação, imagens públicas ARM64, nove perfis e oito atividades SDK; redes explícitas com doctor pronto e retirada isolada | Bootstrap autorizado, ativação conjunta, canais, upgrade/restauração e entrega em outro repo |
+| P6/S6 | Nova instalação pública, GitHub vinculado, bootstrap autorizado e relay/SDK ativados com atribuição por atividade | Brief aguardando aceite; canais, recuperação em execução e entrega em outro repo |
 | P7/S7 | Não iniciado | Retomar Truco após qualificação da plataforma |
 
 O [S4 original](HERMES-S4-QUALIFICATION.md) permanece como prova independente:
@@ -79,8 +81,9 @@ receita pública do navegador passou em quatro jobs TDD e um probe QA real no UI
 O preparo público validou nove perfis e o SDK recusou last-known-good como
 configuração atual válida. Um perfil divergente não impediu outro de ser admitido
 no Kanban. O contrato também atravessou oito atividades SDK reais com respostas
-locais, TDD e pausa/reinício. Falta integrar esses passos na qualificação da
-instalação limpa, sem copiar os bancos ou sessões anteriores.
+locais, TDD e pausa/reinício. A instalação limpa agora usa clone público novo,
+upstream sem patches, ambiente SDK novo e board/sessões novos. A entrega completa
+por essa entrada continua em qualificação.
 
 O preparo limpo revelou que o login GitHub do shell não era a identidade do
 perfil nativo. O vínculo explícito do diretório GitHub do controlador foi
@@ -91,13 +94,30 @@ chamadas ao modelo. O `doctor` agora informa ausência ou divergência desse
 vínculo. Isso qualifica autenticação para consultas, não PR/merge ou entrega
 autônoma no novo repositório.
 
+A base descartável aprovada foi publicada somente em uma nova branch de
+`codifydeep/descartavel`, com CI local obrigatória. Main e sua proteção foram
+conferidas intactas. A ativação conjunta do novo SDK e relay preservou volumes,
+chave, medidor e homologação anterior; o serviço antigo ficou parado para
+rollback. O backup foi extraído em isolamento, passou na integridade SQLite e
+na leitura nativa dos cards e da pausa. Nenhum serviço foi iniciado nessa cópia;
+isso não qualifica ainda recuperação de trabalho em andamento.
+
+Produto já apresentou e corrigiu o brief da fatia de lobby para dois navegadores.
+O texto inicial continha uma exceção de testes incompatível com a governança;
+foi devolvido por revisão do operador antes do aceite e corrigido pelo próprio
+Produto. Essa intervenção fica registrada. Nenhum brief ou código de produto
+foi editado manualmente. O marco aguarda aprovação explícita do escopo pelo CEO;
+não há entrega de produto S6 aprovada nem alegação de autonomia completa.
+
 O [reparo de atribuição auxiliar](ADR-0005-VALIDATION-AND-ACCOUNTING.md) passou
 no compressor real/relay com respostas simuladas e na recuperação nativa, sem
-chamadas pagas. Preservar as 15 chamadas sem origem comprovada e validar a
-ativação coordenada do SDK/relay. Depois, qualificar a instalação pública de S6 em outro
-repositório, com status, pausa/retomada, upgrade/rollback, canais e propriedade
-dos recursos. O próximo ciclo pago precisa de fonte congelada, objetivo próprio
-de qualificação e cota suficiente. Não repetir outra saudação genérica nem
+chamadas pagas. A ativação conjunta já reconhece `path-v1`; as primeiras chamadas
+reais de Produto no S6 foram atribuídas às execuções e tiveram custos reportados.
+Isso não reatribui as 15 chamadas históricas sem origem comprovada nem comprova
+compressão real neste ciclo. Continuar a qualificação da instalação pública em
+outro repositório, com status, pausa/retomada, upgrade/rollback, canais e
+propriedade dos recursos. O ciclo usa fonte congelada, objetivo próprio e limite
+autorizado. Não repetir outra saudação genérica nem
 resetar o board para ocultar falhas.
 
 O [plano S6](S6-PORTABILITY-PLAN.md), o [roadmap](ROADMAP.md) e o [resultado S5](HERMES-S5-QUALIFICATION.md) orientam a

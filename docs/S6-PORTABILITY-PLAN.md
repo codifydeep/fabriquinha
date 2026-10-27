@@ -24,8 +24,10 @@ relay existente. Não adicionar orquestradores, filas ou bancos paralelos.
 | S6.6 — Upgrade e corte | Atualizar/reverter o código com preservação de estado e retirar serviços legados sem uso | Backup restaurado em isolamento, mesma cota e dados, proteção de leases, volumes/rollback retidos e nenhuma dependência operacional do legado |
 
 S6.1 tem implementação e provas locais preparadas no
-[ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md), mas falta ativação conjunta e
-qualificação do novo caminho real. Um relay antigo deve bloquear o novo SDK no
+[ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md). A ativação conjunta foi feita
+na nova instalação, e as primeiras chamadas reais de Produto têm escopo e custo
+vinculados. Compressão no novo ciclo e entrega completa ainda não estão
+qualificadas. Um relay antigo deve bloquear o novo SDK no
 preflight, sem consumir chamadas. Não iniciar paid dispatch para descobrir uma
 incompatibilidade já observável por metadados.
 
@@ -83,11 +85,16 @@ não criou worker. Em outra prova, o contrato acompanhou oito atividades SDK rea
 reinício, perfil revisor ausente e retomada. Nenhuma chamada paga, alteração GitHub
 ou homologação de produto. A suíte do núcleo chegou a 371 testes, também com `-S`.
 
-1. Preparar uma raiz nova usando os comandos públicos e a mesma fonte no SDK e
-   relay. Qualificar operação/restauração e reservar o ciclo real antes de ativar
-   consumo. Não mudar a fonte instalada do S5 apenas para atualizar documentação.
-2. Verificar provisionamento de redes, estado/credenciais externos e comandos de
-   bootstrap no outro repositório autorizado, sem dependência de bancos históricos.
+1. **Preparado:** raiz nova por fonte pública congelada, SDK/upstream novos,
+   perfis e redes explícitos, sem copiar bancos ou sessões para a execução nova.
+2. **Preparado:** bootstrap aprovado e protegido no outro repositório, identidade
+   GitHub explícita e relay/SDK ativados conjuntamente. Backup, integridade e
+   leitura nativa da cópia restaurada passaram, sem iniciar serviços nela.
+3. **Em andamento:** brief do lobby com dois incrementos dependentes, apresentado
+   por Produto e aguardando aceite de negócio. Uma devolução do operador antes
+   do aceite corrigiu a exceção indevida de testes; não é uma prova sem intervenção.
+4. **Pendente:** ciclo real após o aceite, recuperação em execução, canal real,
+   upgrade/rollback e instruções suficientes para uma reprodução externa.
 
 **Identidade GitHub verificada:** o preparo com upstream e ambiente SDK públicos
 novos revelou a ausência de autenticação no perfil de integração, apesar do
@@ -110,11 +117,11 @@ redes por comandos públicos, verificou IDs estáveis e `doctor` pronto, renderi
 o Compose central e retirou somente as duas redes vazias por IDs exatos. Nenhum
 relay/worker/modelo foi iniciado nessa prova.
 
-O repositório autorizado `descartavel` ainda tem código e testes da calculadora
-anterior. O bootstrap agora oferece prévia local e exige aceite do SHA quando
-substitui arquivos de baseline; não presume que testes antigos possam ser
-retirados por ser um repo descartável. O próximo preparo deve mostrar essa
-proposta concreta ao proprietário antes de qualquer reset na branch nova.
+O repositório autorizado `descartavel` mantém na main o código e os testes da
+calculadora anterior. A prévia e o SHA exato foram aprovados pelo proprietário
+somente para a base de uma nova branch; o bootstrap conferiu main e sua proteção
+inalteradas após a publicação. O comando exige esse aceite quando substitui
+arquivos de baseline; não presume autorização por ser um repo descartável.
 
 ## Decisões para a execução
 
@@ -145,7 +152,8 @@ operar e recuperar a equipe e entregar pela mesma entrada. Uma prova programada
 com transporte falso não substitui essa entrega real. A aprovação técnica do
 instalador também não dispensa os gates do produto ou a aprovação de negócio.
 
-A instalação de referência encerrou S5 em 6.951/7.000 chamadas: restam 49.
+O checkpoint S5 foi 6.951/7.000 chamadas. O proprietário autorizou 7.064 para S6,
+preservando contador e histórico; o teto global continua 10.000.
 Esses valores são um checkpoint, não uma autorização para novas instalações ou
 um limite de dólares. Reservar o orçamento do ciclo antes da ativação; se não
 couber, continuar offline e pedir a autorização específica necessária.

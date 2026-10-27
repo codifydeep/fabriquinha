@@ -38,6 +38,7 @@ flowchart LR
     VB[Bundle imutável da instalação] --> V
     V --> K
     K --> G[PR e CI local no GitHub]
+    GI[Conta GitHub do controlador: vínculo explícito por perfil] --> G
     G --> D[Compose local e QA]
     D --> H[Gate de homologação]
     H --> K
@@ -182,7 +183,7 @@ já passou em probes TDD/QA sobre Linux ARM64; o instalador completo continua em
 
 ## Situação das validações
 
-Em 27/10/2026, o núcleo passou em 378 testes (Python 3.14.10), também sem
+Em 27/10/2026, o núcleo passou em 386 testes (Python 3.14.10), também sem
 `site-packages`. A [entrada operacional de S6](docs/S6-PORTABILITY-PLAN.md)
 passou em clone/board novos, sob pausa, com fonte verificada e lock exclusivo;
 isso ainda não é uma instalação completa ou nova entrega de produto.
