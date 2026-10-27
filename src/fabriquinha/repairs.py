@@ -95,6 +95,9 @@ class RepairTools(DraftTools):
         result=super().evidence();context=self.a.store.receipt(self.body()['repair_context'],kind='repair_context')
         if context['binding']['release']!=self.run.release:raise ValueError('foreign corrective context')
         result.update(repair=context_view(self.a.store,context['payload']),contract='Classify the actual QA failure against the approved brief. Submit only classification, reason and test_paths using repair_submit. No new brief or release plan. Product corrections preserve tests; technical corrections may revise only expected text in explicitly listed QA files. Infrastructure/scope classifications are explicit holds, never permission to alter product or business scope. Review independently; never remove coverage.')
+        from .executor import browser_contract
+        if browser_contract(self.a.project,self.a.store)==2:
+            result['contract']='Classify actual failure against the brief. Product repair preserves frozen Python tests and manifests. Technical revision of frozen Python acceptance is not qualified: report this controller capability as an infrastructure hold with the CTO as technical owner and no test_paths. Do not retry the same unsupported operation or ask the CEO to debug it. Business changes or removal of coverage require scoped CEO approval. New candidate tests may be corrected before independent freeze.'
         return result
 
     def submit(self,args):

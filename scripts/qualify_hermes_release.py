@@ -122,7 +122,7 @@ class FixtureRuntime(Runtime):
         with patch('fabriquinha.runtime.subprocess.Popen',spawn):return super().spawn(*args,**kwargs)
 
 
-def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None):
+def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None,acceptance_suite=False):
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -137,15 +137,27 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
     write_json(root/'project.json',dict(version=1,namespace=namespace,
         repository='https://github.com/example/release-qualification',branch='release/qualification',
         validation_image=image,browser_image=browser,tests_dir='tests',qualification=True,
+        **({'browser_tdd':True} if acceptance_suite else {}),
         coordination_roles={'product':'release-product','lead':'release-lead'},
         technical_roles={'lead':'release-lead','cto':'release-cto'},
         delivery_roles={'tests':'release-tests','integration':'release-devops'},
         reviewers={'release-tests':'release-lead','release-author':'release-lead','release-lead':'release-cto','release-devops':'release-tests'}))
     runtime=FixtureRuntime(root,upstream)
+    if acceptance_suite:
+        pause=runtime.control.pause()
+        old=json.loads((root/'installation.json').read_bytes())['validation_bundle']
+        runtime.configure_acceptance(old)
+        with runtime.control.lock():runtime.control.resume(pause['episode'])
     if network_pool:reserve_fixture_networks(runtime.project,network_pool)
     if recovery!='none':write_json(root/'recovery-mode.json',dict(mode=recovery))
     fixture=ROOT/'tests/fixtures/delivery';folder=root/'github-fixture';folder.mkdir(mode=0o700)
     remote,seed=folder/'remote.git',folder/'seed';remote.mkdir();shutil.copytree(fixture/'base',seed)
+    if acceptance_suite:
+        baseline=seed/'app.py'
+        text=baseline.read_text().replace('import json','import json, os')
+        text=text.replace("        self.send_response(status)",
+            "        if self.path == '/identity':status,value=200,{'source_sha':os.environ.get('FABRIQUINHA_SOURCE_SHA')}\n        self.send_response(status)")
+        baseline.write_text(text)  # Qualified bootstrap infrastructure, before product authors run.
     def git(path,*args):
         return subprocess.run(['git','-c','core.hooksPath=/dev/null','-C',str(path),*args],check=True,capture_output=True,text=True,timeout=30).stdout
     git(remote,'init','--bare','--initial-branch=main');git(seed,'init','--initial-branch=main');git(seed,'add','.')
@@ -157,6 +169,9 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
     document=dict(architecture='Python HTTP with small DOM controls.',observability='Record HTTP error totals.',tasks=[
         dict(id='greet',title='Named greeting',owner='release-author',depends_on=[],criteria=['GREET'],acceptance='Click greet to see Hello, Ada'),
         dict(id='farewell',title='Named farewell',owner='release-author',depends_on=['greet'],criteria=['BYE'],acceptance='Click farewell to see Goodbye, Ada; greeting remains intact')])
+    if acceptance_suite:
+        brief['criteria'].append(dict(id='REGRESSION',statement='Preserve and execute all existing automated tests.'))
+        document['tasks'][-1]['criteria'].append('REGRESSION')
     app1=(fixture/'app_feature.py').read_text()
     app2=app1.replace('<p id="result" role="status"></p>',
         '<button id="farewell">Farewell</button><p id="farewell-result" role="status"></p><p id="result" role="status"></p>')
@@ -211,6 +226,17 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                             selector='#thanks-result' if third else '#result' if first else '#farewell-result',text='Thanks, Ada' if third else 'Hello, Ada' if first else 'Goodbye, Ada')
                         sequence=[('write_file',dict(path='/workspace/tests/test_'+package+'.py',content=test3 if third else test1 if first else test2)),
                             ('write_file',dict(path='/workspace/tests/qa.'+package+'.json',content=json.dumps(dict(version=1,checks=[check])))),('delivery_submit',{})]
+                        if acceptance_suite:
+                            browser_test=('from fabriquinha_acceptance import AcceptanceTest\nfrom playwright.sync_api import expect\n'
+                                'class Browser(AcceptanceTest):\n def test_behavior(self):\n'
+                                '  page=self.new_context().new_page()\n  page.goto(self.target,wait_until="domcontentloaded")\n'
+                                '  expect(page.locator('+repr(check['actions'][1]['selector'])+')).to_be_visible(timeout=1000)\n'
+                                '  page.locator("#name").fill("Ada")\n  page.locator('+repr(check['actions'][1]['selector'])+').click()\n'
+                                '  expect(page.locator('+repr(check['selector'])+')).to_have_text('+repr(check['text'])+')\n')
+                            coverage={check['id']:dict(cases=['acceptance_'+package+'.Browser.test_behavior'],gates=[])}
+                            if package=='farewell':coverage['REGRESSION']=dict(cases=[],gates=['regression'])
+                            sequence=[sequence[0],('write_file',dict(path='/workspace/tests/acceptance_'+package+'.py',content=browser_test)),
+                                ('write_file',dict(path='/workspace/tests/acceptance.'+package+'.json',content=json.dumps(dict(version=2,criteria=coverage)))),sequence[-1]]
                     else:sequence=[('write_file',dict(path='/workspace/app.py',content=app)),
                         ('delivery_submit',{'mutations':[{'app.py':app.replace('Thanks, ','Wrong, ') if third else app.replace('Hello, ','Wrong, ') if first else app.replace('Goodbye, ','Wrong, ')}]})]
                 sequences[run.number]=sequence
@@ -302,7 +328,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             graph=runtime.store.receipt(data['graph'],kind='release_graph')['payload'];assert len(graph['items'])==2
             assert data['packages'][1]['cases'] and set(data['packages'][0]['cases'])<set(data['packages'][1]['cases'])
             assert data['packages'][0]['commit']!=data['packages'][1]['commit']
-            assert set(data['criteria'])=={'GREET','BYE'} and len({p['pr'] for p in data['packages']})==2
+            assert set(data['criteria'])==({'GREET','BYE','REGRESSION'} if acceptance_suite else {'GREET','BYE'}) and len({p['pr'] for p in data['packages']})==2
             assert all(kb.get_task(conn,c['id']).status=='done' for i in graph['items'] for c in i['cards'].values())
         if continuity:
             prior_acceptance=acceptance;prior_data=data
@@ -338,6 +364,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             branch_bases_chained=True,old_tests_preserved=True,final_criteria=data['criteria'],
             release_gate_exercised=True,delivery_approval=False,migration=False,url=data['url'])
         result['wal_lifetime_probe']=wal
+        if acceptance_suite:result.update(browser_contract=2,same_acceptance_preview_and_deploy=True,regression_gate_coverage=True)
         if continuity:result.update(releases=2,subsequent_release_rollback_qualified=True,work_packages=3,generated_work_cards=9)
         if recovery=='recover':
             assert len(plan_faults)==1 and len(guidance_seen)==1
@@ -361,6 +388,7 @@ if __name__=='__main__':
     parser.add_argument('--recovery',choices=('none','recover','triage'),default='none')
     parser.add_argument('--continuity',action='store_true',help='Also deliver a subsequent release using the prior homologated rollback')
     parser.add_argument('--network-pool',help='Explicit nonoverlapping private /27, split into two owned /28 test networks')
+    parser.add_argument('--acceptance-suite',action='store_true',help='Qualify version 2 shared Python acceptance and controller gate coverage')
     args=parser.parse_args();root,upstream=args.root.resolve(),args.upstream.resolve()
     if args.mode=='worker':FixtureRuntime(root,upstream).worker(args.task,args.run)
     elif args.mode=='serve':
@@ -370,6 +398,6 @@ if __name__=='__main__':
             FixtureRuntime(root,upstream).serve(stop,interval=0.25)
     elif args.mode=='retire':retire_fixture(root,upstream)
     else:
-        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool),indent=2))
+        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool,acceptance_suite=args.acceptance_suite),indent=2))
         except BaseException as error:
             write_json(root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False));raise

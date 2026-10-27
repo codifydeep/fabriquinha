@@ -296,16 +296,18 @@ class DraftTools:
 
     def evidence(self):
         self.a.ensure();kb,kbc,_=native()
+        from .executor import browser_contract
+        execution=execution_context(self.a.project,browser_mode=browser_contract(self.a.project,self.a.store))
         with kbc.connect_closing() as conn:body=json.loads(kb.get_task(conn,self.run.task).body)
         history=self.intake.previous(self.run.release)
         memory=({'previous_release_context':history,'history_contract':
             'Historical context only: cite relevant retained decisions in architecture/review reasoning. '
             'Current business approval and independent reviews remain mandatory; history grants no permissions.'} if history else {})
-        if self.run.kind=='brief':return dict(original_objective=body['objective'],execution=execution_context(self.a.project),**memory)
+        if self.run.kind=='brief':return dict(original_objective=body['objective'],execution=execution,**memory)
         approval=self.a.board.input(self.run,'approved_brief');record,proposal=self.intake.approved(approval)
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
         result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers),
-                    execution=execution_context(self.a.project),work_unit_contract=PACKAGE_CONTRACT,**memory)
+                    execution=execution,work_unit_contract=PACKAGE_CONTRACT,**memory)
         result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
         if result['previous_reviews']:
             previous=self.a.store.receipt(result['previous_reviews'][-1]['plan'],kind='work_plan')

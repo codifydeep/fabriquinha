@@ -88,6 +88,13 @@ def missing_profiles(project):
 
 def doctor(project,root,store):
     errors=[]
+    from .executor import browser_contract
+    acceptance=None
+    try:
+        mode=browser_contract(project,store)
+        acceptance=dict(version=mode,multiple_contexts=mode==2,timing_assertions=mode==2,
+            frozen_python_test_revision=False,scope='qualified Python HTTP only')
+    except (ValueError,OSError,TypeError):errors.append('AcceptanceContractInvalid')
     profiles=profile_report(project,root);errors+=profiles['errors']
     from .github_auth import report as github_report
     github=github_report(project,root);errors+=github['errors']
@@ -106,4 +113,5 @@ def doctor(project,root,store):
         from .deployment import deployment_networks
         try:deployment_networks(project)
         except (ValueError,OSError,subprocess.SubprocessError,EffectBlocked):errors.append('DeploymentNetworksUnavailable')
-    return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project),profiles=profiles,github=github)
+    return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project),profiles=profiles,github=github,
+        acceptance=acceptance)

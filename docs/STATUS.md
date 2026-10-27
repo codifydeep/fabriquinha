@@ -10,7 +10,18 @@ desabilitado e sem workers. Homologação anterior preservada. O brief S6 foi
 aprovado pelo CEO; o aceite está guardado, ainda não aplicado ao intake.
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
-despacho. Suas propostas ainda não foram implementadas. Zero chamadas na auditoria.
+despacho. O proprietário aprovou os refinamentos e a retomada das correções;
+o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) passou na qualificação offline. O
+despacho S6 continua parado até concluir a preparação. Zero chamadas na auditoria.
+
+**Correção R1 validada:** 396 testes do núcleo; sete jobs reais de navegador;
+dois incrementos dependentes pelo Hermes nativo com autores/revisores e GitHub
+programados. A mesma aceitação congelada rodou na prévia e no deploy, preservando
+regressão. Uma falha encontrada no ensaio agora impede congelar Red quando os
+testes de navegador não chegaram a executar. Zero chamadas pagas. Isso não
+qualifica agentes reais nem conclui S6. R2 ainda exige provisionamento público
+de credenciais/volumes e supervisão/parada econômica reproduzíveis, seguido da
+instalação do novo bundle na raiz S6 existente.
 
 ## Resultado mais recente
 

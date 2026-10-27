@@ -12,7 +12,7 @@ import tempfile
 import time
 from .artifacts import protected_unchanged
 from .effects import Pending, EffectBlocked, Journal, write_json
-from .executor import preview_drivers,validation_files
+from .executor import preview_drivers,validation_files,browser_contract
 
 PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
              'requirements.txt', 'package.json', 'package-lock.json')
@@ -38,7 +38,12 @@ def suite_report(value,*,diagnostic=False):
         raise ValueError('complete real suite without errors or skips required')
     failed={item['case'] for item in report['failures']}
     preview=report.get('qa_preview');preview_failed=False
-    if value.get('identity',{}).get('qa_preview'):
+    shared=value.get('identity',{}).get('browser_contract')==2
+    if shared and preview is not None:
+        if (not isinstance(preview,dict) or not isinstance(preview.get('cases'),list) or not preview['cases']
+                or len(set(preview['cases']))!=len(preview['cases']) or not set(preview['cases'])<=set(report['cases'])):
+            raise ValueError('complete acceptance inventory must execute in every phase, including Red')
+    if value.get('identity',{}).get('qa_preview') or shared and preview is not None:
         if (not isinstance(preview,dict) or preview.get('version')!=1
                 or preview.get('source_sha')!=value['identity']['snapshot']
                 or preview.get('status') not in ('passed','failed')
@@ -53,7 +58,10 @@ def suite_report(value,*,diagnostic=False):
             or any(not set(report[field])<=set(report['cases']) for field in ('errors','skips','expected_failures','unexpected_successes'))
             or value['exit_code']!=(1 if failed or report['errors'] or report['unexpected_successes'] or preview_failed else 0)):
         raise ValueError('suite exit and assertion facts disagree')
-    if preview_failed and not diagnostic:raise ValueError('frozen QA preview failed: '+json.dumps(preview['errors'])[:1800])
+    expected_red=(shared and value['identity'].get('phase') in ('baseline','red','control','diagnostic')
+        and preview_failed and preview.get('failure_kind')=='behavior' and bool(failed&set(preview['cases'])))
+    if preview_failed and not diagnostic and not expected_red:
+        raise ValueError('frozen QA preview failed: '+json.dumps(preview['errors'])[:1800])
     return report
 
 
@@ -61,13 +69,24 @@ def preview_evidence(project,store,value,snapshot,phase):
     """Do not let a historic Green/CI receipt silently satisfy a new contract."""
     bundle,_=validation_files(project,store)
     if value['identity'].get('validation_bundle')!=bundle:raise ValueError('exact installed validation bundle required')
+    mode=browser_contract(project,store)
+    if value['identity'].get('browser_contract')!=(2 if mode==2 else None):raise ValueError('exact installed browser contract required')
     drivers=preview_drivers(project,phase,store)
     if value['identity'].get('qa_preview')!=drivers:raise ValueError('exact current frozen QA preview drivers required')
     report=value.get('report')
     if drivers and not isinstance(report,dict):raise ValueError('complete frozen QA preview report required')
-    if drivers and isinstance(report.get('qa_preview'),dict) and report['qa_preview'].get('status')=='passed':
-        from .browser import load_contract
-        expected=[check['id'] for check in load_contract(store.tree(snapshot)/project.tests_dir)['checks']]
+    if mode==2:
+        from .browser import acceptance_manifest
+        inventory=acceptance_manifest(store.tree(snapshot)/project.tests_dir,allow_empty=phase=='baseline')['cases']
+        if inventory and (not isinstance(report,dict) or not set(inventory)<=set(report.get('cases',[]))
+                or not isinstance(report.get('qa_preview'),dict) or report['qa_preview'].get('cases')!=inventory):
+            raise ValueError('complete acceptance inventory required in every phase')
+    if (drivers or mode==2) and isinstance(report,dict) and isinstance(report.get('qa_preview'),dict) and report['qa_preview'].get('status')=='passed':
+        from .browser import expected_checks,acceptance_manifest
+        folder=store.tree(snapshot)/project.tests_dir
+        expected=expected_checks(folder,mode)
+        if mode==2 and report['qa_preview'].get('cases')!=acceptance_manifest(folder)['cases']:
+            raise ValueError('frozen acceptance inventory must execute completely')
         if value['report']['qa_preview'].get('checks')!=expected:
             raise ValueError('frozen QA preview must execute the complete contract')
 
@@ -121,6 +140,8 @@ class Quality:
 
     def correction_diff(self,before,after,paths):
         """V1 exception: reviewed expected text only; no actions, code or tests removed."""
+        if browser_contract(self.project,self.store)==2:
+            raise ValueError('technical Python acceptance revision is not qualified; preserve tests and escalate to CTO')
         from .browser import contract
         left,right=self.store.manifest(before),self.store.manifest(after)
         if (not isinstance(paths,list) or not paths or len(paths)>20 or len(set(paths))!=len(paths)
@@ -360,9 +381,11 @@ class Quality:
 
     def browser_tests(self,run,snapshot):
         if not self.project.delivery_roles:return
-        from .browser import load_contract
-        checks=load_contract(self.store.tree(snapshot)/self.project.tests_dir)['checks']
-        if not set(self.board.criteria(run))<={item['id'] for item in checks}:
+        from .browser import load_contract,acceptance_manifest
+        folder=self.store.tree(snapshot)/self.project.tests_dir
+        ids=(set(acceptance_manifest(folder)['criteria']) if browser_contract(self.project,self.store)==2
+             else {item['id'] for item in load_contract(folder)['checks']})
+        if not set(self.board.criteria(run))<=ids:
             raise ValueError('browser scenarios must cover every current package acceptance criterion before Red')
 
     def tests_review(self, run, red_id, decision, *, control_risks=None):

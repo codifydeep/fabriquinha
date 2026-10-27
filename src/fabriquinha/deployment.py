@@ -193,7 +193,9 @@ class Deployment:
                     or repository.snapshot(commit)!=snapshot):
                 raise ValueError('passing exact Git baseline required for bootstrap rollback')
         else:
-            load_contract(self.store.tree(snapshot)/self.project.tests_dir)
+            from .executor import browser_contract
+            from .browser import expected_checks
+            expected_checks(self.store.tree(snapshot)/self.project.tests_dir,browser_contract(self.project,self.store))
         recipe=ROOT/'Dockerfile.web'
         scope=dict(subject=run.subject(),project=self.project.fingerprint(),review=review_id,
                       commit=sha(commit),snapshot=snapshot,role=role,recipe=hashlib.sha256(recipe.read_bytes()).hexdigest())
@@ -385,16 +387,43 @@ class Deployment:
             with opener.open(before['url']+path,timeout=5) as response:
                 if response.status!=200 or json.loads(response.read(4097))!=expected_value:
                     raise ValueError('CEO local URL identity/health mismatch')
-        expected=contract(load_contract(self.store.tree(artifact['snapshot'])/self.project.tests_dir))
+        from .executor import browser_contract
+        from .browser import expected_checks,acceptance_manifest
+        mode=browser_contract(self.project,self.store)
+        folder=self.store.tree(artifact['snapshot'])/self.project.tests_dir
+        expected=expected_checks(folder,mode)
         job=self.runner.browser(run,artifact['snapshot'],artifact['commit'])
         evidence=self.store.receipt(job,kind='browser_job')
         value=evidence['payload'];report=value['report']
         if (evidence['binding']!=run.binding() or value['exit_code']!=0 or value['infrastructure_error']
                 or value['identity']['snapshot']!=artifact['snapshot'] or value['identity']['commit']!=artifact['commit']
                 or not isinstance(report,dict) or report.get('status')!='passed' or report.get('source_sha')!=artifact['commit']
-                or report.get('checks')!=[c['id'] for c in expected] or report.get('errors')
+                or report.get('checks')!=expected or report.get('errors')
                 or not value['screenshot_sha256']):
             raise BrowserValidationFailed(job,report)
+        checks=report['checks']
+        if mode==2:
+            from .quality import Quality,preview_evidence,suite_report
+            manifest=acceptance_manifest(folder)
+            if value['identity'].get('browser_contract')!=2 or report.get('cases')!=manifest['cases']:
+                raise ValueError('exact deployed acceptance inventory required')
+            integrated=self.store.receipt(artifact['integrated'],kind='integrated')
+            suite=self.store.receipt(integrated['payload']['suite_job'],kind='suite_job')
+            identity=suite['payload']['identity']
+            if (suite['binding']!=integrated['binding'] or identity['binding']!=integrated['binding']
+                    or identity['project']!=self.project.fingerprint() or identity['snapshot']!=artifact['snapshot']
+                    or identity['phase']!='integrated' or integrated['payload']['commit']!=artifact['commit']):
+                raise ValueError('exact integrated suite required for acceptance gates')
+            preview_evidence(self.project,self.store,suite['payload'],artifact['snapshot'],'integrated')
+            facts=suite_report(suite['payload'])
+            review=self.store.receipt(artifact['review'],kind='delivery_review')['payload']
+            green=self.store.receipt(review['green'],kind='green')['payload']
+            quality=Quality(self.project,self.store,None,self.board)
+            frozen=quality.frozen_plan(self.store.receipt(green['freeze'],kind='tests_frozen'))
+            if facts['failures'] or set(facts['cases'])!=set(frozen['cases']):raise ValueError('complete independently frozen suite required')
+            quality.protect(frozen['baseline'],artifact['snapshot'])
+            if quality.tests(artifact['snapshot'])!=frozen['tests']:raise ValueError('deployed tests differ from independent freeze')
+            checks=list(manifest['criteria'])
         after=self.service(artifact)
         if after!=before:raise EffectBlocked('deployment changed during QA')
         if repository.remote_head(self.project.branch)!=artifact['commit']:
@@ -403,5 +432,5 @@ class Deployment:
         return self.store.record('release_evidence',run.binding(),dict(project=self.project.fingerprint(),
             qualification=self.project.qualification,rollout=rollout_id,artifact=data['candidate'],
             integrated=artifact['integrated'],commit=artifact['commit'],image=artifact['image'],
-            url=after['url'],container=after['container'],qa_job=job,checks=report['checks'],
+            url=after['url'],container=after['container'],qa_job=job,checks=checks,
             rollback_verified=True,delivery_approval=False))

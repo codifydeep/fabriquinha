@@ -4,7 +4,8 @@
 com aceite preservado fora do intake até a retomada. A [auditoria pré-S6](EXECUTION-REVIEW-2026-10-27.md)
 identificou que o QA atual não demonstra sessões independentes/prazo de três
 segundos, além de divergência com o ADR 0004 na redação de governança. Os
-refinamentos F2/F3 e a sequência R1–R4 são propostas, ainda não implementadas.
+refinamentos F2/F3 e R1–R4 foram aprovados; o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md)
+registra a implementação em qualificação offline, antes do despacho.
 
 ## Ponto de partida
 

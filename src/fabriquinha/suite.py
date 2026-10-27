@@ -50,11 +50,13 @@ class Result(unittest.TestResult):
 def main():
     root = Path('/workspace')
     preview_driver=None
-    if 'FABRIQUINHA_QA_PREVIEW' in os.environ:
+    mode=os.environ.get('FABRIQUINHA_BROWSER_CONTRACT','1')
+    if mode not in ('1','2'):raise ValueError('known browser contract required')
+    if 'FABRIQUINHA_QA_PREVIEW' in os.environ or mode=='2':
         # Product modules may also be named browser.py. Never resolve the
         # trusted read-only mounted interpreter through product sys.path.
         spec=importlib.util.spec_from_file_location('_fabriquinha_frozen_browser','/opt/fabriquinha/browser.py')
-        preview_driver=importlib.util.module_from_spec(spec);spec.loader.exec_module(preview_driver)
+        preview_driver=importlib.util.module_from_spec(spec);sys.modules[spec.name]=preview_driver;spec.loader.exec_module(preview_driver)
     test_dir = os.environ['FABRIQUINHA_TESTS_DIR']
     path = Path(test_dir)
     if path.is_absolute() or '..' in path.parts or str(path) != test_dir:
@@ -65,16 +67,26 @@ def main():
     with contextlib.redirect_stdout(Output()), contextlib.redirect_stderr(Output()):
         tests = unittest.TestLoader().discover(str(root / path), pattern='test*.py')
         tests.run(result)
+    acceptance=None
+    if mode=='2':
+        manifest=preview_driver.acceptance_manifest(root/path,allow_empty=True)
+        if manifest['cases']:
+            with contextlib.redirect_stdout(Output()),contextlib.redirect_stderr(Output()):
+                acceptance=preview_driver.preview(root,test_dir,os.environ['FABRIQUINHA_SOURCE_SHA'],mode=2,result=result)
     report = dict(version=1, cases=result.cases, tests_run=result.testsRun,
                   failures=result.failure_details, errors=[t.id() for t, _ in result.errors],
                   skips=[t.id() for t, _ in result.skipped],
                   expected_failures=[t.id() for t, _ in result.expectedFailures],
                   unexpected_successes=[t.id() for t in result.unexpectedSuccesses])
     preview_ok=True
+    if acceptance is not None:report['qa_preview']=acceptance
     if 'FABRIQUINHA_QA_PREVIEW' in os.environ:
         with contextlib.redirect_stdout(Output()), contextlib.redirect_stderr(Output()):
-            report['qa_preview']=preview_driver.preview(root,test_dir,os.environ['FABRIQUINHA_QA_PREVIEW'])
+            report['qa_preview']=(acceptance if mode=='2' else
+                preview_driver.preview(root,test_dir,os.environ['FABRIQUINHA_QA_PREVIEW']))
+        if report['qa_preview'] is None:raise ValueError('frozen acceptance required after implementation')
         preview_ok=report['qa_preview']['status']=='passed'
+    if acceptance and acceptance['status']!='passed':preview_ok=False
     print(json.dumps(report, sort_keys=True), flush=True)
     return 0 if result.wasSuccessful() and preview_ok else 1
 

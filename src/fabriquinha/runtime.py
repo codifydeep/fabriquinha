@@ -21,7 +21,7 @@ from .artifacts import Store, digest
 from .board import Board
 from .config import Project
 from .effects import EffectBlocked, Pending, Journal, write_json
-from .executor import Runner,seal_validation,validation_files
+from .executor import Runner,seal_validation,validation_files,browser_contract
 from .hermes import Sandbox, run_activity
 from .kanban_lane import native, UPSTREAM_COMMIT
 from .quality import Quality
@@ -160,6 +160,10 @@ class Runtime:
                     from .quality import CONTROL_CONTRACT
                     binding.update(validation_bundle=existing['validation_bundle'],control_contract=CONTROL_CONTRACT)
                 if 'profile_contract' in existing:binding['profile_contract']=profile_contract()
+                if 'browser_contract' in existing:
+                    if type(existing['browser_contract']) is not int or existing['browser_contract'] not in (1,2):
+                        raise ValueError('known installed browser contract required')
+                    binding['browser_contract']=existing['browser_contract']
                 if existing!=binding:raise ValueError('installation contract changed; explicit reconfiguration required')
             else:
                 from .quality import CONTROL_CONTRACT
@@ -167,6 +171,7 @@ class Runtime:
                 if not self.project.qualification:binding['profile_contract']=profile_contract()
                 write_json(installation,binding)
             validation_files(self.project,self.store)
+            browser_contract(self.project,self.store)
         self.control=Control(self.root,self.project)
         self.board=Board(self.project,guard=self.control.ensure)
         self.children=[];self.settlement={};self.recovery_issues={};self.integration_issues={}
@@ -176,6 +181,39 @@ class Runtime:
         self.intake=Intake(self.project,self.store,self.board);self.intake_issues={}
         self.releases=Releases(self.project,self.store,self.board,self.intake);self.release_issues={}
         self.outbox=Outbox(self.project,self.store)
+
+    def configure_acceptance(self,expected_bundle):
+        """Owner-approved F2/F3, before planning; never convert delivery evidence."""
+        with Owner(self.root),Journal(self.store.root/'effects').lock(['installation',self.project.fingerprint()]):
+            path=self.root/'installation.json';before=json.loads(path.read_bytes())
+            if before.get('browser_contract')==2:
+                for record_path in (self.store.root/'receipts').glob('*.json'):
+                    record=self.store.receipt(record_path.stem)
+                    if (record['kind']=='acceptance_upgrade' and record['payload']['after']==before
+                            and record['payload']['before'].get('validation_bundle')==expected_bundle):
+                        return dict(browser_contract=2,receipt=record_path.stem,already_installed=True,dispatch_started=False)
+                raise ValueError('installed acceptance bundle has no matching upgrade receipt')
+            if before.get('validation_bundle')!=expected_bundle:raise ValueError('exact previous validation bundle required')
+            control=self.control.read()
+            if not control['paused'] or control.get('error'):raise ValueError('valid explicit pause required')
+            policy=self.root/'provider-policy.json'
+            if not self.project.qualification and (not policy.is_file() or Policy.parse(json.loads(policy.read_bytes())).enabled):
+                raise ValueError('disabled provider policy required')
+            _,api,_=native()
+            with api.connect_closing() as conn:
+                if not self.pause_status(conn)['drained']:raise ValueError('drained workers and effects required')
+                if any(json.loads(row['body']).get('kind') not in ('release','brief')
+                       for row in conn.execute('SELECT body FROM tasks').fetchall()):
+                    raise ValueError('acceptance upgrade is allowed only before planning and delivery')
+            if not self.project.browser_tdd or not self.project.delivery_roles:
+                raise ValueError('qualified browser TDD and delivery roles required')
+            after={**before,'validation_bundle':seal_validation(self.store),'browser_contract':2}
+            receipt=self.store.record('acceptance_upgrade',dict(project=self.project.fingerprint(),actor='operator'),
+                dict(before=before,after=after,pause_episode=control['episode'],
+                    authority='Owner-approved audit 2026-10-27 F2/F3; business brief remains unchanged',
+                    model_calls=0,delivery_approval=False))
+            write_json(path,after)
+            return dict(browser_contract=2,receipt=receipt,already_installed=False,dispatch_started=False)
 
     def settle(self,task=None,*,conn=None):
         """Retire only stale SDK sandboxes; no process is killed here.
@@ -651,10 +689,11 @@ class Runtime:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume','costs'))
+    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume','costs','configure-acceptance'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--task');parser.add_argument('--run',type=int);parser.add_argument('--interval',type=float,default=15)
     parser.add_argument('--expect-pause')
+    parser.add_argument('--expect-validation')
     args=parser.parse_args()
     if args.operation=='serve':
         with Owner(args.root):
@@ -667,7 +706,8 @@ def main():
         Runtime(args.root,args.upstream).worker(args.task,args.run)
     else:
         runtime=Runtime(args.root,args.upstream)
-        value=(runtime.pause() if args.operation=='pause' else runtime.resume(args.expect_pause)
+        value=(runtime.configure_acceptance(args.expect_validation) if args.operation=='configure-acceptance' else
+               runtime.pause() if args.operation=='pause' else runtime.resume(args.expect_pause)
                if args.operation=='resume' else runtime.check_admission(force=True)
                if args.operation=='doctor' else runtime.costs() if args.operation=='costs' else runtime.status())
         print(json.dumps(value,indent=2))

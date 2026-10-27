@@ -1,5 +1,6 @@
 """Fixed validation jobs with actual Docker facts and bounded effect recovery."""
 import json
+import ast
 import hashlib
 import base64
 import binascii
@@ -43,6 +44,25 @@ def validation_files(project,store=None):
                 if set(store.manifest(bundle))!={'suite.py','browser.py'}:raise ValueError('fixed validation bundle contents required')
                 return bundle,{name:tree/name for name in ('suite.py','browser.py')}
     return None,{name:ROOT/'src/fabriquinha'/name for name in ('suite.py','browser.py')}
+
+
+def browser_contract(project,store=None):
+    """Installation-selected gate; workers cannot choose a weaker format."""
+    if store is None:return 1
+    path=store.root.parent/'installation.json'
+    if not path.exists():return 1
+    validation_files(project,store)
+    value=json.loads(path.read_bytes()).get('browser_contract',1)
+    if type(value) is not int or value not in (1,2):raise ValueError('known installed browser contract required')
+    if value==2 and (not project.browser_tdd or not project.delivery_roles
+            or not json.loads(path.read_bytes()).get('validation_bundle')):
+        raise ValueError('acceptance suite requires pinned validation and browser TDD')
+    if value==2:
+        _,files=validation_files(project,store)
+        names={node.name for node in ast.parse(files['browser.py'].read_bytes()).body if isinstance(node,ast.FunctionDef)}
+        if not {'acceptance_manifest','acceptance_evaluate'}<=names:
+            raise ValueError('pinned browser bundle lacks the installed acceptance contract')
+    return value
 
 
 def preview_drivers(project,phase,store=None):
@@ -111,6 +131,12 @@ class Runner:
         if preview or bundle:sources.update({'/opt/fabriquinha/'+file:paths[file] for file in ('suite.py','browser.py')})
         by_target={mount['Destination']:mount for mount in binds}
         env=config.get('Env',[])
+        mode=browser_contract(self.project,self.store)
+        if (expected.get('browser_contract')!=(2 if mode==2 else None)
+                or ([e for e in env if e.startswith('FABRIQUINHA_BROWSER_CONTRACT=')]
+                    !=(['FABRIQUINHA_BROWSER_CONTRACT=2'] if mode==2 else []))
+                or mode==2 and env.count('FABRIQUINHA_SOURCE_SHA='+expected['snapshot'])!=1):
+            raise ValueError('fixed acceptance suite contract rejected')
         if (info['Image'] != self.project.validation_image or config.get('User') != '65534:65534'
                 or config.get('Labels', {}).get('fabriquinha.job') != expected['key']
                 or config.get('Labels', {}).get('com.docker.compose.project') != self.project.namespace+'-tests'
@@ -151,6 +177,13 @@ class Runner:
             raise ValueError('fixed browser job sandbox rejected')
         if hashlib.sha256(paths['browser.py'].read_bytes()).hexdigest()!=expected['driver']:
             raise ValueError('browser driver changed during execution')
+        mode=browser_contract(self.project,self.store)
+        if (expected.get('browser_contract')!=(2 if mode==2 else None)
+                or config.get('Entrypoint')!=['python'] or config.get('Cmd')!=['-B','/qa.py']
+                or [e for e in config.get('Env',[]) if e.startswith('FABRIQUINHA_SOURCE_SHA=')]!=['FABRIQUINHA_SOURCE_SHA='+expected['commit']]
+                or [e for e in config.get('Env',[]) if e.startswith('FABRIQUINHA_BROWSER_CONTRACT=')]
+                    !=(['FABRIQUINHA_BROWSER_CONTRACT=2'] if mode==2 else [])):
+            raise ValueError('fixed deployed acceptance command rejected')
         return info
 
     def browser(self,run,snapshot,commit):
@@ -168,6 +201,8 @@ class Runner:
                       phase='browser',image=self.project.browser_image,commit=commit,
                       driver=hashlib.sha256(paths['browser.py'].read_bytes()).hexdigest())
         if bundle:expected['validation_bundle']=bundle
+        mode=browser_contract(self.project,self.store)
+        if mode==2:expected['browser_contract']=2
         key=digest(expected);expected['key']=key
         command=['create','--name',self.project.namespace+'-browser-'+key[:16],
             *grouping('browser',self.project.namespace),'--label','fabriquinha.job='+key,
@@ -177,6 +212,7 @@ class Runner:
             '--tmpfs','/tmp:rw,nosuid,size=256m','--env','FABRIQUINHA_SOURCE_SHA='+commit,
             '--mount',f'type=bind,src={paths["browser.py"]},dst=/qa.py,readonly',
             '--mount',f'type=bind,src={self.store.tree(snapshot)/self.project.tests_dir},dst=/qa-contracts,readonly',
+            *(['--env','FABRIQUINHA_BROWSER_CONTRACT=2'] if mode==2 else []),
             self.project.browser_image,'-B','/qa.py']
         return self._execute(run,expected,command)
 
@@ -187,6 +223,8 @@ class Runner:
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)
         bundle,paths=validation_files(self.project,self.store)
         if bundle:expected['validation_bundle']=bundle
+        mode=browser_contract(self.project,self.store)
+        if mode==2:expected['browser_contract']=2
         preview=preview_drivers(self.project,phase,self.store)
         if preview:expected['qa_preview']=preview
         key = digest(expected)
@@ -202,6 +240,8 @@ class Runner:
             '--mount', f'type=bind,src={self.store.tree(snapshot)},dst=/workspace,readonly']
         if preview:
             command+=['--env','FABRIQUINHA_QA_PREVIEW='+snapshot]
+        if mode==2:
+            command+=['--env','FABRIQUINHA_BROWSER_CONTRACT=2','--env','FABRIQUINHA_SOURCE_SHA='+snapshot]
         if preview or bundle:
             for file in ('suite.py','browser.py'):
                 command+=['--mount',f'type=bind,src={paths[file]},dst=/opt/fabriquinha/{file},readonly']

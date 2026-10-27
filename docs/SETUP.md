@@ -281,6 +281,32 @@ somente na branch nova e nunca é uma entrega de produto ou dispensa dos gates.
 
 ### Revisão de execução isolada do checkout
 
+#### Medidor novo e preservação do histórico
+
+O relay não cria nem repara contadores. Para uma instalação realmente nova,
+prepare um diretório privado vazio pertencente ao usuário que executará o relay:
+
+```sh
+mkdir -m 700 <privado>/meter
+python3 scripts/initialize_provider_meter.py --new-meter <privado>/meter
+```
+
+O comando cria `calls.json` com zero e um marcador de origem, sem chamada à
+OpenRouter, chave, habilitação ou alteração de teto. Recusa links, diretório
+público, qualquer conteúdo anterior e inicialização interrompida. **Não use em
+uma instalação existente**, nem apague seu medidor para conseguir executá-lo.
+Um contador ausente em instalação antiga é recuperação de dados, não bootstrap.
+
+O Compose de referência recebe volumes externos de medidor e credencial. O
+conteúdo deve ser preparado pelo operador com UID/GID 10000 e modo privado;
+a chave é somente leitura no relay e nunca entra no export Git. O exemplo
+acima qualifica o formato em filesystem; não automatiza provisionamento de
+volumes/credenciais. A prova reproduzível desse provisionamento e da supervisão
+host continua pendente em R2. Não copie volumes históricos de outra instalação
+como substituto dessa etapa.
+
+#### Fonte fixada
+
 Para uma fronteira de qualificação, exporte uma revisão Git publicada e já
 testada para um diretório privado novo. O comando lê objetos do commit, não
 arquivos alterados ou não rastreados do checkout. Não faz fetch nem comprova que
@@ -337,7 +363,24 @@ as atividades do SDK. Corrigir a fonte exige outra cópia e manutenção; não
 edite um export vivo. A fonte fixada não substitui o bundle de validadores nem
 autoriza mudar seu contrato. O ciclo completo de upgrade/rollback continua em S6.
 
-Uma prova isolada de clone local limpo, board nativo novo, início pausado, lock
+Para instalar o contrato de aceitação compartilhada antes do planejamento,
+use a mesma entrada pública:
+
+```sh
+python3.14 -B scripts/run_hermes_runtime.py configure-acceptance \
+  --source <privado>/runtime-source --expect-source <source_digest> \
+  --python <python-do-SDK> --root <raiz-privada-da-instancia> \
+  --upstream <checkout-Hermes-fixado> --expect-validation <bundle-atual>
+```
+
+A fonte deve conter o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) e seus validadores.
+Exige pausa drenada, provedor desabilitado e ausência de cards de planejamento
+ou entrega. Não muda o brief, não habilita consumo e não inicia o dispatcher.
+O recibo preserva os bundles anterior e novo; não converte resultados antigos.
+Uma instalação com trabalho já iniciado exige outro procedimento de migração,
+ainda não qualificado — não apague cards para contornar a restrição.
+
+A prova isolada de clone local limpo, board nativo novo, início pausado, lock
 exclusivo, reinício, recusa de retomada obsoleta e detecção de alteração pode ser
 executada com o Python do SDK, sem rota de modelo, credenciais ou jobs Docker:
 

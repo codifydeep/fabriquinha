@@ -128,9 +128,9 @@ class Project:
         raise ValueError('no independent reviewer available in approved matrix')
 
 
-def execution_context(project):
+def execution_context(project,*,browser_mode=1):
     """Bounded public constraints, not credentials or a grant to change policy."""
-    return dict(stack='python-http',repository=project.repository,branch=project.branch,
+    result=dict(stack='python-http',repository=project.repository,branch=project.branch,
         workers=project.max_workers,tests_dir=project.tests_dir,iterations=40,
         reviewers={role:list(project.reviewers_for(role)) for role in project.reviewers},
         coordination_roles=dict(project.coordination_roles or {}),delivery_roles=dict(project.delivery_roles or {}),
@@ -156,3 +156,10 @@ def execution_context(project):
             'text is the exact normalized full locator text, never a substring. Unit Green alone cannot satisfy this check. '
             'It does not replace post-deploy QA or historical Red.' if project.browser_tdd and project.delivery_roles else None),
         network='No network, downloads, infrastructure credentials or Docker socket in product sandboxes.')
+    if browser_mode==2:
+        from .browser import author_protocol
+        result['browser_protocol']=author_protocol(2)
+        result['test_tooling']['contract']='Unit/integration tests use test*.py; shared acceptance uses acceptance_*.py and self.target supplied by the fixed runner. All inventories run in every TDD phase. Use real browser assertions and independently reviewed criterion coverage.'
+        result['frozen_qa_preview']='The same frozen Python acceptance inventory runs in the full suite and on the deployed SHA. Multiple isolated sessions and explicit timing assertions are available.'
+        result['test_authority']='The installed owner-approved F3 quality contract supersedes older brief boilerplate requiring CEO approval for every technical correction; the brief still governs business scope. Lead and independent reviewer classify technical corrections; CTO resolves ambiguity. CEO decides scope changes or coverage removal. Existing frozen tests stay immutable; unsupported technical repair remains a visible CTO impediment, never an implicit waiver.'
+    return result

@@ -214,7 +214,11 @@ class Releases:
             receipt=self.board.input(run,key,review_handoff=True)
             snapshot=(quality.test_evidence(receipt) if key=='red' else self.store.receipt(receipt,kind=key))['payload']['snapshot']
         folder=self.store.tree(snapshot)/self.project.tests_dir
-        try:existing=[item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else []
+        from .executor import browser_contract
+        from .browser import acceptance_manifest
+        mode=browser_contract(self.project,self.store)
+        try:existing=(list(acceptance_manifest(folder,allow_empty=True)['criteria']) if mode==2 else
+            [item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else [])
         except (ValueError,OSError):existing='InvalidBrowserContract: review the immutable files; do not weaken existing scenarios'
         controls=(quality.freeze(run,self.board.input(run,'tests'))['control_cases'] if run.kind=='implementation' else None)
         from .repairs import repair_authority,context_view
@@ -224,8 +228,8 @@ class Releases:
             repair=({**authority,'context':context_view(self.store,authority['context'])} if authority else None),
             required_control_cases=controls,
             architecture=technical['architecture'],observability=technical['observability'],
-            execution=execution_context(self.project),baseline=snapshot,existing_qa=existing,
-            browser_protocol=author_protocol(),
+            execution=execution_context(self.project,browser_mode=mode),baseline=snapshot,existing_qa=existing,
+            browser_protocol=author_protocol(mode),
             acceptance=body['acceptance'],stack='qualified Python HTTP, port 8080, /health and /identity; no downloads/network in workers',
             tdd='Tests author: change tests only; Red requires a real failing assertion in a new test body, not import/discovery/runtime errors. '
                 'If existing baseline tests already fail, submit the UNCHANGED baseline to confirm a known regression at the controller SHA; '
@@ -243,6 +247,8 @@ class Releases:
         if authority and authority['proposal']['classification']=='test_contract':
             result['tdd']='Technical QA-expectation correction, not new functionality. Historical Red and every unittest/control target remain preserved. Test author may correct only expected text in repair.proposal.test_paths, citing the approved brief. delivery_submit records test_revision, not a new Red. Reviewer independently checks the correction and freezes a new revision. Implementer uses unchanged frozen tests and must run Green and all required negative controls.'
             result['browser']='Change only expected text in the explicitly authorized existing QA files; preserve all IDs, actions, selectors, paths and unit tests. Match the brief and deterministic UI wording; do not add requirements or weaken business coverage.'
+        if mode==2:
+            result['browser']='Add acceptance_*.py tests subclassing AcceptanceTest and acceptance.*.json criterion coverage. The same frozen suite runs in preview and deployment; use self.target and self.new_context(). Preserve every existing test/manifest. Review behavior coverage independently, including timing and independent sessions where required.'
         return result
 
     def baseline(self,run,body):
