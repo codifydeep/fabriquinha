@@ -5,8 +5,11 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 retomado:** controlador sob launchd, relay pronto e planejamento em execução
-pelo Tech Lead. Homologação anterior preservada. O aceite guardado do CEO foi
+**S6 em manutenção controlada:** o plano foi aprovado pelo CTO após duas
+devoluções ao Tech Lead. Controlador e relay estão parados após drenagem para
+corrigir a cobertura aditiva de um mesmo critério entre incrementos. Nenhum
+Red/freeze ou entrega de testes existia nessa fronteira. Homologação anterior
+preservada. O aceite guardado do CEO foi
 aplicado à mesma revisão do brief pelo intake nativo, sem dispensar gates.
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
@@ -35,6 +38,13 @@ retomado. A primeira chamada do planejamento levou o contador a 6.954/7.064.
 Iniciar scripts privados antigos não é o procedimento de retomada. A conclusão
 S6 e canal/restore R4 continuam pendentes. As intervenções prévias ao despacho
 permanecem registradas; S6 não é reclassificado como autônomo desde o briefing.
+
+Na manutenção seguinte, foi identificada uma inconsistência: o plano permitia
+o mesmo critério em dois pacotes, mas o manifesto recusava casos adicionais
+desse critério no segundo arquivo. O reparo une cobertura de forma aditiva,
+preserva arquivos congelados e recusa qualquer troca de bundle após evidência
+de qualidade existente. O núcleo passou com 401 testes; a cadeia offline com
+critério transversal está em validação. Contador preservado: 6.960/7.064.
 
 ## Resultado mais recente
 

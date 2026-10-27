@@ -203,7 +203,7 @@ class Runtime:
                 counters_and_holds_untouched=True,delivery_approval=False)
 
     def configure_acceptance(self,expected_bundle):
-        """Owner-approved F2/F3, before planning; never convert delivery evidence."""
+        """Owner-approved F2/F3; never convert existing quality evidence."""
         with Owner(self.root),Journal(self.store.root/'effects').lock(['installation',self.project.fingerprint()]):
             path=self.root/'installation.json';before=json.loads(path.read_bytes())
             if before.get('browser_contract')==2:
@@ -212,7 +212,8 @@ class Runtime:
                     if (record['kind']=='acceptance_upgrade' and record['payload']['after']==before
                             and record['payload']['before'].get('validation_bundle')==expected_bundle):
                         return dict(browser_contract=2,receipt=record_path.stem,already_installed=True,dispatch_started=False)
-                raise ValueError('installed acceptance bundle has no matching upgrade receipt')
+                if before.get('validation_bundle')!=expected_bundle:
+                    raise ValueError('installed acceptance bundle has no matching upgrade receipt')
             if before.get('validation_bundle')!=expected_bundle:raise ValueError('exact previous validation bundle required')
             control=self.control.read()
             if not control['paused'] or control.get('error'):raise ValueError('valid explicit pause required')
@@ -222,9 +223,23 @@ class Runtime:
             _,api,_=native()
             with api.connect_closing() as conn:
                 if not self.pause_status(conn)['drained']:raise ValueError('drained workers and effects required')
-                if any(json.loads(row['body']).get('kind') not in ('release','brief')
-                       for row in conn.execute('SELECT body FROM tasks').fetchall()):
-                    raise ValueError('acceptance upgrade is allowed only before planning and delivery')
+                kinds={json.loads(row['body']).get('kind') for row in conn.execute('SELECT body FROM tasks').fetchall()}
+                if before.get('browser_contract')!=2:
+                    if not kinds<={'release','brief'}:
+                        raise ValueError('initial acceptance upgrade is allowed only before planning and delivery')
+                else:
+                    # A planned but not yet validated increment may receive an
+                    # additive representation repair. No baseline/Red/freeze or
+                    # job (even an incomplete one) can be reinterpreted.
+                    if not kinds<={'release','brief','plan','tests','implementation','integration'}:
+                        raise ValueError('unsupported pre-quality board state')
+                    allowed={'product_brief','brief_approval','product_answer','work_plan','plan_review',
+                             'release_graph','release_seed','model_activity','activity_interrupted','acceptance_upgrade'}
+                    if any(self.store.receipt(p.stem)['kind'] not in allowed
+                           for p in (self.store.root/'receipts').glob('*.json')):
+                        raise ValueError('existing quality or diagnostic evidence forbids acceptance repair')
+                    jobs=self.store.root/'jobs'
+                    if jobs.exists() and any(jobs.iterdir()):raise ValueError('existing validation job forbids acceptance repair')
             if not self.project.browser_tdd or not self.project.delivery_roles:
                 raise ValueError('qualified browser TDD and delivery roles required')
             after={**before,'validation_bundle':seal_validation(self.store),'browser_contract':2}

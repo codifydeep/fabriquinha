@@ -32,7 +32,7 @@ def acceptance_manifest(folder, *, allow_empty=False):
                 or value['version']!=2 or not isinstance(value['criteria'],dict) or not value['criteria']):
             raise ValueError('version 2 criterion coverage required')
         for key,proof in value['criteria'].items():
-            if (not isinstance(key,str) or not key.strip() or len(key)>100 or key in criteria
+            if (not isinstance(key,str) or not key.strip() or len(key)>100
                     or not isinstance(proof,dict) or set(proof)!={'cases','gates'}
                     or not isinstance(proof['cases'],list) or not isinstance(proof['gates'],list)
                     or not proof['cases'] and not proof['gates']
@@ -40,6 +40,13 @@ def acceptance_manifest(folder, *, allow_empty=False):
                     or any(gate not in ('full_suite','regression') for gate in proof['gates'])
                     or len(set(proof['cases']))!=len(proof['cases']) or len(set(proof['gates']))!=len(proof['gates'])):
                 raise ValueError('distinct criteria with explicit browser cases or controller gates required')
+            if key in criteria:
+                previous=criteria[key]
+                if (set(previous['cases'])&set(proof['cases'])
+                        or not (set(proof['cases'])-set(previous['cases']) or set(proof['gates'])-set(previous['gates']))):
+                    raise ValueError('distinct criteria coverage extensions required; duplicate coverage is not an extension')
+                proof=dict(cases=sorted(set(previous['cases'])|set(proof['cases'])),
+                           gates=sorted(set(previous['gates'])|set(proof['gates'])))
             criteria[key]=proof
     cases=[]
     for path in sorted(folder.glob('acceptance_*.py')):
@@ -171,6 +178,7 @@ def author_protocol(mode=1):
                 'A criterion may reference several cases and a case may cover several criteria. Coverage is semantic and must be independently reviewed.',
                 'Only full_suite and regression are controller gates. Use gates only for corresponding delivery-quality criteria, never to replace a user-visible behavior test.',
                 'At most 20 distinct criteria and 128 cases. Append a new manifest and test file per increment; preserve all baseline tests and manifests byte-for-byte.',
+                'To extend an existing criterion in a later increment, repeat its ID in the new manifest with only additional case IDs. Coverage is the union of all immutable manifests; never replace earlier cases or edit their manifest. Exact duplicate coverage is rejected.',
                 'Server data is shared. Use explicit repeatable fixtures through supported product behavior; new browser contexts isolate cookies/storage, not server data. Do not add privileged test-only application endpoints.',
                 'Same-origin HTTP only, no WebSockets/CDNs/downloads. Register cleanup for any extra resources. No browser console/page errors.',
                 'New candidate tests can be corrected by their author before independent freeze. Reviewers never edit the author. Frozen Python test revision is not qualified; escalate that technical limitation to CTO, not CEO. Business changes or removing coverage require CEO approval.'])

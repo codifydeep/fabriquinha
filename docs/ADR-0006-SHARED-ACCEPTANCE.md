@@ -25,6 +25,10 @@ o endereço pertencem ao controlador; agentes escrevem testes do produto.
   conferir suíte integrada, freeze, snapshot e proteção dos testes.
 - Cada incremento acrescenta arquivos. Testes e manifestos anteriores continuam
   protegidos. SHA/saúde do deploy são conferidos fora dos testes autorais.
+- Um critério transversal pode receber casos adicionais no manifesto do próximo
+  incremento. A cobertura é a união aditiva dos arquivos imutáveis. Repetir
+  cobertura idêntica ou duplicar o mesmo caso no mesmo critério é recusado;
+  nenhuma extensão substitui os casos/gates anteriores.
 - Preview usa container sem rede externa, credenciais ou socket; QA alcança o
   aplicativo em rede interna própria. Snapshots ficam somente para leitura.
 - A stack permanece Python/HTTP local. Contextos isolam cookies/storage; fixtures
@@ -56,9 +60,12 @@ impedimento técnico explícito ao CTO, sem retries iguais ou depuração pelo C
 
 `configure-acceptance --expect-validation <hash-atual>` usa a entrada pública
 do operador. Exige pausa, workers/efeitos drenados, provedor desabilitado e board
-ainda sem planejamento ou entrega. Preserva o vínculo anterior em recibo e
-instala o bundle atomicamente; repetição reconhece o mesmo recibo. Não inicia
-despacho nem muda o projeto/brief.
+ainda sem planejamento ou entrega para a instalação inicial. Um reparo do modo 2
+já instalado pode preservar planejamento aprovado, desde que não exista nenhum
+job de validação, baseline/Red/freeze ou outro recibo de qualidade/diagnóstico.
+Uma atividade interrompida sem tais evidências não é uma entrega validada.
+Preserva o vínculo anterior em recibo e instala o bundle atomicamente; repetição
+reconhece o mesmo recibo. Não inicia despacho nem muda o projeto/brief.
 
 Os testes do núcleo cobrem instalação tardia, bundle divergente, recibos antigos,
 inventário parcial e preservação da configuração anterior.

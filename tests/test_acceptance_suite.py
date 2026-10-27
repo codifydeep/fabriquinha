@@ -67,6 +67,17 @@ class AcceptanceInventory(unittest.TestCase):
         (self.root/'qa.json').write_text('{}')
         with self.assertRaisesRegex(ValueError,'silently omitted'):acceptance_manifest(self.root)
 
+    def test_later_increment_extends_the_same_criterion_without_editing_frozen_files(self):
+        original=(self.root/'acceptance.rooms.json').read_bytes()
+        (self.root/'acceptance_join.py').write_text(SOURCE.replace('Rooms','Join').replace('test_shared','test_join_nickname'))
+        (self.root/'acceptance.join.json').write_text(json.dumps(dict(version=2,criteria={
+            'SHARED':dict(cases=['acceptance_join.Join.test_join_nickname'],gates=[])})))
+        result=acceptance_manifest(self.root)
+        self.assertEqual(set(result['criteria']['SHARED']['cases']),
+                         {'acceptance_join.Join.test_join_nickname','acceptance_rooms.Rooms.test_shared'})
+        self.assertEqual((self.root/'acceptance.rooms.json').read_bytes(),original)
+        self.assertEqual(len(result['cases']),2)
+
 
 class PinnedAcceptanceRunner(unittest.TestCase):
     def setUp(self):
@@ -140,6 +151,31 @@ class PinnedAcceptanceRunner(unittest.TestCase):
         self.assertEqual(proof['before'],old)
         self.assertEqual(json.loads(path.read_text()),proof['after'])
         with patch('fabriquinha.runtime.native',side_effect=AssertionError('do not repeat migration')):
+            self.assertTrue(runtime.configure_acceptance(self.bundle)['already_installed'])
+
+
+    def test_additive_repair_after_planning_refuses_any_existing_quality_receipt_or_job(self):
+        from unittest.mock import Mock
+        runtime=Runtime.__new__(Runtime);runtime.root=self.root;runtime.store=self.store;runtime.project=self.project
+        runtime.control=SimpleNamespace(read=lambda:dict(paused=True,error=None,episode='e'*32))
+        runtime.pause_status=lambda conn:dict(drained=True)
+        connection=Mock();connection.execute.return_value.fetchall.return_value=[dict(body=json.dumps(dict(kind='plan'))),dict(body=json.dumps(dict(kind='tests')))]
+        api=Mock();api.connect_closing.return_value.__enter__=Mock(return_value=connection)
+        api.connect_closing.return_value.__exit__=Mock(return_value=False)
+        before=(self.root/'installation.json').read_bytes()
+        receipt=self.store.record('test_plan',{'fixture':True},{'frozen':True})
+        with patch('fabriquinha.runtime.native',return_value=(None,api,None)):
+            with self.assertRaisesRegex(ValueError,'quality'):runtime.configure_acceptance(self.bundle)
+            self.assertEqual((self.root/'installation.json').read_bytes(),before)
+            # Remove only this disposable test fixture to exercise the separate
+            # pending-job boundary; production has no receipt deletion API.
+            (self.store.root/'receipts'/(receipt+'.json')).unlink()
+            jobs=self.store.root/'jobs';jobs.mkdir(exist_ok=True);(jobs/'pending').write_text('unobserved')
+            with self.assertRaisesRegex(ValueError,'job'):runtime.configure_acceptance(self.bundle)
+            self.assertEqual((self.root/'installation.json').read_bytes(),before)
+            (jobs/'pending').unlink()
+            result=runtime.configure_acceptance(self.bundle)
+            self.assertFalse(result['dispatch_started'])
             self.assertTrue(runtime.configure_acceptance(self.bundle)['already_installed'])
 
 

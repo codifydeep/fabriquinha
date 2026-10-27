@@ -443,8 +443,10 @@ A fonte deve conter o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) e seus validador
 Exige pausa drenada, provedor desabilitado e ausência de cards de planejamento
 ou entrega. Não muda o brief, não habilita consumo e não inicia o dispatcher.
 O recibo preserva os bundles anterior e novo; não converte resultados antigos.
-Uma instalação com trabalho já iniciado exige outro procedimento de migração,
-ainda não qualificado — não apague cards para contornar a restrição.
+No modo 2 já instalado, um reparo aditivo pode preservar o planejamento se ainda
+não houver nenhum job de validação ou recibo de qualidade/diagnóstico, incluindo
+baseline, Red e freeze. Após essa fronteira, outra migração seria necessária e
+continua não qualificada — não apague cards, jobs ou recibos para contornar isso.
 
 A prova isolada de clone local limpo, board nativo novo, início pausado, lock
 exclusivo, reinício, recusa de retomada obsoleta e detecção de alteração pode ser

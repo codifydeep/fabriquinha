@@ -171,6 +171,8 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         dict(id='farewell',title='Named farewell',owner='release-author',depends_on=['greet'],criteria=['BYE'],acceptance='Click farewell to see Goodbye, Ada; greeting remains intact')])
     if acceptance_suite:
         brief['criteria'].append(dict(id='REGRESSION',statement='Preserve and execute all existing automated tests.'))
+        brief['criteria'].append(dict(id='NAMED',statement='Every supported message includes the entered name.'))
+        for task in document['tasks']:task['criteria'].append('NAMED')
         document['tasks'][-1]['criteria'].append('REGRESSION')
     app1=(fixture/'app_feature.py').read_text()
     app2=app1.replace('<p id="result" role="status"></p>',
@@ -234,6 +236,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                                 '  page.locator("#name").fill("Ada")\n  page.locator('+repr(check['actions'][1]['selector'])+').click()\n'
                                 '  expect(page.locator('+repr(check['selector'])+')).to_have_text('+repr(check['text'])+')\n')
                             coverage={check['id']:dict(cases=['acceptance_'+package+'.Browser.test_behavior'],gates=[])}
+                            coverage['NAMED']=dict(cases=['acceptance_'+package+'.Browser.test_behavior'],gates=[])
                             if package=='farewell':coverage['REGRESSION']=dict(cases=[],gates=['regression'])
                             sequence=[sequence[0],('write_file',dict(path='/workspace/tests/acceptance_'+package+'.py',content=browser_test)),
                                 ('write_file',dict(path='/workspace/tests/acceptance.'+package+'.json',content=json.dumps(dict(version=2,criteria=coverage)))),sequence[-1]]
@@ -328,7 +331,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             graph=runtime.store.receipt(data['graph'],kind='release_graph')['payload'];assert len(graph['items'])==2
             assert data['packages'][1]['cases'] and set(data['packages'][0]['cases'])<set(data['packages'][1]['cases'])
             assert data['packages'][0]['commit']!=data['packages'][1]['commit']
-            assert set(data['criteria'])==({'GREET','BYE','REGRESSION'} if acceptance_suite else {'GREET','BYE'}) and len({p['pr'] for p in data['packages']})==2
+            assert set(data['criteria'])==({'GREET','BYE','REGRESSION','NAMED'} if acceptance_suite else {'GREET','BYE'}) and len({p['pr'] for p in data['packages']})==2
             assert all(kb.get_task(conn,c['id']).status=='done' for i in graph['items'] for c in i['cards'].values())
         if continuity:
             prior_acceptance=acceptance;prior_data=data
