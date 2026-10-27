@@ -46,7 +46,7 @@ atribuição por horário. A origem delas permanece não comprovada.
 chamadas ao modelo. Telegram real ainda não está configurado nesta fronteira:
 a fila de outbox não comprova recebimento de uma entrega pelo CEO.
 
-A suíte do controlador passou em **378 testes**, também sem `site-packages`,
+A suíte do controlador passou em **386 testes**, também sem `site-packages`,
 após o preparo de fonte/operação e a admissão dos perfis de S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
 SDK/Docker qualificam mecanismos delimitados; não substituem julgamento real
 nem medem a autonomia por porcentagem de testes verdes.
@@ -81,6 +81,15 @@ configuração atual válida. Um perfil divergente não impediu outro de ser adm
 no Kanban. O contrato também atravessou oito atividades SDK reais com respostas
 locais, TDD e pausa/reinício. Falta integrar esses passos na qualificação da
 instalação limpa, sem copiar os bancos ou sessões anteriores.
+
+O preparo limpo revelou que o login GitHub do shell não era a identidade do
+perfil nativo. O vínculo explícito do diretório GitHub do controlador foi
+qualificado em DevOps e seus revisores QA/CTO, sem copiar tokens para perfis ou
+contêineres. Um perfil não vinculado continuou sem herdar a identidade ambiente.
+Os nove perfis permaneceram válidos; a instalação ficou pausada, sem cards ou
+chamadas ao modelo. O `doctor` agora informa ausência ou divergência desse
+vínculo. Isso qualifica autenticação para consultas, não PR/merge ou entrega
+autônoma no novo repositório.
 
 O [reparo de atribuição auxiliar](ADR-0005-VALIDATION-AND-ACCOUNTING.md) passou
 no compressor real/relay com respostas simuladas e na recuperação nativa, sem

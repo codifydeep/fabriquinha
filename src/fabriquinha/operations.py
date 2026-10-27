@@ -89,6 +89,8 @@ def missing_profiles(project):
 def doctor(project,root,store):
     errors=[]
     profiles=profile_report(project,root);errors+=profiles['errors']
+    from .github_auth import report as github_report
+    github=github_report(project,root);errors+=github['errors']
     try:
         if not project.qualification and validation_files(project,store)[0] is None:errors.append('ValidationBundleRequired')
     except (ValueError,OSError,TypeError):errors.append('ValidationBundleInvalid')
@@ -104,4 +106,4 @@ def doctor(project,root,store):
         from .deployment import deployment_networks
         try:deployment_networks(project)
         except (ValueError,OSError,subprocess.SubprocessError,EffectBlocked):errors.append('DeploymentNetworksUnavailable')
-    return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project),profiles=profiles)
+    return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project),profiles=profiles,github=github)

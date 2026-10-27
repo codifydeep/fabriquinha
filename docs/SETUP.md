@@ -132,6 +132,39 @@ homes SDK. Políticas gerenciadas pelo administrador exigem sua própria
 qualificação; o kit não as ignora para passar o teste. Credenciais de modelo e
 canal ficam no controlador/relay, fora desses homes.
 
+### Identidade GitHub explícita
+
+O Hermes fixado isola a identidade GitHub de cada perfil nomeado. Um `gh api
+user` bem-sucedido no shell do operador não comprova que o perfil responsável
+pela integração consegue autenticar. O `doctor` exige também o vínculo abaixo
+em projetos reais com CI local; isso verifica configuração, não disponibilidade
+atual da API nem autorização de merge.
+
+Autentique primeiro a conta declarada como `local_ci.publisher` em um diretório
+GitHub CLI administrado pelo controlador. Depois, com a instalação pausada e
+drenada, execute usando o SDK e a fonte revisados:
+
+```sh
+PYTHONPATH=<fonte-revisada>/src <python-do-SDK> -m fabriquinha.github_auth \
+  --root <raiz-privada> --upstream <checkout-Hermes-fixado> \
+  --config-dir <diretorio-absoluto-gh-do-controlador>
+```
+
+Esse comando faz apenas uma consulta de conta na API e provisiona
+`github-auth.json` privado e as referências não secretas `GH_CONFIG_DIR`/`GH_HOST`
+nos perfis de integração e seus revisores. O SDK nativo continua usando essas
+identidades na conclusão do Kanban. Não são copiados tokens, `hosts.yml` ou
+sessões. O diretório deve ficar fora da instalação e nunca é montado em
+contêineres de execução, revisão ou testes. A mesma conta pode servir aos perfis;
+a independência de revisão continua sendo a do papel/execução/SHA, não identidades
+GitHub fictícias. Perfis no host não são uma barreira contra o administrador.
+
+Conta divergente, `.env` com credenciais ou configuração desconhecida impedem o
+provisionamento antes da escrita. Uma interrupção parcial mantém o `doctor`
+recusando prontidão; a repetição com a mesma identidade termina o vínculo. Trocar
+uma identidade já vinculada exige migração explícita. Nunca resolva a recusa
+retirando o perfil das operações GitHub para fazê-las herdar o login ambiente.
+
 Os handlers continuam impondo as permissões da fase, incluindo revisão imutável;
 o preflight não substitui essa barreira nem é uma sandbox contra o administrador
 capaz de modificar arquivos. Mudanças operacionais devem ocorrer sob pausa

@@ -89,6 +89,17 @@ ou homologação de produto. A suíte do núcleo chegou a 371 testes, também co
 2. Verificar provisionamento de redes, estado/credenciais externos e comandos de
    bootstrap no outro repositório autorizado, sem dependência de bancos históricos.
 
+**Identidade GitHub verificada:** o preparo com upstream e ambiente SDK públicos
+novos revelou a ausência de autenticação no perfil de integração, apesar do
+login válido no shell. `fabriquinha.github_auth` provisiona, sob pausa drenada,
+somente o ponteiro não secreto para o diretório GitHub do controlador. A prova
+nativa confirmou GET de conta com DevOps/QA/CTO, ausência de token no ambiente
+e recusa de fallback ambiente em perfil não vinculado. Todos os nove perfis
+continuaram válidos, com board vazio e zero inferência/alterações GitHub. O
+`doctor` confere esse vínculo nos projetos reais com CI local. Testes cobrem
+conta incorreta, credenciais inesperadas, divergência, interrupção e retomada
+idempotente; isso não valida publicação ou aceitação de uma entrega.
+
 **Redes explícitas preparadas:** `network_pool` opcional e fixado pelo fingerprint
 permite reservar três blocos `/28` e um de reserva dentro de um `/26` privado.
 O preflight detecta sobreposição, inclusive no bloco central/reservado, antes da

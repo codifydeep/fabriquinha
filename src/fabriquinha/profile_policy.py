@@ -133,8 +133,9 @@ def inspect_profile(root,name,*,loader=None):
                 if (folder/'auth.json').exists() or (folder/'auth.json').is_symlink():errors.append('ProfileCredentialsUnqualified')
                 env=folder/'.env'
                 if env.exists() or env.is_symlink():
+                    from .github_auth import env_allowed
                     if (env.is_symlink() or not env.is_file() or env.stat().st_size>16384 or env.stat().st_mode&0o077
-                            or any(line.strip() and not line.lstrip().startswith('#') for line in env.read_text().splitlines())):
+                            or not env_allowed(root,name if folder==home else None,env.read_text())):
                         errors.append('ProfileCredentialsUnqualified')
                 plugins=folder/'plugins'
                 if plugins.is_symlink() or plugins.exists() and (not plugins.is_dir() or any(plugins.iterdir())):
