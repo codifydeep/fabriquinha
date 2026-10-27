@@ -13,6 +13,7 @@ from fabriquinha.effects import write_json, Journal, Pending, EffectBlocked
 from fabriquinha.operations import Control, ActivityPaused, doctor
 from fabriquinha.executor import seal_validation
 from fabriquinha.quality import CONTROL_CONTRACT
+from fabriquinha.profile_policy import contract as profile_contract
 from test_delivery_core import configuration
 
 
@@ -59,6 +60,15 @@ class OperationalControl(unittest.TestCase):
             result=doctor(self.project,self.root,Store(self.root/'private'))
         self.assertTrue(result['ready']);self.assertEqual(result['missing_profiles'],['mobile'])
 
+    def test_one_divergent_profile_is_reported_without_a_global_dispatch_fence(self):
+        state={'contract':profile_contract(),'errors':[],
+            'profiles':{'backend':{'ready':False,'errors':['ProfileConfigDrift']},'lead':{'ready':True,'errors':[]}}}
+        with patch('fabriquinha.operations.profile_report',return_value=state), \
+             patch('fabriquinha.operations.missing_profiles',return_value=[]), \
+             patch('fabriquinha.operations.Runner'),patch('fabriquinha.operations.shutil.disk_usage',return_value=Mock(free=2**32)):
+            result=doctor(self.project,self.root,Store(self.root/'private'))
+        self.assertTrue(result['ready']);self.assertEqual(result['profiles'],state)
+
     def test_resource_failure_does_not_claim_success_or_expose_raw_docker_output(self):
         with patch('fabriquinha.operations.missing_profiles',return_value=[]), \
              patch('fabriquinha.operations.Runner',side_effect=ValueError('private diagnostic')), \
@@ -74,7 +84,8 @@ class OperationalControl(unittest.TestCase):
             'coordination_roles':{'product':'backend','lead':'lead'},
             'delivery_roles':{'tests':'backend','integration':'lead'},'browser_image':'sha256:'+'b'*64})
         store=Store(self.root/'private');bundle=seal_validation(store)
-        write_json(self.root/'installation.json',dict(project=project.fingerprint(),validation_bundle=bundle,control_contract=CONTROL_CONTRACT))
+        write_json(self.root/'installation.json',dict(project=project.fingerprint(),validation_bundle=bundle,
+            control_contract=CONTROL_CONTRACT,profile_contract=profile_contract()))
         with patch('fabriquinha.operations.missing_profiles',return_value=[]), \
              patch('fabriquinha.operations.Runner'), \
              patch('fabriquinha.operations.docker',return_value=project.browser_image), \

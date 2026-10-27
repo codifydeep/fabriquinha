@@ -58,8 +58,9 @@ ou credenciais de outra máquina.
 ### Validação fixada e consulta de consumo
 
 A preparação de uma instalação nova grava `validation_bundle` e `control_contract`
-em `installation.json`, usando scripts capturados em snapshot imutável. Não edite
-esses campos para promover uma instalação legada ou reaproveitar suas aprovações.
+em `installation.json`, usando scripts capturados em snapshot imutável. As novas
+instalações reais também fixam `profile_contract`. Não edite esses campos para
+promover uma instalação legada ou reaproveitar suas aprovações.
 Trabalho real exige esse pin; instalações antigas permanecem consultáveis como
 história. Migração geral de upgrades ainda depende de S6.
 
@@ -89,6 +90,68 @@ A prova isolada pode ser executada com o Python do SDK e um diretório privado n
 O script usa o compressor real com provedor simulado e apenas sua porta local.
 Não usa a chave ou o contador de produção e não qualifica uma entrega de produto.
 Veja os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
+
+### Perfis gerenciados e modelo do controlador
+
+`prepare_hermes_project.py` prepara uma raiz privada **nova**, vazia e pausada,
+com perfis nomeados, a rota local e política de inferência desabilitada. O SDK,
+upstream fixado e imagens devem existir; o script não inicia relay, gateway ou
+workers, não provisiona chaves e não altera GitHub. Exemplo de entrada:
+
+```sh
+<python-do-SDK> scripts/prepare_hermes_project.py \
+  --root <raiz-privada-nova> --upstream <checkout-Hermes-fixado> \
+  --project <project.json-revisado> --model <modelo-autorizado> \
+  --provider-port <porta-local-livre> --max-calls <teto-autorizado> \
+  --max-output-tokens <limite-autorizado>
+```
+
+Nesta fronteira, **modelo e orçamento pertencem a `provider-policy.json` e
+`route.json` privados**, sob controle do operador. Os perfis SDK gerados não
+escolhem outro modelo ou provedor. Não configure seus modelos pelo menu do
+Hermes esperando alterar a rota da equipe: a divergência será recusada. Trocar
+o modelo exige manutenção coordenada e nova validação, preservando o contador.
+O arquivo `config.yaml` gerenciado usa JSON compatível com YAML, produzido por
+`fabriquinha.profile_policy.configuration()`; a comparação é pelo conteúdo
+canônico, não pela ordem ou espaços. Alterações manuais e YAML fora desse
+formato não são uma configuração suportada do perfil gerenciado.
+
+`doctor` e `status` mostram erros por perfil e seu responsável técnico. Um perfil
+divergente é recusado no spawn; os demais continuam elegíveis. O worker confere
+novamente antes do sandbox/SDK e durante a atividade. A recusa usa a espera de
+infraestrutura existente, preservando fase/sessão e sem gastar o limite de falhas
+funcionais. O cooldown nativo continua em vigor; readiness não significa que um
+worker já foi executado ou que uma tarefa foi concluída.
+
+O preflight confere a configuração atual e os defaults/normalização efetivos do
+SDK. Um arquivo ilegível ou corrompido **não** é qualificado usando o backup
+last-known-good. O carregador Hermes pode criar seu backup nativo limitado; o
+preflight não reescreve a configuração. Também recusa rotas auxiliares explícitas,
+fallbacks, hooks/extensões não qualificados, memória externa e credenciais nos
+homes SDK. Políticas gerenciadas pelo administrador exigem sua própria
+qualificação; o kit não as ignora para passar o teste. Credenciais de modelo e
+canal ficam no controlador/relay, fora desses homes.
+
+Os handlers continuam impondo as permissões da fase, incluindo revisão imutável;
+o preflight não substitui essa barreira nem é uma sandbox contra o administrador
+capaz de modificar arquivos. Mudanças operacionais devem ocorrer sob pausa
+drenada. Instalações históricas sem `profile_contract` permanecem consultáveis,
+mas o código novo recusa trabalho real até uma migração qualificada. Adicionar
+o campo manualmente não constitui essa migração.
+
+```sh
+<python-do-SDK> scripts/qualify_profile_admission.py \
+  --root <privado>/perfis-novos --upstream <checkout-Hermes-fixado> \
+  --image <ID-validation> --browser-image <ID-qa>
+<python-do-SDK> scripts/qualify_hermes_operations.py \
+  --root <privado>/operacao-nova --upstream <checkout-Hermes-fixado> \
+  --image <ID-validation> --managed-profiles
+```
+
+A primeira prova prepara nove perfis e usa um callback sem worker para verificar
+admissão independente no Kanban. A segunda executa SDK/sandboxes reais, TDD,
+pausa, reinício e retomada com respostas HTTP locais. Nenhuma faz chamada paga,
+altera GitHub ou qualifica uma nova entrega de produto.
 
 ### Imagens públicas da stack Python/HTTP
 

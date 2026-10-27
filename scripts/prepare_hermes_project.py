@@ -18,6 +18,7 @@ from fabriquinha.effects import write_json
 from fabriquinha.provider import Policy,OUTPUT_LIMITS
 from fabriquinha.runtime import Runtime,bind
 from fabriquinha.kanban_lane import native
+from fabriquinha.profile_policy import configuration as profile_configuration,report as profile_report,names as profile_names
 
 
 def configuration(value,model,port,max_calls,*,max_output_tokens=4096):
@@ -27,10 +28,9 @@ def configuration(value,model,port,max_calls,*,max_output_tokens=4096):
         raise ValueError('real isolated delivery project, non-primary branch and explicit loopback port required')
     policy=Policy.parse(dict(version=1,project=project.fingerprint(),model=model,max_calls=max_calls,
         max_output_tokens=max_output_tokens,enabled=False,client_token=secrets.token_urlsafe(32)))
-    profiles=set(project.reviewers)
-    for author in project.reviewers:profiles.update(project.reviewers_for(author))
-    for roles in (project.technical_roles,project.coordination_roles,project.delivery_roles):profiles.update(roles.values())
-    return project,policy,sorted(profiles)
+    profiles=profile_names(project)
+    if 'default' in profiles:raise ValueError('explicit named managed profiles required; default is not a prepared team role')
+    return project,policy,profiles
 
 
 def prepare(root,upstream,value,model,port,max_calls,*,max_output_tokens=4096):
@@ -51,14 +51,16 @@ def prepare(root,upstream,value,model,port,max_calls,*,max_output_tokens=4096):
     from hermes_cli.profiles import create_profile,profile_exists
     for name in profiles:
         if profile_exists(name):raise ValueError('fresh profile home required; never reuse active context')
-        create_profile(name,no_skills=True,description='Prepared isolated delivery profile; no gateway enabled')
-        write_json(root/'home/profiles'/name/'config.yaml',dict(model={'streaming':False,'context_length':65536},
-            auxiliary={'title_generation':{'enabled':False}},tools={'tool_search':{'enabled':'off'}},
-            terminal={'backend':'fabriquinha','cwd':'/workspace'}))
+        create_profile(name,no_skills=True,no_alias=True,description='Prepared isolated delivery profile; no gateway enabled')
+        write_json(root/'home/profiles'/name/'config.yaml',profile_configuration())
+    profiles_state=profile_report(project,root)
+    if profiles_state['errors'] or any(not state['ready'] for state in profiles_state['profiles'].values()):
+        raise ValueError('prepared profiles failed effective SDK admission; keep paused and inspect doctor')
     write_json(root/'provider-policy.json',policy.values())
     write_json(root/'route.json',dict(base_url='http://127.0.0.1:'+str(port)+'/v1',api_key=policy.client_token,
         provider='custom',api_mode='chat_completions',model=policy.model))
     result=dict(prepared=True,project=project.fingerprint(),profiles=profiles,empty_board=True,
+        profile_contract=profiles_state['contract'],effective_profiles_verified=True,
         max_output_tokens=policy.max_output_tokens,
         operational_pause=True,provider_enabled=False,service_started=False,model_calls=0,
         github_mutations=0,delivery_approval=False,complete_installer=False)

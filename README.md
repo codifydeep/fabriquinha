@@ -30,6 +30,7 @@ flowchart LR
     CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
     A[Admissão: imagens, disco e redes reservadas] --> K
     SRC[Commit Git: export fechado e hash verificado] --> W[Agentes via SDK Hermes]
+    PC[Perfil: contrato e configuração efetiva] --> W
     K --> W
     W --> S[Sandbox por atividade e deadline interno]
     S --> E[Snapshot e recibos imutáveis]
@@ -181,10 +182,14 @@ já passou em probes TDD/QA sobre Linux ARM64; o instalador completo continua em
 
 ## Situação das validações
 
-Em 27/10/2026, o núcleo passou em 360 testes (Python 3.14.10), também sem
+Em 27/10/2026, o núcleo passou em 371 testes (Python 3.14.10), também sem
 `site-packages`. A [entrada operacional de S6](docs/S6-PORTABILITY-PLAN.md)
 passou em clone/board novos, sob pausa, com fonte verificada e lock exclusivo;
 isso ainda não é uma instalação completa ou nova entrega de produto.
+O preparo público também verificou nove perfis, recusa de configuração antiga
+e admissão independente. O contrato passou em oito atividades SDK com respostas
+locais, TDD e pausa/reinício, sem chamadas pagas. Modelo/orçamento ficam na política
+do controlador; os perfis gerenciados seguem essa rota.
 O reparo mínimo completou uma
 homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
 específicas; decisões programadas não são julgamento de um agente real.

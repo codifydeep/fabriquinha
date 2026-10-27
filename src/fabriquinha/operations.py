@@ -13,6 +13,7 @@ import uuid
 from .effects import EffectBlocked, NotSent, write_json
 from .executor import Runner, docker,validation_files
 from .kanban_lane import UPSTREAM_COMMIT
+from .profile_policy import names as profile_names,report as profile_report
 
 
 class ActivityPaused(EffectBlocked,NotSent):pass
@@ -82,16 +83,12 @@ class Control:
 
 def missing_profiles(project):
     from hermes_cli.profiles import profile_exists
-    names=set(project.reviewers)
-    for author in project.reviewers:names.update(project.reviewers_for(author))
-    names.update((project.technical_roles or {}).values())
-    names.update((project.coordination_roles or {}).values())
-    names.update((project.delivery_roles or {}).values())
-    return sorted(name for name in names if not profile_exists(name))
+    return [name for name in profile_names(project) if not profile_exists(name)]
 
 
 def doctor(project,root,store):
     errors=[]
+    profiles=profile_report(project,root);errors+=profiles['errors']
     try:
         if not project.qualification and validation_files(project,store)[0] is None:errors.append('ValidationBundleRequired')
     except (ValueError,OSError,TypeError):errors.append('ValidationBundleInvalid')
@@ -107,4 +104,4 @@ def doctor(project,root,store):
         from .deployment import deployment_networks
         try:deployment_networks(project)
         except (ValueError,OSError,subprocess.SubprocessError,EffectBlocked):errors.append('DeploymentNetworksUnavailable')
-    return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project))
+    return dict(checked_at=time.time(),ready=not errors,errors=errors,missing_profiles=missing_profiles(project),profiles=profiles)

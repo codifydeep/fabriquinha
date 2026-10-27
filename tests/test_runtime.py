@@ -181,6 +181,35 @@ class NativeRuntime(unittest.TestCase):
              patch.object(self.runtime,'settle'),patch.object(self.runtime,'_spawn',return_value=42):
             self.assertEqual(self.runtime.spawn(task,'/unused'),42)
 
+    def test_profile_drift_refuses_only_that_spawn_before_provider_or_worker(self):
+        modules={'tools':SimpleNamespace(),'tools.process_registry':SimpleNamespace(RestartSafeScopeUnavailable=EffectBlocked)}
+        task=SimpleNamespace(id='task',assignee='backend',body='{"kind":"tests"}')
+        with patch.dict(sys.modules,modules),patch.object(self.runtime,'check_admission',return_value={'ready':True}), \
+             patch('fabriquinha.runtime.profile_admission',return_value={'ready':False,'errors':['ProfileConfigDrift']}) as admission, \
+             patch.object(self.runtime,'provider_status',return_value={'ready':True}) as provider, \
+             patch.object(self.runtime,'settle'),patch.object(self.runtime,'_spawn',return_value=42) as spawn:
+            with self.assertRaisesRegex(EffectBlocked,'ProfileConfigDrift'):self.runtime.spawn(task,'/unused')
+            provider.assert_not_called();spawn.assert_not_called()
+            admission.return_value={'ready':True,'errors':[]}
+            self.assertEqual(self.runtime.spawn(SimpleNamespace(id='other',assignee='lead',body='{"kind":"tests"}'),'/unused'),42)
+            self.assertEqual(admission.call_args.args[-1],'lead')
+
+    def test_worker_rechecks_profile_before_sandbox_and_parks_as_infrastructure(self):
+        run=Run('task',7,'backend','tests',False,'backend','v1','contract')
+        conn=Mock();conn.execute.return_value.fetchone.return_value={'worker_pid':os.getpid()}
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(conn));kb=Mock();dispatch=Mock()
+        dispatch.adopt_worker_pid.return_value=True
+        with patch.dict(os.environ,{}),patch('fabriquinha.runtime.native',return_value=(kb,api,dispatch)), \
+             patch.object(self.runtime.board,'current',return_value=run), \
+             patch('fabriquinha.runtime.profile_admission',return_value={'ready':False,'errors':['ProfileConfigDrift']}), \
+             patch('fabriquinha.runtime.Runner') as runner:
+            self.runtime._worker('task',7)
+        runner.assert_not_called();kb.block_task.assert_not_called()
+        wait=json.loads((self.root/'runs/7/provider-wait.json').read_bytes())
+        payload=self.runtime.store.receipt(wait['receipt'],kind='provider_wait')['payload']
+        self.assertEqual(payload['reason'],'profile_configuration_unqualified')
+        self.assertFalse((self.root/'runs/7/activity.json').exists())
+
     def test_invalid_graph_defers_only_that_spawn_before_any_model_worker(self):
         value=configuration();value.update(coordination_roles={'product':'product','lead':'lead'},
             delivery_roles={'tests':'qa','integration':'devops'},browser_image='sha256:'+'b'*64,

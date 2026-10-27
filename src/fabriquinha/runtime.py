@@ -34,6 +34,7 @@ from .intake import Intake, DraftActivity
 from .releases import Releases
 from .provider import Policy, Held, inspect as inspect_provider,inspect_usage
 from .source import environment as check_source
+from .profile_policy import contract as profile_contract,admission as profile_admission,report as profile_report
 
 
 class IntegrationRunner(Runner):
@@ -158,10 +159,12 @@ class Runtime:
                 if 'validation_bundle' in existing:
                     from .quality import CONTROL_CONTRACT
                     binding.update(validation_bundle=existing['validation_bundle'],control_contract=CONTROL_CONTRACT)
+                if 'profile_contract' in existing:binding['profile_contract']=profile_contract()
                 if existing!=binding:raise ValueError('installation contract changed; explicit reconfiguration required')
             else:
                 from .quality import CONTROL_CONTRACT
                 binding.update(validation_bundle=seal_validation(self.store),control_contract=CONTROL_CONTRACT)
+                if not self.project.qualification:binding['profile_contract']=profile_contract()
                 write_json(installation,binding)
             validation_files(self.project,self.store)
         self.control=Control(self.root,self.project)
@@ -215,6 +218,10 @@ class Runtime:
         if not admission['ready']:
             from tools.process_registry import RestartSafeScopeUnavailable
             raise RestartSafeScopeUnavailable('runtime admission deferred; inspect doctor/status')
+        state=profile_admission(self.project,self.root,getattr(task,'assignee',None))
+        if not state['ready']:
+            from tools.process_registry import RestartSafeScopeUnavailable
+            raise RestartSafeScopeUnavailable('profile deferred: '+','.join(state['errors']))
         if json.loads(task.body).get('kind')!='integration':
             state=self.provider_status()
             if not state['ready']:
@@ -513,7 +520,8 @@ class Runtime:
                     integration_issues=self.integration_issues,intake_issues=self.intake_issues,release_issues=self.release_issues,
                     control=control,admission=self.admission,
                     provider=self.provider_status(),provider_issues=self.provider_issues,
-                    incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,delivery_approval=False)
+                    incidents=incidents,notifications=self.outbox.summary(),qualification=self.project.qualification,
+                    profiles=profile_report(self.project,self.root),delivery_approval=False)
 
     def serve(self,stop,*,interval=15):
         # Keep WAL sidecars present across short native API connections. This
@@ -572,6 +580,10 @@ class Runtime:
         try:
             self.control.ensure()
             os.environ['HERMES_HOME']=str(self.root/'home/profiles'/run.actor)
+            def profile_check():
+                if not profile_admission(self.project,self.root,run.actor)['ready']:
+                    raise Held('profile_configuration_unqualified')
+            profile_check()  # Before validator/sandbox creation or any SDK client.
             runner=IntegrationRunner if run.kind=='integration' else Runner
             quality=Quality(self.project,self.store,runner(self.project,self.store),self.board)
             if self.project.delivery_roles and run.kind in ('tests','implementation','integration'):
@@ -592,6 +604,7 @@ class Runtime:
             def provider_check():
                 try:check_source()
                 except (ValueError,TypeError,OSError):raise Held('source_changed') from None
+                profile_check()
                 try:current=model_route(self.project,self.root/'route.json')
                 except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
                 if current!=route:raise Held('provider_route_changed')

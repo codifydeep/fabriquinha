@@ -22,14 +22,21 @@ from fabriquinha.effects import write_json
 from fabriquinha.executor import docker
 from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
+from fabriquinha.profile_policy import contract as profile_contract
 
 
-def qualify(root,upstream,image):
+def qualify(root,upstream,image,*,managed_profiles=False):
     tests,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-operations')
     project=json.loads((root/'project.json').read_bytes())
     project['reviewers']['mobile']='flow-reviewer'  # Absent and unused must not stop web work.
     write_json(root/'project.json',project)
     runtime=Runtime(root,upstream);kb,kbc,_=native()
+    if managed_profiles:
+        # New, synthetic fixture before any claim or approval; never promote an
+        # old installation by adding this field in an operational migration.
+        path=root/'installation.json'
+        write_json(path,{**json.loads(path.read_bytes()),'profile_contract':profile_contract()})
+        runtime=Runtime(root,upstream)
     held={kind:threading.Event() for kind in ('author','review')}
     release={kind:threading.Event() for kind in held};paused={};sequences={};requests={};services=[]
     class Response(BaseHTTPRequestHandler):
@@ -154,7 +161,8 @@ def qualify(root,upstream,image):
             stale_resume_refused=True,missing_profile_did_not_spend_retry=True,
             absent_unused_role_did_not_stop_work=True,complete_tdd_after_resume=True,
             native_runs=len(runs),local_http_requests=sum(requests.values()),model_calls=0,
-            delivery_approval=False,migration=False)
+            delivery_approval=False,migration=False,managed_profiles=managed_profiles,
+            profile_contract=profile_contract() if managed_profiles else None)
         write_json(root/'receipt.json',result);print(json.dumps(result,indent=2))
     finally:
         for event in release.values():event.set()
@@ -172,5 +180,5 @@ def qualify(root,upstream,image):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    parser.add_argument('--image',required=True);args=parser.parse_args()
-    qualify(args.root.resolve(),args.upstream.resolve(),args.image)
+    parser.add_argument('--image',required=True);parser.add_argument('--managed-profiles',action='store_true');args=parser.parse_args()
+    qualify(args.root.resolve(),args.upstream.resolve(),args.image,managed_profiles=args.managed_profiles)

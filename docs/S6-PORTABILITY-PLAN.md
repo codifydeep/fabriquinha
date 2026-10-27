@@ -67,12 +67,27 @@ retirados; imagens instaladas no S5 não mudaram. Build público não implica
 determinismo bit a bit das bibliotecas Debian ou qualificação de outra arquitetura.
 Instruções e limites em [SETUP](SETUP.md#imagens-públicas-da-stack-pythonhttp).
 
-1. Validar a configuração efetiva de cada perfil antes do despacho, especialmente
-   rotas auxiliares, modelo e ferramentas. Um perfil divergente deve impedir seu
-   próprio despacho com motivo visível, sem bloquear papéis independentes.
-2. Preparar uma raiz nova usando os comandos públicos e a mesma fonte no SDK e
+**Perfis preparados e qualificados:** a fonte gerenciada produz o `config.yaml`
+e fixa `profile_contract` na instalação nova. Preflight e worker recusam configuração
+divergente, rota/modelo auxiliar explícito, fallback ou extensão não qualificados,
+sem reutilizar o last-known-good como configuração válida. Status expõe motivo,
+responsável e próxima ação por perfil; um problema local não cria uma barreira
+para papéis independentes. A fonte nova não ativa trabalho real em instalação
+histórica sem esse pin.
+
+Uma prova com o preparo público criou nove perfis novos, verificou os defaults
+efetivos do Hermes e a recusa de fallback nativo. O Kanban recusou o perfil
+divergente e admitiu outro no mesmo tick, sem gastar falha funcional; esse callback
+não criou worker. Em outra prova, o contrato acompanhou oito atividades SDK reais,
+19 respostas HTTP locais e TDD completo, incluindo pausa durante autoria/revisão,
+reinício, perfil revisor ausente e retomada. Nenhuma chamada paga, alteração GitHub
+ou homologação de produto. A suíte do núcleo chegou a 371 testes, também com `-S`.
+
+1. Preparar uma raiz nova usando os comandos públicos e a mesma fonte no SDK e
    relay. Qualificar operação/restauração e reservar o ciclo real antes de ativar
    consumo. Não mudar a fonte instalada do S5 apenas para atualizar documentação.
+2. Verificar provisionamento de redes, estado/credenciais externos e comandos de
+   bootstrap no outro repositório autorizado, sem dependência de bancos históricos.
 
 ## Decisões para a execução
 

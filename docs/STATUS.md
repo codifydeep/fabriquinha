@@ -46,8 +46,8 @@ atribuição por horário. A origem delas permanece não comprovada.
 chamadas ao modelo. Telegram real ainda não está configurado nesta fronteira:
 a fila de outbox não comprova recebimento de uma entrega pelo CEO.
 
-A suíte do controlador passou em **360 testes**, também sem `site-packages`,
-após o preparo da fonte verificada e da entrada operacional de S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
+A suíte do controlador passou em **371 testes**, também sem `site-packages`,
+após o preparo de fonte/operação e a admissão dos perfis de S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
 SDK/Docker qualificam mecanismos delimitados; não substituem julgamento real
 nem medem a autonomia por porcentagem de testes verdes.
 
@@ -61,7 +61,7 @@ nem medem a autonomia por porcentagem de testes verdes.
 | P2 | Bundle fixado e custo reportado contabilizado | Atribuição auxiliar integral ainda não garantida |
 | P4/S4 | PR 59 sem intervenção técnica após o aceite | Stack Python/HTTP e brief reutilizado por autorização |
 | P5/S5 | Segunda homologação, memória e recuperação reais | Sete intervenções; ainda não é um ciclo inteiro limpo |
-| P6/S6 | Fonte/operação pausada comprovadas em clone/board novos; receita pública e probes ARM64 do navegador passaram | Configuração de perfis, ativação conjunta, canais, upgrade/restauração e entrega em outro repo |
+| P6/S6 | Fonte/operação, receita pública ARM64 e preflight de nove perfis passaram; oito atividades SDK com perfis gerenciados e transporte local | Ativação conjunta, redes/provisionamento, canais, upgrade/restauração e entrega em outro repo |
 | P7/S7 | Não iniciado | Retomar Truco após qualificação da plataforma |
 
 O [S4 original](HERMES-S4-QUALIFICATION.md) permanece como prova independente:
@@ -76,8 +76,11 @@ com início pausado, lock exclusivo, reinício e recusa de alteração do export
 Nessa prova não houve modelo nem jobs Docker. Em uma prova separada, a nova
 receita pública do navegador passou em quatro jobs TDD e um probe QA real no UID
 10000, em Linux ARM64. A homologação e as imagens instaladas foram preservadas.
-Falta validar a configuração efetiva dos perfis e integrar esses passos na
-qualificação da instalação limpa, sem copiar os bancos ou sessões anteriores.
+O preparo público validou nove perfis e o SDK recusou last-known-good como
+configuração atual válida. Um perfil divergente não impediu outro de ser admitido
+no Kanban. O contrato também atravessou oito atividades SDK reais com respostas
+locais, TDD e pausa/reinício. Falta integrar esses passos na qualificação da
+instalação limpa, sem copiar os bancos ou sessões anteriores.
 
 O [reparo de atribuição auxiliar](ADR-0005-VALIDATION-AND-ACCOUNTING.md) passou
 no compressor real/relay com respostas simuladas e na recuperação nativa, sem
