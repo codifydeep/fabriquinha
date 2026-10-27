@@ -1,170 +1,82 @@
 # Status do projeto — 27 de outubro de 2026
 
-**S4 técnico qualificado; Reset validado em homologação; S5 segue no pacote Undo.**
-O caminho usa Hermes + Kanban nativos e operações determinísticas. Multica e
-Temporal não participam dessa execução. A autonomia geral, a distribuição e a
-retomada do Truco continuam pendentes.
+**S4 técnico qualificado; S5 homologado com assistência. O objetivo geral continua aberto.**
+A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
+Multica e Temporal não participam desse caminho. A distribuição pública e a
+retomada do Truco ainda não estão qualificadas.
 
-## Evidência mais recente
+## Resultado mais recente
 
-A revisão `e7349bb6` foi instalada após as provas de memória. O Lead real
-executou um novo SPIKE, reconheceu o artefato como a homologação anterior do
-mesmo projeto e decidiu a retomada. O controlador aplicou essa decisão, sem
-desbloqueio manual. Reset, do [PR 60](https://github.com/codifydeep/descartavel2/pull/60),
-passou por candidate/rollback/restore e QA independente no commit `454b845a`.
-Foram validados AC1, AC2, AC3, AC7 e AC8; o rollback reutilizou o artefato S4 exato.
+O [S5](HERMES-S5-QUALIFICATION.md) entregou dois pacotes dependentes na mesma
+aplicação: Reset e Undo. Os PRs [60](https://github.com/codifydeep/descartavel2/pull/60)
+e [61](https://github.com/codifydeep/descartavel2/pull/61) foram integrados na
+branch de release. O commit final é `9af291f509416e085958e281fed40c267fc3e750`.
+A main do produto permaneceu intacta.
 
-O grafo liberou automaticamente os testes de Undo. Após solicitação de mudanças,
-o autor corrigiu a proposta, a revisão congelou os testes e o frontend iniciou
-a implementação. A versão completa ainda não está homologada. As sete intervenções de manutenção permanecem registradas como
-assistência: essa recuperação não converte S5 em uma release autônoma limpa.
+A auditoria conferiu:
 
-### Referência S4 preservada
+- 18 testes na integração de Reset e 29 na de Undo, com os anteriores intactos.
+- Red, congelamento independente, Green e controles negativos por entrega.
+- Revisão independente, CI local no SHA do PR e do merge, imagem e commit exatos.
+- Candidate/rollback/restore, QA dos oito critérios e serviço saudável.
+- Memória da decisão S4 usada por Produto, sem herdar a aprovação antiga.
+- Recuperação real e liberação automática da dependência após QA de Reset.
+- Nenhum worker, claim, sandbox não retirado ou efeito pendente no encerramento.
 
-O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) chegou a `HOMOLOGADA`
-no commit `5fef1cd40cb05bcaf60db1b42b450d19ca08f473`. O operador apenas aplicou a
-aprovação humana condicional do mesmo documento de negócio e observou a execução.
-Depois do aceite, a equipe conduziu o ciclo inteiro sem correções, orientação
-técnica externa ou reinício do controlador.
+O S5 registra **sete intervenções de manutenção**. Não é uma release autônoma
+limpa. Depois da última instalação, a equipe reavaliou o impedimento e concluiu
+o trabalho restante sem edição manual do produto. A exportação executada,
+`e7349bb6`, manteve seus 27 arquivos inalterados e o bundle dos validadores fixado.
 
-Foram conferidos nove testes, seis falhas reais no Red, três mutações cobrindo
-seis alvos,
-revisões independentes, CI no SHA do PR e do merge, implantação, rollback e QA
-AC1/AC2. Saúde e identidade HTTP coincidiram com o commit integrado. Os dois
-testes de infraestrutura anteriores ficaram intactos e a main permaneceu
-inalterada. Não havia worker, claim, sandbox ou efeito pendente ao encerrar.
-
-O runtime foi executado de uma exportação da revisão publicada, com 27 arquivos
-inalterados até o final. Jobs e aceitação usaram o mesmo bundle de validação.
-O [documento S4](HERMES-S4-QUALIFICATION.md) registra prova, autoria e limites.
-Reutilizar um brief completo não comprova descoberta autônoma de novos requisitos.
+O [reparo de continuidade e memória](S5-DEPLOYMENT-CONTINUITY.md) preservou o
+deployment anterior e corrigiu a seleção do rollback. O diagnóstico passou a
+receber fatos atuais e histórico referenciado, em vez de instruções livres do
+veredito anterior. O Lead executou um SPIKE e decidiu a retomada; o controlador
+aplicou essa decisão. A instalação não desbloqueou o card diretamente.
 
 ## Consumo e operação
 
-O ciclo usou **31 chamadas**, com **US$ 0,074938** reportados pelo provedor.
-Todas têm custo e atribuição de atividade resolvidos. O contador encerrou em
-**6.811/7.000**, com 189 chamadas restantes. Não houve aumento de teto ou fallback;
-seguem Haiku, 40 iterações por atividade, dois workers e saída máxima 16.384.
+O contador encerrou em **6.951/7.000**, com 49 chamadas restantes. Na janela
+após S4 houve 140 chamadas: 125 atribuídas por recibo a S5 e 15 sem vínculo
+comprovado. O custo total reportado nessa janela foi **US$ 0,4845305**, incluindo
+US$ 0,0633779 dessas chamadas sem atribuição. Não houve reset, desconto ou
+atribuição por horário. A origem delas permanece não comprovada.
 
-Depois da qualificação offline dos contratos S5, o controlador foi atualizado
-em manutenção drenada para a revisão publicada `2bd47470`, em outra exportação
-verificada de 27 arquivos. O banco foi salvo e sua restauração conferida; código,
-recibos, sessões e deploy S4 ficaram preservados. Não houve reset de board ou quota.
-Produto elaborou o novo brief em uma chamada, com custo reportado de US$ 0,0019945;
-o CEO aprovou Reset e Undo de um nível. A segunda versão entrou em execução pela
-equipe. Esse checkpoint não é nova homologação; o contador nesse início era
-6.812/7.000, com 188 chamadas restantes.
+`runtime costs` consulta metadados sem inferência; polling e status não consomem
+chamadas ao modelo. Telegram real ainda não está configurado nesta fronteira:
+a fila de outbox não comprova recebimento de uma entrega pelo CEO.
 
-O S5 foi depois drenado por repetição de revisão: múltiplos checks AC7 e remoção
-de AC8 conflitavam com o protocolo instalado. O [reparo do impasse](S5-REVIEW-IMPASSE.md)
-impõe escalonamento ao CTO, mantendo revisão e gates. Passaram 330 testes e uma
-prova nativa de 13 atividades/41 respostas locais, sem chamadas pagas. A manutenção
-externa impede classificar todo esse ciclo como autônomo.
-Na drenagem: 6.857/7.000, com 143 restantes. Das 46 chamadas desde S4, 38 têm vínculo
-com S5 e oito permanecem sem atribuição, incluídas no custo reportado de US$ 0,1736602.
+A suíte do controlador passou em **344 testes**. As provas programadas com
+SDK/Docker qualificam mecanismos delimitados; não substituem julgamento real
+nem medem a autonomia por porcentagem de testes verdes.
 
-O escalonamento ocorreu no modelo real. O CTO manteve um `hold` técnico; a
-clarificação de caminhos da base/candidatos chegou ao Lead, que encaminhou nova
-orientação ao CTO. A revisão publicada `82b6dac7` corrigiu a identidade desse
-encaminhamento: predecessor novo gera atendimento novo, repetição reutiliza o
-mesmo. O Kanban nativo comprovou compatibilidade, reinício e status do sucessor
-atual sem modelo/Docker. O controlador atualizado retomou o mesmo ciclo e criou
-automaticamente outro diagnóstico CTO. O contador na instalação era 6.873/7.000.
-Os três ajustes de manutenção após o aceite continuam identificados como assistência.
+## Fronteiras de qualificação
 
-O lote publicado `7231004e` tornou a recusa diagnóstica explícita e indicou a
-observação imutável permitida, sem afrouxar o DSL ou testes. Passaram 333 testes,
-o fluxo nativo de recusa/observação/retomada e a CI de regressão com `subTest`.
-Após a quarta manutenção, a equipe executou o experimento, retomou a revisão e
-congelou os 18 testes de Reset, preservando os nove anteriores. O frontend
-iniciou a implementação. Ainda faltam suas revisões/integração e o pacote Undo;
-não houve nova homologação. O contador nesse checkpoint era 6.894/7.000.
-
-Reset foi depois revisado e integrado no [PR 60](https://github.com/codifydeep/descartavel2/pull/60),
-commit `454b845a0d4cf64f29f5a56ef3b32483b940356e`, mas o deploy foi impedido.
-O seletor do primeiro pacote de uma nova release ainda cria um bootstrap em vez
-de reutilizar o artefato da homologação anterior. A proteção contra substituir
-um deployment diferente preservou o S4 real. O CTO comprovou 18 testes verdes
-e manteve o bloqueio técnico visível. O próximo reparo deve selecionar o rollback
-anterior por proveniência, sem remover containers ou afrouxar essa proteção.
-O contador conferido nesse bloqueio era 6.908/7.000, com 92 chamadas restantes.
-
-Em 27/10, o [reparo de continuidade](S5-DEPLOYMENT-CONTINUITY.md) passou em
-340 testes e numa prova isolada de duas releases com Docker/QA reais, 18
-atividades SDK e 27 respostas programadas, sem chamadas pagas. A guarda contra
-substituição de um deployment divergente foi preservada. A instalação deste
-reparo e a retomada do mesmo incidente técnico são os próximos passos; o ensaio
-programado não qualifica a autonomia do S5.
-
-O seletor foi instalado da revisão `45610561` após backup verificado. O novo
-diagnóstico Lead executou 18 testes verdes, mas manteve o bloqueio por classificar
-a implantação como não relacionada. A observação foi então completada com a
-ligação explícita artefato → QA → homologação, verificada por leitura no ambiente
-real. Também passou a subir automaticamente ao CTO o hold do Lead, mantendo fonte
-bloqueada e a decisão histórica. Essas extensões passaram em 342 testes e numa
-prova de sucessores no Kanban nativo, sem chamadas pagas. A atualização instalada
-e o novo diagnóstico ainda precisam ser conferidos; S5 continua assistido.
-
-A revisão `4ab2f407` foi instalada e o CTO recebeu a ligação exata dos
-artefatos, mas também manteve o hold. A mensagem entregue foi inspecionada:
-não houve perda desses fatos nem reutilização da sessão anterior. Nessa execução, o contexto
-carregava o veredito livre do predecessor sem marca histórica. O
-[reparo de memória](S5-DEPLOYMENT-CONTINUITY.md) passou em 344 testes e numa
-prova nativa de nove runs/29 respostas locais; ainda exige revalidação pelo
-modelo real. O trabalho não será liberado por alteração manual de card.
-
-A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
-terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
-mas Telegram real não está configurado: fila não comprova recebimento nesse canal.
-
-## Mecanismos qualificados
-
-- Os [contratos S5](S5-CONTRACT-QUALIFICATION.md) acrescentam regressão conhecida
-  sem duplicar testes: quatro atividades SDK, Git/Docker e CI reais, decisões
-  programadas e zero chamadas pagas. Outra base ou snapshot não reutiliza a aprovação.
-  A memória recupera somente a última decisão homologada; uso real por outro
-  perfil continua pendente.
-
-- O [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md) fixa scripts de validação em
-  snapshots imutáveis e contabiliza custo/cache/raciocínio sem estimar ausências.
-- 306 testes do núcleo e treze jobs Docker/Chromium qualificaram adição normal de
-  testes e correção restrita de expectativa QA, pela entrada real da CI com Git.
-- A orientação de recuperação referencia somente seu recibo. A prova nativa
-  percorreu nove atividades/29 respostas locais, com reinício e parecer completo;
-  comentários genuínos de PR continuam ativando a proteção contra duplicação.
-- As provas locais usaram decisões programadas e zero chamadas pagas; são
-  mecanismos, não julgamento autônomo. O S4 real é uma evidência separada.
-
-Os [PRs 57](https://github.com/codifydeep/descartavel2/pull/57) e
-[58](https://github.com/codifydeep/descartavel2/pull/58) permanecem homologações
-assistidas. As falhas e os reparos não foram apagados nem reclassificados. No
-ciclo do PR 58, 57 chamadas custaram US$ 0,147579 reportados; uma ficou sem vínculo
-explícito de atividade, com custo incluído no total. Ausência não foi tratada como
-zero nem atribuída por horário/prosa.
-
-## Próximas fronteiras
-
-| Marco | Evidência | Pendência |
+| Marco | Evidência | Limite ou pendência |
 |---|---|---|
-| S0/S1 | Integração Hermes/Kanban; upstream sem patches | Não constitui entrega de produto |
-| S2/S3 | TDD, revisão, operações e recuperação delimitada em isolamento | Não equivale a julgamento real universal |
-| P1/P3 | Reparo até homologação assistida dos PRs 57/58 | História preservada; não é autonomia |
-| P2 | Bundle e custos reais conferidos até homologação | Atribuição completa de chamadas auxiliares não é garantida |
-| P4/S4 | PR 59: ciclo técnico completo sem intervenção externa | Escopo Python/HTTP e brief já aprovado |
-| P5/S5 | Ainda não qualificado | Segunda versão, dois pacotes dependentes, regressão e memória entre perfis |
-| P6/S6 | Preparação parcial | Instalação reproduzível em outro repo, canais e corte do legado |
-| P7/S7 | Não iniciado | Retomar Truco após qualificação |
+| S0/S1 | Integração Hermes/Kanban, sem patches upstream | Não constitui entrega de produto |
+| S2/S3 | TDD, revisão, operações e recuperação em isolamento | Não é julgamento real universal |
+| P1/P3 | PRs 57/58 homologados com assistência | História preservada; não reclassificada |
+| P2 | Bundle fixado e custo reportado contabilizado | Atribuição auxiliar integral ainda não garantida |
+| P4/S4 | PR 59 sem intervenção técnica após o aceite | Stack Python/HTTP e brief reutilizado por autorização |
+| P5/S5 | Segunda homologação, memória e recuperação reais | Sete intervenções; ainda não é um ciclo inteiro limpo |
+| P6/S6 | Preparação parcial | Instalação limpa, atribuição auxiliar, canais, lifecycle e corte do legado |
+| P7/S7 | Não iniciado | Retomar Truco após qualificação da plataforma |
 
-O [plano S5](S5-CONTINUITY-PLAN.md) orienta o próximo trabalho. Não repetir outro
-ensaio genérico de saudação. Os contratos de regressão e projeção histórica
-passaram offline; a próxima fronteira é uma segunda versão na mesma aplicação.
-O novo brief foi aprovado; o mesmo ciclo continua após instalar os reparos
-de escalonamento e identidade. Não iniciar outra release ou resetar o board para esconder o
-impasse. Continuidade, recuperação real e nova homologação só serão declaradas
-após a conferência das evidências, identificando a assistência técnica externa.
+O [S4 original](HERMES-S4-QUALIFICATION.md) permanece como prova independente:
+31 chamadas, US$ 0,074938 reportados e nenhuma intervenção técnica após o aceite.
+As provas de regressão conhecida são separadas e documentadas nos
+[contratos S5](S5-CONTRACT-QUALIFICATION.md); não convertem resultados antigos.
 
-O [roadmap](ROADMAP.md) mantém o objetivo completo. As revisões de
-[24/10](SIMPLIFICATION-REVIEW-2026-10-24.md),
-[25/10](EXECUTION-REVIEW-2026-10-25.md) e
-[26/10](EXECUTION-REVIEW-2026-10-26.md) preservam sua análise histórica.
-Não há promessa de recuperação universal ou ausência universal de starvation.
+## Próximo trabalho
+
+Corrigir e testar a atribuição auxiliar offline, preservando as 15 chamadas sem
+origem comprovada. Depois, qualificar a instalação pública de S6 em outro
+repositório, com status, pausa/retomada, upgrade/rollback, canais e propriedade
+dos recursos. O próximo ciclo pago precisa de fonte congelada, objetivo próprio
+de qualificação e cota suficiente. Não repetir outra saudação genérica nem
+resetar o board para ocultar falhas.
+
+O [roadmap](ROADMAP.md) e o [resultado S5](HERMES-S5-QUALIFICATION.md) orientam a
+continuação. As auditorias e ADRs anteriores preservam decisões e limites; não
+são ordens concorrentes de execução.

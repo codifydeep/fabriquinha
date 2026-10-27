@@ -192,9 +192,10 @@ costs` consulta o relay local autenticado e não libera pausas nem faz inferênc
 
 O [S4](docs/HERMES-S4-QUALIFICATION.md) foi concluído sem correção externa do
 controlador ou dos artefatos após o aceite do brief. Foram 31 chamadas e
-US$ 0,074938 reportados. Os PRs 57/58 permanecem assistidos. Falta a segunda
-versão com regressão/memória/recuperação e uma instalação reproduzível em outro
-repositório. Telegram real ainda não está configurado nesta fronteira.
+US$ 0,074938 reportados. Os PRs 57/58 permanecem assistidos. O [S5](docs/HERMES-S5-QUALIFICATION.md) entregou Reset/Undo com 29 testes,
+memória entre perfis e recuperação real, preservando sete intervenções externas.
+Ainda faltam ciclo limpo nessa fronteira, atribuição auxiliar completa e uma
+instalação reproduzível em outro repositório. Telegram real ainda não está configurado nesta fronteira.
 Veja o [roadmap](docs/ROADMAP.md).
 
 ## Retirada de recursos de teste

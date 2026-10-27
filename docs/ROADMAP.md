@@ -1,11 +1,11 @@
-# Roadmap vigente — 26 de outubro de 2026
+# Roadmap vigente — 27 de outubro de 2026
 
 **Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57. O PR 58 também chegou
 à homologação assistida após recuperar um handoff e corrigir a regressão CI.
 P2 foi qualificado sob o [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
 P4/S4 chegou à primeira homologação técnica sem intervenção externa pelo PR 59;
-veja o [escopo e as evidências](HERMES-S4-QUALIFICATION.md). O próximo trabalho é
-P5/S5; não repetir outro S4 genérico. Os ensaios assistidos não foram reclassificados.
+veja o [escopo e as evidências](HERMES-S4-QUALIFICATION.md). O [S5](HERMES-S5-QUALIFICATION.md) chegou à homologação assistida; o próximo
+trabalho é operação/portabilidade S6, sem repetir outro S4 genérico. Os ensaios assistidos não foram reclassificados.
 As cotas e o modelo existentes continuam limitando o consumo.
 
 A estratégia aprovada continua [Hermes + Kanban](SIMPLIFICATION-REVIEW-2026-10-24.md).
@@ -28,7 +28,8 @@ O [status](STATUS.md) registra o resultado real mais recente.
 O PR 56 foi implantado com rollback/restauração, mas o QA congelado falhou.
 O PR 57 corrigiu a divergência por revisão técnica do contrato QA e chegou à
 homologação assistida. O PR 59 qualificou o S4 técnico sem intervenção.
-S5, S6 e S7 permanecem não qualificados.
+S5 entregou a segunda homologação, com assistência preservada. S6 e S7
+permanecem não qualificados; autonomia geral não foi declarada.
 
 ## Marcos e sequência de execução
 
@@ -107,6 +108,10 @@ Qualificar o Red de regressão antes de usá-lo. Todos os testes anteriores cont
 protegidos e executados. Falhas de transporte/permissão podem usar fixtures
 separadas; não exigem um ensaio pago completo por caso.
 
+**Resultado observado:** dois pacotes dependentes homologados, 29 testes,
+memória entre perfis e recuperação real, com sete intervenções externas.
+Ver [auditoria S5](HERMES-S5-QUALIFICATION.md); não equivale a ciclo limpo.
+
 **Saída:** segunda homologação com regressão preservada e recuperação real.
 Verificar slots livres durante espera e progresso de tarefa independente; uma
 espera humana legítima não é promessa de ausência universal de starvation.
@@ -114,7 +119,8 @@ espera humana legítima não é promessa de ausência universal de starvation.
 ### P6 / S6 — Reutilização por terceiros e corte do legado
 
 Instalar do Git em outro diretório/repo sem bancos, sessões ou UUIDs históricos.
-Provar setup, doctor, start, pause, status, resume, upgrade/rollback e limpeza
+Corrigir e qualificar atribuição das chamadas auxiliares sem retroatribuir as
+15 chamadas históricas. Provar setup, doctor, start, pause, status, resume, upgrade/rollback e limpeza
 com propriedade qualificada. Declarar somente stacks e plataformas testadas.
 Depois, retirar os serviços legados do caminho ativo preservando recuperação.
 
