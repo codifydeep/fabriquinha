@@ -182,6 +182,26 @@ class Runtime:
         self.releases=Releases(self.project,self.store,self.board,self.intake);self.release_issues={}
         self.outbox=Outbox(self.project,self.store)
 
+    def disable_provider(self,episode):
+        """Persist economic shutdown only after the dispatcher and workers stop."""
+        with Owner(self.root):
+            control=self.control.read()
+            if (not control['paused'] or control.get('error') or control['episode']!=episode):
+                raise ValueError('exact current valid pause required')
+            _,api,_=native()
+            with api.connect_closing() as conn:
+                if not self.pause_status(conn)['drained']:raise ValueError('drained workers and effects required')
+            path=self.root/'provider-policy.json'
+            if path.is_symlink() or not path.is_file() or path.stat().st_mode&0o077:
+                raise ValueError('private provider policy required')
+            before=Policy.parse(json.loads(path.read_bytes()))
+            if before.project!=self.project.fingerprint():raise ValueError('provider project mismatch')
+            after=Policy.parse({**before.values(),'enabled':False})
+            write_json(path,after.values())
+            return dict(policy_enabled=False,already_disabled=not before.enabled,
+                relay_stop_or_recreate_required=True,pause_episode=episode,model_calls=0,
+                counters_and_holds_untouched=True,delivery_approval=False)
+
     def configure_acceptance(self,expected_bundle):
         """Owner-approved F2/F3, before planning; never convert delivery evidence."""
         with Owner(self.root),Journal(self.store.root/'effects').lock(['installation',self.project.fingerprint()]):
@@ -689,7 +709,7 @@ class Runtime:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume','costs','configure-acceptance'))
+    parser.add_argument('operation',choices=('serve','worker','status','doctor','pause','resume','costs','configure-acceptance','disable-provider'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--task');parser.add_argument('--run',type=int);parser.add_argument('--interval',type=float,default=15)
     parser.add_argument('--expect-pause')
@@ -706,7 +726,8 @@ def main():
         Runtime(args.root,args.upstream).worker(args.task,args.run)
     else:
         runtime=Runtime(args.root,args.upstream)
-        value=(runtime.configure_acceptance(args.expect_validation) if args.operation=='configure-acceptance' else
+        value=(runtime.disable_provider(args.expect_pause) if args.operation=='disable-provider' else
+               runtime.configure_acceptance(args.expect_validation) if args.operation=='configure-acceptance' else
                runtime.pause() if args.operation=='pause' else runtime.resume(args.expect_pause)
                if args.operation=='resume' else runtime.check_admission(force=True)
                if args.operation=='doctor' else runtime.costs() if args.operation=='costs' else runtime.status())

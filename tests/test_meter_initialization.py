@@ -3,12 +3,23 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('meter_init',Path(__file__).resolve().parents[1]/'scripts/initialize_provider_meter.py')
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
 
 class NewMeter(unittest.TestCase):
+    def test_storage_bootstrap_rejects_existing_state_before_touching_either_directory(self):
+        with tempfile.TemporaryDirectory() as temporary,patch.object(module.os,'geteuid',return_value=0):
+            root=Path(temporary);meter=root/'meter';secret=root/'secret'
+            meter.mkdir();secret.mkdir();(secret/'preserve').write_text('existing')
+            with self.assertRaises(ValueError):module.initialize_storage(meter,secret,b'fake-only-key')
+            self.assertEqual(list(meter.iterdir()),[])
+            self.assertEqual((secret/'preserve').read_text(),'existing')
+            with self.assertRaises(ValueError):module.initialize_storage(meter,meter,b'fake-only-key')
+            with self.assertRaises(ValueError):module.initialize_storage(meter,secret,b'bad\nvalue')
+
     def test_new_meter_and_refusal_to_reset_existing_or_partial_state(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)

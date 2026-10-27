@@ -2,6 +2,30 @@
 # This starts a relay, not agents; policy and runtime admission remain mandatory.
 name: ${FABRIQUINHA_INSTANCE:?}
 services:
+  storage-bootstrap:
+    profiles: [bootstrap]
+    image: ${FABRIQUINHA_PYTHON_IMAGE:?}
+    pull_policy: never
+    entrypoint: [python]
+    command: [-B, /initialize.py, --new-meter, /meter, --new-secret, /secret]
+    stdin_open: true
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    volumes:
+      - type: bind
+        source: ${FABRIQUINHA_SOURCE:?}/scripts/initialize_provider_meter.py
+        target: /initialize.py
+        read_only: true
+      - meter:/meter
+      - secret:/secret
+    restart: "no"
   model-relay:
     image: ${FABRIQUINHA_PYTHON_IMAGE:?}
     pull_policy: never

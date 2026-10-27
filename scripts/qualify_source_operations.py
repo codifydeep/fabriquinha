@@ -11,6 +11,7 @@ import signal
 import subprocess
 import sys
 import time
+import re
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
@@ -18,7 +19,7 @@ from fabriquinha.effects import write_json
 from fabriquinha.source import freeze, verify
 
 
-def qualify(root,repository,revision,upstream):
+def qualify(root,repository,revision,upstream,*,launchd=False):
     root=Path(root).resolve();repository=Path(repository).resolve();upstream=Path(upstream).resolve()
     if root.exists():raise ValueError('fresh private qualification root required')
     if root.is_relative_to(ROOT) and subprocess.run(['git','-C',str(ROOT),'check-ignore','--quiet',str(root)],capture_output=True).returncode:
@@ -88,6 +89,26 @@ print(json.dumps({'pause':status['control']['episode']}))
         if service.poll() is None:service.send_signal(signal.SIGTERM)
         service.wait(timeout=15);assert service.returncode==0
 
+    launch_service=None
+    def launchctl(*arguments,success=True):
+        result=subprocess.run(['launchctl',*arguments],capture_output=True,text=True,timeout=15)
+        if success and result.returncode:raise RuntimeError('launchd operation failed: '+result.stderr[:1000])
+        return result
+    def observed_pid(previous=None):
+        deadline=time.monotonic()+100
+        while time.monotonic()<deadline:
+            value=launchctl('print',launch_service)
+            match=re.search(r'\n\s*pid = (\d+)',value.stdout)
+            pid=int(match[1]) if match else None
+            if pid and pid!=previous:
+                os.kill(pid,0)  # Actual live process, not an old status file.
+                state=json.loads((installation/'status.json').read_bytes())
+                if state.get('dispatcher_pid')==pid and state.get('dispatcher_state')=='running':
+                    assert state['board']['control']['paused'] and state['board']['control']['drained']
+                    assert state['board']['control']['episode']==episode
+                    return pid
+            time.sleep(.25)
+        raise TimeoutError('same launchd job observation expired; inspect, never duplicate bootstrap')
     try:
         first=start()
         cli('serve',success=False)  # Native Owner lock, no second dispatcher.
@@ -99,6 +120,21 @@ print(json.dumps({'pause':status['control']['episode']}))
         second=start()
         assert cli('status')['control']['episode']==episode
         stop(second)
+        if launchd:
+            if sys.platform!='darwin':raise ValueError('launchd qualification is macOS only')
+            prepare_args=[sys.executable,'-B',str(source/'scripts/prepare_hermes_launchagent.py'),
+                  '--source',str(source),'--expect-source',export['source_digest'],
+                  '--python',sys.executable,'--root',str(installation),'--upstream',str(upstream)]
+            prepared=json.loads(subprocess.check_output(prepare_args,text=True))
+            domain='gui/'+str(os.getuid());target=domain+'/'+prepared['label']
+            if launchctl('print',target,success=False).returncode==0:raise ValueError('existing launchd job; preserve it')
+            launchctl('bootstrap',domain,prepared['plist']);launch_service=target
+            pid=observed_pid()
+            cli('serve',success=False)
+            launchctl('kill','SIGKILL',target)  # Our empty, paused fixture only.
+            replacement=observed_pid(pid);assert replacement!=pid
+            launchctl('bootout',target);launch_service=None
+            assert launchctl('print',target,success=False).returncode!=0
         # Drift in our own stopped fixture; never alter an installed delivery.
         changed=source/'src/fabriquinha/config.py';original=changed.read_bytes()
         changed.chmod(0o600);changed.write_bytes(original+b'\n# fixture drift\n');changed.chmod(0o400)
@@ -115,8 +151,10 @@ print(json.dumps({'pause':status['control']['episode']}))
             pause_survives_restart=True,stale_resume_refused=True,source_drift_refused=True,
             services_stopped=True,native_runs=0,model_calls=0,github_mutations=0,docker_jobs=0,
             delivery_approval=False,complete_installer=False)
+        if launchd:result.update(launchd_paused_start=True,launchd_crash_restarted=True,launchd_job_unloaded=True)
         write_json(root/'receipt.json',result);print(json.dumps(result,indent=2));return result
     finally:
+        if launch_service:launchctl('bootout',launch_service)
         for service in services:
             if service.poll() is None:stop(service)
 
@@ -125,4 +163,5 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--repository',type=Path,required=True)
     parser.add_argument('--revision',required=True);parser.add_argument('--upstream',type=Path,required=True)
-    args=parser.parse_args();qualify(args.root,args.repository,args.revision,args.upstream)
+    parser.add_argument('--launchd',action='store_true')
+    args=parser.parse_args();qualify(args.root,args.repository,args.revision,args.upstream,launchd=args.launchd)

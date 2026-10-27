@@ -17,7 +17,7 @@ FILES=('Dockerfile.web','LICENSE','THIRD_PARTY_NOTICES.md',
        'team-delivery-kit/docker_grouping.py','scripts/hermes_s1_worker.py',
        'scripts/prepare_hermes_project.py','scripts/prepare_hermes_networks.py',
        'scripts/bootstrap_hermes_branch.py','scripts/enable_hermes_provider.py',
-       'scripts/run_hermes_runtime.py','scripts/initialize_provider_meter.py',
+       'scripts/run_hermes_runtime.py','scripts/initialize_provider_meter.py','scripts/prepare_hermes_launchagent.py',
        'scripts/requirements-hermes-agent.txt','examples/python-http/compose.provider.yml')
 TREES=('src/fabriquinha/','examples/python-http/bootstrap/')
 MANIFEST='source-manifest.json'

@@ -297,13 +297,31 @@ público, qualquer conteúdo anterior e inicialização interrompida. **Não use
 uma instalação existente**, nem apague seu medidor para conseguir executá-lo.
 Um contador ausente em instalação antiga é recuperação de dados, não bootstrap.
 
-O Compose de referência recebe volumes externos de medidor e credencial. O
-conteúdo deve ser preparado pelo operador com UID/GID 10000 e modo privado;
-a chave é somente leitura no relay e nunca entra no export Git. O exemplo
-acima qualifica o formato em filesystem; não automatiza provisionamento de
-volumes/credenciais. A prova reproduzível desse provisionamento e da supervisão
-host continua pendente em R2. Não copie volumes históricos de outra instalação
-como substituto dessa etapa.
+O Compose de referência recebe volumes externos de medidor e credencial. Para
+uma instalação **nova**, escolha nomes exclusivos em `FABRIQUINHA_METER_VOLUME`
+e `FABRIQUINHA_SECRET_VOLUME`. Confira que não existem em `docker volume ls`;
+não reutilize volumes históricos. Com os demais parâmetros do Compose definidos
+em um arquivo privado `provider-compose.env`, crie somente esses dois volumes:
+
+```sh
+docker volume create --label "com.docker.compose.project=$FABRIQUINHA_INSTANCE" "$FABRIQUINHA_METER_VOLUME"
+docker volume create --label "com.docker.compose.project=$FABRIQUINHA_INSTANCE" "$FABRIQUINHA_SECRET_VOLUME"
+docker compose --env-file <privado>/provider-compose.env \
+  -f examples/python-http/compose.provider.yml --profile bootstrap \
+  run --rm -T --no-deps storage-bootstrap < <arquivo-privado-da-chave>
+```
+
+O arquivo de chave deve ser privado (0600), nunca parâmetro, variável de ambiente
+com o valor da chave ou conteúdo Git. O helper lê stdin sem imprimir a chave;
+executa como root apenas para definir UID/GID 10000 e permissões, sem rede,
+socket ou ferramentas de agente. Refusa qualquer conteúdo preexistente em ambos
+os volumes, inclusive estado parcial. Não o repita para reparar uma instalação.
+O relay recebe a credencial somente para leitura e continua desabilitado pela
+política inicial. A inicialização não autoriza inferência.
+
+`scripts/qualify_provider_storage.py` reproduz o bootstrap com chave fictícia,
+recusa de sobrescrita e leitura pelo UID do relay. Retém dois volumes mínimos
+de prova; os helpers agrupados são retirados por `--rm`.
 
 #### Fonte fixada
 
@@ -357,6 +375,51 @@ uma manutenção. `resume` exige `--expect-pause <episodio-atual>` e os prefligh
 existentes; não é uma aprovação de escopo ou consumo. `SIGTERM` em `serve`
 encerra o dispatcher, mas sozinho não pausa nem mata workers separados. Não use
 um PID antigo do status como autorização para sinalizar processos.
+
+#### Supervisão macOS e parada econômica
+
+`scripts/prepare_hermes_launchagent.py` recebe os mesmos `--source`,
+`--expect-source`, `--python`, `--root` e `--upstream` e produz exclusivamente
+`<raiz>/private/operations/dispatcher.plist`. Exige pausa e provedor desabilitado;
+não carrega o serviço. Confira o plist com `plutil -lint` e seus argumentos.
+Ele contém somente caminhos e digest, sem credenciais. Para o usuário logado:
+
+```sh
+launchctl bootstrap "gui/$(id -u)" <raiz>/private/operations/dispatcher.plist
+launchctl print "gui/$(id -u)/ai.fabriquinha.<namespace>"
+```
+
+O controlador permanece em primeiro plano sob `launchd`, com o lock nativo.
+Crash é reiniciado com intervalo mínimo de 60 segundos; saída normal ou erro de
+configuração não dispara retentativa contínua. Veja estado e logs privados do
+job; existência do plist/status antigo não prova processo vivo. Reiniciar não
+remove pausa nem habilita inferência. Para iniciar também nos próximos logins,
+instale o plist revisado, sem sobrescrever outro job, em
+`~/Library/LaunchAgents/ai.fabriquinha.<namespace>.plist`. O registro apenas por
+`bootstrap` não é uma promessa de persistência entre logins. Trocar a fonte
+exige descarregar e substituir explicitamente esse job após drenagem.
+
+Parada econômica completa, preservando homologação e volumes:
+
+1. Execute `pause` pela entrada pública e confira `control.drained=true` em
+   `status`. Pausa durante uma chamada não desfaz o consumo já enviado.
+2. Confira no `launchctl print` o job/caminho da sua instalação; execute
+   `launchctl bootout gui/<uid>/ai.fabriquinha.<namespace>`. Confirme que o job
+   não existe mais. Não sinalize um PID copiado de arquivo antigo.
+3. Execute `disable-provider --expect-pause <episodio-atual>` pela mesma entrada
+   pública. Ela exige o lock exclusivo livre e drenagem, muda somente `enabled`
+   na política e mantém contadores, holds e teto. O relay já carregado ainda
+   precisa ser parado: não existe recarga de política em memória.
+4. Com o Compose e env exatos da instalação, execute `stop model-relay` e
+   confira `ps -a model-relay` como parado. Não use `down -v`, prune ou parada
+   global do Docker.
+
+Para retomar: carregue o controlador pausado; recrie somente o relay com política
+desabilitada, confira `/status`, use o enablement existente com contador/teto
+exatos autorizados, recrie o relay e somente então aplique `resume` com o episódio
+atual. Aprovação de escopo continua independente. A prova
+`qualify_source_operations.py --launchd` verifica fonte publicada, board vazio,
+lock único e manutenção da pausa após crash/reinício sem chamadas ao modelo.
 
 O runtime gerenciado verifica a fonte no início, antes de despacho e durante
 as atividades do SDK. Corrigir a fonte exige outra cópia e manutenção; não

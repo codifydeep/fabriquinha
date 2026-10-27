@@ -15,16 +15,16 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from fabriquinha.source import verify
 
-OPERATIONS=('serve','status','doctor','pause','resume','costs','configure-acceptance')
+OPERATIONS=('serve','status','doctor','pause','resume','costs','configure-acceptance','disable-provider')
 
 
 def command(source,expected,python,root,upstream,operation,*,episode=None,interval=15,validation=None):
     if (operation not in OPERATIONS or type(interval) not in (int,float) or not math.isfinite(interval)
             or not 0.1<=interval<=60 or interval!=15 and operation!='serve'
-            or operation=='resume' and (not isinstance(episode,str) or not re.fullmatch('[a-f0-9]{32}',episode))
+            or operation in ('resume','disable-provider') and (not isinstance(episode,str) or not re.fullmatch('[a-f0-9]{32}',episode))
             or operation=='configure-acceptance' and (not isinstance(validation,str) or not re.fullmatch('[a-f0-9]{64}',validation))
             or operation!='configure-acceptance' and validation is not None
-            or operation!='resume' and episode is not None):
+            or operation not in ('resume','disable-provider') and episode is not None):
         raise ValueError('fixed operation, bounded interval and explicit resume episode required')
     source=Path(source).absolute();verify(source,expected)
     python=Path(python).absolute();root=Path(root).resolve();upstream=Path(upstream).resolve()
@@ -32,7 +32,7 @@ def command(source,expected,python,root,upstream,operation,*,episode=None,interv
         raise ValueError('existing SDK Python, installation and pinned upstream required')
     args=[str(python),'-B','-m','fabriquinha.runtime',operation,'--root',str(root),'--upstream',str(upstream)]
     if operation=='serve':args+=['--interval',str(interval)]
-    if operation=='resume':args+=['--expect-pause',episode]
+    if operation in ('resume','disable-provider'):args+=['--expect-pause',episode]
     if operation=='configure-acceptance':args+=['--expect-validation',validation]
     env={**os.environ,'PYTHONPATH':str(source/'src'),'PYTHONDONTWRITEBYTECODE':'1',
         'PYTHONSAFEPATH':'1','PYTHONNOUSERSITE':'1','FABRIQUINHA_SOURCE_DIGEST':expected}
