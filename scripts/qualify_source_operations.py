@@ -137,7 +137,10 @@ print(json.dumps({'pause':status['control']['episode']}))
             launchctl('kill','SIGABRT',target)  # Crash (not intentional SIGKILL); core dumps disabled in plist.
             replacement=observed_pid(pid);assert replacement!=pid
             launchctl('bootout',target);launch_service=None
-            assert launchctl('print',target,success=False).returncode!=0
+            deadline=time.monotonic()+40
+            while launchctl('print',target,success=False).returncode==0:
+                if time.monotonic()>deadline:raise TimeoutError('bootout acknowledged; observe same job without repeating it')
+                time.sleep(.25)
         # Drift in our own stopped fixture; never alter an installed delivery.
         changed=source/'src/fabriquinha/config.py';original=changed.read_bytes()
         changed.chmod(0o600);changed.write_bytes(original+b'\n# fixture drift\n');changed.chmod(0o400)

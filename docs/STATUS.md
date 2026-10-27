@@ -19,13 +19,18 @@ dois incrementos dependentes pelo Hermes nativo com autores/revisores e GitHub
 programados. A mesma aceitação congelada rodou na prévia e no deploy, preservando
 regressão. Uma falha encontrada no ensaio agora impede congelar Red quando os
 testes de navegador não chegaram a executar. Zero chamadas pagas. Isso não
-qualifica agentes reais nem conclui S6. R2 ainda exige provisionamento público
-de credenciais/volumes e supervisão/parada econômica reproduzíveis. O bundle
+qualifica agentes reais nem conclui S6. R2 passou nas provas operacionais locais:
+bootstrap Compose com credencial fictícia, recusa de sobrescrita, leitura pelo
+UID do relay, clone limpo e supervisão launchd com pausa preservada após crash.
+O descarregamento é observado até desaparecer; não se repete bootout por atraso.
+A política econômica foi conferida no S6 sem mudar contador ou teto. O bundle
 novo já foi instalado na raiz S6 existente a partir da fonte publicada
 `eaf52e21`, com recibo de upgrade, backup mínimo, board/brief preservados,
-provedor desabilitado e despacho parado. O relay e o supervisor deverão usar
-essa fonte na próxima ativação; iniciar scripts privados antigos não é o
-procedimento de retomada.
+provedor desabilitado e despacho parado. A fonte operacional `e3e443c6` mantém
+o bundle e acrescenta os comandos públicos de R2. O relay foi recriado desabilitado
+nessa fonte: 6.953/7.064, sem hold e sem chamadas novas. O supervisor S6 está
+preparado, ainda não carregado. Iniciar scripts privados antigos não é o
+procedimento de retomada. S6 real e canal/restore R4 continuam pendentes.
 
 ## Resultado mais recente
 

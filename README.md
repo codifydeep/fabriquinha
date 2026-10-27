@@ -12,11 +12,11 @@ desse caminho. A instalação legada está preservada e pausada.
 [Revisão crítica de 27/10/2026](docs/EXECUTION-REVIEW-2026-10-27.md) ·
 [Documentação](docs/README.md)
 
-**Correções pré-S6 em qualificação offline.** O escopo de produto foi aprovado,
+**Aceitação compartilhada qualificada offline e instalada; operação pré-S6 em validação.** O escopo de produto foi aprovado,
 mas a auditoria identificou incompatibilidade entre o QA atual e a aceitação em
 sessões independentes, além de divergência na autoridade para corrigir testes.
 O proprietário aprovou o plano e os refinamentos do [ADR 0006](docs/ADR-0006-SHARED-ACCEPTANCE.md).
-O despacho S6 aguarda as provas e a instalação. Os diagramas abaixo representam
+O despacho S6 aguarda a preparação operacional. Os diagramas abaixo representam
 a implementação atual.
 
 ## O que queremos construir
@@ -35,6 +35,8 @@ pausa humana ou dependência externa também não significa cancelamento.
 ```mermaid
 flowchart LR
     CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
+    LS[launchd opcional: supervisão macOS] --> C[Controlador nativo: pausa e lock único]
+    C --> K
     A[Admissão: imagens, disco e redes reservadas] --> K
     SRC[Commit Git: export fechado e hash verificado] --> W[Agentes via SDK Hermes]
     PC[Perfil: contrato e configuração efetiva] --> W
@@ -42,7 +44,8 @@ flowchart LR
     W --> S[Sandbox por atividade e deadline interno]
     S --> E[Snapshot e recibos imutáveis]
     E --> V[Validação fixa em Docker]
-    VB[Bundle imutável da instalação] --> V
+    VB[Bundle imutável e mesma aceitação congelada] --> V
+    VB --> D
     V --> K
     K --> G[PR e CI local no GitHub]
     GI[Conta GitHub do controlador: vínculo explícito por perfil] --> G
@@ -106,8 +109,9 @@ flowchart TD
     Q -->|falha| X[Lead: classificar erro contra o brief]
     X --> R[Proposta corretiva e revisão independente]
     R -->|produto| T
-    R -->|expectativa QA incorreta| RT[Correção restrita; Red histórico preservado]
+    R -->|expectativa textual no contrato legado| RT[Correção restrita; Red histórico preservado]
     RT --> F
+    R -->|teste Python congelado sem reparo qualificado| E
     R -->|infraestrutura ou escopo| E[Impedimento explícito com responsável]
 ```
 
@@ -115,6 +119,9 @@ O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
 O [reparo mínimo](docs/ADR-0004-SCOPED-REPAIR.md) limita-se ao último pacote
 serializado e, para testes, à expectativa textual QA explicitamente autorizada.
 Não é replanejamento geral nem permissão para remover cobertura.
+O [contrato novo](docs/ADR-0006-SHARED-ACCEPTANCE.md) executa a mesma aceitação
+Python/Playwright em prévia e deploy. Revisão de teste Python já congelado ainda
+é impedimento técnico ao CTO, sem autorização implícita para editar a entrega.
 O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) completou a primeira
 entrega técnica sem intervenção externa: nove testes, controles, revisão,
 PR/CI, deploy, rollback e QA. O ensaio reutilizou explicitamente um brief já
