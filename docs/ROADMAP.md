@@ -118,6 +118,8 @@ espera humana legítima não é promessa de ausência universal de starvation.
 
 ### P6 / S6 — Reutilização por terceiros e corte do legado
 
+Executar o [plano S6](S6-PORTABILITY-PLAN.md), preservando as evidências S4/S5.
+
 Instalar do Git em outro diretório/repo sem bancos, sessões ou UUIDs históricos.
 Corrigir e qualificar atribuição das chamadas auxiliares sem retroatribuir as
 15 chamadas históricas. Provar setup, doctor, start, pause, status, resume, upgrade/rollback e limpeza

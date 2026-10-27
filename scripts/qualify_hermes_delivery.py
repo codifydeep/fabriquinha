@@ -7,6 +7,7 @@ No external model, real GitHub, deployment or autonomous-product claim.
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -74,7 +75,7 @@ def worker(root,upstream,task,number):
         def do_POST(self):
             body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             index=len(requests);requests.append(body)
-            if self.path!='/v1/chat/completions' or body.get('stream') or index>=len(sequence):
+            if not re.fullmatch(r'(?:/activities/[a-f0-9]{64})?/v1/chat/completions',self.path) or body.get('stream') or index>=len(sequence):
                 self.send_error(400);return
             name,args=sequence[index]
             message=dict(role='assistant',content=None,tool_calls=[dict(id='flow-'+str(number)+'-'+str(index),

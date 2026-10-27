@@ -46,7 +46,8 @@ atribuição por horário. A origem delas permanece não comprovada.
 chamadas ao modelo. Telegram real ainda não está configurado nesta fronteira:
 a fila de outbox não comprova recebimento de uma entrega pelo CEO.
 
-A suíte do controlador passou em **344 testes**. As provas programadas com
+A suíte do controlador passou em **348 testes** após o reparo de atribuição
+auxiliar preparado para S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
 SDK/Docker qualificam mecanismos delimitados; não substituem julgamento real
 nem medem a autonomia por porcentagem de testes verdes.
 
@@ -70,13 +71,15 @@ As provas de regressão conhecida são separadas e documentadas nos
 
 ## Próximo trabalho
 
-Corrigir e testar a atribuição auxiliar offline, preservando as 15 chamadas sem
-origem comprovada. Depois, qualificar a instalação pública de S6 em outro
+O [reparo de atribuição auxiliar](ADR-0005-VALIDATION-AND-ACCOUNTING.md) passou
+no compressor real/relay com respostas simuladas e na recuperação nativa, sem
+chamadas pagas. Preservar as 15 chamadas sem origem comprovada e validar a
+ativação coordenada do SDK/relay. Depois, qualificar a instalação pública de S6 em outro
 repositório, com status, pausa/retomada, upgrade/rollback, canais e propriedade
 dos recursos. O próximo ciclo pago precisa de fonte congelada, objetivo próprio
 de qualificação e cota suficiente. Não repetir outra saudação genérica nem
 resetar o board para ocultar falhas.
 
-O [roadmap](ROADMAP.md) e o [resultado S5](HERMES-S5-QUALIFICATION.md) orientam a
+O [plano S6](S6-PORTABILITY-PLAN.md), o [roadmap](ROADMAP.md) e o [resultado S5](HERMES-S5-QUALIFICATION.md) orientam a
 continuação. As auditorias e ADRs anteriores preservam decisões e limites; não
 são ordens concorrentes de execução.

@@ -13,11 +13,23 @@ from fabriquinha.artifacts import Store
 from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.hermes import Sandbox, command, sandbox_context, incomplete_activity, terminal_arguments
+import fabriquinha.hermes as adapter
 from fabriquinha.effects import Pending
 from test_delivery_core import configuration
 
 
 class NativeBackendPolicy(unittest.TestCase):
+    def test_activity_address_is_inherited_without_changing_the_stored_route(self):
+        route=dict(base_url='http://127.0.0.1:1234/v1',model='fixture',api_key='fixture-only',provider='custom',api_mode='chat_completions')
+        before=dict(route)
+        self.assertTrue(callable(getattr(adapter,'activity_route',None)))
+        scoped=adapter.activity_route(route,'a'*64)
+        self.assertEqual(scoped['base_url'],'http://127.0.0.1:1234/activities/'+'a'*64+'/v1')
+        self.assertEqual(route,before);self.assertEqual(scoped['model'],route['model'])
+        for url in ('http://127.0.0.1:1234/v1?scope=other','http://127.0.0.1:1234/v1#other','http://user:password@127.0.0.1:1234/v1','http://127.0.0.1:1234/other'):
+            with self.subTest(url=url),self.assertRaises(ValueError):adapter.activity_route({**route,'base_url':url},'a'*64)
+        with self.assertRaises(ValueError):adapter.activity_route(route,'not-an-activity')
+
     def test_exploration_cannot_request_a_terminal_batch_beyond_the_controller_limit(self):
         for timeout in (570,0,-1,True,'120',120.5):
             with self.subTest(timeout=timeout),self.assertRaises(ValueError):

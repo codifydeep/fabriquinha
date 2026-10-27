@@ -4,11 +4,12 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
+from io import BytesIO
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.effects import write_json
-from fabriquinha.provider import Policy,Ledger,Relay,Held,admit
+from fabriquinha.provider import Policy,Ledger,Relay,Held,admit,server
 
 
 def policy(**changes):
@@ -17,6 +18,37 @@ def policy(**changes):
 
 
 class NeutralProvider(unittest.TestCase):
+    def test_preflight_rejects_old_relay_before_any_paid_dispatch(self):
+        observed=self.app.status();observed.pop('activity_scopes',None)
+        with self.assertRaisesRegex(Held,'activity_routing_unavailable'):
+            admit(self.app.policy,observed,'a'*64)
+        self.app.forward.assert_not_called();self.assertEqual(self.app.ledger.state()['calls'],7)
+
+    def http_request(self,path,activity=None):
+        body=json.dumps(dict(model='example/model',messages=[dict(role='user',content='fixture')])).encode()
+        with patch('fabriquinha.provider.ThreadingHTTPServer') as transport:
+            server(self.app,'127.0.0.1',0)
+            cls=transport.call_args.args[1]
+        handler=object.__new__(cls);handler.path=path;handler.rfile=BytesIO(body)
+        handler.headers={'Content-Length':str(len(body)),'Authorization':'Bearer local-client-token-for-tests'}
+        if activity is not None:handler.headers['X-Fabriquinha-Activity']=activity
+        handler.send=Mock();handler.do_POST()
+        return handler.send.call_args.args[0]
+
+    def test_auxiliary_request_inherits_activity_from_scoped_url_without_header(self):
+        activity='b'*64
+        self.assertEqual(self.http_request('/activities/'+activity+'/v1/chat/completions'),200)
+        record=json.loads((self.meter/'attempts/8.json').read_bytes())
+        self.assertEqual(record['activity'],activity)
+        self.assertEqual(self.app.ledger.state()['calls'],8)
+
+    def test_scope_header_disagreement_cannot_charge_or_reassign_a_request(self):
+        self.assertEqual(self.http_request('/activities/'+'b'*64+'/v1/chat/completions','c'*64),400)
+        self.app.forward.assert_not_called();self.assertEqual(self.app.ledger.state()['calls'],7)
+        for path in ('/activities/not-a-receipt/v1/chat/completions','/activities/'+'b'*64+'/v1/chat/completions?other=1'):
+            self.assertEqual(self.http_request(path),404)
+        self.assertEqual(self.http_request('/v1/chat/completions','b'*64),200)
+        self.assertEqual(self.http_request('/activities/'+'b'*64+'/v1/chat/completions','b'*64),200)
     def setUp(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup);self.root=Path(temporary.name)
         self.meter=self.root/'meter';self.meter.mkdir(mode=0o700);write_json(self.meter/'calls.json',{'calls':7})

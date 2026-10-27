@@ -7,6 +7,7 @@ unblocks the source or dispatches a diagnostic card itself.
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import re
 import os
 from pathlib import Path
 import signal
@@ -101,6 +102,8 @@ print(json.dumps(rows))'''
             if not marker or body.get('stream'):self.send_error(400);return
             binding=json.loads(marker.removeprefix('Delivery activity '));run=runtime.board.current(binding['task'],binding['number'])
             assert run.binding()==binding
+            scoped=re.fullmatch(r'/activities/([a-f0-9]{64})/v1/chat/completions',self.path)
+            assert scoped and scoped[1]==self.headers.get('X-Fabriquinha-Activity'),'every managed SDK request must carry the same URI/header activity'
             native_context=next(m['content'] for m in body['messages'] if m.get('role')=='user' and
                 isinstance(m.get('content'),str) and m['content'].startswith('Delivery activity '))
             assert 'Workspace: dir @ /workspace' in native_context,'native host path must not be advertised as tool workspace'
@@ -367,7 +370,7 @@ print(json.dumps(rows))'''
         assert (root/'work/tests/app.py').read_text()=='VALUE = 1\n'
         assert (root/'work/implementation/app.py').read_text()=='VALUE = 2\n'
         assert not docker('ps','-aq','--filter','label=com.docker.compose.project='+project['namespace']+'-tests').strip()
-        proof=dict(native_diagnostic_cards=True,lead_escalated_to_cto=True,cto_executed_real_disposable_spike=True,
+        proof=dict(native_diagnostic_cards=True,managed_activity_uri_header_verified=True,lead_escalated_to_cto=True,cto_executed_real_disposable_spike=True,
             source_unchanged_by_diagnosticians=True,author_resumed_with_guidance=True,restart_did_not_duplicate_actions=True,
             incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=len(decisions),runs=len(runs),
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)

@@ -68,6 +68,27 @@ não inicia o serviço, faz chamadas ao modelo nem arquiva pausas financeiras.
 Custos ausentes não são zero, e contadores históricos sem atribuição continuam
 visíveis. Veja os campos e os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
 
+### Compatibilidade da atribuição por atividade
+
+O SDK atual gera internamente `/activities/<hash>/v1` para cada execução. Mantenha
+a rota configurada pelo operador em `/v1`; não copie um hash para a configuração.
+O relay deve anunciar `activity_scopes: path-v1`. Sem essa capacidade, o preflight
+recusa despacho pago com `activity_routing_unavailable`. Atualize SDK/controlador
+e relay em uma manutenção coordenada, preservando contador, pausas financeiras,
+credenciais e dados. Não aponte código novo para um relay histórico só porque ele
+responde a `/status`.
+
+A prova isolada pode ser executada com o Python do SDK e um diretório privado novo:
+
+```sh
+<python-do-SDK> scripts/qualify_auxiliary_attribution.py \
+  --root <raiz-privada-nova> --upstream <checkout-Hermes-fixado>
+```
+
+O script usa o compressor real com provedor simulado e apenas sua porta local.
+Não usa a chave ou o contador de produção e não qualifica uma entrega de produto.
+Veja os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
+
 ### Revisão de execução isolada do checkout
 
 Para uma fronteira de qualificação, o operador pode exportar a revisão publicada

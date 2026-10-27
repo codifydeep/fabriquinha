@@ -94,3 +94,39 @@ de preços ou desconto de cache presumido no código.
 
 As provas usam decisões/respostas programadas, zero chamadas pagas e nenhuma
 aprovação de entrega. P2 não qualifica o julgamento real nem o S4 sem intervenção.
+
+## Atribuição auxiliar por endereço de atividade — preparada em 27/10
+
+O compressor do Hermes não copia o header de `request_overrides` das chamadas
+principais. A prova com o cliente real e provedor simulado reproduziu uma chamada
+sem vínculo. Esse achado demonstra o caminho de falha, mas não atribui
+retroativamente as 15 chamadas históricas do S5.
+
+O controlador agora gera, a partir do recibo `model_activity`, um endereço
+local `/activities/<hash>/v1` para o cliente SDK. Clientes auxiliares que herdam
+a rota principal preservam esse endereço mesmo sem copiar o header. O relay
+extrai o hash do caminho, usando o mesmo registro de atribuição existente.
+Não há outro serviço, banco ou patch no Hermes upstream.
+
+- A rota persistida e a identidade da sessão continuam estáveis; o endereço de
+  atividade é calculado apenas para a execução atual.
+- O header principal continua presente. Divergência entre caminho e header é
+  recusada antes de consumir cota ou encaminhar a requisição.
+- A API anterior `/v1/chat/completions` permanece compatível. Uma chamada legada
+  sem identificação continua sem atribuição; não recebe uma identidade presumida.
+- O novo SDK exige a capacidade `activity_scopes: path-v1` no preflight do relay.
+  Um relay antigo é recusado antes do despacho pago. Atualizar ambos em manutenção.
+- Contador, limites, autorização, modelo, saída máxima e marcadores financeiros
+  não são alterados por esse protocolo.
+
+A prova usou duas chamadas HTTP locais do compressor real, com resposta simulada
+e bloqueio de conexões fora da porta do ensaio. Conferiu herança do endereço,
+recusa de vínculo divergente sem cobrança e preservação do registro antigo sem
+atribuição. A recuperação nativa percorreu nove runs/29 respostas locais,
+conferindo o mesmo vínculo URI/header em cada chamada gerenciada. A suíte passou
+em 348 testes. Não houve inferência paga nem acesso ao contador de produção.
+
+O código está preparado para S6; a instalação S5 homologada permanece na fonte
+congelada anterior. A ativação conjunta e um novo fluxo real devem ser verificados
+antes de declarar atribuição integral. Outros clientes auxiliares explicitamente
+configurados com rota própria não estão qualificados por essa prova do compressor.

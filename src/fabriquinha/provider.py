@@ -226,7 +226,8 @@ class Relay:
 
     def status(self):
         result=dict(version=1,project=self.policy.project,policy=self.policy.fingerprint(),model=self.policy.model,enabled=self.policy.enabled,
-            max_output_tokens=self.policy.max_output_tokens,max_request_bytes=2*1024*1024,fallback=None,neutral=True,ready=False)
+            max_output_tokens=self.policy.max_output_tokens,max_request_bytes=2*1024*1024,fallback=None,neutral=True,ready=False,
+            activity_scopes='path-v1')
         try:
             value=self.ledger.state();result.update(value)
             key_ready=self.key.is_file() and not self.key.is_symlink() and self.key.stat().st_size<=4096 and not self.key.stat().st_mode&0o077
@@ -316,6 +317,7 @@ def admit(policy,observed,project):
             or observed.get('max_request_bytes')!=2*1024*1024 or type(observed.get('remaining')) is not int
             or type(observed.get('calls')) is not int or observed['calls']<0
             or observed.get('remaining')!=max(0,policy.max_calls-observed['calls'])):raise Held('provider_identity_mismatch')
+    if observed.get('activity_scopes')!='path-v1':raise Held('activity_routing_unavailable')
     if not policy.enabled or observed.get('enabled') is not True:raise Held('provider_disabled')
     pause=observed.get('provider_pause')
     if pause:
@@ -373,11 +375,16 @@ def server(app,host,port):
             if self.path!='/status':self.send(404,b'{}');return
             self.send(200,json.dumps(app.status()).encode())
         def do_POST(self):
-            if self.path!='/v1/chat/completions':self.send(404,b'{}');return
+            activity=self.headers.get('X-Fabriquinha-Activity')
+            if self.path!='/v1/chat/completions':
+                scoped=re.fullmatch(r'/activities/([a-f0-9]{64})/v1/chat/completions',self.path)
+                if not scoped:self.send(404,b'{}');return
+                if activity is not None and activity!=scoped[1]:self.send(400,b'{}');return
+                activity=scoped[1]
             try:size=int(self.headers.get('Content-Length','0'))
             except ValueError:self.send(400,b'{}');return
             if not 0<size<=2*1024*1024:self.send(413,b'{}');return
-            self.send(*app.handle(self.headers.get('Authorization'),self.rfile.read(size),self.headers.get('X-Fabriquinha-Activity')))
+            self.send(*app.handle(self.headers.get('Authorization'),self.rfile.read(size),activity))
     service=ThreadingHTTPServer((host,port),Handler);service.daemon_threads=False
     return service
 

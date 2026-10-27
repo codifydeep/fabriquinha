@@ -402,6 +402,19 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     return {name},operations
 
 
+def activity_route(route,activity):
+    """Scope inherited SDK clients at the existing relay, not SDK internals.
+
+    Keep the persisted route/session anchor stable. Auxiliary clients inherit
+    this address even when they do not copy main-call request headers.
+    """
+    url=urlsplit(route['base_url'])
+    if (not re.fullmatch('[a-f0-9]{64}',str(activity)) or url.scheme!='http' or url.hostname!='127.0.0.1'
+            or not url.port or url.username or url.password or url.path!='/v1' or url.query or url.fragment):
+        raise ValueError('fixed loopback relay and exact activity identity required')
+    return {**route,'base_url':url._replace(path='/activities/'+activity+'/v1').geturl()}
+
+
 def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=None,provider_check=None,output_limit=None,recovery_epoch=None):
     """Trusted SDK adapter; no lifecycle inference from the assistant's prose.
 
@@ -466,7 +479,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
         bundle=validation_files(sandbox.project,sandbox.store)[0]
         activity=sandbox.store.record('model_activity',sandbox.run.binding(),{'project':sandbox.project.fingerprint(),
             **({'validation_bundle':bundle} if bundle else {})})
-        agent=AIAgent(**route,max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
+        agent=AIAgent(**activity_route(route,activity),max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
             request_overrides={'extra_headers':{'X-Fabriquinha-Activity':activity}},
             quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
             session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,
