@@ -33,6 +33,7 @@ from .operations import Control, ActivityPaused, doctor
 from .intake import Intake, DraftActivity
 from .releases import Releases
 from .provider import Policy, Held, inspect as inspect_provider,inspect_usage
+from .source import environment as check_source
 
 
 class IntegrationRunner(Runner):
@@ -47,6 +48,7 @@ class IntegrationRunner(Runner):
 
 
 def bind(root,upstream):
+    check_source()  # Managed entry verifies again in the actual SDK interpreter.
     if subprocess.check_output(['git','-C',str(upstream),'rev-parse','HEAD'],text=True).strip()!=UPSTREAM_COMMIT:
         raise ValueError('pinned Hermes upstream required')
     if subprocess.check_output(['git','-C',str(upstream),'status','--porcelain'],text=True).strip():
@@ -206,6 +208,7 @@ class Runtime:
         return self.settlement
 
     def spawn(self,task,workspace,*,board=None):
+        check_source()
         admission=self.check_admission()
         # Profile existence is checked freshly by the native dispatcher. The
         # cached doctor list is diagnostic, never a second per-profile guard.
@@ -233,7 +236,8 @@ class Runtime:
     def _spawn(self,task,workspace,*,board=None):
         folder=self.root/'runs'/str(task.current_run_id);folder.mkdir(mode=0o700,parents=True,exist_ok=True)
         env={key:os.environ[key] for key in ('PATH','PYTHONPATH','HERMES_HOME','HERMES_KANBAN_DB',
-             'HERMES_KANBAN_BOARD','HERMES_DISABLE_LAZY_INSTALLS','PYTHONDONTWRITEBYTECODE') if key in os.environ}
+             'HERMES_KANBAN_BOARD','HERMES_DISABLE_LAZY_INSTALLS','PYTHONDONTWRITEBYTECODE',
+             'PYTHONSAFEPATH','PYTHONNOUSERSITE','FABRIQUINHA_SOURCE_DIGEST') if key in os.environ}
         fd=os.open(folder/'worker.log',os.O_CREAT|os.O_APPEND|os.O_WRONLY,0o600)
         with os.fdopen(fd,'ab') as log:
             process=subprocess.Popen([sys.executable,'-m','fabriquinha.runtime','worker',
@@ -357,6 +361,7 @@ class Runtime:
         return dict(control=control,pending_effects=status['pending_effects'],delivery_approval=False)
 
     def tick(self):
+        check_source()
         self.children=[child for child in self.children if child.poll() is None]
         # A changed project file cannot silently grant a live service authority.
         if Project.parse(json.loads((self.root/'project.json').read_bytes())).fingerprint()!=self.project.fingerprint():
@@ -585,6 +590,8 @@ class Runtime:
             try:route=model_route(self.project,self.root/'route.json')
             except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
             def provider_check():
+                try:check_source()
+                except (ValueError,TypeError,OSError):raise Held('source_changed') from None
                 try:current=model_route(self.project,self.root/'route.json')
                 except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
                 if current!=route:raise Held('provider_route_changed')

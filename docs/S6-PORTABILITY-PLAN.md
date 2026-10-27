@@ -29,6 +29,17 @@ qualificação do novo caminho real. Um relay antigo deve bloquear o novo SDK no
 preflight, sem consumir chamadas. Não iniciar paid dispatch para descobrir uma
 incompatibilidade já observável por metadados.
 
+### Entrada de fonte e operação
+
+S6.2/S6.3 agora dispõem de `fabriquinha.source freeze/verify` e da entrada pública
+`scripts/run_hermes_runtime.py`. O export usa um commit completo e uma lista
+fechada de caminhos; um hash externo verifica conteúdo, links, permissões e
+arquivos extras. Os comandos existentes são reutilizados, sem outro daemon,
+gerenciador de PID ou banco. `serve` preserva a pausa, e workers recebem o mesmo
+pin. A prova nativa de operação está em `scripts/qualify_source_operations.py`;
+sucesso nessa fronteira não conclui a instalação, upgrade ou entrega real de S6.
+Instruções em [SETUP](SETUP.md).
+
 ## Decisões para a execução
 
 - Usar as entradas existentes e reduzir passos manuais. Não criar outro serviço

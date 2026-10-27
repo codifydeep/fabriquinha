@@ -29,7 +29,7 @@ pausa humana ou dependência externa também não significa cancelamento.
 flowchart LR
     CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
     A[Admissão: imagens, disco e redes reservadas] --> K
-    SRC[Revisão Git publicada e exportada] --> W[Agentes via SDK Hermes]
+    SRC[Commit Git: export fechado e hash verificado] --> W[Agentes via SDK Hermes]
     K --> W
     W --> S[Sandbox por atividade e deadline interno]
     S --> E[Snapshot e recibos imutáveis]

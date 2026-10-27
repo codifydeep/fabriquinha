@@ -152,6 +152,22 @@ class NativeRuntime(unittest.TestCase):
             self.assertTrue(kwargs['start_new_session'])
             self.assertEqual((self.root/'runs/7/worker.log').stat().st_mode & 0o777,0o600)
 
+    def test_frozen_source_pin_reaches_detached_worker_without_provider_keys(self):
+        task=SimpleNamespace(id='task',current_run_id=7)
+        with patch.dict(os.environ,FABRIQUINHA_SOURCE_DIGEST='a'*64,PYTHONSAFEPATH='1',PYTHONNOUSERSITE='1'), \
+             patch('fabriquinha.runtime.subprocess.Popen') as popen:
+            self.runtime._spawn(task,'/unused')
+        self.assertEqual(popen.call_args.kwargs['env']['FABRIQUINHA_SOURCE_DIGEST'],'a'*64)
+        self.assertEqual(popen.call_args.kwargs['env']['PYTHONSAFEPATH'],'1')
+        self.assertEqual(popen.call_args.kwargs['env']['PYTHONNOUSERSITE'],'1')
+
+    def test_managed_source_drift_stops_tick_or_spawn_before_native_dispatch(self):
+        with patch('fabriquinha.runtime.check_source',side_effect=ValueError('source drift')), \
+             patch('fabriquinha.runtime.native') as native,patch.object(self.runtime,'check_admission') as admit:
+            with self.assertRaisesRegex(ValueError,'source drift'):self.runtime.tick()
+            with self.assertRaisesRegex(ValueError,'source drift'):self.runtime.spawn(Mock(),'/unused')
+        native.assert_not_called();admit.assert_not_called()
+
     def test_spawning_other_work_does_not_hide_an_unsettled_task(self):
         self.runtime.settlement={'older':dict(run=1,category='EffectBlocked')}
         self.runtime.settle('different',conn=Mock())

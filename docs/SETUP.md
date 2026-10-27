@@ -1,6 +1,6 @@
 # Instalação segura e limites
 
-Estado de referência revisto: **26 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
+Estado de referência revisto: **27 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
 antes de ativar agentes. O kit continua experimental; não há instalação completa
 e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
@@ -91,26 +91,74 @@ Veja os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
 
 ### Revisão de execução isolada do checkout
 
-Para uma fronteira de qualificação, o operador pode exportar a revisão publicada
-já testada para um diretório privado vazio. Manter a estrutura relativa é
-necessário para os mounts, o agrupamento Docker e a receita de build:
+Para uma fronteira de qualificação, exporte uma revisão Git publicada e já
+testada para um diretório privado novo. O comando lê objetos do commit, não
+arquivos alterados ou não rastreados do checkout. Não faz fetch nem comprova que
+o commit foi publicado: confirme isso antes. Manter a estrutura relativa é
+necessário para os mounts, o agrupamento Docker e a receita de build.
 
 ```bash
 fabriquinha_revision=$(git rev-parse HEAD)
-git archive --format=tar --output <privado>/runtime.tar "$fabriquinha_revision" \
-  src team-delivery-kit/docker_grouping.py Dockerfile.web scripts/hermes_s1_worker.py \
-  examples/python-http/compose.provider.yml LICENSE THIRD_PARTY_NOTICES.md
-tar -xf <privado>/runtime.tar -C <privado>/runtime-source
+PYTHONPATH=src python3.14 -B -m fabriquinha.source freeze \
+  --checkout "$PWD" --revision "$fabriquinha_revision" \
+  --destination <privado>/runtime-source
 ```
 
-O diretório de destino deve existir e estar vazio. Registrar revisão e hashes dos
-arquivos, remover o tar após conferir a extração e usar exclusivamente
-`PYTHONPATH=<privado>/runtime-source/src` no serviço e nas consultas desse ciclo.
-O Python do SDK e o checkout upstream continuam explicitamente fixados. Não
-copiar homes, chaves, bancos ou configurações de uma instalação antiga. A cópia
-não recebe edições em voo; uma correção exige manutenção e outra qualificação.
-Isso isola o código executado sem outro serviço ou banco. Não substitui o pin de
-validadores nem qualifica, por si só, o instalador e upgrades de S6.
+O destino **não deve existir**. O resultado contém commit, quantidade de arquivos
+e `source_digest`; guarde esse hash fora da cópia, em estado privado. O export
+contém apenas os caminhos públicos necessários ao runtime e preparo: não copia
+homes, credenciais, bancos, sessões, histórico operacional nem worktrees. Um
+export interrompido permanece visível e não é sobrescrito automaticamente.
+Os arquivos ficam sem permissão de escrita; isso protege de alterações acidentais,
+não do proprietário capaz de mudar permissões.
+
+Verifique a cópia usando o hash registrado, não um hash recalculado após uma
+alteração. Arquivos extras, ausentes, modificados, links e escrita habilitada
+recusam a verificação:
+
+```sh
+PYTHONPATH=src python3.14 -B -m fabriquinha.source verify \
+  --source <privado>/runtime-source --expect-source <source_digest>
+```
+
+O Python do SDK e o checkout upstream continuam explicitamente fixados. Use a
+entrada abaixo para `status`, `doctor`, `costs`, `pause`, `resume` ou `serve`.
+Ela substitui o processo pelo runtime existente, com `PYTHONPATH` da cópia
+verificada e sem importação implícita do diretório de trabalho ou pacotes do
+usuário. A mesma identificação da fonte é herdada pelos workers.
+
+```sh
+python3.14 -B scripts/run_hermes_runtime.py status \
+  --source <privado>/runtime-source --expect-source <source_digest> \
+  --python <python-do-SDK> --root <raiz-privada-da-instancia> \
+  --upstream <checkout-Hermes-fixado>
+```
+
+`serve` fica em primeiro plano e usa o lock exclusivo nativo. Iniciar o processo
+**preserva** a pausa persistente e não habilita o relay. `pause` solicita drenagem;
+confira `control.drained=true` no status antes de encerrar o controlador durante
+uma manutenção. `resume` exige `--expect-pause <episodio-atual>` e os preflights
+existentes; não é uma aprovação de escopo ou consumo. `SIGTERM` em `serve`
+encerra o dispatcher, mas sozinho não pausa nem mata workers separados. Não use
+um PID antigo do status como autorização para sinalizar processos.
+
+O runtime gerenciado verifica a fonte no início, antes de despacho e durante
+as atividades do SDK. Corrigir a fonte exige outra cópia e manutenção; não
+edite um export vivo. A fonte fixada não substitui o bundle de validadores nem
+autoriza mudar seu contrato. O ciclo completo de upgrade/rollback continua em S6.
+
+Uma prova isolada de clone local limpo, board nativo novo, início pausado, lock
+exclusivo, reinício, recusa de retomada obsoleta e detecção de alteração pode ser
+executada com o Python do SDK, sem rota de modelo, credenciais ou jobs Docker:
+
+```sh
+<python-do-SDK> scripts/qualify_source_operations.py \
+  --root <raiz-privada-nova> --repository "$PWD" \
+  --revision "$fabriquinha_revision" --upstream <checkout-Hermes-fixado>
+```
+
+Essa prova não instala imagens, não qualifica execução paga nem entrega produto.
+Ela também não qualifica o gerenciador de serviços do host ou o corte do legado.
 
 **As seções numeradas abaixo preservam procedimentos do legado.** Os comandos
 Multica, port2 e da ponte de revisão não são a instalação do caminho Hermes.
