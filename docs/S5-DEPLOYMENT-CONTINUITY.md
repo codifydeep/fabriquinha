@@ -60,7 +60,7 @@ A execução completa passou com duas releases, três pacotes, 18 atividades SDK
 e 27 respostas HTTP programadas. A segunda release reutilizou exatamente o
 artefato anterior nos três passos candidate/rollback/restore, preservou os testes
 e reexecutou QA. A retirada exata do deployment e das redes descartáveis ocorreu
-depois da evidência. O núcleo passou em 342 testes sob Python 3.14.10.
+depois da evidência. O núcleo passou em 344 testes sob Python 3.14.10.
 
 As tentativas anteriores foram preservadas: uma encontrou esgotamento de pools
 automáticos Docker; outra perdeu o executável Homebrew do ambiente virtual.
@@ -80,6 +80,30 @@ um diagnóstico CTO vinculado ao predecessor. O CTO pode manter um impedimento
 visível com próxima ação concreta; não há recursão nem decisão técnica enviada
 ao CEO. O qualificador nativo de sucessores comprovou hold preservado, fonte
 nunca desbloqueada e ausência de duplicação após reinício, sem modelo ou Docker.
+
+## Memória diagnóstica sem instruções herdadas
+
+O contexto enviado ao CTO continha a relação correta entre artefatos, mas
+reenviava o veredito livre do diagnóstico anterior sem marcar sua natureza
+histórica. O modelo repetiu a orientação antiga. Isso demonstra a falha da
+decisão observada; a ancoragem pelo histórico é uma hipótese a revalidar.
+
+O novo repasse inclui apenas referência ao diagnóstico, autoria/run, ação e
+resultado do experimento vinculado. Não injeta o antigo veredito como nova
+instrução. O texto original permanece no recibo imutável para auditoria. Não
+transfere autoridade ou aprovações. O contexto também deixa de repetir a
+arquitetura inteira da homologação anterior em cada diagnóstico de deployment.
+
+O SPIKE de integração registra novamente os fatos atuais do serviço, ligados
+à sua própria execução. A prioridade é o contrato instalado, as observações
+atuais e o experimento novo. Uma decisão antiga não exige outro hold quando
+as condições verificadas mudaram; divergências reais continuam bloqueadas.
+
+A regressão do contrato foi reproduzida em dois testes e a suíte passou em
+344 testes. O fluxo isolado com SDK/Kanban/Docker passou em nove runs e 29
+respostas programadas, sem chamadas pagas. A mensagem efetivamente entregue
+ao SDK foi conferida: histórico identificado, evidência preservada e ausência
+do veredito livre antigo. Isso não substitui a próxima decisão do modelo real.
 
 ## Limites
 

@@ -91,6 +91,14 @@ bloqueada e a decisão histórica. Essas extensões passaram em 342 testes e num
 prova de sucessores no Kanban nativo, sem chamadas pagas. A atualização instalada
 e o novo diagnóstico ainda precisam ser conferidos; S5 continua assistido.
 
+A revisão `4ab2f407` foi instalada e o CTO recebeu a ligação exata dos
+artefatos, mas também manteve o hold. A mensagem entregue foi inspecionada:
+não houve perda desses fatos nem reutilização da sessão anterior. O contexto
+continua carregando o veredito livre do predecessor sem marca histórica. O
+[reparo de memória](S5-DEPLOYMENT-CONTINUITY.md) passou em 344 testes e numa
+prova nativa de nove runs/29 respostas locais; ainda exige revalidação pelo
+modelo real. O trabalho não será liberado por alteração manual de card.
+
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
 mas Telegram real não está configurado: fila não comprova recebimento nesse canal.

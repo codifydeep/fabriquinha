@@ -180,7 +180,7 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 27/10/2026, o núcleo passou em 342 testes (Python 3.14.10). O reparo mínimo completou uma
+Em 27/10/2026, o núcleo passou em 344 testes (Python 3.14.10). O reparo mínimo completou uma
 homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
 específicas; decisões programadas não são julgamento de um agente real.
 
