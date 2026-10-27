@@ -5,12 +5,13 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 retomado com plano aprovado:** o CTO aprovou após duas devoluções ao Tech
-Lead. O reparo aditivo de cobertura passou offline e foi instalado antes de
-qualquer Red/freeze ou entrega de testes. Controlador e relay foram retomados;
-o QA recebeu novamente o card de testes do primeiro incremento. Homologação
-anterior preservada. O aceite guardado do CEO foi
-aplicado à mesma revisão do brief pelo intake nativo, sem dispensar gates.
+**S6 em manutenção antes do primeiro Red:** o CTO aprovou o plano após duas
+devoluções ao Tech Lead. A admissão recusou corretamente o QA porque o grafo
+ainda fixava o validador anterior ao reparo aditivo. Controlador e relay estão
+parados, sem workers ou efeitos pendentes; contador preservado em 6.960/7.064.
+A correção versiona o vínculo do grafo, preservando o original, cards, dependências
+e o brief aprovado. A retomada depende da qualificação offline dessa migração.
+O aceite do CEO já foi aplicado à mesma revisão pelo intake nativo.
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
 despacho. O proprietário aprovou os refinamentos e a retomada das correções;

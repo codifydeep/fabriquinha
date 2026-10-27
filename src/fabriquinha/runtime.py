@@ -206,15 +206,21 @@ class Runtime:
         """Owner-approved F2/F3; never convert existing quality evidence."""
         with Owner(self.root),Journal(self.store.root/'effects').lock(['installation',self.project.fingerprint()]):
             path=self.root/'installation.json';before=json.loads(path.read_bytes())
+            existing_upgrade=None
             if before.get('browser_contract')==2:
                 for record_path in (self.store.root/'receipts').glob('*.json'):
                     record=self.store.receipt(record_path.stem)
                     if (record['kind']=='acceptance_upgrade' and record['payload']['after']==before
                             and record['payload']['before'].get('validation_bundle')==expected_bundle):
-                        return dict(browser_contract=2,receipt=record_path.stem,already_installed=True,dispatch_started=False)
-                if before.get('validation_bundle')!=expected_bundle:
+                        existing_upgrade=(record_path.stem,record)
+                        graphs=(self.store.root/'releases').glob('*/graph.json')
+                        if all(self.store.receipt(json.loads(p.read_bytes())['receipt'],kind='release_graph')['payload'].get('validation_bundle')
+                               ==before['validation_bundle'] for p in graphs):
+                            return dict(browser_contract=2,receipt=record_path.stem,already_installed=True,dispatch_started=False)
+                        break
+                if not existing_upgrade and before.get('validation_bundle')!=expected_bundle:
                     raise ValueError('installed acceptance bundle has no matching upgrade receipt')
-            if before.get('validation_bundle')!=expected_bundle:raise ValueError('exact previous validation bundle required')
+            if not existing_upgrade and before.get('validation_bundle')!=expected_bundle:raise ValueError('exact previous validation bundle required')
             control=self.control.read()
             if not control['paused'] or control.get('error'):raise ValueError('valid explicit pause required')
             policy=self.root/'provider-policy.json'
@@ -242,13 +248,17 @@ class Runtime:
                     if jobs.exists() and any(jobs.iterdir()):raise ValueError('existing validation job forbids acceptance repair')
             if not self.project.browser_tdd or not self.project.delivery_roles:
                 raise ValueError('qualified browser TDD and delivery roles required')
-            after={**before,'validation_bundle':seal_validation(self.store),'browser_contract':2}
-            receipt=self.store.record('acceptance_upgrade',dict(project=self.project.fingerprint(),actor='operator'),
+            after=(existing_upgrade[1]['payload']['after'] if existing_upgrade else
+                   {**before,'validation_bundle':seal_validation(self.store),'browser_contract':2})
+            receipt=existing_upgrade[0] if existing_upgrade else self.store.record('acceptance_upgrade',dict(project=self.project.fingerprint(),actor='operator'),
                 dict(before=before,after=after,pause_episode=control['episode'],
                     authority='Owner-approved audit 2026-10-27 F2/F3; business brief remains unchanged',
                     model_calls=0,delivery_approval=False))
+            graphs=[]
+            if any((self.store.root/'releases').glob('*/graph.json')):
+                with api.connect_closing() as conn:graphs=self.releases.upgrade_unvalidated_graphs(conn,receipt)
             write_json(path,after)
-            return dict(browser_contract=2,receipt=receipt,already_installed=False,dispatch_started=False)
+            return dict(browser_contract=2,receipt=receipt,already_installed=bool(existing_upgrade),graphs=graphs,dispatch_started=False)
 
     def settle(self,task=None,*,conn=None):
         """Retire only stale SDK sandboxes; no process is killed here.

@@ -114,6 +114,12 @@ class FixtureRuntime(Runtime):
         return self.release_services(run.actor,task=run.task)
 
     def spawn(self,*args,**kwargs):
+        if ((self.root/'upgrade-before-tests.json').exists() and not (self.root/'upgrade-done.json').exists()
+                and json.loads(args[0].body).get('kind')=='tests'):
+            self.control.pause()
+            write_json(self.root/'upgrade-requested.json',dict(task=args[0].id))
+            from tools.process_registry import RestartSafeScopeUnavailable
+            raise RestartSafeScopeUnavailable('qualified pre-quality upgrade pause; no worker started')
         original=subprocess.Popen
         def spawn(command,**options):
             if command[1:4]==['-m','fabriquinha.runtime','worker']:
@@ -147,6 +153,14 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         pause=runtime.control.pause()
         old=json.loads((root/'installation.json').read_bytes())['validation_bundle']
         runtime.configure_acceptance(old)
+        # An older pin with identical fixture behavior exercises graph binding
+        # migration before quality, independently of product/test changes.
+        pin=json.loads((root/'installation.json').read_bytes())
+        older=root/'older-validator';shutil.copytree(runtime.store.tree(pin['validation_bundle']),older)
+        file=older/'browser.py';file.chmod(0o600);file.write_bytes(file.read_bytes()+b'\n# older qualification pin\n')
+        prior=runtime.store.capture(older)
+        write_json(root/'installation.json',{**pin,'validation_bundle':prior})
+        write_json(root/'upgrade-before-tests.json',dict(bundle=prior))
         with runtime.control.lock():runtime.control.resume(pause['episode'])
     if network_pool:reserve_fixture_networks(runtime.project,network_pool)
     if recovery!='none':write_json(root/'recovery-mode.json',dict(mode=recovery))
@@ -275,6 +289,12 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             with kbc.connect_closing() as conn:
                 blocked={r[0] for r in conn.execute("SELECT id FROM task_runs WHERE outcome IN ('blocked','crashed','timed_out','spawn_failed','gave_up')")}
             expected=set(plan_faults)
+            if acceptance_suite and (root/'upgrade-requested.json').exists():
+                upgrade_task=json.loads((root/'upgrade-requested.json').read_bytes())['task']
+                with kbc.connect_closing() as conn:
+                    expected.update(r[0] for r in conn.execute(
+                        "SELECT id FROM task_runs WHERE task_id=? AND outcome='spawn_failed' AND error=?",
+                        (upgrade_task,'qualified pre-quality upgrade pause; no worker started')))
             if (root/'integration-fault.json').exists():expected.add(json.loads((root/'integration-fault.json').read_bytes())['run'])
             if blocked-expected or board.get('release_issues') or board.get('intake_issues') or board.get('recovery_issues'):
                 write_json(root/'failure-observation.json',status)
@@ -322,7 +342,55 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                 automatic_cto_assignment=True,source_review_failures=2,local_http_requests=count,
                 release_homologated=False,paid_calls=0,model_judgment=False,delivery_approval=False)
             write_json(root/'receipt.json',result);return result
-        until(delivered)
+        if acceptance_suite:
+            until(lambda:(root/'upgrade-requested.json').exists())
+            until(settled)
+            service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
+            installation=root/'installation.json';before=installation.read_bytes()
+            with kbc.connect_closing() as conn:
+                anchor=kb.get_task(conn,started['release']);graph_path=runtime.releases.folder(anchor)/'graph.json'
+                cards_before=[tuple(row) for row in conn.execute('SELECT id,body,status,assignee FROM tasks ORDER BY id')]
+                links_before=[tuple(row) for row in conn.execute('SELECT parent_id,child_id FROM task_links ORDER BY parent_id,child_id')]
+            graph_before=json.loads(graph_path.read_bytes())['receipt'];original_graph=runtime.store.receipt(graph_before,kind='release_graph')
+            original_write=write_json
+            def interrupted_write(path,value):
+                if Path(path)==installation:raise OSError('fixture interruption between graph and installation commit')
+                return original_write(path,value)
+            prior=json.loads((root/'upgrade-before-tests.json').read_bytes())['bundle']
+            with patch('fabriquinha.runtime.write_json',side_effect=interrupted_write):
+                try:runtime.configure_acceptance(prior)
+                except OSError as error:assert 'fixture interruption' in str(error)
+                else:raise AssertionError('upgrade interruption was not exercised')
+            assert installation.read_bytes()==before
+            with kbc.connect_closing() as conn:
+                task=kb.get_task(conn,json.loads((root/'upgrade-requested.json').read_bytes())['task'])
+                try:runtime.releases.admit(task)
+                except ValueError as error:assert 'bundle changed' in str(error)
+                else:raise AssertionError('half-committed upgrade admitted a worker')
+            upgrade=runtime.configure_acceptance(prior)
+            assert not upgrade['graphs']  # Same graph already durable; no duplicate successor.
+            successor=json.loads(graph_path.read_bytes())['receipt']
+            migrated=runtime.store.receipt(successor,kind='release_graph')
+            assert migrated['payload']['items']==original_graph['payload']['items']
+            assert migrated['payload']['previous_graph']==graph_before and migrated['payload']['validation_upgrade']==upgrade['receipt']
+            # Also recover the old installer order observed in S6: installation
+            # pin committed while its graph still points at the prior receipt.
+            write_json(graph_path,{'receipt':graph_before})
+            resumed=runtime.configure_acceptance(prior)
+            assert resumed['already_installed'] and len(resumed['graphs'])==1
+            assert json.loads(graph_path.read_bytes())['receipt']==successor
+            assert runtime.store.receipt(graph_before,kind='release_graph')==original_graph
+            assert runtime.configure_acceptance(prior)['already_installed']
+            with kbc.connect_closing() as conn:
+                runtime.releases.admit(kb.get_task(conn,task.id))
+                assert [tuple(row) for row in conn.execute('SELECT id,body,status,assignee FROM tasks ORDER BY id')]==cards_before
+                assert [tuple(row) for row in conn.execute('SELECT parent_id,child_id FROM task_links ORDER BY parent_id,child_id')]==links_before
+            write_json(root/'upgrade-done.json',upgrade)
+            with runtime.control.lock():runtime.control.resume(runtime.control.read()['episode'])
+            service=start()
+        # The injected placement failure includes Hermes' unchanged 300-second
+        # infrastructure cooldown; leave time for both actual delivery chains.
+        until(delivered,seconds=900 if acceptance_suite else 480)
         until(settled);service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
         with kbc.connect_closing() as conn:
             anchor=kb.get_task(conn,started['release']);row=kb.latest_run(conn,anchor.id)
@@ -367,7 +435,8 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             branch_bases_chained=True,old_tests_preserved=True,final_criteria=data['criteria'],
             release_gate_exercised=True,delivery_approval=False,migration=False,url=data['url'])
         result['wal_lifetime_probe']=wal
-        if acceptance_suite:result.update(browser_contract=2,same_acceptance_preview_and_deploy=True,regression_gate_coverage=True)
+        if acceptance_suite:result.update(browser_contract=2,same_acceptance_preview_and_deploy=True,regression_gate_coverage=True,
+            pre_quality_upgrade_kept_cards=True,interrupted_graph_upgrade_recovered=True,half_upgrade_dispatch_refused=True)
         if continuity:result.update(releases=2,subsequent_release_rollback_qualified=True,work_packages=3,generated_work_cards=9)
         if recovery=='recover':
             assert len(plan_faults)==1 and len(guidance_seen)==1

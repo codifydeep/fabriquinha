@@ -1,12 +1,15 @@
 # Roadmap vigente — 27 de outubro de 2026
 
-**Correções offline antes da implementação S6.** O CEO aprovou o brief; o aceite está
-preservado e ainda não foi aplicado ao intake. A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md)
+**Correções offline antes da implementação S6.** O CEO aprovou o brief; o aceite
+já foi aplicado ao intake e o CTO aprovou o plano de dois incrementos. A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md)
 recomenda resolver a incompatibilidade do QA entre sessões e harmonizar a
 autoridade técnica antes do despacho. R1–R4 naquele documento são a sequência
 aprovada, com F2/F3 no [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md). R1 passou na
 qualificação offline e foi instalado. R2 passou nas provas locais de bootstrap
-e supervisão; a próxima fronteira é R3/S6 real, com a fonte congelada. O aceite
+e supervisão. R3/S6 real está em manutenção antes do primeiro Red: falta concluir
+a migração do vínculo do validador no grafo, preservando os cards existentes.
+Depois, retomar a equipe com fonte congelada; canal e restauração R4 continuam
+pendentes. O aceite
 não marca S6 como concluído nem converte provas antigas.
 
 **Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57. O PR 58 também chegou

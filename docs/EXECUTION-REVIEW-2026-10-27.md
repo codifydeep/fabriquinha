@@ -4,8 +4,10 @@ Estado: **refinamentos e plano aprovados pelo proprietário em 27/10/2026**.
 F2/F3 estão no [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md), em implementação e
 qualificação offline. O restante preserva o estado auditado; recomendações não
 constituem evidência de conclusão. O aceite não eleva cotas nem converte provas.
-O CEO aprovou o escopo do brief S6; o aceite foi preservado, mas ainda não foi
-aplicado ao intake. Nenhuma implementação S6 começou.
+O CEO aprovou o escopo do brief S6. O estado abaixo é o retrato da auditoria;
+a execução posterior, incluindo aceite aplicado e manutenções, está no
+[status atualizado](STATUS.md). Nenhuma evidência da auditoria é convertida
+retroativamente em entrega.
 
 ## 1. Parecer
 

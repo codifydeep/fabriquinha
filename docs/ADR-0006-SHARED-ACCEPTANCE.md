@@ -19,7 +19,7 @@ o endereço pertencem ao controlador; agentes escrevem testes do produto.
   não implementa cenários nem aprova sua própria cobertura.
 - O inventário estático deve corresponder à descoberta e execução completas,
   inclusive no Red. Falha unitária não pode mascarar aceitação que não iniciou.
-  Seleção parcial, skips, testes inventados e critérios duplicados são recusados.
+  Seleção parcial, skips, testes inventados e cobertura duplicada são recusados.
 - O revisor independente avalia a suficiência semântica. Critérios de qualidade
   não precisam virar texto fictício na UI. Os gates declarados só contam após
   conferir suíte integrada, freeze, snapshot e proteção dos testes.
@@ -64,8 +64,12 @@ ainda sem planejamento ou entrega para a instalação inicial. Um reparo do modo
 já instalado pode preservar planejamento aprovado, desde que não exista nenhum
 job de validação, baseline/Red/freeze ou outro recibo de qualidade/diagnóstico.
 Uma atividade interrompida sem tais evidências não é uma entrega validada.
-Preserva o vínculo anterior em recibo e instala o bundle atomicamente; repetição
-reconhece o mesmo recibo. Não inicia despacho nem muda o projeto/brief.
+Preserva o vínculo anterior em recibo e versiona também o bundle fixado no grafo
+aprovado, sem editar cards ou dependências. A gravação do grafo precede a da
+instalação. Uma interrupção mantém o despacho bloqueado por divergência; repetir
+o comando com o hash anterior completa a mesma transição, sem duplicar recibos.
+A recuperação também reconhece instalações antigas com a ordem inversa de
+gravação. Não inicia despacho nem muda o projeto/brief.
 
 Os testes do núcleo cobrem instalação tardia, bundle divergente, recibos antigos,
 inventário parcial e preservação da configuração anterior.

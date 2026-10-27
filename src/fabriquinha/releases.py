@@ -136,6 +136,32 @@ class Releases:
         if repair is not None and not re.fullmatch(r't_[a-f0-9]{8}',repair):raise ValueError('native corrective plan identity required')
         return self.folder(anchor)/(('repair-'+repair+'.json') if repair else 'graph.json')
 
+    def upgrade_unvalidated_graphs(self,conn,upgrade):
+        """Version graph pins during fenced operator maintenance; keep all cards."""
+        authority=self.store.receipt(upgrade,kind='acceptance_upgrade')
+        data=authority['payload'];old=data['before']['validation_bundle'];new=data['after']['validation_bundle']
+        if authority['binding']!={'project':self.project.fingerprint(),'actor':'operator'}:
+            raise ValueError('operator bundle transition required')
+        kb,_,_=native();changed=[]
+        for path in sorted((self.store.root/'releases').glob('*/graph.json')):
+            key=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(key,kind='release_graph')
+            anchor=kb.get_task(conn,record['binding']['task'])
+            if not anchor or anchor.status!='blocked' or path!=self.graph_path(anchor,{}):
+                raise ValueError('active original graph required for pre-quality transition')
+            specification=self.specification(conn,anchor);graph=record['payload']
+            if (not specification or record['binding']!=self.binding(anchor)
+                    or graph['project']!=self.project.fingerprint() or graph['plan_review']!=specification['review']
+                    or graph.get('validation_bundle') not in (old,new)):
+                raise ValueError('exact approved graph and previous validator required')
+            for item in graph['items']:
+                for card in item['cards'].values():self.check_card(conn,card)
+            if graph['validation_bundle']==new:continue
+            successor=self.store.record('release_graph',record['binding'],
+                {**graph,'validation_bundle':new,'previous_graph':key,'validation_upgrade':upgrade})
+            if json.loads(path.read_bytes())!={'receipt':key}:raise ValueError('graph pointer changed during maintenance')
+            write_json(path,{'receipt':successor});changed.append(dict(before=key,after=successor))
+        return changed
+
     def check_card(self,conn,card):
         kb,_,_=native();task=kb.get_task(conn,card['id'])
         parents={row[0] for row in conn.execute('SELECT parent_id FROM task_links WHERE child_id=?',(card['id'],))}
