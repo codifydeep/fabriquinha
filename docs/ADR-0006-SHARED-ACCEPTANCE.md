@@ -99,3 +99,10 @@ mesma cadeia de dois incrementos. O critério NAMED recebeu casos dos dois pacot
 sem alterar o primeiro manifesto; prévia, controles, integração e QA preservaram
 os casos anteriores. A instalação S6 foi atualizada antes de qualquer job ou
 recibo de qualidade, conservando seu plano aprovado e sua intervenção registrada.
+
+A migração do grafo passou depois em uma cadeia completa: interrupção após gravar
+o grafo e antes da instalação; recuperação da ordem inversa do instalador antigo;
+recusa de despacho intermediário; retomada idempotente e mesmas dependências.
+O cooldown nativo de 300 segundos foi preservado. Após ele, os dois incrementos
+chegaram ao QA final. Os recibos antigos e os arquivos do primeiro incremento
+permaneceram inalterados. Zero chamadas pagas; 11 atividades SDK programadas.

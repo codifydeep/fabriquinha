@@ -5,13 +5,12 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 em manutenção antes do primeiro Red:** o CTO aprovou o plano após duas
-devoluções ao Tech Lead. A admissão recusou corretamente o QA porque o grafo
-ainda fixava o validador anterior ao reparo aditivo. Controlador e relay estão
-parados, sem workers ou efeitos pendentes; contador preservado em 6.960/7.064.
-A correção versiona o vínculo do grafo, preservando o original, cards, dependências
-e o brief aprovado. A retomada depende da qualificação offline dessa migração.
-O aceite do CEO já foi aplicado à mesma revisão pelo intake nativo.
+**S6 retomado após reparo do vínculo de validação:** o CTO aprovou o plano após
+duas devoluções ao Tech Lead. A migração preservou os nove cards, dependências,
+brief e grafo anterior. Admissão do QA, GitHub e nove perfis passaram; o despacho
+foi retomado com a fonte publicada `ea9f0d81`, no contador 6.960/7.064.
+Não houve aumento de teto nem conversão de evidências antigas. O aceite do CEO
+já foi aplicado à mesma revisão pelo intake nativo. A homologação S6 ainda falta.
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
 despacho. O proprietário aprovou os refinamentos e a retomada das correções;
@@ -171,3 +170,20 @@ resetar o board para ocultar falhas.
 O [plano S6](S6-PORTABILITY-PLAN.md), o [roadmap](ROADMAP.md) e o [resultado S5](HERMES-S5-QUALIFICATION.md) orientam a
 continuação. As auditorias e ADRs anteriores preservam decisões e limites; não
 são ordens concorrentes de execução.
+
+## Recuperação do vínculo do grafo — 27/10
+
+A primeira retomada após o reparo aditivo foi recusada porque o grafo ainda
+fixava o bundle anterior. Nenhuma nova chamada foi enviada nessa recusa.
+A correção reutiliza o recibo de upgrade e versiona o grafo sem editar cards.
+401 testes passaram; a prova nativa final completou dois incrementos, 11
+atividades SDK e 19 requisições locais programadas, com regressão e QA reais
+em Docker. Testou interrupções nas duas ordens de gravação, recusa de despacho
+parcial, recuperação sem duplicação e preservação dos cards. Zero chamadas pagas.
+
+As tentativas anteriores ficaram preservadas: uma classificação incorreta da
+interrupção planejada, uma reserva de rede ainda ocupada e um limite de observação
+que não incluía o cooldown nativo de cinco minutos. O prazo da prova foi ajustado;
+timeouts dos workers e cooldown de produção não mudaram. O deployment descartável
+final foi retirado após salvar evidências. Essa prova programada não é autonomia
+do modelo. A instalação real registra a manutenção adicional e mantém o histórico.

@@ -6,10 +6,10 @@ recomenda resolver a incompatibilidade do QA entre sessões e harmonizar a
 autoridade técnica antes do despacho. R1–R4 naquele documento são a sequência
 aprovada, com F2/F3 no [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md). R1 passou na
 qualificação offline e foi instalado. R2 passou nas provas locais de bootstrap
-e supervisão. R3/S6 real está em manutenção antes do primeiro Red: falta concluir
-a migração do vínculo do validador no grafo, preservando os cards existentes.
-Depois, retomar a equipe com fonte congelada; canal e restauração R4 continuam
-pendentes. O aceite
+e supervisão. A migração do vínculo do validador no grafo passou na prova
+interrompida e foi aplicada sem alterar cards. R3/S6 real foi retomado com fonte
+congelada; a entrega e a recuperação dos agentes reais ainda precisam de prova.
+Canal e restauração R4 continuam pendentes. O aceite
 não marca S6 como concluído nem converte provas antigas.
 
 **Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57. O PR 58 também chegou
