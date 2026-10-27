@@ -66,6 +66,15 @@ congelou os 18 testes de Reset, preservando os nove anteriores. O frontend
 iniciou a implementação. Ainda faltam suas revisões/integração e o pacote Undo;
 não houve nova homologação. O contador nesse checkpoint era 6.894/7.000.
 
+Reset foi depois revisado e integrado no [PR 60](https://github.com/codifydeep/descartavel2/pull/60),
+commit `454b845a0d4cf64f29f5a56ef3b32483b940356e`, mas o deploy foi impedido.
+O seletor do primeiro pacote de uma nova release ainda cria um bootstrap em vez
+de reutilizar o artefato da homologação anterior. A proteção contra substituir
+um deployment diferente preservou o S4 real. O CTO comprovou 18 testes verdes
+e manteve o bloqueio técnico visível. O próximo reparo deve selecionar o rollback
+anterior por proveniência, sem remover containers ou afrouxar essa proteção.
+O contador conferido nesse bloqueio era 6.908/7.000, com 92 chamadas restantes.
+
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
 mas Telegram real não está configurado: fila não comprova recebimento nesse canal.

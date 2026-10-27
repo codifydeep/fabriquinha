@@ -71,6 +71,14 @@ proveniência e a chave sucessora vinculada ao predecessor também foram publica
 e instaladas; outro diagnóstico CTO está atendendo o encaminhamento do Lead.
 Preservar os três pontos de assistência, o `hold` anterior e os mesmos cards.
 
+**Próxima correção concreta:** após os reparos de feedback, os testes de Reset
+foram congelados, o frontend implementou e o PR 60 foi integrado. A integração
+parou na seleção do rollback da segunda release: o primeiro pacote não reconhece
+o artefato homologado anteriormente na mesma instalação. Qualificar primeiro
+essa continuidade com Git/Docker e identidade exata de artefatos; só então
+retomar o mesmo card por diagnóstico. Não remover a implantação preservada,
+substituir a guarda por comparação de nomes ou criar outra release para contornar.
+
 Após os mecanismos anteriores passarem offline:
 
 1. Preparar atualização explícita do código executado em manutenção drenada,
