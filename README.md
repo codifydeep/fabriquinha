@@ -176,7 +176,8 @@ Isso testa o controlador, não inicia agentes e não instala a plataforma. As
 qualificações com Hermes/Docker têm dependências próprias e procedimentos em
 [SETUP](docs/SETUP.md). Não execute overrides de instalações históricas como
 se fossem um instalador. Imagens locais por digest ainda não asseguram
-reprodução a partir de um clone limpo.
+reprodução a partir de um clone limpo. A [receita pública do navegador](docs/SETUP.md#imagens-públicas-da-stack-pythonhttp)
+já passou em probes TDD/QA sobre Linux ARM64; o instalador completo continua em S6.
 
 ## Situação das validações
 

@@ -11,8 +11,9 @@ Para o caminho novo Hermes aprovado, consulte as provas isoladas
 Elas não exigem Multica nem iniciam a instalação antiga. Os comandos Multica
 abaixo documentam a referência histórica; não são pré-requisito da simplificação.
 S3 pode construir e manter um demo local com Compose, QA de navegador e rollback,
-sem modelo ou GitHub real. O navegador ainda requer toolchain local previamente
-selecionado por ID; não há promessa de reprodução limpa dessa dependência até S6.
+sem modelo ou GitHub real. S6 acrescenta uma receita pública do navegador,
+qualificada em Linux ARM64; a instalação e o ciclo real completos ainda precisam
+da qualificação de portabilidade. Imagens continuam selecionadas por ID exato.
 O [serviço contínuo TDD](HERMES-RUNTIME-QUALIFICATION.md) já passou em isolamento
 com reinício/crash/retomada. Sua CLI oferece consulta do board sem modelo;
 as rotas de fixture expiram e não devem ser reutilizadas como produção. Provedores
@@ -88,6 +89,54 @@ A prova isolada pode ser executada com o Python do SDK e um diretório privado n
 O script usa o compressor real com provedor simulado e apenas sua porta local.
 Não usa a chave ou o contador de produção e não qualifica uma entrega de produto.
 Veja os limites no [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
+
+### Imagens públicas da stack Python/HTTP
+
+Faça o build a partir do clone Git revisado, antes de exportar a fonte operacional.
+`Dockerfile.validation-browser` agora oferece dois alvos a partir do mesmo
+toolchain público: `validation` (UID 65534 e suíte fixa) e `qa` (UID 10000 e
+entrada Python). Escolha tags próprias da instância; as abaixo são exemplos.
+
+```sh
+docker build --target validation -f Dockerfile.validation-browser \
+  -t delivery-kit-example-validation:20261027.1 .
+docker build --target qa -f Dockerfile.validation-browser \
+  -t delivery-kit-example-browser:20261027.1 .
+docker image inspect --format '{{.Id}}' delivery-kit-example-validation:20261027.1
+docker image inspect --format '{{.Id}}' delivery-kit-example-browser:20261027.1
+```
+
+Use os IDs retornados, respectivamente, em `validation_image` e `browser_image`
+do seu `project.json`. Não copie IDs da máquina de referência. A base Python está
+fixada por digest público; o pacote Playwright e suas dependências têm versões e
+hashes em `scripts/requirements-browser.txt`. O instalador oficial baixa somente
+Chromium headless e suas bibliotecas de sistema, conforme os procedimentos de
+[Docker](https://playwright.dev/python/docs/docker) e
+[headless shell](https://playwright.dev/python/docs/browsers#chromium-headless-shell).
+O build inicial requer internet; os testes continuam sem rede externa, chave,
+socket Docker ou instalações de pacotes em tempo de execução.
+
+O contexto Docker é limitado pelo `.dockerignore` específico da receita. O build
+não usa imagens de Reforma/Toso nem suas credenciais. Base e wheels fixados não
+tornam o build bit a bit determinístico: as bibliotecas do sistema vêm dos
+repositórios Debian vigentes. Registre o ID resultante e qualifique-o antes de
+usar em uma instalação; não troque o ID de um projeto ativo silenciosamente.
+
+As provas públicas usam raízes privadas novas e não iniciam os agentes:
+
+```sh
+python3.14 -B scripts/qualify_browser_tdd.py \
+  --root <privado>/browser-tdd --image <ID-validation>
+python3.14 -B scripts/qualify_browser_image.py \
+  --root <privado>/browser-qa --image <ID-qa>
+```
+
+Na referência ARM64, quatro jobs comprovaram Red, Green, controle comportamental,
+teste auxiliar preservado e isolamento. Outro job executou o driver QA real no
+UID 10000 contra um servidor de fixture dentro do próprio contêiner, com raiz
+somente leitura e rede `none`. Todos os contêineres foram retirados. Essa última
+prova qualifica o toolchain; não é QA de um produto implantado nem homologação.
+Outras arquiteturas e o novo ciclo completo de S6 continuam pendentes.
 
 ### Revisão de execução isolada do checkout
 

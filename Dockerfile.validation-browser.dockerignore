@@ -3,3 +3,5 @@
 !src/
 !src/fabriquinha/
 !src/fabriquinha/suite.py
+!scripts/
+!scripts/requirements-browser.txt

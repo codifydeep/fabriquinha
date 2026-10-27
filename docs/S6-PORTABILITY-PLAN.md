@@ -57,14 +57,20 @@ preservado como falha de preparo, sem promoção de evidências.
 
 ### Próximo bloco antes da ativação
 
-1. Publicar e construir a receita de navegador a partir de dependências públicas.
-   `Dockerfile.validation-browser` ainda deriva de `delivery-kit-browser-qa`, cuja
-   origem é uma imagem privada de outro projeto. Hash local não elimina essa
-   dependência nem demonstra reprodução por terceiros.
-2. Validar a configuração efetiva de cada perfil antes do despacho, especialmente
+**Toolchain público preparado:** `Dockerfile.validation-browser` passou a derivar
+do digest público Python, com Playwright 1.64.1 e wheels transitivos fixados por
+hash. Seus alvos `validation` e `qa` foram construídos em Linux ARM64 sem imagens
+de Reforma ou Toso. Quatro jobs de TDD passaram, incluindo Red comportamental,
+Green, controle negativo e preservação do teste auxiliar. Um probe separado
+executou o driver QA real no UID 10000, sem rede externa. Todos os jobs foram
+retirados; imagens instaladas no S5 não mudaram. Build público não implica
+determinismo bit a bit das bibliotecas Debian ou qualificação de outra arquitetura.
+Instruções e limites em [SETUP](SETUP.md#imagens-públicas-da-stack-pythonhttp).
+
+1. Validar a configuração efetiva de cada perfil antes do despacho, especialmente
    rotas auxiliares, modelo e ferramentas. Um perfil divergente deve impedir seu
    próprio despacho com motivo visível, sem bloquear papéis independentes.
-3. Preparar uma raiz nova usando os comandos públicos e a mesma fonte no SDK e
+2. Preparar uma raiz nova usando os comandos públicos e a mesma fonte no SDK e
    relay. Qualificar operação/restauração e reservar o ciclo real antes de ativar
    consumo. Não mudar a fonte instalada do S5 apenas para atualizar documentação.
 

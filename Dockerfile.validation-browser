@@ -1,7 +1,21 @@
-# Reuse the already-qualified cached browser base. No dependency download.
-FROM delivery-kit-browser-qa:20261001.1@sha256:72cb1ba338b9f4047a52a8fea4702ebebebc7eb9dac11aba9c1becf605c12b4b
+# Public multi-platform Python index; no dependency on another local project.
+FROM python@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS toolchain
+ENV PYTHONDONTWRITEBYTECODE=1 HOME=/tmp PLAYWRIGHT_BROWSERS_PATH=/opt/fabriquinha/browsers
+COPY scripts/requirements-browser.txt /opt/fabriquinha/requirements-browser.txt
+RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r /opt/fabriquinha/requirements-browser.txt \
+    && python -m playwright install --with-deps --only-shell chromium \
+    && chmod -R a+rX /opt/fabriquinha/browsers \
+    && rm -rf /var/lib/apt/lists/* /root/.cache/pip
+LABEL org.opencontainers.image.source="https://github.com/codifydeep/fabriquinha" fabriquinha.playwright="1.64.1"
+
+# Deployed QA uses a different fixed UID/entrypoint from suite validation.
+FROM toolchain AS qa
+USER 10000:10000
+ENTRYPOINT ["python"]
+
+# Default target remains compatible with the existing validator policy.
+FROM toolchain AS validation
 COPY src/fabriquinha/suite.py /opt/fabriquinha/suite.py
 USER 65534:65534
-ENV PYTHONDONTWRITEBYTECODE=1 HOME=/tmp
 ENTRYPOINT ["python", "-B", "/opt/fabriquinha/suite.py"]
-LABEL org.opencontainers.image.source="https://github.com/codifydeep/fabriquinha" fabriquinha.browser-tdd="1"
+LABEL fabriquinha.browser-tdd="1"
