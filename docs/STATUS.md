@@ -13,8 +13,9 @@ homologação S6. O runtime foi drenado para manutenção. Consumo observado:
 7.029/7.064; a ampliação solicitada permanece pendente.
 
 O reparo de orientação passou offline com 402 testes, mas ainda não está instalado.
-A admissão somente leitura dessa continuação também passou offline (406 testes
-no total) e reconheceu os vínculos reais preservados, sem alterar o board.
+A admissão somente leitura reconheceu os vínculos reais preservados. A criação
+idempotente e a revisão independente da proposta passaram offline (409 testes
+no total), ainda sem conexão ao despacho ou alteração do board real.
 Falta qualificar a continuação limitada após triagem, preservando o card antigo,
 o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a

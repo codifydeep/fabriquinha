@@ -15,6 +15,7 @@ from .recovery import Recovery,browser_refusal_context
 # Controller source revision, never model-supplied. Changed only for a qualified
 # repair-protocol fix, not for documents, timeouts or another identical retry.
 REPAIR_PROTOCOL='qa-text-handoff-1'
+SUBMISSION_PROTOCOL='complete-control-set-1'
 
 
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
@@ -76,6 +77,13 @@ def reviewed(project,store,key):
             or proposed['binding']['release']!=scope['release']):
         raise ValueError('exact independent corrective-plan review required')
     proposal=repair_document(proposed['payload']['document'],context['payload'])
+    if context['payload'].get('repair_kind')=='submission':
+        data=context['payload']
+        facts=submission_failure(project,store,data['incident'],data['reviewed_diagnosis'],data['tests'],data['snapshot'])
+        if (data.get('submission_protocol')!=SUBMISSION_PROTOCOL or body.get('repair_protocol')!=SUBMISSION_PROTOCOL
+                or body.get('repair_of')!=facts['source']
+                or any(data.get(k)!=facts[k] for k in ('source','source_run','source_contract'))):
+            raise ValueError('exact scoped submission proposal required')
     return dict(review=key,proposal=proposal,context=context['payload'],context_id=body['repair_context'],task=scope['task'])
 
 
@@ -91,7 +99,8 @@ def repair_authority(project,store,board,run):
 def repair_document(value,context):
     if not isinstance(value,dict) or set(value)!={'classification','reason','test_paths'}:
         raise ValueError('repair classification, brief-grounded reason and explicit test paths required')
-    if value['classification'] not in ('product','test_contract','infrastructure','scope'):raise ValueError('classify product, test_contract, infrastructure or scope')
+    allowed=('submission','infrastructure','scope') if context.get('repair_kind')=='submission' else ('product','test_contract','infrastructure','scope')
+    if value['classification'] not in allowed:raise ValueError('permitted corrective classifications: '+', '.join(allowed))
     text(value['reason']);texts(value['test_paths'],maximum=20)
     paths=value['test_paths']
     if len(set(paths))!=len(paths) or not set(paths)<=set(context['qa_paths']):raise ValueError('only existing recorded QA paths may be proposed')
@@ -101,7 +110,8 @@ def repair_document(value,context):
 
 def context_view(store,value):
     """Model context needs failure facts, not private graph/workspace copies."""
-    keys=('source','source_run','snapshot','commit','tests','browser_job','failure','package','qa_paths','failed_stage','retry_rule','prior_authority')
+    keys=('source','source_run','snapshot','commit','tests','browser_job','failure','package','qa_paths','failed_stage','retry_rule','prior_authority',
+          'repair_kind','control_refusal','submission_contract')
     result={k:value[k] for k in keys if k in value}
     if value.get('reviewed_diagnosis'):
         result['prior_diagnosis']=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')['payload']['verdict']
@@ -142,6 +152,15 @@ class RepairTools(DraftTools):
         from .executor import browser_contract
         if browser_contract(self.a.project,self.a.store)==2:
             result['contract']='Classify actual failure against the brief. Product repair preserves frozen Python tests and manifests. Technical revision of frozen Python acceptance is not qualified: report this controller capability as an infrastructure hold with the CTO as technical owner and no test_paths. Do not retry the same unsupported operation or ask the CEO to debug it. Business changes or removal of coverage require scoped CEO approval. New candidate tests may be corrected before independent freeze.'
+        if context['payload'].get('repair_kind')=='submission':
+            from .quality import CONTROL_SUBMISSION_CONTRACT
+            result['contract']=('Review a bounded continuation after native implementation triage. '
+                'Classify submission only when the recorded negative-control refusal can be addressed with a complete set; '
+                'explain how the proposed continuation differs from the failed partial attempts. '
+                'Otherwise classify infrastructure or scope and hold. test_paths must be empty. '
+                'No new brief, test changes, breaker reset or approval of the previous Green. '
+                'Independent approval authorizes only a replacement attempt with fresh Green, controls and review. '+CONTROL_SUBMISSION_CONTRACT)
+            result['repair_classifications']=['submission','infrastructure','scope']
         return result
 
     def submit(self,args):
@@ -169,6 +188,40 @@ class RepairTools(DraftTools):
 class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
+
+    def propose_submission(self,conn,anchor,spec,item,incident,decision):
+        """Document-only native handoff; activation of replacement work is separate."""
+        from .quality import CONTROL_SUBMISSION_CONTRACT
+        kb,_,_=native()
+        source=self.r.check_card(conn,item['cards']['implementation'])
+        tests=self.r.check_card(conn,item['cards']['tests'])
+        latest=kb.latest_run(conn,source.id)
+        if source.status!='triage' or tests.status!='done' or not latest or not latest.ended_at:
+            raise ValueError('settled triaged implementation and independently closed tests required')
+        frozen,_,_=self.r.closed(tests.id,'tests','tests_frozen')
+        facts=submission_failure(self.project,self.store,incident,decision,frozen,self.store.capture(source.workspace_path))
+        if (facts['source']!=source.id or facts['source_run']!=latest.id
+                or facts['source_contract']!=digest(json.loads(source.body))
+                or json.loads(source.body).get('release_anchor')!=anchor.id):
+            raise ValueError('native source changed since CTO diagnosis')
+        if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
+            raise EffectBlocked('settle controller effects before a submission proposal')
+        context=self.store.record('repair_context',self.r.binding(anchor),dict(**facts,
+            project=self.project.fingerprint(),repair_kind='submission',submission_protocol=SUBMISSION_PROTOCOL,
+            submission_contract=CONTROL_SUBMISSION_CONTRACT,qa_paths=[],package=item['package'],
+            architecture=spec['document']['architecture'],observability=spec['document']['observability']))
+        body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
+            repair_of=source.id,repair_context=context,repair_protocol=SUBMISSION_PROTOCOL,
+            inputs={'approved_brief':spec['approval']})
+        key=digest([self.project.fingerprint(),source.id,latest.id,SUBMISSION_PROTOCOL,'proposal'])
+        existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        if existing:
+            if json.loads(existing['body'])!=body:raise ValueError('existing submission proposal differs; preserve it')
+            return existing['id']
+        if self.r.board.guard:self.r.board.guard()
+        return kb.create_task(conn,title='REPAIR SUBMISSION '+item['package']['title'],body=json.dumps(body),
+            assignee=self.project.coordination_roles['lead'],workspace_kind='scratch',completion_contract='local-only',
+            parents=[spec['task']],max_retries=2,max_runtime_seconds=600,idempotency_key=key)
 
     def context(self,conn,item,anchor,services,spec):
         kb,_,_=native();card=item['cards']['integration'];task=kb.get_task(conn,card['id'])

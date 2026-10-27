@@ -52,7 +52,11 @@ A admissão somente leitura (`submission_failure`) está implementada: vincula
 triagem, execução, decisão/experimento do CTO, recusa negativa, snapshot e freeze
 independente. Rejeita divergências e efeitos pendentes; não cria cards nem libera
 o breaker. Os vínculos também foram conferidos nas evidências reais preservadas
-do S6, sem chamadas ao modelo. Criação/revisão da proposta, substituição do trecho
-ainda não iniciado e qualificação ponta a ponta permanecem pendentes.
+do S6, sem chamadas ao modelo. A criação idempotente da proposta também está implementada em fonte, ainda
+sem ligação ao despacho: somente Lead, classificação de submissão limitada,
+revisão independente do CTO vinculada aos mesmos fatos e nenhuma alteração
+do card em triagem. Classificações de infraestrutura/escopo continuam holds.
+A substituição do trecho ainda não iniciado e a qualificação nativa ponta a ponta
+permanecem pendentes. Testes de unidade dessa etapa não representam retomada real.
 A orientação e a admissão isoladas não fecham essa lacuna de autonomia. A cota adicional aguarda autorização e não foi
 aplicada; trabalho offline pode prosseguir sem chamadas ao modelo.

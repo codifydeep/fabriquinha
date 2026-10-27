@@ -401,10 +401,11 @@ def register_draft(activity,on_terminal):
     names={'plan_review':operations.review} if activity.run.reviewing else (
         {'brief_submit':operations.submit,'brief_question':operations.question} if activity.run.kind=='brief' else
         {'repair_submit' if repair else 'plan_submit':operations.submit})
-    criteria_ids=([item['id'] for item in operations.evidence()['approved_brief']['criteria']]
+    evidence=operations.evidence() if activity.run.kind=='plan' else None
+    criteria_ids=([item['id'] for item in evidence['approved_brief']['criteria']]
                   if activity.run.kind=='plan' else ())
     properties=draft_schemas(activity.project,criteria_ids)
-    if repair:properties['repair_submit']=dict(classification=dict(type='string',enum=['product','test_contract','infrastructure','scope']),
+    if repair:properties['repair_submit']=dict(classification=dict(type='string',enum=evidence.get('repair_classifications',['product','test_contract','infrastructure','scope'])),
         reason=dict(type='string',minLength=1,maxLength=4000),test_paths=dict(type='array',maxItems=20,uniqueItems=True,items=dict(type='string')))
     for name,operation in names.items():
         def handler(args,operation=operation,**kwargs):
