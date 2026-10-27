@@ -12,13 +12,13 @@ desse caminho. A instalação legada está preservada e pausada.
 [Revisão crítica de 27/10/2026](docs/EXECUTION-REVIEW-2026-10-27.md) ·
 [Documentação](docs/README.md)
 
-**Aceitação compartilhada instalada; S6 com plano aprovado e reparo aditivo em validação.** O escopo de produto foi aprovado,
+**Aceitação compartilhada instalada; S6 retomado com plano aprovado.** O escopo de produto foi aprovado,
 mas a auditoria identificou incompatibilidade entre o QA atual e a aceitação em
 sessões independentes, além de divergência na autoridade para corrigir testes.
 O proprietário aprovou o plano e os refinamentos do [ADR 0006](docs/ADR-0006-SHARED-ACCEPTANCE.md).
 O preparo operacional local passou e os agentes aprovaram o planejamento S6.
-O despacho foi drenado para qualificar a extensão de critérios entre incrementos,
-sem editar os testes anteriores. A entrega real
+O reparo de extensão aditiva de critérios passou na cadeia offline e foi instalado,
+sem editar os testes anteriores; o mesmo board foi retomado. A entrega real
 e as provas de canal/restore ainda estão pendentes. Os diagramas abaixo representam
 a implementação atual.
 

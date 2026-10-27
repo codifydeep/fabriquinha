@@ -5,11 +5,11 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 em manutenção controlada:** o plano foi aprovado pelo CTO após duas
-devoluções ao Tech Lead. Controlador e relay estão parados após drenagem para
-corrigir a cobertura aditiva de um mesmo critério entre incrementos. Nenhum
-Red/freeze ou entrega de testes existia nessa fronteira. Homologação anterior
-preservada. O aceite guardado do CEO foi
+**S6 retomado com plano aprovado:** o CTO aprovou após duas devoluções ao Tech
+Lead. O reparo aditivo de cobertura passou offline e foi instalado antes de
+qualquer Red/freeze ou entrega de testes. Controlador e relay foram retomados;
+o QA recebeu novamente o card de testes do primeiro incremento. Homologação
+anterior preservada. O aceite guardado do CEO foi
 aplicado à mesma revisão do brief pelo intake nativo, sem dispensar gates.
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
@@ -43,8 +43,11 @@ Na manutenção seguinte, foi identificada uma inconsistência: o plano permitia
 o mesmo critério em dois pacotes, mas o manifesto recusava casos adicionais
 desse critério no segundo arquivo. O reparo une cobertura de forma aditiva,
 preserva arquivos congelados e recusa qualquer troca de bundle após evidência
-de qualidade existente. O núcleo passou com 401 testes; a cadeia offline com
-critério transversal está em validação. Contador preservado: 6.960/7.064.
+de qualidade existente. O núcleo passou com 401 testes e a cadeia offline
+concluiu os dois incrementos com critério transversal, PR/CI programados e
+Docker/QA reais. Fonte instalada: `a89ffe37`. Retomada em 6.960/7.064, mantendo
+plano, cards e histórico. Essa manutenção é uma intervenção adicional registrada,
+não uma entrega autônoma de produto nem nova execução que apague o histórico.
 
 ## Resultado mais recente
 

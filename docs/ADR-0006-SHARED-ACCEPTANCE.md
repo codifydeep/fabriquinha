@@ -89,3 +89,9 @@ programado. Preservou testes anteriores e conferiu os critérios GREET, BYE e
 REGRESSION com o mesmo contrato na prévia e no deploy. Nenhum patch upstream,
 chamada paga ou mutação GitHub real; os deployments descartáveis foram retirados
 depois de salvar evidências. As duas primeiras provas falhas permanecem arquivadas.
+
+O reparo aditivo seguinte passou com 401 testes do núcleo e outra execução da
+mesma cadeia de dois incrementos. O critério NAMED recebeu casos dos dois pacotes
+sem alterar o primeiro manifesto; prévia, controles, integração e QA preservaram
+os casos anteriores. A instalação S6 foi atualizada antes de qualquer job ou
+recibo de qualidade, conservando seu plano aprovado e sua intervenção registrada.
