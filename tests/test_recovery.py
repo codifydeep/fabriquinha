@@ -20,6 +20,20 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_forbidden_diagnostic_write_identifies_phase_and_next_permitted_operation(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality);self.quality.observe=Mock(return_value=('observed',dict(failures=[])))
+        with self.assertRaises(ValueError) as error:
+            diagnostic.validate(dict(hypothesis='Attempt a test change',replacements={'tests/test_existing.py':'weakened'}))
+        self.assertIn('operation_forbidden',str(error.exception));self.assertIn('without replacements',str(error.exception))
+        self.quality.observe.assert_not_called()
+        records=[self.store.receipt(p.stem) for p in (self.store.root/'receipts').glob('*.json')]
+        refusal=next(r for r in records if r['kind']=='diagnostic_refusal')
+        self.assertEqual(refusal['payload']['next_operation'],'diagnostic_validate_without_replacements')
+        self.assertFalse(refusal['payload']['delivery_approval'])
+        diagnostic.validate(dict(hypothesis='Observe the current immutable suite'))
+        self.quality.observe.assert_called_once_with(self.run,self.snapshot,'diagnostic')
+        self.assertEqual((self.work/'tests/test_existing.py').read_text(),'baseline test\n')
+
     def test_qa_correction_diagnosis_executes_the_preview_and_cannot_direct_product_writes(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.repair=dict(proposal=dict(classification='test_contract',test_paths=['tests/qa.json']))

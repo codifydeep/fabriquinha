@@ -60,7 +60,7 @@ permanece preservado. O próximo atendimento deve seguir a decisão técnica
 registrada e a clarificação instalada, com novo experimento e revisão, sem
 desbloquear diretamente o card ou converter manutenção em autonomia.
 
-330 testes passaram. `scripts/qualify_hermes_recovery.py --review-churn` executou
+333 testes passaram. `scripts/qualify_hermes_recovery.py --review-churn` executou
 13 atividades nativas, 41 respostas locais programadas e três diagnósticos,
 com Docker real. Três pareceres `changes` acionaram o CTO sem o modelo pedir
 `escalate`; houve SPIKE, retomada da revisão, revalidação e recuperação após
@@ -90,3 +90,24 @@ de manter prioridade fixa no diagnóstico antigo.
 novo encaminhamento, ausência de duplicação após reinício, compatibilidade de
 chave anterior e status do sucessor atual. Decisões são fixtures programadas;
 zero modelo, zero Docker e nenhum claim aberto. Isso não aprova a entrega S5.
+
+## Operação proibida não é falha de infraestrutura
+
+O novo CTO recebeu a orientação, mas manteve `hold` porque seu SPIKE tentou
+substituir testes e foi corretamente recusado, sem produzir experimento. A
+recusa genérica não indicava o caminho permitido. Agora ela registra
+`diagnostic_refusal`, classificação `operation_forbidden`, fase, caminhos e
+próxima operação: `diagnostic_validate` somente com hipótese, sem substituições.
+Essa observação da suíte imutável pode permanecer Red e fundamentar orientação;
+não concede Green, freeze, aprovação ou permissão para escrever testes.
+
+O diagnóstico também recebe os critérios realmente atribuídos ao card: não pode
+aconselhar remover um ID obrigatório do QA. Sua cobertura é composta pela suíte
+completa e QA retido/novo. As regras de execução e o DSL não foram afrouxados.
+
+A prova nativa de 13 atividades confirmou: recusa real, mensagem com próximo
+passo, observação imutável Red sem erros e retomada da revisão. Outra prova com
+Git/Docker confirmou regressão com falhas `subTest` múltiplas no mesmo caso:
+preserva-se a multiplicidade das falhas de base/Red/CI, sem duplicar casos ou
+ignorar falhas. Todas essas qualificações usaram decisões programadas e zero
+chamadas pagas. Retomar somente após publicar e instalar o lote qualificado.

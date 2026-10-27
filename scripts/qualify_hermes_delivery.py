@@ -130,7 +130,8 @@ def create_trial(root,upstream,image,*,namespace='delivery-kit-hermes-native-flo
     (source/'app.py').write_text('VALUE = 1\n')
     (source/'tests/test_existing.py').write_text('import unittest, app\nclass Existing(unittest.TestCase):\n def test_type(self): self.assertIsInstance(app.VALUE,int)\n')
     if known_regression:
-        with (source/'tests/test_existing.py').open('a') as stream:stream.write(' def test_value(self): self.assertEqual(app.VALUE,2)\n')
+        with (source/'tests/test_existing.py').open('a') as stream:
+            stream.write(' def test_value(self): self.assertEqual(app.VALUE,2)\n def test_offsets(self):\n  for offset in (0,1):\n   with self.subTest(offset=offset):self.assertEqual(app.VALUE+offset,2+offset)\n')
         remote=root/'remote.git';remote.mkdir();fixture_git(remote,'init','--bare','--initial-branch=main')
         fixture_git(source,'init','--initial-branch=main');fixture_git(source,'add','.')
         fixture_git(source,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','Existing failing behavior fixture')
@@ -162,6 +163,8 @@ def regression_ci(root,project,store,board,impl):
     review=store.receipt(metadata['delivery'],kind='delivery_review');green=store.receipt(review['payload']['green'],kind='green')
     quality=Quality(project,store,Runner(project,store),board);frozen=quality.frozen_plan(store.receipt(green['payload']['freeze'],kind='tests_frozen'))
     red=quality.test_evidence(frozen['red']);assert red['kind']=='regression_red' and frozen['new_cases']==[]
+    failures=store.receipt(red['payload']['red_job'],kind='suite_job')['payload']['report']['failures']
+    assert len(failures)>len({failure['case'] for failure in failures}),'real subtest failures must remain individually recorded'
     repo=Repository(project,store,remote=root/'remote.git');base=repo.base();assert red['payload']['base_commit']==base
     ci=LocalCI(project,store,repo,quality.runner)
     def wait(call):

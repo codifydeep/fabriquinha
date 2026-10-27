@@ -74,6 +74,28 @@ class KnownRegression(unittest.TestCase):
         self.inputs['base_commit']='not-a-sha'
         with self.assertRaises(ValueError):self.q.red(self.author,self.base,self.base)
 
+    def test_multiple_subtest_failures_preserve_multiplicity_without_duplicating_cases(self):
+        report=self.report
+        def subtests(phase):
+            value=report(phase)
+            if value['failures']:
+                failure=value['failures'][0]
+                value['failures']=[{**failure,'detail':'input A'}, {**failure,'detail':'input B'}]
+            return value
+        self.report=subtests
+        frozen=self.freeze()
+        self.assertEqual(frozen['control_cases'],['test_existing.Existing.test_value'])
+        red=self.q.test_evidence(self.red)['payload'];self.assertEqual(len(self.store.receipt(red['red_job'])['payload']['report']['failures']),2)
+
+    def test_missing_one_of_two_subtest_failures_invalidates_regression_confirmation(self):
+        report=self.report
+        def unstable(phase):
+            value=report(phase)
+            if phase=='baseline':value['failures']=[{**value['failures'][0],'detail':'A'},{**value['failures'][0],'detail':'B'}]
+            return value
+        self.report=unstable
+        with self.assertRaisesRegex(ValueError,'failures or discovery changed'):self.q.red(self.author,self.base,self.base)
+
     def test_regression_cannot_hide_skips_errors_or_unstable_failure_identity(self):
         for attribute,value in [('skips',['test_existing.Existing.test_type']),('errors',['test_existing.Existing.test_type']),('drift',True)]:
             with self.subTest(attribute=attribute):

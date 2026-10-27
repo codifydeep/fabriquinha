@@ -143,12 +143,12 @@ class Quality:
     def failures(self,report):
         """Stable assertion identities; never accept an arbitrary failing exit."""
         failures=report['failures'];prefix=self.project.tests_dir+'/'
-        if (not failures or len({f['case'] for f in failures})!=len(failures)
+        if (not failures
                 or any(f.get('assertion') is not True or not any(
                     frame['file'].startswith(prefix) and frame['function'].startswith('test')
                     for frame in f.get('frames',[])) for f in failures)):
             raise ValueError('known regression requires real existing-test assertion failures')
-        return sorted((dict(case=f['case'],frames=f['frames'],detail=f.get('detail')) for f in failures),key=lambda f:f['case'])
+        return sorted((dict(case=f['case'],frames=f['frames'],detail=f.get('detail')) for f in failures),key=lambda f:json.dumps(f,sort_keys=True))
 
     def known_regression(self,record):
         """Recheck immutable evidence without granting a current worker claim."""

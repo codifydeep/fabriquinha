@@ -8,7 +8,7 @@ from .artifacts import digest,encoded
 from .board import Run
 from .effects import Journal, EffectBlocked, Pending,write_json
 from .kanban_lane import native
-from .quality import Quality, DeliveryTools, product_mutations, review_decision, suite_report
+from .quality import Quality, DeliveryTools, product_mutations, review_decision, suite_report,PROTECTED
 
 
 def browser_refusal_context(store,project,binding,key):
@@ -142,6 +142,11 @@ class Diagnostic:
         kb,kbc,_=native()
         with kbc.connect_closing() as conn:
             body=json.loads(kb.get_task(conn,self.run.task).body)
+            if self.incident.get('review_escalation') and self.original['kind']=='tests' and self.q.project.delivery_roles:
+                source=json.loads(kb.get_task(conn,self.original['task']).body)
+                if digest(source)!=self.original['contract']:raise ValueError('diagnostic source contract changed')
+                result['required_browser_criteria']=source['criteria']
+                result['coverage_contract']='Every assigned criterion needs a representative deployed check ID; do not advise removing a required ID. Behavioral coverage is assessed across the full unittest/browser suite and all retained/new QA, not solely that one check. No duplicate IDs. New candidate paths may be revised by the author before freeze. Scope/architecture decisions belong to technical reviewers, never the CEO.'
             if body.get('escalated_from'):
                 prior=kb.latest_run(conn,body['escalated_from'])
                 result['previous_diagnosis']=dict(summary=prior.summary,error=prior.error) if prior else None
@@ -186,7 +191,20 @@ class Diagnostic:
                     for path,content in replacements.items():(work/path).write_text(content)
                     snapshot=self.store.capture(work)
                 self.q.correction_diff(self.repair['context']['snapshot'],snapshot,self.repair['proposal']['test_paths'])
-            else:snapshot=product_mutations(self.q,snapshot,[args['replacements']])[0]
+            else:
+                replacements=args['replacements']
+                if isinstance(replacements,dict) and 1<=len(replacements)<=16 and all(isinstance(p,str) for p in replacements):
+                    manifest=self.store.manifest(snapshot)
+                    protected=sorted(p for p in replacements if p in manifest and any(p==prefix or p.startswith(prefix)
+                        for prefix in (*PROTECTED,self.q.project.tests_dir+'/')))
+                    if protected:
+                        refusal=self.q.record(self.run,'diagnostic_refusal',dict(incident=self.board.input(self.run,'incident'),snapshot=snapshot,
+                            classification='operation_forbidden',phase='diagnostic',paths=protected,
+                            next_operation='diagnostic_validate_without_replacements',delivery_approval=False))
+                        raise ValueError('protected baseline changed: '+protected[0]+'. operation_forbidden in diagnostic SPIKE, not infrastructure failure; no source edit was made. '
+                            'Next permitted operation: diagnostic_validate with a hypothesis only, without replacements, to observe the immutable current suite. '
+                            'Assertion failures qualify diagnostic evidence, not Green or approval. Candidate-only author changes require a new author revision and independent review. Refusal '+refusal)
+                snapshot=product_mutations(self.q,snapshot,[replacements])[0]
         job,report=DeliveryTools.wait(self,lambda:self.q.observe(self.run,snapshot,'green' if correction else 'diagnostic'))
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
             snapshot=snapshot,hypothesis=args['hypothesis'],job=job,report=report))

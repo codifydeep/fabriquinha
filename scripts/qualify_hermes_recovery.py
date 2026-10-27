@@ -40,7 +40,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
-    churn_reviews=[];churn_context=[]
+    churn_reviews=[];churn_context=[];churn_refusals=[];churn_observations=[]
     control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[];negative_reports=[]
     terminal_cids=[];terminal_verified=[]
     reference='https://github.com/example/qualification/pull/58';guidance_seen=[]
@@ -187,6 +187,10 @@ print(json.dumps(rows))'''
                         assert visible['test_revision_contract']['candidate_only_paths']==['tests/test_new.py']
                         assert visible['test_revision_contract']['protected_paths']==['tests/test_existing.py']
                         churn_context.append(run.number)
+                        for operation,arguments in sequence:
+                            if operation=='diagnostic_validate' and set(arguments.get('replacements',{}))=={'app.py'}:
+                                arguments.pop('replacements')
+                                arguments['hypothesis']='Observe the immutable handoff without replacements after the expected write refusal'
                 if terminal_deadline and run.number==1:
                     sequence.insert(3,('terminal',dict(command=deadline_probe,timeout=6)))
                 if pr_in_guidance and run.kind=='diagnostic' and run.actor=='flow-cto':
@@ -196,6 +200,14 @@ print(json.dumps(rows))'''
                     guidance_seen.append(run.number)
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
+            if run.number in churn_context and index==3:
+                result=str(body['messages'][-1].get('content'))
+                assert 'operation_forbidden' in result and 'without replacements' in result
+                churn_refusals.append(run.number)
+            if run.number in churn_context and index==4:
+                result=json.loads(body['messages'][-1]['content'])
+                assert result['report']['failures'] and not result['report']['errors'] and result['delivery_approval'] is False
+                churn_observations.append(run.number)
             if invalid_red and run.kind=='diagnostic':
                 last=body['messages'][-1].get('content')
                 if isinstance(last,str):
@@ -348,7 +360,10 @@ print(json.dumps(rows))'''
             following=next(r for r in runs if r['id']>failed['id'] and r['task_id']==source)
             assert following['profile']==failed['profile'],'recovery must resume independent review, not author mode'
         experiment=runtime.store.receipt(decisions[-1]['payload']['experiment'],kind='diagnostic_experiment')
-        assert (runtime.store.tree(experiment['payload']['snapshot'])/'app.py').read_text()==("VALUE = 'broken'\n" if control_refusal else 'VALUE = 2\n')
+        # Churn now qualifies an unchanged observation after a forbidden write,
+        # not the product-mutation experiment used by the other scenarios.
+        expected=("VALUE = 'broken'\n" if control_refusal else 'VALUE = 1\n' if review_churn else 'VALUE = 2\n')
+        assert (runtime.store.tree(experiment['payload']['snapshot'])/'app.py').read_text()==expected
         assert (root/'work/tests/app.py').read_text()=='VALUE = 1\n'
         assert (root/'work/implementation/app.py').read_text()=='VALUE = 2\n'
         assert not docker('ps','-aq','--filter','label=com.docker.compose.project='+project['namespace']+'-tests').strip()
@@ -359,8 +374,10 @@ print(json.dumps(rows))'''
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
         if review_churn:
             assert len(churn_reviews)==3 and len(churn_context)==1
+            assert churn_refusals==churn_context and churn_observations==churn_context
             proof.update(automatic_review_churn_escalation=True,model_requested_escalation=False,three_independent_changes=True,
-                cto_received_prior_reviews_and_protocol=True)
+                cto_received_prior_reviews_and_protocol=True,forbidden_write_explains_next_operation=True,
+                unchanged_red_observation_resumed_review=True)
         if provider_error:proof.update(native_sdk_policy_error_reached_diagnosis=True)
         if invalid_red:
             assert len(set(negative_reports))==2
