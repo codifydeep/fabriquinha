@@ -88,6 +88,22 @@ class BehaviorControlTargets(unittest.TestCase):
         changes=dict(decision='changes',reason='Fix coverage',findings=[dict(path='app.py',line=1,detail='Missing behavior assertion')])
         with self.assertRaises(ValueError):self.q.tests_review(self.reviewer,self.red,changes,control_risks=[dict(case='qa_metadata',reason='risk')])
 
+    def test_partial_submissions_do_not_accumulate_but_combined_mutants_cover_targets(self):
+        self.freeze([dict(case='passing_risk',reason='Independent passing behavior needs a negative control.')])
+        green,first=self.green_and_mutant()
+        (self.work/'app.py').write_text('VALUE = -2\n');second=self.store.capture(self.work)
+        execute=self.q.runner.run
+        def targeted(run,snapshot,phase):
+            self.failing=['feature'] if snapshot==first else ['passing_risk']
+            return execute(run,snapshot,phase)
+        self.q.runner.run=targeted
+        for mutant in (first,second):
+            with self.assertRaisesRegex(ValueError,'Separate failed submissions do not accumulate coverage'):
+                self.q.controls(self.implementer,green,[mutant])
+        controls=self.q.controls(self.implementer,green,[first,second])
+        self.assertEqual(self.store.receipt(controls)['payload']['coverage'],['feature','passing_risk'])
+        self.assertIsNone(self.q.control_refusal)
+
     def test_altered_target_set_and_legacy_freeze_cannot_become_current_evidence(self):
         freeze=self.freeze();receipt=self.store.receipt(freeze)
         for updates in ({'control_cases':[]},{'control_cases':['qa_metadata']},{'control_contract':1}):

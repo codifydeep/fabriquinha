@@ -5,12 +5,16 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 retomado após reparo do vínculo de validação:** o CTO aprovou o plano após
-duas devoluções ao Tech Lead. A migração preservou os nove cards, dependências,
-brief e grafo anterior. Admissão do QA, GitHub e nove perfis passaram; o despacho
-foi retomado com a fonte publicada `ea9f0d81`, no contador 6.960/7.064.
-Não houve aumento de teto nem conversão de evidências antigas. O aceite do CEO
-já foi aplicado à mesma revisão pelo intake nativo. A homologação S6 ainda falta.
+**S6 em hold técnico após duas submissões incompletas de controles negativos.**
+O teste Red foi aprovado independentemente e congelado; a implementação chegou
+a Green. Lead executou diagnóstico e retomou o autor; a repetição escalou ao
+CTO, que preservou a triagem. Nenhum controle foi dispensado e não houve PR ou
+homologação S6. O runtime foi drenado para manutenção. Consumo observado:
+7.029/7.064; a ampliação solicitada permanece pendente.
+
+O reparo de orientação passou offline com 402 testes, mas ainda não está instalado.
+Falta qualificar a continuação limitada após triagem, preservando o card antigo,
+o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
 despacho. O proprietário aprovou os refinamentos e a retomada das correções;

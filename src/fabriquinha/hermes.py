@@ -362,7 +362,7 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
     if sandbox.run.kind=='diagnostic':
         from .recovery import register_diagnostic
         return register_diagnostic(sandbox,quality,on_terminal)
-    from .quality import DeliveryTools
+    from .quality import DeliveryTools,CONTROL_SUBMISSION_CONTRACT
     from tools.registry import registry
     operations=DeliveryTools(sandbox,quality)
     if sandbox.run.reviewing:
@@ -393,6 +393,7 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
         description=('Validate the actual workspace and request independent review. '
             'Tests phase: real Red. Implementation: Green and behavior-changing product mutations. '
             'On validation error correct the work; never remove or weaken tests. No pass flags, commands or receipt IDs accepted.')
+        if sandbox.run.kind=='implementation':description+=' '+CONTROL_SUBMISSION_CONTRACT
     def handler(args,**kwargs):
         result=operation(args)
         if on_terminal:on_terminal(result)

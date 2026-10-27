@@ -142,6 +142,9 @@ class RecoveryPhases(unittest.TestCase):
         self.assertTrue(evidence['matches_current_snapshot'])
         self.assertTrue(evidence['requires_fresh_validation'])
         self.assertFalse(evidence['delivery_approval'])
+        guidance=self.diagnostic_evidence(key)
+        self.assertIn('Separate failed submissions do not accumulate coverage',guidance['control_submission_contract'])
+        self.assertIn('does not resolve missing mutation targets',guidance['experiment_semantics'])
         self.recovery=Recovery(self.project,self.store,self.board);self.discover(task)
         self.assertEqual(len(self.created),1)
 

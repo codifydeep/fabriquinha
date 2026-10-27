@@ -129,8 +129,11 @@ class Diagnostic:
                 result['approved_brief']=Intake(self.q.project,self.store,self.board).approved(approval)[1]['payload']['document']
             result['phase_expectation']='Authorized QA expected-text correction, not a new feature Red. The independent corrective plan permits only its listed QA text paths. Diagnose all frozen-preview failures against the approved brief. Do not tell the author to edit product code or preserve a known incorrect QA expectation; do not silently override the reviewed authority. diagnostic_validate runs both full suite and QA preview; negative results remain observations, not approval.'
         if self.incident.get('control_refusal'):
+            from .quality import CONTROL_SUBMISSION_CONTRACT
             result['last_control_refusal']=control_refusal_context(self.store,self.q.project,self.original,
                 self.incident['control_refusal'],self.incident['snapshot'])
+            result['control_submission_contract']=CONTROL_SUBMISSION_CONTRACT
+            result['experiment_semantics']+=' For a control refusal, a passing unmodified suite only reconfirms Green; it does not resolve missing mutation targets. Address the recorded negative-control coverage in the technical guidance.'
         if self.incident.get('suite_refusal'):
             result['last_suite_refusal']=suite_refusal_context(self.store,self.q.project,self.original,
                 self.incident['suite_refusal'],self.incident['snapshot'])

@@ -19,6 +19,12 @@ PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
 REVIEW_FINDINGS_CONTRACT=('findings lists blocking defects only. approve requires findings=[]; '
     'put positive observations in reason. changes or escalate requires at least one concrete finding.')
 CONTROL_CONTRACT = 2
+CONTROL_SUBMISSION_CONTRACT=('Submit the complete set of 1-8 mutations together in one delivery_submit call. '
+    'Each mutation maps existing product paths to complete replacement file contents, not patches. '
+    'Each starts independently from the same Green snapshot; their failing behavior targets are combined within that call only. '
+    'After a partial refusal, retain useful mutations and include them again together with the new ones. '
+    'Separate failed submissions do not accumulate coverage. Passing Green or a diagnostic suite does not prove negative-control coverage. '
+    'Do not edit the real product into a mutant or change frozen tests.')
 CONTROL_REVIEW_CONTRACT=('Check approved acceptance coverage before approving tests. Every validated Red assertion failure is a mandatory '
     'mutation target. Passing auxiliary checks still run in the full suite. Add control_risks only for passing cases requiring '
     'an additional product negative control, with a concrete reason; never exclude a Red target. Request changes for missing or vacuous behavior tests '
@@ -507,7 +513,7 @@ class Quality:
             self.control_refusal=self.record(run,'control_refusal',dict(green=green_id,freeze=data['freeze'],
                 snapshot=data['snapshot'],jobs=jobs,missing=missing,coverage=sorted(coverage),feedback=feedback,delivery_approval=False))
             raise ValueError('negative controls did not witness all independently frozen behavior targets: '+json.dumps({**feedback,'refusal':self.control_refusal})+
-                '. Correct product mutations for the missing cases; preserve the full suite and frozen tests.')
+                '. Correct product mutations for the missing cases; preserve the full suite and frozen tests. '+CONTROL_SUBMISSION_CONTRACT)
         self.control_refusal=None
         return self.record(run, 'controls', dict(control_contract=CONTROL_CONTRACT,green=green_id, jobs=jobs, coverage=sorted(coverage)))
 
