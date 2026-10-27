@@ -20,8 +20,12 @@ programados. A mesma aceitação congelada rodou na prévia e no deploy, preserv
 regressão. Uma falha encontrada no ensaio agora impede congelar Red quando os
 testes de navegador não chegaram a executar. Zero chamadas pagas. Isso não
 qualifica agentes reais nem conclui S6. R2 ainda exige provisionamento público
-de credenciais/volumes e supervisão/parada econômica reproduzíveis, seguido da
-instalação do novo bundle na raiz S6 existente.
+de credenciais/volumes e supervisão/parada econômica reproduzíveis. O bundle
+novo já foi instalado na raiz S6 existente a partir da fonte publicada
+`eaf52e21`, com recibo de upgrade, backup mínimo, board/brief preservados,
+provedor desabilitado e despacho parado. O relay e o supervisor deverão usar
+essa fonte na próxima ativação; iniciar scripts privados antigos não é o
+procedimento de retomada.
 
 ## Resultado mais recente
 
