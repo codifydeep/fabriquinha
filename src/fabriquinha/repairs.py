@@ -17,6 +17,50 @@ from .recovery import Recovery,browser_refusal_context
 REPAIR_PROTOCOL='qa-text-handoff-1'
 
 
+def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
+    """Read-only admission facts; never releases triage or creates a task.
+
+    Only a pre-review implementation with an exact negative-control refusal
+    and completed CTO diagnosis can become a scoped continuation proposal.
+    The native source/run/state and idle effects still need controller checks.
+    """
+    from .recovery import control_refusal_context
+    incident=store.receipt(incident_key,kind='incident');data=incident['payload'];binding=incident['binding']
+    decision=store.receipt(decision_key,kind='diagnostic_decision');choice=decision['payload'];actor=decision['binding']
+    cto=(project.technical_roles or {}).get('cto')
+    if (not cto or binding.get('kind')!='implementation' or binding.get('reviewing') is not False
+            or data.get('project')!=project.fingerprint() or data.get('source_state')!='triage'
+            or data.get('source')!=binding.get('task') or data.get('source_run')!=binding.get('number')
+            or data.get('resume_allowed') is not False or data.get('controller_effects')!=[]
+            or data.get('snapshot')!=current_snapshot
+            or actor.get('kind')!='diagnostic' or actor.get('reviewing') is not False
+            or actor.get('actor')!=cto or actor.get('release')!=binding.get('release')
+            or choice.get('project')!=project.fingerprint() or choice.get('incident')!=incident_key
+            or choice.get('action')!='hold' or choice.get('delivery_approval') is not False):
+        raise ValueError('exact triaged implementation and CTO hold required for submission repair')
+    experiment=store.receipt(choice['experiment'],kind='diagnostic_experiment')
+    if (experiment['binding']!=actor or experiment['payload'].get('incident')!=incident_key
+            or experiment['payload'].get('project')!=project.fingerprint()
+            or experiment['payload'].get('snapshot')!=current_snapshot):
+        raise ValueError('exact CTO experiment required; never a replacement for negative controls')
+    refusal=control_refusal_context(store,project,binding,data['control_refusal'],current_snapshot)
+    record=store.receipt(data['control_refusal'],kind='control_refusal')
+    green=store.receipt(record['payload']['green'],kind='green')['payload']
+    quality=Quality(project,store,None,None)
+    freeze=store.receipt(tests,kind='tests_frozen');frozen=quality.frozen_plan(freeze)
+    if (not refusal['matches_current_snapshot'] or not refusal['missing']
+            or green['freeze']!=tests or freeze['binding']['release']!=binding['release']
+            or set(green['cases'])!=set(frozen['cases'])
+            or not set(refusal['missing'])<=set(frozen['control_cases'])
+            or not set(refusal['coverage'])<=set(frozen['cases'])):
+        raise ValueError('unchanged snapshot and exact independently frozen control targets required')
+    quality.protect(frozen['snapshot'],current_snapshot,exact_tests=True)
+    return dict(source=data['source'],source_run=data['source_run'],source_contract=binding['contract'],
+        snapshot=current_snapshot,tests=tests,incident=incident_key,reviewed_diagnosis=decision_key,
+        control_refusal=refusal,delivery_approval=False,requires_independent_plan_review=True,
+        requires_fresh_green_and_controls=True)
+
+
 def reviewed(project,store,key):
     record=store.receipt(key,kind='plan_review');scope=record['binding']
     proposed=store.receipt(record['payload']['plan'],kind='work_plan')

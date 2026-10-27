@@ -48,6 +48,11 @@ Antes de retomar o produto, qualificar uma continuação limitada pela equipe:
 6. Qualificar offline antes de instalar. Somente então permitir que os agentes
    submetam uma nova entrega, conservando a falha como parte do resultado S6.
 
-Este caminho ainda não foi implementado/qualificado. A orientação isolada não
-fecha essa lacuna de autonomia. A cota adicional aguarda autorização e não foi
+A admissão somente leitura (`submission_failure`) está implementada: vincula
+triagem, execução, decisão/experimento do CTO, recusa negativa, snapshot e freeze
+independente. Rejeita divergências e efeitos pendentes; não cria cards nem libera
+o breaker. Os vínculos também foram conferidos nas evidências reais preservadas
+do S6, sem chamadas ao modelo. Criação/revisão da proposta, substituição do trecho
+ainda não iniciado e qualificação ponta a ponta permanecem pendentes.
+A orientação e a admissão isoladas não fecham essa lacuna de autonomia. A cota adicional aguarda autorização e não foi
 aplicada; trabalho offline pode prosseguir sem chamadas ao modelo.
