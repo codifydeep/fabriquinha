@@ -60,11 +60,26 @@ A execução completa passou com duas releases, três pacotes, 18 atividades SDK
 e 27 respostas HTTP programadas. A segunda release reutilizou exatamente o
 artefato anterior nos três passos candidate/rollback/restore, preservou os testes
 e reexecutou QA. A retirada exata do deployment e das redes descartáveis ocorreu
-depois da evidência. O núcleo passou em 340 testes sob Python 3.14.10.
+depois da evidência. O núcleo passou em 342 testes sob Python 3.14.10.
 
 As tentativas anteriores foram preservadas: uma encontrou esgotamento de pools
 automáticos Docker; outra perdeu o executável Homebrew do ambiente virtual.
 Nenhuma foi convertida em sucesso. O ensaio completo não usou chamadas pagas.
+
+## Observação e escalonamento qualificados
+
+A observação liga explicitamente o artefato atual ao recibo de QA e à aceitação
+anterior. Comparar apenas projeto, nome ou commit é insuficiente: o campo
+`current_is_previous_homologation` exige o mesmo artefato e imagem. Um erro
+histórico contendo a palavra “unrelated” não classifica o deployment atual.
+Essa informação permite ao diagnóstico avaliar a relação real sem acesso ao
+Docker administrativo ou autorização para dispensar QA.
+
+Um `hold` do Tech Lead mantém sua decisão e o bloqueio, mas cria automaticamente
+um diagnóstico CTO vinculado ao predecessor. O CTO pode manter um impedimento
+visível com próxima ação concreta; não há recursão nem decisão técnica enviada
+ao CEO. O qualificador nativo de sucessores comprovou hold preservado, fonte
+nunca desbloqueada e ausência de duplicação após reinício, sem modelo ou Docker.
 
 ## Limites
 

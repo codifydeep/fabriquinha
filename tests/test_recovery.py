@@ -20,6 +20,22 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_lead_hold_escalates_without_unblocking_but_cto_hold_stays_terminal(self):
+        recovery=Recovery(self.project,self.store,self.board);recovery.create=Mock();kb=Mock()
+        for stage,actor in (('lead','lead'),('cto','cto')):
+            body=dict(version=1,kind='diagnostic',release='v1',stage=stage,inputs={'incident':self.incident})
+            task=SimpleNamespace(id='held-'+stage,assignee=actor,body=json.dumps(body))
+            run=Run(task.id,10,actor,'diagnostic',False,actor,'v1',digest(body))
+            decision=self.store.record('diagnostic_decision',run.binding(),dict(project=self.project.fingerprint(),incident=self.incident,action='hold'))
+            kb.latest_run.return_value=SimpleNamespace(id=10,outcome='completed',metadata={'diagnosis':decision})
+            recovery.create.reset_mock()
+            conn=Mock()
+            with patch('fabriquinha.recovery.native',return_value=(kb,None,None)):
+                recovery.apply(conn,task)
+            if stage=='lead':recovery.create.assert_called_once_with(conn,self.incident,'cto',previous=task.id)
+            else:recovery.create.assert_not_called()
+            kb.unblock_task.assert_not_called()
+
     def test_integration_diagnosis_has_fixed_safe_deployment_observation(self):
         from dataclasses import replace
         diagnostic=Diagnostic(self.sandbox,self.quality)
@@ -29,13 +45,13 @@ class TechnicalRecovery(unittest.TestCase):
         current=dict(container='container',image='image',artifact='artifact',url='http://127.0.0.1:1234',healthy=True,network='qa')
         with patch('fabriquinha.recovery.native',return_value=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)), \
              patch('fabriquinha.deployment.Deployment') as deployment,patch('fabriquinha.intake.Intake') as intake:
-            deployment.return_value.service.return_value=current
+            deployment.return_value.continuity_observation.return_value=dict(current=current,delivery_approval=False)
             intake.return_value.previous.return_value={'historical_only':True,'acceptance':'prior'}
             observed=diagnostic.evidence()['deployment_observation']
             self.assertEqual(observed['current'],current);self.assertFalse(observed['delivery_approval'])
             self.assertEqual(observed['group'],self.project.namespace+'-homologation')
             intake.return_value.previous.assert_called_once_with(self.run.release)
-            deployment.return_value.service.side_effect=EffectBlocked('foreign sandbox')
+            deployment.return_value.continuity_observation.side_effect=EffectBlocked('foreign sandbox')
             unavailable=diagnostic.evidence()['deployment_observation']
             self.assertEqual(unavailable['state'],'unavailable');self.assertNotIn('current',unavailable)
 

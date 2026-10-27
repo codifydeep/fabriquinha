@@ -82,6 +82,15 @@ substituição de um deployment divergente foi preservada. A instalação deste
 reparo e a retomada do mesmo incidente técnico são os próximos passos; o ensaio
 programado não qualifica a autonomia do S5.
 
+O seletor foi instalado da revisão `45610561` após backup verificado. O novo
+diagnóstico Lead executou 18 testes verdes, mas manteve o bloqueio por classificar
+a implantação como não relacionada. A observação foi então completada com a
+ligação explícita artefato → QA → homologação, verificada por leitura no ambiente
+real. Também passou a subir automaticamente ao CTO o hold do Lead, mantendo fonte
+bloqueada e a decisão histórica. Essas extensões passaram em 342 testes e numa
+prova de sucessores no Kanban nativo, sem chamadas pagas. A atualização instalada
+e o novo diagnóstico ainda precisam ser conferidos; S5 continua assistido.
+
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
 mas Telegram real não está configurado: fila não comprova recebimento nesse canal.

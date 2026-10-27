@@ -113,11 +113,11 @@ class Diagnostic:
             # Fixed read-only observations, never Docker commands from the model.
             # service() validates ownership/sandbox policy and exposes no env.
             try:
+                history=Intake(self.q.project,self.store,self.board).previous(self.run.release)
                 result['deployment_observation']=dict(project=self.q.project.fingerprint(),
                     group=self.q.project.namespace+'-homologation',
-                    current=Deployment(self.q.project,self.store,self.board,None).service(),
-                    previous_homologation=Intake(self.q.project,self.store,self.board).previous(self.run.release),
-                    delivery_approval=False)
+                    previous_homologation=history,
+                    **Deployment(self.q.project,self.store,self.board,None).continuity_observation(history))
             except (ValueError,OSError,subprocess.SubprocessError,EffectBlocked) as error:
                 result['deployment_observation']=dict(state='unavailable',error=type(error).__name__,delivery_approval=False)
         if self.qa_correction():
@@ -483,7 +483,11 @@ class Recovery:
         if data['action']=='escalate':
             if body['stage']!='lead':raise ValueError('only lead escalates to CTO')
             self.create(conn,data['incident'],'cto',previous=task.id);return
-        if data['action']=='hold':return
+        if data['action']=='hold':
+            # Keep the hold receipt/source block, but do not strand a technical
+            # impediment at Lead. CTO is the final technical decision owner.
+            if body['stage']=='lead':self.create(conn,data['incident'],'cto',previous=task.id)
+            return
         if source.get('resume_allowed') is False:raise EffectBlocked('native triage/controller effect needs scoped repair; preserve source')
         experiment=self.store.receipt(data['experiment'],kind='diagnostic_experiment')
         if experiment['binding']!=expected.binding() or experiment['payload']['incident']!=data['incident']:

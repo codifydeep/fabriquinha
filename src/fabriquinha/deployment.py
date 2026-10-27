@@ -231,6 +231,24 @@ class Deployment:
                     url='http://127.0.0.1:'+ports[0]['HostPort'] if ports else None,healthy=bool(healthy and ports),
                     network=self.group+'_qa')
 
+    def continuity_observation(self,history):
+        """Join safe live identity to accepted QA; never infer from names/ports."""
+        current=self.service();prior=None
+        if history:
+            accepted=self.store.receipt(history['acceptance'],kind='release_acceptance')['payload']
+            qa=self.store.receipt(accepted['final_qa'],kind='release_evidence')['payload']
+            artifact=self.read_artifact(qa['artifact'])
+            if (accepted['project']!=self.project.fingerprint() or qa['project']!=accepted['project']
+                    or accepted['state']!='HOMOLOGADA' or artifact['role']!='candidate'
+                    or any(qa[key]!=accepted[key] or artifact[key]!=accepted[key] for key in ('commit','image'))):
+                raise ValueError('historical deployment must match exact acceptance and QA')
+            prior=dict(acceptance=history['acceptance'],qa=accepted['final_qa'],artifact=qa['artifact'],
+                commit=artifact['commit'],image=artifact['image'],snapshot=artifact['snapshot'])
+        return dict(current=current,previous_homologated_deployment=prior,
+            current_is_previous_homologation=bool(current and prior and current['artifact']==prior['artifact'] and current['image']==prior['image']),
+            policy='The exact previous same-project homologation may be replaced by the fixed candidate/rollback/restore sequence. Preserve every unmatched deployment. The incident error describes a historical attempt; classify current identity by these receipts, not that error wording. Resume still requires actual integration and independent deployed QA.',
+            delivery_approval=False)
+
     def _up(self,run,artifact,operation):
         self.current(run)
         if self.project.delivery_roles and not self.project.qualification:deployment_networks(self.project)

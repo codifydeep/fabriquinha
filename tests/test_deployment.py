@@ -76,6 +76,25 @@ class ComposeBoundaries(unittest.TestCase):
                 deployment.rollout(run,candidate,previous,Mock())
             deployment._up.assert_not_called()
 
+    def test_observation_links_exact_current_artifact_to_homologation_not_name_or_sha(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store=Store(Path(folder)/'private');deployment=Deployment(self.project,store,None,None)
+            data=dict(project=self.project.fingerprint(),commit='a'*40,image='sha256:'+'b'*64)
+            artifact=store.record('artifact',{},dict(**data,role='candidate',snapshot='c'*64))
+            qa=store.record('release_evidence',{},dict(**data,artifact=artifact))
+            accepted=store.record('release_acceptance',{},dict(**data,state='HOMOLOGADA',final_qa=qa))
+            current=dict(artifact=artifact,image=data['image'],container='owned',url='http://127.0.0.1:1',healthy=True)
+            deployment.service=Mock(return_value=current)
+            observed=deployment.continuity_observation(dict(acceptance=accepted))
+            self.assertTrue(observed['current_is_previous_homologation'])
+            self.assertEqual(observed['previous_homologated_deployment']['artifact'],artifact)
+            self.assertFalse(observed['delivery_approval'])
+            deployment.service.return_value={**current,'artifact':'different-receipt-same-image'}
+            self.assertFalse(deployment.continuity_observation(dict(acceptance=accepted))['current_is_previous_homologation'])
+            self.assertFalse(deployment.continuity_observation(None)['current_is_previous_homologation'])
+            bad=store.record('release_acceptance',{},dict(**{**data,'image':'sha256:'+'d'*64},state='HOMOLOGADA',final_qa=qa))
+            with self.assertRaises(ValueError):deployment.continuity_observation(dict(acceptance=bad))
+
     def test_deployment_receipt_keeps_overlapping_effect_and_observation_fields(self):
         with tempfile.TemporaryDirectory() as folder:
             store=Store(Path(folder)/'private')

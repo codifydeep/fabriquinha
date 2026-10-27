@@ -55,6 +55,17 @@ def qualify(root,upstream):
         assert kb.latest_run(conn,old).metadata['diagnosis']==held
         assert next(i for i in fresh.status(conn) if i['source']==store.receipt(key)['payload']['source'])['diagnostic']==successors[0].id
         complete(conn,successors[0].id,key,'hold')
+        # A Lead hold is preserved, but the technical incident must reach CTO.
+        held_key=incident(conn,'lead-hold-must-reach-cto')
+        held_lead=fresh.create(conn,held_key,'lead');lead_receipt=complete(conn,held_lead,held_key,'hold')
+        fresh.apply(conn,kb.get_task(conn,held_lead))
+        automatic=[t for t in fresh.cards(conn) if json.loads(t.body).get('escalated_from')==held_lead]
+        assert len(automatic)==1 and automatic[0].assignee=='succ-cto'
+        restarted=Recovery(project,store,Board(project));restarted.apply(conn,kb.get_task(conn,held_lead))
+        assert len([t for t in restarted.cards(conn) if json.loads(t.body).get('escalated_from')==held_lead])==1
+        assert kb.latest_run(conn,held_lead).metadata['diagnosis']==lead_receipt
+        assert kb.get_task(conn,store.receipt(held_key)['payload']['source']).status=='blocked'
+        complete(conn,automatic[0].id,held_key,'hold')
         # A pre-upgrade key with the SAME predecessor must still be reused.
         legacy_incident=incident(conn,'legacy-predecessor');prior=recovery.create(conn,legacy_incident,'lead');complete(conn,prior,legacy_incident,'escalate')
         record=store.receipt(legacy_incident);data=record['payload']
@@ -69,6 +80,7 @@ def qualify(root,upstream):
         assert len([t for t in fresh.cards(conn) if json.loads(t.body).get('escalated_from')==lead])==1
         assert not conn.execute('SELECT 1 FROM task_runs WHERE ended_at IS NULL').fetchone()
     result=dict(native_kanban=True,held_cto_receipt_preserved=True,new_predecessor_created_new_cto=True,
+        lead_hold_automatically_escalated=True,lead_hold_preserved=True,source_never_unblocked=True,
         restart_reused_same_successor=True,legacy_same_predecessor_reused=True,status_selects_current_successor=True,open_claims=0,model_calls=0,docker_jobs=0,
         programmed_decisions=True,delivery_approval=False,autonomous_delivery=False)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2))
