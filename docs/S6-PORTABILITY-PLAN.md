@@ -40,6 +40,34 @@ pin. A prova nativa de operação está em `scripts/qualify_source_operations.py
 sucesso nessa fronteira não conclui a instalação, upgrade ou entrega real de S6.
 Instruções em [SETUP](SETUP.md).
 
+**Prova de 27/10:** revisão `786e16d76f1e506a63431165ba12bf0471f95dd4`, 36
+arquivos exportados e Hermes upstream sem patches. Um clone Git local novo e
+board nativo vazio comprovaram início pausado, recusa de segundo dispatcher,
+persistência da pausa após reinício, recusa de episódio obsoleto e rejeição de
+conteúdo alterado no export. Os dois processos próprios terminaram normalmente;
+nenhum worker foi criado. Zero chamadas ao modelo, operações GitHub ou jobs
+Docker. A suíte do núcleo passou em 360 testes, também sem `site-packages`.
+
+Isso qualifica a entrada operacional nessa condição pausada, não o instalador
+completo, execução paga, todos os caminhos de doctor/retomada ou serviço do host.
+O relay e a homologação da instalação anterior não foram alterados; o contador
+permaneceu em 6.951/7.000. O primeiro ensaio local selecionou uma revisão antiga
+antes do fim do commit e foi recusado por ausência de inputs obrigatórios; foi
+preservado como falha de preparo, sem promoção de evidências.
+
+### Próximo bloco antes da ativação
+
+1. Publicar e construir a receita de navegador a partir de dependências públicas.
+   `Dockerfile.validation-browser` ainda deriva de `delivery-kit-browser-qa`, cuja
+   origem é uma imagem privada de outro projeto. Hash local não elimina essa
+   dependência nem demonstra reprodução por terceiros.
+2. Validar a configuração efetiva de cada perfil antes do despacho, especialmente
+   rotas auxiliares, modelo e ferramentas. Um perfil divergente deve impedir seu
+   próprio despacho com motivo visível, sem bloquear papéis independentes.
+3. Preparar uma raiz nova usando os comandos públicos e a mesma fonte no SDK e
+   relay. Qualificar operação/restauração e reservar o ciclo real antes de ativar
+   consumo. Não mudar a fonte instalada do S5 apenas para atualizar documentação.
+
 ## Decisões para a execução
 
 - Usar as entradas existentes e reduzir passos manuais. Não criar outro serviço

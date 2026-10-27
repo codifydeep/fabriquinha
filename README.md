@@ -180,7 +180,11 @@ reprodução a partir de um clone limpo.
 
 ## Situação das validações
 
-Em 27/10/2026, o núcleo passou em 348 testes (Python 3.14.10). O reparo mínimo completou uma
+Em 27/10/2026, o núcleo passou em 360 testes (Python 3.14.10), também sem
+`site-packages`. A [entrada operacional de S6](docs/S6-PORTABILITY-PLAN.md)
+passou em clone/board novos, sob pausa, com fonte verificada e lock exclusivo;
+isso ainda não é uma instalação completa ou nova entrega de produto.
+O reparo mínimo completou uma
 homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
 específicas; decisões programadas não são julgamento de um agente real.
 

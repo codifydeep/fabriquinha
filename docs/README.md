@@ -1,6 +1,6 @@
 # Documentação da Fabriquinha
 
-Referência: **26 de outubro de 2026**. Plataforma experimental; S4 técnico
+Referência: **27 de outubro de 2026**. Plataforma experimental; S4 técnico
 qualificado, autonomia geral e distribuição ainda não concluídas. Documentos públicos descrevem contratos,
 arquitetura, resultados agregados e limites. Instalações, transcrições, bancos,
 snapshots e recibos operacionais completos permanecem privados.
@@ -31,7 +31,9 @@ as correções offline não autorizam consumo adicional nem homologam o S4.
 | [S2](HERMES-S2-QUALIFICATION.md) | Mecanismos Red, freeze, Green e controles |
 | [S3](HERMES-S3-QUALIFICATION.md) | Cadeia determinística de integração, deploy e QA |
 | [S4](HERMES-S4-QUALIFICATION.md) | Primeira entrega técnica por agentes reais, sem intervenção externa, com limites explícitos |
-| [Contratos S5](S5-CONTRACT-QUALIFICATION.md) | Regressão existente com CI restrita e projeção histórica de decisões; segunda versão real ainda pendente |
+| [Contratos S5](S5-CONTRACT-QUALIFICATION.md) | Regressão existente com CI restrita e projeção histórica de decisões |
+| [Entrega S5](HERMES-S5-QUALIFICATION.md) | Segunda homologação com memória e recuperação reais; sete intervenções preservadas |
+| [S6](S6-PORTABILITY-PLAN.md) | Export e operação pausada em clone/board novos; instalação completa e entrega portátil pendentes |
 | [Agentes](HERMES-AGENT-QUALIFICATION.md) | SDK, ferramentas e sessões |
 | [Runtime](HERMES-RUNTIME-QUALIFICATION.md) | Serviço, reinício e worker órfão |
 | [Recuperação](HERMES-RECOVERY-QUALIFICATION.md) | Diagnóstico Lead/CTO em cenários delimitados |

@@ -46,8 +46,8 @@ atribuição por horário. A origem delas permanece não comprovada.
 chamadas ao modelo. Telegram real ainda não está configurado nesta fronteira:
 a fila de outbox não comprova recebimento de uma entrega pelo CEO.
 
-A suíte do controlador passou em **348 testes** após o reparo de atribuição
-auxiliar preparado para S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
+A suíte do controlador passou em **360 testes**, também sem `site-packages`,
+após o preparo da fonte verificada e da entrada operacional de S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
 SDK/Docker qualificam mecanismos delimitados; não substituem julgamento real
 nem medem a autonomia por porcentagem de testes verdes.
 
@@ -61,7 +61,7 @@ nem medem a autonomia por porcentagem de testes verdes.
 | P2 | Bundle fixado e custo reportado contabilizado | Atribuição auxiliar integral ainda não garantida |
 | P4/S4 | PR 59 sem intervenção técnica após o aceite | Stack Python/HTTP e brief reutilizado por autorização |
 | P5/S5 | Segunda homologação, memória e recuperação reais | Sete intervenções; ainda não é um ciclo inteiro limpo |
-| P6/S6 | Preparação parcial | Instalação limpa, atribuição auxiliar, canais, lifecycle e corte do legado |
+| P6/S6 | Export por commit e entrada operacional comprovados em clone/board novos, sob pausa | Imagens públicas, configuração de perfis, ativação conjunta, canais, upgrade/restauração e entrega em outro repo |
 | P7/S7 | Não iniciado | Retomar Truco após qualificação da plataforma |
 
 O [S4 original](HERMES-S4-QUALIFICATION.md) permanece como prova independente:
@@ -70,6 +70,12 @@ As provas de regressão conhecida são separadas e documentadas nos
 [contratos S5](S5-CONTRACT-QUALIFICATION.md); não convertem resultados antigos.
 
 ## Próximo trabalho
+
+O [preparo de fonte S6](S6-PORTABILITY-PLAN.md) passou em clone Git local novo,
+com início pausado, lock exclusivo, reinício e recusa de alteração do export.
+Não houve modelo nem jobs Docker; a homologação atual foi preservada. A imagem
+de navegador ainda depende de um build privado e precisa de uma receita pública
+antes da qualificação de instalação limpa.
 
 O [reparo de atribuição auxiliar](ADR-0005-VALIDATION-AND-ACCOUNTING.md) passou
 no compressor real/relay com respostas simuladas e na recuperação nativa, sem
