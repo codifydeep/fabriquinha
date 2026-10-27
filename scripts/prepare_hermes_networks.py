@@ -9,7 +9,8 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.deployment import prepare_networks
+from fabriquinha.deployment import prepare_networks,network_identity
+from fabriquinha.config import pool_subnets
 from fabriquinha.effects import write_json
 from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime
@@ -25,8 +26,7 @@ def prepare(root,upstream):
         with kbc.connect_closing() as conn:
             status=runtime.pause_status(conn)
             if not status['agents_stopped']:raise ValueError('settle workers before provisioning')
-        expected=[dict(project=runtime.project.fingerprint(),group=runtime.project.namespace+'-homologation',
-                       suffix=suffix,version=1) for suffix in ('default','qa')]
+        expected=[network_identity(runtime.project,suffix) for suffix in ('default','qa')]
         for key in status['pending_effects']:
             effect=json.loads((runtime.store.root/'effects'/(key+'.json')).read_bytes())
             if effect.get('identity') not in expected:
@@ -35,6 +35,7 @@ def prepare(root,upstream):
         # never by a second create; do not deadlock behind its own intent.
         networks=prepare_networks(runtime.project,runtime.store)
         result=dict(project=runtime.project.fingerprint(),networks=networks,model_calls=0,delivery_approval=False)
+        result.update(network_pool=runtime.project.network_pool,core_subnet=pool_subnets(runtime.project.network_pool).get('core'))
         write_json(runtime.root/'deployment-network-preflight.json',result)
         return result
 

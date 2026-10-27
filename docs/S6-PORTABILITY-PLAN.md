@@ -89,6 +89,22 @@ ou homologação de produto. A suíte do núcleo chegou a 371 testes, também co
 2. Verificar provisionamento de redes, estado/credenciais externos e comandos de
    bootstrap no outro repositório autorizado, sem dependência de bancos históricos.
 
+**Redes explícitas preparadas:** `network_pool` opcional e fixado pelo fingerprint
+permite reservar três blocos `/28` e um de reserva dentro de um `/26` privado.
+O preflight detecta sobreposição, inclusive no bloco central/reservado, antes da
+primeira intenção de criação; confere IPAM e owner nas observações seguintes.
+O journal continua sendo a única fonte de confirmação dos efeitos. O caminho
+legado sem campo mantém o fingerprint original. Uma prova real preparou duas
+redes por comandos públicos, verificou IDs estáveis e `doctor` pronto, renderizou
+o Compose central e retirou somente as duas redes vazias por IDs exatos. Nenhum
+relay/worker/modelo foi iniciado nessa prova.
+
+O repositório autorizado `descartavel` ainda tem código e testes da calculadora
+anterior. O bootstrap agora oferece prévia local e exige aceite do SHA quando
+substitui arquivos de baseline; não presume que testes antigos possam ser
+retirados por ser um repo descartável. O próximo preparo deve mostrar essa
+proposta concreta ao proprietário antes de qualquer reset na branch nova.
+
 ## Decisões para a execução
 
 - Usar as entradas existentes e reduzir passos manuais. Não criar outro serviço

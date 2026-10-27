@@ -1,5 +1,6 @@
 """Fixed Python-HTTP build, Compose rollout/rollback and independent browser QA."""
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,7 @@ from .browser import contract, load_contract
 from .effects import Journal, Pending, EffectBlocked, write_json
 from .executor import ROOT, docker
 from .publication import sha
+from .config import pool_subnets
 
 
 class BrowserValidationFailed(ValueError):
@@ -37,6 +39,9 @@ def _network(project,suffix):
             or labels.get('com.docker.compose.network')!=suffix
             or labels.get('fabriquinha.project')!=project.fingerprint()):
         raise EffectBlocked('deployment network ownership or policy mismatch; preserve it')
+    expected=pool_subnets(project.network_pool).get(suffix)
+    if expected and [item.get('Subnet') for item in (info.get('IPAM',{}).get('Config') or [])]!=[expected]:
+        raise EffectBlocked('deployment network subnet drift; preserve it')
     return dict(id=info['Id'],name=name,internal=info['Internal'])
 
 
@@ -47,13 +52,49 @@ def deployment_networks(project):
     return result
 
 
+def network_identity(project,suffix):
+    identity=dict(project=project.fingerprint(),group=project.namespace+'-homologation',suffix=suffix,version=1)
+    subnet=pool_subnets(project.network_pool).get(suffix)
+    if subnet:identity.update(version=2,subnet=subnet)
+    return identity
+
+
+def check_pool(project):
+    planned=pool_subnets(project.network_pool)
+    if not planned:return
+    ranges={**planned,'reserved':str(list(ipaddress.IPv4Network(project.network_pool).subnets(new_prefix=28))[3])}
+    # Check both owned names before the first creation, including policy drift
+    # outside the proposed range. Never adopt a foreign or replaced network.
+    for suffix in ('default','qa'):_network(project,suffix)
+    ids=docker('network','ls','-q').split()
+    if len(ids)>4096:raise EffectBlocked('network inventory exceeds qualified local scope')
+    values=json.loads(docker('network','inspect',*ids)) if ids else []
+    for info in values:
+        for item in (info.get('IPAM',{}).get('Config') or []):
+            try:existing=ipaddress.ip_network(item['Subnet'],strict=True)
+            except (ValueError,KeyError,TypeError):raise EffectBlocked('network subnet observation invalid; preserve existing networks') from None
+            if existing.version!=4:continue
+            for suffix,subnet in ranges.items():
+                if not existing.overlaps(ipaddress.IPv4Network(subnet)):continue
+                if suffix in ('default','qa') and info['Name']==project.namespace+'-homologation_'+suffix:
+                    continue  # Exact ownership and subnet were checked above.
+                labels=info.get('Labels') or {}
+                if (suffix=='core' and info['Name']==project.namespace+'_default' and str(existing)==subnet
+                        and info.get('Driver')=='bridge' and info.get('Scope')=='local' and not info.get('Ingress')
+                        and info.get('Internal') is False and labels.get('com.docker.compose.project')==project.namespace
+                        and labels.get('com.docker.compose.network')=='default' and labels.get('fabriquinha.project')==project.fingerprint()):
+                    continue
+                raise EffectBlocked('configured network pool overlaps another Docker network; choose an unused pool before preparation')
+
+
 def prepare_networks(project,store):
     """Explicit paused-install operation, no prune or uncertain-create retry."""
     journal=Journal(store.root/'effects');group=project.namespace+'-homologation'
+    check_pool(project)
     for suffix in ('default','qa'):
         def observe():return _network(project,suffix)
         observe()  # Reject foreign ownership before recording any creation intent.
-        identity=dict(project=project.fingerprint(),group=group,suffix=suffix,version=1)
+        identity=network_identity(project,suffix)
         def send():
             # Revalidate after the journal lock; never replace a foreign network.
             current=observe()
@@ -63,6 +104,7 @@ def prepare_networks(project,store):
                               ('fabriquinha.project',project.fingerprint())):
                 args+=['--label',key+'='+value]
             if suffix=='qa':args+=['--internal']
+            if identity.get('subnet'):args+=['--subnet',identity['subnet']]
             docker(*args,group+'_'+suffix)
             return observe()
         journal.do('deployment-network:'+suffix,identity,send,observe)

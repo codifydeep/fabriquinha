@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from fabriquinha.artifacts import Store
 from fabriquinha.config import Project
-from fabriquinha.effects import Pending
+from fabriquinha.effects import Pending,EffectBlocked
 from test_preparation import project
 
 spec=importlib.util.spec_from_file_location('bootstrap_branch',ROOT/'scripts/bootstrap_hermes_branch.py')
@@ -28,8 +28,8 @@ class BranchBootstrap(unittest.TestCase):
             status=lambda:dict(cards=[],control=dict(drained=True)))
         self.head=None;self.pushes=0;self.puts=0;self.lost=False;self.protection=None
         self.main=dict(required_status_checks={'contexts':['ci']})
-        self.repo=SimpleNamespace(git=lambda *a:None,remote_head=lambda branch:'a'*40 if branch=='main' else self.head,
-            propose=lambda *a:'b'*40,push=self.push)
+        self.repo=SimpleNamespace(git=lambda *a:b'',remote_head=lambda branch:'a'*40 if branch=='main' else self.head,
+            propose=lambda *a:'b'*40,push=self.push,_manifest=lambda head:{})
         self.github=SimpleNamespace(repo='example/product',cli=self.cli)
         self.repo_patch=patch.object(bootstrap,'Repository',return_value=self.repo);self.repo_patch.start();self.addCleanup(self.repo_patch.stop)
         self.gh_patch=patch.object(bootstrap,'GitHub',return_value=self.github);self.gh_patch.start();self.addCleanup(self.gh_patch.stop)
@@ -68,6 +68,25 @@ class BranchBootstrap(unittest.TestCase):
         for status in (dict(cards=[{'id':'task'}],control={'drained':True}),dict(cards=[],control={'drained':False})):
             self.runtime.status=lambda:status
             with self.assertRaises(ValueError):bootstrap.bootstrap(self.runtime)
+        self.assertEqual((self.pushes,self.puts),(0,0))
+
+    def test_preview_has_no_remote_mutation_and_baseline_reset_needs_exact_ack(self):
+        self.repo._manifest=lambda head:{'test_existing.py':{'sha256':'old','executable':False}}
+        value=bootstrap.bootstrap(self.runtime,preview=True)
+        self.assertEqual(value['head'],'b'*40);self.assertEqual(value['removed_paths'],['test_existing.py'])
+        self.assertTrue(value['requires_baseline_reset_approval']);self.assertEqual((self.pushes,self.puts),(0,0))
+        with self.assertRaisesRegex(ValueError,'baseline'):bootstrap.bootstrap(self.runtime)
+        with self.assertRaises(ValueError):bootstrap.bootstrap(self.runtime,expected_head='c'*40)
+        self.assertEqual((self.pushes,self.puts),(0,0))
+        result=bootstrap.bootstrap(self.runtime,expected_head='b'*40)
+        self.assertTrue(result['baseline_reset']);self.assertEqual(result['baseline_reset_ack'],'b'*40)
+        # Receipt of this exact decision survives restart/replay; no new approval.
+        self.assertEqual(result,bootstrap.bootstrap(self.runtime));self.assertEqual((self.pushes,self.puts),(1,1))
+
+    def test_changed_main_after_preview_is_refused_before_external_mutation(self):
+        bootstrap.bootstrap(self.runtime,preview=True)
+        self.repo.remote_head=lambda branch:'c'*40 if branch=='main' else self.head
+        with self.assertRaises(EffectBlocked):bootstrap.bootstrap(self.runtime,expected_head='b'*40)
         self.assertEqual((self.pushes,self.puts),(0,0))
 
 

@@ -10,6 +10,7 @@
   "browser_tdd": true,
   "local_ci": {"context": "fabriquinha-local-ci", "publisher": "YOUR-GITHUB-LOGIN"},
   "max_workers": 2,
+  "network_pool": "10.245.248.0/26",
   "technical_roles": {"lead": "techlead", "cto": "cto"},
   "coordination_roles": {"product": "produto", "lead": "techlead"},
   "delivery_roles": {"tests": "quality_security", "integration": "devops"},

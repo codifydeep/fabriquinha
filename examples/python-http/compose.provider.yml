@@ -44,3 +44,10 @@ volumes:
   secret:
     external: true
     name: ${FABRIQUINHA_SECRET_VOLUME:?}
+networks:
+  default:
+    labels:
+      fabriquinha.project: ${FABRIQUINHA_PROJECT:?}
+    ipam:
+      config:
+        - subnet: ${FABRIQUINHA_CORE_SUBNET:?}

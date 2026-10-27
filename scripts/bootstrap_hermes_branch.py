@@ -18,7 +18,7 @@ from fabriquinha.publication import GitHub,Repository
 from fabriquinha.runtime import Runtime
 
 
-def bootstrap(runtime):
+def bootstrap(runtime,*,preview=False,expected_head=None):
     project,store=runtime.project,runtime.store
     if (project.qualification or not project.local_ci or not project.delivery_roles
             or not project.branch.startswith('release/') or not runtime.control.read()['paused']):
@@ -44,6 +44,23 @@ def bootstrap(runtime):
         identity={key:inputs[key] for key in ('project','base','snapshot')}
         branch='bootstrap/fabriquinha-'+project.fingerprint()[:20]
         head=repo.propose(inputs['snapshot'],inputs['base'],branch,'infrastructure-bootstrap')
+        if repo.remote_head('main')!=inputs['base'] or json.loads(github.cli(
+                'api',f'repos/{github.repo}/branches/main/protection'))!=inputs['main_protection']:
+            raise EffectBlocked('main changed after preparation; inspect before any remote bootstrap mutation')
+        original=repo._manifest(inputs['base']);seed=store.manifest(inputs['snapshot'])
+        removed=sorted(set(original)-set(seed))
+        proposal=dict(project=project.fingerprint(),branch=project.branch,head=head,parent=inputs['base'],
+            snapshot=inputs['snapshot'],removed_paths=removed,added_paths=sorted(set(seed)-set(original)),
+            changed_paths=sorted(name for name in set(seed)&set(original) if seed[name]!=original[name]),
+            requires_baseline_reset_approval=bool(removed),model_calls=0,product_delivery=False,delivery_approval=False)
+        diff=repo.git('diff','--no-ext-diff','--no-textconv',inputs['base'],head).decode()
+        write_json(folder/'preview.json',{**proposal,'diff':diff})
+        if preview:return proposal
+        if expected_head is not None and expected_head!=head:raise ValueError('exact preview head required')
+        if removed and inputs.get('baseline_reset_ack')!=head:
+            if expected_head!=head:
+                raise ValueError('baseline replacement requires owner scope/test-contract approval and exact preview head')
+            inputs={**inputs,'baseline_reset_ack':head};write_json(path,inputs)
         def observed():
             current=repo.remote_head(project.branch)
             if current is not None and current!=head:raise EffectBlocked('new branch diverged; preserve it')
@@ -82,6 +99,7 @@ def bootstrap(runtime):
             raise EffectBlocked('main changed during bootstrap; inspect independently, never overwrite it')
         result=dict(project=project.fingerprint(),branch=project.branch,head=head,parent=inputs['base'],
             snapshot=inputs['snapshot'],main_unchanged=True,protection_verified=True,
+            baseline_reset=bool(removed),baseline_reset_ack=inputs.get('baseline_reset_ack'),removed_paths=removed,
             product_delivery=False,delivery_approval=False,model_calls=0)
         write_json(folder/'receipt.json',result);return result
 
@@ -89,4 +107,5 @@ def bootstrap(runtime):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    args=parser.parse_args();print(json.dumps(bootstrap(Runtime(args.root,args.upstream)),indent=2))
+    parser.add_argument('--preview',action='store_true');parser.add_argument('--expect-head')
+    args=parser.parse_args();print(json.dumps(bootstrap(Runtime(args.root,args.upstream),preview=args.preview,expected_head=args.expect_head),indent=2))

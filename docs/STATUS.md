@@ -46,7 +46,7 @@ atribuição por horário. A origem delas permanece não comprovada.
 chamadas ao modelo. Telegram real ainda não está configurado nesta fronteira:
 a fila de outbox não comprova recebimento de uma entrega pelo CEO.
 
-A suíte do controlador passou em **371 testes**, também sem `site-packages`,
+A suíte do controlador passou em **378 testes**, também sem `site-packages`,
 após o preparo de fonte/operação e a admissão dos perfis de S6. A execução S5 manteve a fonte anterior congelada. As provas programadas com
 SDK/Docker qualificam mecanismos delimitados; não substituem julgamento real
 nem medem a autonomia por porcentagem de testes verdes.
@@ -61,7 +61,7 @@ nem medem a autonomia por porcentagem de testes verdes.
 | P2 | Bundle fixado e custo reportado contabilizado | Atribuição auxiliar integral ainda não garantida |
 | P4/S4 | PR 59 sem intervenção técnica após o aceite | Stack Python/HTTP e brief reutilizado por autorização |
 | P5/S5 | Segunda homologação, memória e recuperação reais | Sete intervenções; ainda não é um ciclo inteiro limpo |
-| P6/S6 | Fonte/operação, receita pública ARM64 e preflight de nove perfis passaram; oito atividades SDK com perfis gerenciados e transporte local | Ativação conjunta, redes/provisionamento, canais, upgrade/restauração e entrega em outro repo |
+| P6/S6 | Fonte/operação, imagens públicas ARM64, nove perfis e oito atividades SDK; redes explícitas com doctor pronto e retirada isolada | Bootstrap autorizado, ativação conjunta, canais, upgrade/restauração e entrega em outro repo |
 | P7/S7 | Não iniciado | Retomar Truco após qualificação da plataforma |
 
 O [S4 original](HERMES-S4-QUALIFICATION.md) permanece como prova independente:

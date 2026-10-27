@@ -201,6 +201,51 @@ somente leitura e rede `none`. Todos os contêineres foram retirados. Essa últi
 prova qualifica o toolchain; não é QA de um produto implantado nem homologação.
 Outras arquiteturas e o novo ciclo completo de S6 continuam pendentes.
 
+### Redes explícitas e prévia do bootstrap
+
+Escolha `network_pool` **antes** do preparo da raiz privada. O exemplo contém
+`10.245.248.0/26`; confira Docker, LAN e VPN e substitua-o se necessário. O pool
+deve ser IPv4 RFC1918 alinhado em `/26`. Os três primeiros `/28` destinam-se,
+respectivamente, à homologação, QA interno e serviços centrais; o último fica
+reservado. A verificação automática cobre conflitos no Docker, não rotas da LAN
+ou VPN. Não copie o pool de outra instância na mesma máquina.
+
+```sh
+<python-do-SDK> scripts/prepare_hermes_networks.py \
+  --root <raiz-privada> --upstream <checkout-Hermes-fixado>
+```
+
+O comando exige pausa e workers/claims/sandboxes encerrados. Grava as intenções
+no journal existente e cria somente as duas redes de homologação, com owner e
+sub-redes exatos. Confirmação perdida é observada sem outro `create`; reexecução
+confere os IDs, labels e IPAM reais. Um conflito não causa limpeza de outras
+redes. A CLI preserva o caminho sem pool de instalações antigas; seu fingerprint
+não muda por causa da adição deste campo opcional.
+
+`deployment-network-preflight.json` informa o `core_subnet`. O Compose público do
+relay exige `FABRIQUINHA_CORE_SUBNET` com esse valor e `FABRIQUINHA_PROJECT` com o
+fingerprint da instalação, além dos inputs já declarados no próprio arquivo.
+Iniciar o Compose do relay é outra operação; reservar redes não o inicia nem
+autoriza inferência. O preparo real de redes e a renderização dessa configuração
+passaram em isolamento; o relay/canal/entrega da instalação portátil ainda precisam
+da qualificação completa de S6.
+
+Antes de criar a branch de produto, gere a proposta local:
+
+```sh
+<python-do-SDK> scripts/bootstrap_hermes_branch.py \
+  --root <raiz-privada> --upstream <checkout-Hermes-fixado> --preview
+```
+
+A prévia guarda o diff privado em `private/bootstrap/preview.json` e retorna SHA,
+parent e caminhos adicionados/modificados/removidos. Não faz push nem altera
+proteções. Se a semente substituir arquivos existentes, obtenha o aceite do dono
+para o escopo/reset de baseline — especialmente testes — antes de aplicar com
+`--expect-head <SHA-da-previa-aprovada>`. O aceite desse SHA é persistido para a
+retomada da mesma operação; não vale para outra proposta. Uma mudança de main ou
+de sua proteção após o preparo recusa a mutação antes do push. O comando trabalha
+somente na branch nova e nunca é uma entrega de produto ou dispensa dos gates.
+
 ### Revisão de execução isolada do checkout
 
 Para uma fronteira de qualificação, exporte uma revisão Git publicada e já

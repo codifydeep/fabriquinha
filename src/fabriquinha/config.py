@@ -1,9 +1,21 @@
 """Versioned project configuration; supplied by the controller, never a worker."""
 from dataclasses import dataclass
 from pathlib import PurePosixPath
+import ipaddress
 import re
 from types import MappingProxyType
 from .artifacts import digest
+
+
+def pool_subnets(pool):
+    if pool is None:return {}
+    if not isinstance(pool,str):raise ValueError('private aligned IPv4 /26 pool required')
+    try:network=ipaddress.IPv4Network(pool,strict=True)
+    except (ValueError,TypeError):raise ValueError('private aligned IPv4 /26 pool required') from None
+    if network.prefixlen!=26 or not any(network.subnet_of(ipaddress.IPv4Network(cidr))
+            for cidr in ('10.0.0.0/8','172.16.0.0/12','192.168.0.0/16')):
+        raise ValueError('private aligned IPv4 /26 pool required')
+    return {name:str(subnet) for name,subnet in zip(('default','qa','core'),network.subnets(new_prefix=28))}
 
 
 @dataclass(frozen=True)
@@ -23,13 +35,14 @@ class Project:
     delivery_roles: dict | None = None
     local_ci: dict | None = None
     browser_tdd: bool | None = None
+    network_pool: str | None = None
 
     @classmethod
     def parse(cls, value):
         required = {'version', 'namespace', 'repository', 'branch', 'validation_image',
                     'tests_dir', 'reviewers', 'qualification'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles', 'local_ci', 'browser_tdd'}
+                or set(value) - required - {'max_workers', 'timeout_seconds', 'browser_image', 'technical_roles', 'coordination_roles', 'delivery_roles', 'local_ci', 'browser_tdd','network_pool'}
                 or type(value['version']) is not int or value['version'] != 1):
             raise ValueError('versioned project contract required')
         if (not re.fullmatch(r'delivery-kit-[a-z0-9-]{1,48}', str(value['namespace']))
@@ -88,17 +101,18 @@ class Project:
         browser_tdd=value.get('browser_tdd')
         if browser_tdd is not None and type(browser_tdd) is not bool:
             raise ValueError('explicit qualified browser TDD capability required')
+        pool=value.get('network_pool');pool_subnets(pool)
         return cls(**fields, reviewers=MappingProxyType(matrix), max_workers=workers,
                    timeout_seconds=timeout,browser_image=browser,
                    technical_roles=MappingProxyType(dict(roles)) if roles else None,
                    coordination_roles=MappingProxyType(dict(coordination)) if coordination else None,
                    delivery_roles=MappingProxyType(dict(delivery)) if delivery else None,
-                   local_ci=MappingProxyType(dict(ci)) if ci else None,browser_tdd=browser_tdd)
+                   local_ci=MappingProxyType(dict(ci)) if ci else None,browser_tdd=browser_tdd,network_pool=pool)
 
     def fingerprint(self):
         return digest({name: dict(value) if name in ('reviewers','technical_roles','coordination_roles','delivery_roles','local_ci') and value is not None else value
                        for name in self.__dataclass_fields__ for value in (getattr(self, name),)
-                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles','local_ci','browser_tdd') or value is not None})
+                       if name not in ('browser_image','technical_roles','coordination_roles','delivery_roles','local_ci','browser_tdd','network_pool') or value is not None})
 
     def reviewers_for(self, author):
         try:
