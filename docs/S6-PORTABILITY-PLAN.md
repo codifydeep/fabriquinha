@@ -1,5 +1,11 @@
 # S6 — Instalação reproduzível e operação da equipe
 
+**Pausado antes da implementação, em 27/10.** Brief de produto aprovado pelo CEO,
+com aceite preservado fora do intake até a retomada. A [auditoria pré-S6](EXECUTION-REVIEW-2026-10-27.md)
+identificou que o QA atual não demonstra sessões independentes/prazo de três
+segundos, além de divergência com o ADR 0004 na redação de governança. Os
+refinamentos F2/F3 e a sequência R1–R4 são propostas, ainda não implementadas.
+
 ## Ponto de partida
 
 S4 tem uma entrega técnica sem intervenção após o aceite. S5 entregou a segunda

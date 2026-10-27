@@ -1,5 +1,12 @@
 # Roadmap vigente — 27 de outubro de 2026
 
+**Pausa antes da implementação S6.** O CEO aprovou o brief; o aceite está
+preservado e ainda não foi aplicado ao intake. A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md)
+recomenda resolver a incompatibilidade do QA entre sessões e harmonizar a
+autoridade técnica antes do despacho. R1–R4 naquele documento são a sequência
+proposta, pendente de aceite dos refinamentos; não substituem silenciosamente
+os contratos aprovados nem marcam S6 como qualificado.
+
 **Retomada e refinamentos aprovados em 26/10/2026.** P1/P3 têm recuperação assistida homologada pelo PR 57. O PR 58 também chegou
 à homologação assistida após recuperar um handoff e corrigir a regressão CI.
 P2 foi qualificado sob o [ADR 0005](ADR-0005-VALIDATION-AND-ACCOUNTING.md).
@@ -119,6 +126,8 @@ espera humana legítima não é promessa de ausência universal de starvation.
 ### P6 / S6 — Reutilização por terceiros e corte do legado
 
 Executar o [plano S6](S6-PORTABILITY-PLAN.md), preservando as evidências S4/S5.
+Antes do despacho, tratar os achados A1/A2 da auditoria de 27/10. Infraestrutura
+pronta não demonstra que o executor consegue provar todos os critérios do brief.
 
 Instalar do Git em outro diretório/repo sem bancos, sessões ou UUIDs históricos.
 Corrigir e qualificar atribuição das chamadas auxiliares sem retroatribuir as

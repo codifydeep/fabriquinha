@@ -5,6 +5,13 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
+**Pausa operacional confirmada:** controlador e relay S6 parados, provedor
+desabilitado e sem workers. Homologação anterior preservada. O brief S6 foi
+aprovado pelo CEO; o aceite está guardado, ainda não aplicado ao intake.
+A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
+capacidade de QA entre sessões e a divergência de autoridade técnica antes do
+despacho. Suas propostas ainda não foram implementadas. Zero chamadas na auditoria.
+
 ## Resultado mais recente
 
 O [S5](HERMES-S5-QUALIFICATION.md) entregou dois pacotes dependentes na mesma
@@ -38,6 +45,8 @@ aplicou essa decisão. A instalação não desbloqueou o card diretamente.
 
 O S5 encerrou em **6.951/7.000**, com 49 chamadas restantes. Para S6, o proprietário
 autorizou elevar o teto específico para **7.064**, sem reset do contador.
+As duas chamadas de Produto em S6 levaram o contador a **6.953/7.064**,
+restando 111; custo reportado dessas duas chamadas: **US$ 0,0046951**.
 Na janela
 após S4 houve 140 chamadas: 125 atribuídas por recibo a S5 e 15 sem vínculo
 comprovado. O custo total reportado nessa janela foi **US$ 0,4845305**, incluindo
@@ -63,7 +72,7 @@ nem medem a autonomia por porcentagem de testes verdes.
 | P2 | Bundle fixado e custo reportado contabilizado | Atribuição auxiliar integral ainda não garantida |
 | P4/S4 | PR 59 sem intervenção técnica após o aceite | Stack Python/HTTP e brief reutilizado por autorização |
 | P5/S5 | Segunda homologação, memória e recuperação reais | Sete intervenções; ainda não é um ciclo inteiro limpo |
-| P6/S6 | Nova instalação pública, GitHub vinculado, bootstrap autorizado e relay/SDK ativados com atribuição por atividade | Brief aguardando aceite; canais, recuperação em execução e entrega em outro repo |
+| P6/S6 | Nova instalação pública, GitHub vinculado, bootstrap autorizado e duas chamadas atribuídas | Brief aprovado e execução pausada; QA entre sessões, canais, recuperação em execução e entrega em outro repo pendentes |
 | P7/S7 | Não iniciado | Retomar Truco após qualificação da plataforma |
 
 O [S4 original](HERMES-S4-QUALIFICATION.md) permanece como prova independente:
@@ -103,10 +112,11 @@ na leitura nativa dos cards e da pausa. Nenhum serviço foi iniciado nessa cópi
 isso não qualifica ainda recuperação de trabalho em andamento.
 
 Produto já apresentou e corrigiu o brief da fatia de lobby para dois navegadores.
-O texto inicial continha uma exceção de testes incompatível com a governança;
-foi devolvido por revisão do operador antes do aceite e corrigido pelo próprio
-Produto. Essa intervenção fica registrada. Nenhum brief ou código de produto
-foi editado manualmente. O marco aguarda aprovação explícita do escopo pelo CEO;
+Uma exceção vaga de testes foi devolvida por revisão do operador antes do aceite
+e corrigida pelo próprio Produto. Essa intervenção fica registrada. A auditoria
+posterior constatou que a correção ficou excessivamente restritiva e conflita
+com a autoridade técnica do ADR 0004; a harmonização está proposta, não aplicada.
+Nenhum brief ou código de produto foi editado manualmente. O CEO aprovou o escopo;
 não há entrega de produto S6 aprovada nem alegação de autonomia completa.
 
 O [reparo de atribuição auxiliar](ADR-0005-VALIDATION-AND-ACCOUNTING.md) passou

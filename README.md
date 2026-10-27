@@ -9,8 +9,14 @@ qualidade, publicação e implantação. Multica e Temporal não são dependênc
 desse caminho. A instalação legada está preservada e pausada.
 
 [Status atual](docs/STATUS.md) · [Próximos passos](docs/ROADMAP.md) ·
-[Revisão crítica de 26/10/2026](docs/EXECUTION-REVIEW-2026-10-26.md) ·
+[Revisão crítica de 27/10/2026](docs/EXECUTION-REVIEW-2026-10-27.md) ·
 [Documentação](docs/README.md)
+
+**Execução pausada antes da implementação S6.** O escopo de produto foi aprovado,
+mas a auditoria identificou incompatibilidade entre o QA atual e a aceitação em
+sessões independentes, além de divergência na autoridade para corrigir testes.
+O plano de simplificação está documentado; as mudanças propostas ainda não estão
+instaladas. Os diagramas abaixo representam a implementação atual.
 
 ## O que queremos construir
 

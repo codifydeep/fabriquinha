@@ -8,9 +8,10 @@ snapshots e recibos operacionais completos permanecem privados.
 ## Ordem de leitura
 
 1. [Status atual](STATUS.md): o que foi comprovado e o que falta.
-2. [Revisão da execução de 26/10](EXECUTION-REVIEW-2026-10-26.md): evolução,
-   divergência de QA, simplificação do retrabalho e custos; refinamentos aceitos
-   posteriormente no [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
+2. [Revisão antes do S6, 27/10](EXECUTION-REVIEW-2026-10-27.md): capacidade de
+   aceitação entre sessões, autoridade técnica, operação, memória e custos;
+   propostas pendentes, execução pausada. A [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md)
+   fundamentou os refinamentos já aceitos no [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
 3. [Validação fixada e custos](ADR-0005-VALIDATION-AND-ACCOUNTING.md): bundle
    imutável, atribuição por atividade e tratamento de custos desconhecidos.
 4. [Roadmap vigente](ROADMAP.md): próxima sequência e critérios de saída.
