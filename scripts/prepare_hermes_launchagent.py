@@ -35,6 +35,7 @@ def prepare(source,expected,python,root,upstream):
         EnvironmentVariables=dict(PATH='/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
             HOME=str(Path.home()),PYTHONNOUSERSITE='1',PYTHONSAFEPATH='1'),
         RunAtLoad=True,KeepAlive=dict(Crashed=True),ThrottleInterval=60,
+        SoftResourceLimits=dict(Core=0),HardResourceLimits=dict(Core=0),
         ProcessType='Background',AbandonProcessGroup=True,ExitTimeOut=30,Umask=0o077,
         StandardOutPath=str(folder/'dispatcher.stdout.log'),StandardErrorPath=str(folder/'dispatcher.stderr.log'))
     # Exclusive creation: a new source revision requires an explicit reviewed

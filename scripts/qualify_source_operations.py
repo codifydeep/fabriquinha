@@ -100,10 +100,13 @@ print(json.dumps({'pause':status['control']['episode']}))
             value=launchctl('print',launch_service)
             match=re.search(r'\n\s*pid = (\d+)',value.stdout)
             pid=int(match[1]) if match else None
-            if pid and pid!=previous:
-                os.kill(pid,0)  # Actual live process, not an old status file.
+            if pid and pid!=previous and re.search(r'\n\s*state = running\s*\n',value.stdout):
+                # launchd's live job state is authoritative. kill(pid, 0) may
+                # be denied across macOS process-security domains even for a
+                # readable, correctly owned job; denial is not proof of death.
                 state=json.loads((installation/'status.json').read_bytes())
-                if state.get('dispatcher_pid')==pid and state.get('dispatcher_state')=='running':
+                if (state.get('dispatcher_pid')==pid and state.get('dispatcher_state')=='running'
+                        and 0<=time.time()-state.get('observed_at',0)<30):
                     assert state['board']['control']['paused'] and state['board']['control']['drained']
                     assert state['board']['control']['episode']==episode
                     return pid
@@ -131,7 +134,7 @@ print(json.dumps({'pause':status['control']['episode']}))
             launchctl('bootstrap',domain,prepared['plist']);launch_service=target
             pid=observed_pid()
             cli('serve',success=False)
-            launchctl('kill','SIGKILL',target)  # Our empty, paused fixture only.
+            launchctl('kill','SIGABRT',target)  # Crash (not intentional SIGKILL); core dumps disabled in plist.
             replacement=observed_pid(pid);assert replacement!=pid
             launchctl('bootout',target);launch_service=None
             assert launchctl('print',target,success=False).returncode!=0

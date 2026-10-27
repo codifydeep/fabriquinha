@@ -391,7 +391,10 @@ launchctl print "gui/$(id -u)/ai.fabriquinha.<namespace>"
 
 O controlador permanece em primeiro plano sob `launchd`, com o lock nativo.
 Crash é reiniciado com intervalo mínimo de 60 segundos; saída normal ou erro de
-configuração não dispara retentativa contínua. Veja estado e logs privados do
+configuração não dispara retentativa contínua. SIGKILL é classificado pelo
+launchd como término intencional e também exige retomada explícita; não confunda
+essa política com recuperação de toda forma possível de falha. Core dumps
+ficam desabilitados. Veja estado e logs privados do
 job; existência do plist/status antigo não prova processo vivo. Reiniciar não
 remove pausa nem habilita inferência. Para iniciar também nos próximos logins,
 instale o plist revisado, sem sobrescrever outro job, em

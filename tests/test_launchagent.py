@@ -21,6 +21,7 @@ class NativeSupervisor(unittest.TestCase):
             target=Path(result['plist']);job=plistlib.loads(target.read_bytes())
             self.assertEqual(job['KeepAlive'],{'Crashed':True})
             self.assertEqual(job['ThrottleInterval'],60)
+            self.assertEqual(job['HardResourceLimits'],{'Core':0})
             self.assertTrue(job['AbandonProcessGroup'])
             self.assertEqual(job['Umask'],0o077)
             self.assertIn('serve',job['ProgramArguments']);self.assertNotIn('resume',job['ProgramArguments'])
