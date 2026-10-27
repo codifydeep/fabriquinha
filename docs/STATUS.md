@@ -58,6 +58,14 @@ atual sem modelo/Docker. O controlador atualizado retomou o mesmo ciclo e criou
 automaticamente outro diagnóstico CTO. O contador na instalação era 6.873/7.000.
 Os três ajustes de manutenção após o aceite continuam identificados como assistência.
 
+O lote publicado `7231004e` tornou a recusa diagnóstica explícita e indicou a
+observação imutável permitida, sem afrouxar o DSL ou testes. Passaram 333 testes,
+o fluxo nativo de recusa/observação/retomada e a CI de regressão com `subTest`.
+Após a quarta manutenção, a equipe executou o experimento, retomou a revisão e
+congelou os 18 testes de Reset, preservando os nove anteriores. O frontend
+iniciou a implementação. Ainda faltam suas revisões/integração e o pacote Undo;
+não houve nova homologação. O contador nesse checkpoint era 6.894/7.000.
+
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,
 mas Telegram real não está configurado: fila não comprova recebimento nesse canal.
