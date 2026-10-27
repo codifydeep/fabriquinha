@@ -1,11 +1,25 @@
 # Status do projeto — 27 de outubro de 2026
 
-**S4 técnico qualificado; S5 integrado parcialmente, com continuidade de implantação em reparo.**
+**S4 técnico qualificado; Reset validado em homologação; S5 segue no pacote Undo.**
 O caminho usa Hermes + Kanban nativos e operações determinísticas. Multica e
 Temporal não participam dessa execução. A autonomia geral, a distribuição e a
 retomada do Truco continuam pendentes.
 
 ## Evidência mais recente
+
+A revisão `e7349bb6` foi instalada após as provas de memória. O Lead real
+executou um novo SPIKE, reconheceu o artefato como a homologação anterior do
+mesmo projeto e decidiu a retomada. O controlador aplicou essa decisão, sem
+desbloqueio manual. Reset, do [PR 60](https://github.com/codifydeep/descartavel2/pull/60),
+passou por candidate/rollback/restore e QA independente no commit `454b845a`.
+Foram validados AC1, AC2, AC3, AC7 e AC8; o rollback reutilizou o artefato S4 exato.
+
+O grafo liberou automaticamente os testes de Undo. Após solicitação de mudanças,
+o autor corrigiu a proposta, a revisão congelou os testes e o frontend iniciou
+a implementação. A versão completa ainda não está homologada. As sete intervenções de manutenção permanecem registradas como
+assistência: essa recuperação não converte S5 em uma release autônoma limpa.
+
+### Referência S4 preservada
 
 O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) chegou a `HOMOLOGADA`
 no commit `5fef1cd40cb05bcaf60db1b42b450d19ca08f473`. O operador apenas aplicou a
@@ -93,8 +107,8 @@ e o novo diagnóstico ainda precisam ser conferidos; S5 continua assistido.
 
 A revisão `4ab2f407` foi instalada e o CTO recebeu a ligação exata dos
 artefatos, mas também manteve o hold. A mensagem entregue foi inspecionada:
-não houve perda desses fatos nem reutilização da sessão anterior. O contexto
-continua carregando o veredito livre do predecessor sem marca histórica. O
+não houve perda desses fatos nem reutilização da sessão anterior. Nessa execução, o contexto
+carregava o veredito livre do predecessor sem marca histórica. O
 [reparo de memória](S5-DEPLOYMENT-CONTINUITY.md) passou em 344 testes e numa
 prova nativa de nove runs/29 respostas locais; ainda exige revalidação pelo
 modelo real. O trabalho não será liberado por alteração manual de card.

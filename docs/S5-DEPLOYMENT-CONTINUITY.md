@@ -105,6 +105,19 @@ respostas programadas, sem chamadas pagas. A mensagem efetivamente entregue
 ao SDK foi conferida: histórico identificado, evidência preservada e ausência
 do veredito livre antigo. Isso não substitui a próxima decisão do modelo real.
 
+## Recuperação real observada
+
+Na fonte `e7349bb6`, a mensagem real do SDK foi novamente conferida com o novo
+repasse estruturado. O Lead executou outro SPIKE e decidiu `resume`, citando o
+artefato atual como a homologação anterior do mesmo projeto. O controlador
+retomou o card original, executou candidate/rollback/restore e concluiu QA
+independente de Reset no commit `454b845a` (PR 60). Os critérios AC1, AC2, AC3,
+AC7 e AC8 foram validados e o pacote dependente de Undo foi liberado pelo grafo.
+
+A fonte da equipe permaneceu congelada nesse trecho. Isso comprova a recuperação
+observada e a liberação da dependência, não a autonomia geral nem a homologação
+completa do S5. As intervenções externas anteriores permanecem contabilizadas.
+
 ## Limites
 
 A nova release deve começar exatamente no commit/snapshot da homologação anterior.
