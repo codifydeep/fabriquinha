@@ -2,7 +2,7 @@
 
 Estado: **aceito pelo proprietário em 27/10/2026**, ao aprovar F2/F3 e o plano
 da [auditoria pré-S6](EXECUTION-REVIEW-2026-10-27.md). Implementação qualificada
-offline e instalada no S6 pausado; o despacho aguarda preparação operacional.
+offline e instalada no S6; o despacho foi retomado após preparação operacional.
 
 ## F2 — Uma suíte para prévia e homologação
 

@@ -5,14 +5,15 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**Pausa operacional confirmada:** controlador e relay S6 parados, provedor
-desabilitado e sem workers. Homologação anterior preservada. O brief S6 foi
-aprovado pelo CEO; o aceite está guardado, ainda não aplicado ao intake.
+**S6 retomado:** controlador sob launchd, relay pronto e planejamento em execução
+pelo Tech Lead. Homologação anterior preservada. O aceite guardado do CEO foi
+aplicado à mesma revisão do brief pelo intake nativo, sem dispensar gates.
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do
 despacho. O proprietário aprovou os refinamentos e a retomada das correções;
-o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) passou na qualificação offline. O
-despacho S6 continua parado até concluir a preparação. Zero chamadas na auditoria.
+o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) passou na qualificação offline.
+Zero chamadas na auditoria e nas provas offline; o novo trabalho dos agentes
+usa a cota existente.
 
 **Correção R1 validada:** 396 testes do núcleo; sete jobs reais de navegador;
 dois incrementos dependentes pelo Hermes nativo com autores/revisores e GitHub
@@ -28,9 +29,12 @@ novo já foi instalado na raiz S6 existente a partir da fonte publicada
 `eaf52e21`, com recibo de upgrade, backup mínimo, board/brief preservados,
 provedor desabilitado e despacho parado. A fonte operacional `e3e443c6` mantém
 o bundle e acrescenta os comandos públicos de R2. O relay foi recriado desabilitado
-nessa fonte: 6.953/7.064, sem hold e sem chamadas novas. O supervisor S6 está
-preparado, ainda não carregado. Iniciar scripts privados antigos não é o
-procedimento de retomada. S6 real e canal/restore R4 continuam pendentes.
+nessa fonte em 6.953/7.064, sem hold. Após admissão verde e inspeção sem recursos
+obsoletos elegíveis, o supervisor foi carregado, a política habilitada e o despacho
+retomado. A primeira chamada do planejamento levou o contador a 6.954/7.064.
+Iniciar scripts privados antigos não é o procedimento de retomada. A conclusão
+S6 e canal/restore R4 continuam pendentes. As intervenções prévias ao despacho
+permanecem registradas; S6 não é reclassificado como autônomo desde o briefing.
 
 ## Resultado mais recente
 

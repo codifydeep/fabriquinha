@@ -12,11 +12,12 @@ desse caminho. A instalação legada está preservada e pausada.
 [Revisão crítica de 27/10/2026](docs/EXECUTION-REVIEW-2026-10-27.md) ·
 [Documentação](docs/README.md)
 
-**Aceitação compartilhada qualificada offline e instalada; operação pré-S6 em validação.** O escopo de produto foi aprovado,
+**Aceitação compartilhada qualificada offline e instalada; S6 retomado pelos agentes.** O escopo de produto foi aprovado,
 mas a auditoria identificou incompatibilidade entre o QA atual e a aceitação em
 sessões independentes, além de divergência na autoridade para corrigir testes.
 O proprietário aprovou o plano e os refinamentos do [ADR 0006](docs/ADR-0006-SHARED-ACCEPTANCE.md).
-O despacho S6 aguarda a preparação operacional. Os diagramas abaixo representam
+O preparo operacional local passou e o planejamento S6 começou. A entrega real
+e as provas de canal/restore ainda estão pendentes. Os diagramas abaixo representam
 a implementação atual.
 
 ## O que queremos construir
