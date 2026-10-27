@@ -119,6 +119,13 @@ def model_route(project,path,*,require_ready=True):
 def worker_alive(row):
     kb,_,dispatch=native()
     if not (row['claim_lock'] or '').startswith(kb._host_prefix()) or not row['worker_pid']:
+        # This installation is local-only. macOS may change its hostname when
+        # switching networks. A completed historical run may be observed dead
+        # with its exact spawn fingerprint; this never reclaims an active claim
+        # or authorizes signalling a foreign/possibly-live process.
+        if 'ended_at' in row.keys() and row['ended_at'] is not None:
+            if (row['worker_pid'] and row['worker_started_at'] not in (None,'unverified')
+                    and not dispatch._worker_alive(row['worker_pid'],row['worker_started_at'])):return False
         raise EffectBlocked('native worker identity is not verified on this host')
     return dispatch._worker_alive(row['worker_pid'],row['worker_started_at'])
 

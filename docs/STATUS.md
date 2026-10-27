@@ -1,6 +1,6 @@
-# Status do projeto — 26 de outubro de 2026
+# Status do projeto — 27 de outubro de 2026
 
-**S4 técnico qualificado; S5 encontrou um impasse de revisão e permanece não qualificado.**
+**S4 técnico qualificado; S5 integrado parcialmente, com continuidade de implantação em reparo.**
 O caminho usa Hermes + Kanban nativos e operações determinísticas. Multica e
 Temporal não participam dessa execução. A autonomia geral, a distribuição e a
 retomada do Truco continuam pendentes.
@@ -74,6 +74,13 @@ um deployment diferente preservou o S4 real. O CTO comprovou 18 testes verdes
 e manteve o bloqueio técnico visível. O próximo reparo deve selecionar o rollback
 anterior por proveniência, sem remover containers ou afrouxar essa proteção.
 O contador conferido nesse bloqueio era 6.908/7.000, com 92 chamadas restantes.
+
+Em 27/10, o [reparo de continuidade](S5-DEPLOYMENT-CONTINUITY.md) passou em
+340 testes e numa prova isolada de duas releases com Docker/QA reais, 18
+atividades SDK e 27 respostas programadas, sem chamadas pagas. A guarda contra
+substituição de um deployment divergente foi preservada. A instalação deste
+reparo e a retomada do mesmo incidente técnico são os próximos passos; o ensaio
+programado não qualifica a autonomia do S5.
 
 A entrega S4 foi preservada em Docker local durante a atualização. Sua execução
 terminou sem cards pendentes e o polling não consome chamadas ao modelo. A outbox contém a entrega,

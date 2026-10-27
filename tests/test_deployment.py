@@ -3,7 +3,7 @@ import unittest
 import tempfile
 import subprocess
 import json
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -58,6 +58,23 @@ class ComposeBoundaries(unittest.TestCase):
         for reviewing,actor,author in ((False,'author','author'),(True,'author','author')):
             run=SimpleNamespace(kind='integration',reviewing=reviewing,actor=actor,author=author)
             with self.assertRaises(ValueError):delivery.current(run,review=True)
+
+    def test_unmatched_live_artifact_is_never_replaced_by_rollout(self):
+        from fabriquinha.effects import EffectBlocked
+        from contextlib import nullcontext
+        with tempfile.TemporaryDirectory() as folder:
+            store=Store(Path(folder)/'private')
+            deployment=Deployment(self.project,store,SimpleNamespace(ensure=lambda run:None),None)
+            run=Run('integration',3,'lead','integration',False,'lead','v1','contract')
+            candidate=store.record('artifact',run.binding(),dict(project=self.project.fingerprint(),role='candidate',
+                image='sha256:'+'c'*64,integrated='integrated',commit='a'*40,snapshot='b'*64))
+            previous=store.record('artifact',{},dict(project=self.project.fingerprint(),role='candidate',image='sha256:'+'d'*64))
+            deployment.integrated=Mock(return_value=(dict(commit='a'*40,snapshot='b'*64),None))
+            deployment.service=Mock(return_value=dict(artifact='foreign-current'))
+            deployment._up=Mock();deployment.journal=SimpleNamespace(lock=lambda *args:nullcontext())
+            with self.assertRaisesRegex(EffectBlocked,'unrelated current deployment'):
+                deployment.rollout(run,candidate,previous,Mock())
+            deployment._up.assert_not_called()
 
     def test_deployment_receipt_keeps_overlapping_effect_and_observation_fields(self):
         with tempfile.TemporaryDirectory() as folder:

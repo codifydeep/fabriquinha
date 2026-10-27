@@ -79,35 +79,32 @@ essa continuidade com Git/Docker e identidade exata de artefatos; só então
 retomar o mesmo card por diagnóstico. Não remover a implantação preservada,
 substituir a guarda por comparação de nomes ou criar outra release para contornar.
 
-Após os mecanismos anteriores passarem offline:
+O brief Reset/Undo já foi aprovado, o grafo de dois pacotes foi criado e Reset
+foi implementado e revisado. **Não repetir entrevista, aceite ou criação de cards.**
+Os próximos passos são:
 
-1. Preparar atualização explícita do código executado em manutenção drenada,
-   mantendo exportação, recibos, deploy e teste da primeira versão. Não sobrescrever
-   a revisão que qualificou S4 nem atualizar workers em voo.
-2. Produto propõe um pequeno incremento com dois pacotes verticalmente úteis e
-   dependentes. Reset do formulário e desfazer o último reset são uma opção de
-   demonstração, ainda sem aprovação de negócio; Produto pode propor alternativa.
-3. Apresentar o novo brief ao CEO. A autorização condicional do documento da
-   primeira versão não aprova outro conteúdo. Não pedir novamente decisões já
-   registradas e não encaminhar escolhas técnicas ao CEO.
-4. Fixar código/configuração antes da execução. Depois do aceite, a equipe conduz
-   o novo grafo; o operador observa. Preservar todos os nove testes anteriores e
-   seus contratos QA, acrescentando somente as provas do incremento.
-5. Registrar uso de memória por outro perfil, dependências efetivamente liberadas,
-   revisão independente e regressões completas em cada integração.
-6. Comprovar uma recuperação pela equipe com fonte e próxima ação duráveis. Uma
-   injeção de falha deve ser planejada e isolada, sem interromper requisição paga,
-   mexer no daemon Docker ou afetar Toso. Falhas específicas podem ter fixtures
-   separadas; não repetir a versão paga inteira para cada falha de transporte.
-7. Exigir nova `HOMOLOGADA`, CI/deploy/QA no mesmo commit, rollback e evidências.
+1. Qualificar a [continuidade de implantação](S5-DEPLOYMENT-CONTINUITY.md) em
+   ambiente descartável, preservando também tentativas que falharem por ambiente.
+2. Atualizar o código executado somente em manutenção drenada, com backup
+   restaurável e exportação imutável. Preservar o S4 e suas evidências originais.
+3. Encaminhar o incidente existente para novo diagnóstico técnico com as novas
+   observações. A equipe deve executar um experimento e decidir a retomada;
+   manutenção não desbloqueia diretamente o card nem aprova a entrega.
+4. Concluir implantação e QA independente de Reset. Somente então liberar os
+   cards dependentes de Undo, com Red, freeze, Green, controles negativos,
+   revisão independente, PR e CI próprios.
+5. Conferir a nova `HOMOLOGADA`, todos os critérios aprovados, testes anteriores
+   e QA reexecutados, CI/deploy/QA no mesmo commit, rollback e recibos duráveis.
+   Registrar memória entre perfis, recuperação, consumo e intervenções externas.
 
 Se precisar de reparo externo, manter o valor da entrega como assistida sem
 reclassificar a qualificação. Não apagar a primeira versão nem resetar o board.
 
 ## 4. Recursos, custo e distribuição
 
-- Manter Haiku, 40 iterações, dois workers e nenhum fallback. No fim de S4 o
-  contador estava em 6.811/7.000; são 189 chamadas restantes, não um teto em USD.
+- Manter Haiku, 40 iterações, dois workers e nenhum fallback. O contador no
+  bloqueio de deployment estava em 6.908/7.000; são 92 chamadas restantes,
+  não um teto em USD. Consultar o relay antes de novas atividades.
 - Usar provas offline para mecanismos e registrar custos reais do novo ciclo.
   Pedir aumento somente se a reserva necessária não couber no teto autorizado.
 - Repetir previews de limpeza nos limites do ciclo; somente recursos próprios,

@@ -130,6 +130,7 @@ def execution_context(project):
                 'No JavaScript engine or browser is provided for Red/Green in this image; post-deploy browser QA is separate.')),
         build_contract='Controller supplies the trusted build recipe, CI and deployment; do not add product Dockerfiles or workflows to duplicate them.',
         deployment='Local Docker only; container HTTP port 8080, dynamic host port and URL supplied by controller; GET /health and /identity; immutable reviewed image.',
+        rollback='First-ever release uses a validated bootstrap. A subsequent release uses its exact last homologated same-project artifact, matching the new release seed. Later packages use immediate independent parent QA. Preserve any unmatched current deployment; never delete it to bypass a mismatch.',
         http_contract=dict(entrypoint=['python','-B','/app/app.py','8080'],
             health=dict(path='/health',status=200,json={'status':'ok'}),
             identity=dict(path='/identity',status=200,json_fields=['source_sha'],

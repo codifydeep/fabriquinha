@@ -20,6 +20,25 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_integration_diagnosis_has_fixed_safe_deployment_observation(self):
+        from dataclasses import replace
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.original={**diagnostic.original,'kind':'integration'}
+        diagnostic.q=SimpleNamespace(project=replace(self.project,delivery_roles={'tests':'backend','integration':'lead'}))
+        kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body='{}'))
+        current=dict(container='container',image='image',artifact='artifact',url='http://127.0.0.1:1234',healthy=True,network='qa')
+        with patch('fabriquinha.recovery.native',return_value=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)), \
+             patch('fabriquinha.deployment.Deployment') as deployment,patch('fabriquinha.intake.Intake') as intake:
+            deployment.return_value.service.return_value=current
+            intake.return_value.previous.return_value={'historical_only':True,'acceptance':'prior'}
+            observed=diagnostic.evidence()['deployment_observation']
+            self.assertEqual(observed['current'],current);self.assertFalse(observed['delivery_approval'])
+            self.assertEqual(observed['group'],self.project.namespace+'-homologation')
+            intake.return_value.previous.assert_called_once_with(self.run.release)
+            deployment.return_value.service.side_effect=EffectBlocked('foreign sandbox')
+            unavailable=diagnostic.evidence()['deployment_observation']
+            self.assertEqual(unavailable['state'],'unavailable');self.assertNotIn('current',unavailable)
+
     def test_forbidden_diagnostic_write_identifies_phase_and_next_permitted_operation(self):
         diagnostic=Diagnostic(self.sandbox,self.quality);self.quality.observe=Mock(return_value=('observed',dict(failures=[])))
         with self.assertRaises(ValueError) as error:

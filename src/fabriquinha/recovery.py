@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import time
 import re
+import subprocess
 from .artifacts import digest,encoded
 from .board import Run
 from .effects import Journal, EffectBlocked, Pending,write_json
@@ -106,6 +107,19 @@ class Diagnostic:
             if self.original['reviewing'] else
             'Diagnose the current implementation/integration phase; preserve frozen tests and its existing delivery gates.')
         result['experiment_semantics']='A complete diagnostic report may contain failures, errors or skips. These are evidence for guidance, not a delivery approval. Resume permits a fresh attempt in the same phase; it does not certify success.'
+        if self.original['kind']=='integration' and self.q.project.delivery_roles:
+            from .deployment import Deployment
+            from .intake import Intake
+            # Fixed read-only observations, never Docker commands from the model.
+            # service() validates ownership/sandbox policy and exposes no env.
+            try:
+                result['deployment_observation']=dict(project=self.q.project.fingerprint(),
+                    group=self.q.project.namespace+'-homologation',
+                    current=Deployment(self.q.project,self.store,self.board,None).service(),
+                    previous_homologation=Intake(self.q.project,self.store,self.board).previous(self.run.release),
+                    delivery_approval=False)
+            except (ValueError,OSError,subprocess.SubprocessError,EffectBlocked) as error:
+                result['deployment_observation']=dict(state='unavailable',error=type(error).__name__,delivery_approval=False)
         if self.qa_correction():
             from .repairs import context_view
             result['repair_authority']={**self.repair,'context':context_view(self.store,self.repair['context'])}

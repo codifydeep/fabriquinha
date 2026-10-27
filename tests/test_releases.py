@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 import json
 import sqlite3
+from contextlib import nullcontext
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.artifacts import Store, digest
@@ -175,6 +176,63 @@ class ReleaseContracts(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'every approved criterion'):
                 self.releases.accept(Mock(),Mock(),dict(brief=document()),'graph',graph,services)
         services.assert_not_called();kb.complete_task.assert_not_called()
+
+    def test_first_package_reuses_exact_previous_homologated_artifact(self):
+        key,seed=self.accepted_rollback_fixture()
+        self.assertEqual(self.releases.accepted_rollback('next-release',seed),key)
+        self.intake.previous.assert_called_once_with('next-release')
+
+    def accepted_rollback_fixture(self,*,artifact_change=None,qa_change=None,accepted_change=None):
+        source=self.store.root.parent/'prior';source.mkdir(exist_ok=True);(source/'app.py').write_text('prior')
+        snapshot=self.store.capture(source);commit='a'*40;image='sha256:'+'b'*64
+        owner=Run('old-integration',7,'devops','integration',False,'devops','old-release','old-contract')
+        reviewer=Run('old-integration',8,'qa','integration',True,'devops','old-release','old-contract')
+        artifact=self.store.record('artifact',owner.binding(),{**dict(project=self.project.fingerprint(),role='candidate',
+            snapshot=snapshot,commit=commit,image=image),**(artifact_change or {})})
+        qa=self.store.record('release_evidence',reviewer.binding(),{**dict(project=self.project.fingerprint(),artifact=artifact,
+            commit=commit,image=image,rollback_verified=True),**(qa_change or {})})
+        acceptance=self.store.record('release_acceptance',dict(actor='controller',release='old-release'),
+            {**dict(project=self.project.fingerprint(),state='HOMOLOGADA',final_qa=qa,commit=commit,image=image,
+                qualification=self.project.qualification,delivery_approval=not self.project.qualification),**(accepted_change or {})})
+        self.intake.previous.return_value=dict(acceptance=acceptance,commit=commit)
+        return artifact,dict(project=self.project.fingerprint(),commit=commit,snapshot=snapshot)
+
+    def test_initial_release_without_previous_acceptance_keeps_bootstrap_path(self):
+        self.intake.previous.return_value=None
+        self.assertIsNone(self.releases.accepted_rollback('first-release',{}))
+
+    def test_prior_deployment_must_match_project_identity_and_current_seed(self):
+        variants=[dict(artifact_change={k:v}) for k,v in [('project','foreign'),('role','bootstrap'),('commit','c'*40),
+            ('image','sha256:'+'c'*64),('snapshot','d'*64)]]
+        variants += [dict(qa_change={k:v}) for k,v in [('project','foreign'),('commit','c'*40),('rollback_verified',False)]]
+        variants += [dict(accepted_change={k:v}) for k,v in [('project','foreign'),('state','ATIVA'),('commit','c'*40),('qualification',False)]]
+        for value in variants:
+            with self.subTest(value=value):
+                _,seed=self.accepted_rollback_fixture(**value)
+                with self.assertRaises(ValueError):self.releases.accepted_rollback('next-release',seed)
+        _,seed=self.accepted_rollback_fixture()
+        for change in ({'commit':'c'*40},{'snapshot':'d'*64},{'project':'foreign'}):
+            with self.subTest(seed=change),self.assertRaises(ValueError):
+                self.releases.accepted_rollback('next-release',{**seed,**change})
+
+    def test_rollback_dispatch_keeps_immediate_package_qa_and_only_first_uses_history(self):
+        anchor=SimpleNamespace(body=json.dumps(dict(release='c'*64)))
+        task=SimpleNamespace(body=json.dumps(dict(release_anchor='anchor')))
+        kb=SimpleNamespace(get_task=lambda conn,key:anchor if key=='anchor' else task)
+        kbc=SimpleNamespace(connect_closing=lambda:nullcontext(None))
+        seed=self.store.record('release_seed',{},dict(commit='a'*40,snapshot='b'*64))
+        graph=self.store.record('release_graph',{},dict(seed=seed,items=[dict(cards={'integration':dict(id=key)}) for key in ('first','second')]))
+        self.releases.folder(anchor).mkdir(parents=True)
+        (self.releases.folder(anchor)/'graph.json').write_text(json.dumps(dict(receipt=graph)))
+        self.releases.accepted_rollback=Mock(return_value='previous-homologated')
+        self.releases.closed=Mock(return_value=('qa',dict(payload=dict(artifact='immediate-parent')),{}))
+        with patch('fabriquinha.releases.native',return_value=(kb,kbc,None)):
+            first=Run('first',9,'devops','integration',False,'devops','next-release','contract')
+            second=Run('second',10,'devops','integration',False,'devops','next-release','contract')
+            self.assertEqual(self.releases.rollback_artifact(first),'previous-homologated')
+            self.assertEqual(self.releases.rollback_artifact(second),'immediate-parent')
+        self.releases.accepted_rollback.assert_called_once()
+        self.releases.closed.assert_called_once_with('first','release_evidence','release_evidence')
 
     def test_a_past_qa_receipt_cannot_homologate_a_changed_or_unhealthy_service(self):
         seed=self.store.record('release_seed',{},dict(snapshot='baseline',commit='base'))

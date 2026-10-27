@@ -312,6 +312,19 @@ class NativeRuntime(unittest.TestCase):
             self.runtime.maintain_pause(conn)
         kb.reclaim_task.assert_called_once_with(conn,'task',reason='operator_pause:'+marker['episode'])
 
+    def test_historical_worker_hostname_drift_does_not_claim_an_active_foreign_run(self):
+        from fabriquinha.runtime import worker_alive
+        kb=SimpleNamespace(_host_prefix=lambda:'current-host:')
+        dispatcher=Mock();dispatcher._worker_alive.return_value=False
+        row=dict(claim_lock='old-host:123',worker_pid=456,worker_started_at='fingerprint',ended_at=1234)
+        with patch('fabriquinha.runtime.native',return_value=(kb,None,dispatcher)):
+            self.assertFalse(worker_alive(row))
+            dispatcher._worker_alive.assert_called_once_with(456,'fingerprint')
+            for change in ({'ended_at':None},{'worker_started_at':None},{'worker_started_at':'unverified'}):
+                with self.subTest(change=change),self.assertRaises(EffectBlocked):worker_alive({**row,**change})
+            dispatcher._worker_alive.return_value=True
+            with self.assertRaises(EffectBlocked):worker_alive(row)
+
     def test_invalid_control_is_a_fence_not_an_operator_reclaim_authority(self):
         self.runtime.control.pause();(self.root/'control.json').write_text('corrupt')
         conn=Mock();kb=Mock()

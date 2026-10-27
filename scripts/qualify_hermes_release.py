@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import sqlite3
+import ipaddress
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -27,6 +28,31 @@ from fabriquinha.effects import write_json
 from fabriquinha.kanban_lane import native
 from fabriquinha.publication import Repository
 from fabriquinha.runtime import Runtime,Owner,worker_alive,recorded_worker
+
+
+def reserve_fixture_networks(project,pool):
+    """Optional explicit /27 for two disposable /28s on crowded Docker hosts.
+
+    No prune or replacement: reject overlap before creating exact owned names.
+    Production uses its existing paused-install network contract instead.
+    """
+    from fabriquinha.executor import docker
+    block=ipaddress.ip_network(pool)
+    if block.version!=4 or block.prefixlen!=27 or not block.is_private:raise ValueError('private IPv4 /27 fixture pool required')
+    ids=docker('network','ls','-q').split()
+    existing=json.loads(docker('network','inspect',*ids)) if ids else []
+    group=project.namespace+'-homologation'
+    for network in existing:
+        if network['Name'] in (group+'_default',group+'_qa'):raise ValueError('fresh fixture networks required')
+        for config in network.get('IPAM',{}).get('Config') or []:
+            if config.get('Subnet') and block.overlaps(ipaddress.ip_network(config['Subnet'])):
+                raise ValueError('fixture pool overlaps existing Docker network')
+    for suffix,subnet in zip(('default','qa'),block.subnets(new_prefix=28)):
+        args=['network','create','--driver','bridge','--subnet',str(subnet)]
+        for key,value in (('com.docker.compose.project',group),('com.docker.compose.network',suffix),('fabriquinha.project',project.fingerprint())):
+            args+=['--label',key+'='+value]
+        if suffix=='qa':args+=['--internal']
+        docker(*args,group+'_'+suffix)
 
 
 def wal_probe(root):
@@ -96,7 +122,7 @@ class FixtureRuntime(Runtime):
         with patch('fabriquinha.runtime.subprocess.Popen',spawn):return super().spawn(*args,**kwargs)
 
 
-def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none'):
+def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None):
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -116,6 +142,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         delivery_roles={'tests':'release-tests','integration':'release-devops'},
         reviewers={'release-tests':'release-lead','release-author':'release-lead','release-lead':'release-cto','release-devops':'release-tests'}))
     runtime=FixtureRuntime(root,upstream)
+    if network_pool:reserve_fixture_networks(runtime.project,network_pool)
     if recovery!='none':write_json(root/'recovery-mode.json',dict(mode=recovery))
     fixture=ROOT/'tests/fixtures/delivery';folder=root/'github-fixture';folder.mkdir(mode=0o700)
     remote,seed=folder/'remote.git',folder/'seed';remote.mkdir();shutil.copytree(fixture/'base',seed)
@@ -137,6 +164,16 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
     app2=app2.replace("        elif url.path == '/':", "        elif url.path == '/farewell':\n            status, value = 200, {'message': 'Goodbye, '+parse_qs(url.query).get('name', ['World'])[0]}\n        elif url.path == '/':")
     test1=(fixture/'test_greeting.py').read_text()
     test2=test1.replace('Greeting','Farewell').replace('test_named_greeting','test_named_farewell').replace('/greeting?','/farewell?').replace('Hello, Ada','Goodbye, Ada')
+    second_release=[None]
+    brief2={**brief,'summary':'Add thanks while preserving both existing behaviors.',
+        'criteria':[*brief['criteria'],dict(id='THANK',statement='Thank Ada by name.') ]}
+    document2={**document,'tasks':[dict(id='thanks',title='Named thanks in a subsequent release',owner='release-author',depends_on=[],
+        criteria=['GREET','BYE','THANK'],acceptance='Thank Ada; preserve greeting and farewell')]}
+    app3=app2.replace('<p id="result" role="status"></p>',
+        '<button id="thanks">Thanks</button><p id="thanks-result" role="status"></p><p id="result" role="status"></p>')
+    app3=app3.replace('</script>',"document.querySelector('#thanks').onclick=async()=>{const r=await fetch('/thanks?name='+encodeURIComponent(document.querySelector('#name').value));document.querySelector('#thanks-result').textContent=(await r.json()).message;};</script>")
+    app3=app3.replace("        elif url.path == '/':", "        elif url.path == '/thanks':\n            status, value = 200, {'message': 'Thanks, '+parse_qs(url.query).get('name', ['World'])[0]}\n        elif url.path == '/':")
+    test3=test1.replace('Greeting','Thanks').replace('test_named_greeting','test_named_thanks').replace('/greeting?','/thanks?').replace('Hello, Ada','Thanks, Ada')
     sequences={};requests={};bindings={};plan_faults=[];diagnostic_actions=[];guidance_seen=[]
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -159,23 +196,23 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                         ('diagnostic_decide',decision)]
                     if action=='hold':sequence.insert(0,('diagnostic_decide',{**decision,'action':'resume'}))
                     diagnostic_actions.append((source,action,run.number))
-                elif run.kind=='brief':sequence=[('brief_submit',brief)]
+                elif run.kind=='brief':sequence=[('brief_submit',brief2 if run.release==second_release[0] else brief)]
                 elif run.kind=='plan' and run.reviewing and recovery!='none' and (recovery=='triage' or not plan_faults):
                     plan_faults.append(run.number);sequence=[(None,'I will review this plan later.')]
                     write_json(root/'plan-faults.json',dict(runs=plan_faults))
-                elif run.kind=='plan':sequence=[('plan_review',dict(decision='approve',reason='Independent fixture architecture review',findings=[]))] if run.reviewing else [('plan_submit',document)]
+                elif run.kind=='plan':sequence=[('plan_review',dict(decision='approve',reason='Independent fixture architecture review',findings=[]))] if run.reviewing else [('plan_submit',document2 if run.release==second_release[0] else document)]
                 elif run.reviewing:sequence=[('delivery_review',dict(decision='approve',reason='Independent immutable fixture review',findings=[]))]
                 else:
                     with kbc.connect_closing() as conn:package=json.loads(kb.get_task(conn,run.task).body)['package']
-                    first=package=='greet';app=app1 if first else app2
+                    first=package=='greet';third=package=='thanks';app=app3 if third else app1 if first else app2
                     if run.kind=='tests':
-                        check=dict(id='GREET' if first else 'BYE',path='/',actions=[dict(action='fill',selector='#name',value='Ada'),
-                            dict(action='click',selector='#greet' if first else '#farewell')],
-                            selector='#result' if first else '#farewell-result',text='Hello, Ada' if first else 'Goodbye, Ada')
-                        sequence=[('write_file',dict(path='/workspace/tests/test_'+package+'.py',content=test1 if first else test2)),
+                        check=dict(id='THANK' if third else 'GREET' if first else 'BYE',path='/',actions=[dict(action='fill',selector='#name',value='Ada'),
+                            dict(action='click',selector='#thanks' if third else '#greet' if first else '#farewell')],
+                            selector='#thanks-result' if third else '#result' if first else '#farewell-result',text='Thanks, Ada' if third else 'Hello, Ada' if first else 'Goodbye, Ada')
+                        sequence=[('write_file',dict(path='/workspace/tests/test_'+package+'.py',content=test3 if third else test1 if first else test2)),
                             ('write_file',dict(path='/workspace/tests/qa.'+package+'.json',content=json.dumps(dict(version=1,checks=[check])))),('delivery_submit',{})]
                     else:sequence=[('write_file',dict(path='/workspace/app.py',content=app)),
-                        ('delivery_submit',{'mutations':[{'app.py':app.replace('Hello, ','Wrong, ') if first else app.replace('Goodbye, ','Wrong, ')}]})]
+                        ('delivery_submit',{'mutations':[{'app.py':app.replace('Thanks, ','Wrong, ') if third else app.replace('Hello, ','Wrong, ') if first else app.replace('Goodbye, ','Wrong, ')}]})]
                 sequences[run.number]=sequence
                 if recovery!='none' and run.kind=='plan' and run.reviewing and sequence[0][0]=='plan_review':
                     assert 'Controller-recorded diagnostic guidance' in str(body['messages'])
@@ -207,7 +244,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             status=json.loads((root/'status.json').read_bytes()) if (root/'status.json').exists() else {}
             board=status.get('board',{})
             with kbc.connect_closing() as conn:
-                blocked={r[0] for r in conn.execute("SELECT id FROM task_runs WHERE outcome IN ('blocked','crashed','timed_out')")}
+                blocked={r[0] for r in conn.execute("SELECT id FROM task_runs WHERE outcome IN ('blocked','crashed','timed_out','spawn_failed','gave_up')")}
             expected=set(plan_faults)
             if (root/'integration-fault.json').exists():expected.add(json.loads((root/'integration-fault.json').read_bytes())['run'])
             if blocked-expected or board.get('release_issues') or board.get('intake_issues') or board.get('recovery_issues'):
@@ -267,12 +304,41 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             assert data['packages'][0]['commit']!=data['packages'][1]['commit']
             assert set(data['criteria'])=={'GREET','BYE'} and len({p['pr'] for p in data['packages']})==2
             assert all(kb.get_task(conn,c['id']).status=='done' for i in graph['items'] for c in i['cards'].values())
+        if continuity:
+            prior_acceptance=acceptance;prior_data=data
+            previous_qa=runtime.store.receipt(prior_data['final_qa'],kind='release_evidence')['payload']
+            from fabriquinha.deployment import Deployment
+            old_live=Deployment(runtime.project,runtime.store,runtime.board,None).service()
+            assert old_live['artifact']==previous_qa['artifact'] and old_live['healthy']
+            started=runtime.intake.start(dict(request='next-release',label='v0.2',objective='Add thanks while retaining greeting and farewell.'))
+            second_release[0]=started['execution'];pending[0]=None
+            service=start();until(question)
+            runtime.intake.respond(pending[0]['task'],pending[0]['request'],'approve','Approve subsequent fixture scope only')
+            until(delivered);until(settled);service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
+            with kbc.connect_closing() as conn:
+                row=kb.latest_run(conn,started['release']);acceptance=runtime.store.receipt(row.metadata['release_acceptance'],kind='release_acceptance')
+            data=acceptance['payload'];qa=runtime.store.receipt(data['final_qa'],kind='release_evidence')['payload']
+            rollout=runtime.store.receipt(qa['rollout'],kind='rollout')['payload']
+            assert rollout['previous']==previous_qa['artifact']
+            assert len(rollout['steps'])==3
+            steps=[runtime.store.receipt(key,kind='deployment')['payload'] for key in rollout['steps']]
+            assert [step['operation'] for step in steps]==['candidate','rollback','restore']
+            assert steps[1]['artifact']==old_live['artifact'] and steps[1]['image']==old_live['image']
+            assert set(data['criteria'])=={'GREET','BYE','THANK'} and len(data['packages'])==1
+            old_tests=runtime.store.manifest(prior_data['packages'][-1]['snapshot'])
+            new_tests=runtime.store.manifest(data['packages'][0]['snapshot'])
+            assert all(new_tests.get(path)==value for path,value in old_tests.items() if path.startswith('tests/'))
+            write_json(root/'continuity-receipt.json',dict(passed=True,paid_calls=0,synthetic_authors=True,real_github_ci=False,
+                releases=2,first_acceptance=prior_acceptance,second_acceptance=acceptance,prior_artifact=old_live['artifact'],
+                rollback_reused_exact_homologated_artifact=True,three_rollout_steps=True,retained_tests=True,
+                final_criteria=data['criteria'],delivery_approval=False))
         runtime.pause()
         result=dict(passed=True,synthetic_authors=True,real_github_ci=False,paid_calls=0,model_judgment=False,
             sdk_activities=len(requests),local_http_requests=sum(requests.values()),work_packages=2,generated_work_cards=6,
             branch_bases_chained=True,old_tests_preserved=True,final_criteria=data['criteria'],
             release_gate_exercised=True,delivery_approval=False,migration=False,url=data['url'])
         result['wal_lifetime_probe']=wal
+        if continuity:result.update(releases=2,subsequent_release_rollback_qualified=True,work_packages=3,generated_work_cards=9)
         if recovery=='recover':
             assert len(plan_faults)==1 and len(guidance_seen)==1
             assert [(kind,action) for kind,action,_ in diagnostic_actions]==[('plan','resume'),('integration','escalate'),('integration','resume')]
@@ -293,6 +359,8 @@ if __name__=='__main__':
     parser.add_argument('--image');parser.add_argument('--browser-image');parser.add_argument('--task');parser.add_argument('--run',type=int)
     parser.add_argument('--namespace',default='delivery-kit-hermes-release')
     parser.add_argument('--recovery',choices=('none','recover','triage'),default='none')
+    parser.add_argument('--continuity',action='store_true',help='Also deliver a subsequent release using the prior homologated rollback')
+    parser.add_argument('--network-pool',help='Explicit nonoverlapping private /27, split into two owned /28 test networks')
     args=parser.parse_args();root,upstream=args.root.resolve(),args.upstream.resolve()
     if args.mode=='worker':FixtureRuntime(root,upstream).worker(args.task,args.run)
     elif args.mode=='serve':
@@ -302,6 +370,6 @@ if __name__=='__main__':
             FixtureRuntime(root,upstream).serve(stop,interval=0.25)
     elif args.mode=='retire':retire_fixture(root,upstream)
     else:
-        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery),indent=2))
+        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool),indent=2))
         except BaseException as error:
             write_json(root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False));raise

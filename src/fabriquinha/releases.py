@@ -294,6 +294,33 @@ class Releases:
             qa=qa_id,commit=qa['payload']['commit'],snapshot=artifact['payload']['snapshot'],cases=green['payload']['cases'],
             checks=qa['payload']['checks'],pr=publication['payload']['pr'])
 
+    def accepted_rollback(self,release,seed):
+        """A new release starts from its last accepted deployment, not bootstrap.
+
+        Historical memory is not an approval of the new release. Intake checks
+        its native acceptance provenance; here it only selects the exact prior
+        rollback image. An externally changed seed requires explicit diagnosis.
+        """
+        previous=self.intake.previous(release)
+        if previous is None:return None
+        accepted=self.store.receipt(previous['acceptance'],kind='release_acceptance')
+        data=accepted['payload'];qa=self.store.receipt(data['final_qa'],kind='release_evidence')
+        artifact_id=qa['payload']['artifact'];artifact=self.store.receipt(artifact_id,kind='artifact')
+        proof,image=qa['payload'],artifact['payload'];owner,reviewer=artifact['binding'],qa['binding']
+        if (data['project']!=self.project.fingerprint() or proof['project']!=data['project'] or image['project']!=data['project']
+                or seed['project']!=data['project'] or data['state']!='HOMOLOGADA' or image['role']!='candidate'
+                or data['qualification'] is not self.project.qualification or data['delivery_approval'] is not (not self.project.qualification)
+                or data['commit']!=previous['commit'] or seed['commit']!=data['commit'] or image['snapshot']!=seed['snapshot']
+                or not proof['rollback_verified'] or any(proof[key]!=data[key] or image[key]!=data[key] for key in ('commit','image'))
+                or owner['release']!=accepted['binding']['release'] or owner['release']==release
+                or any(reviewer[key]!=owner[key] for key in ('task','contract','release','author','kind'))
+                or owner['kind']!='integration' or owner['reviewing'] is not False or owner['actor']!=owner['author']
+                or reviewer['reviewing'] is not True or reviewer['actor']==owner['author']
+                or reviewer['actor'] not in self.project.reviewers_for(owner['author'])):
+            raise ValueError('rollback must match exact prior homologation, independent QA and current release seed')
+        self.store.tree(image['snapshot'])
+        return artifact_id
+
     def rollback_artifact(self,run):
         self.board.ensure(run);kb,kbc,_=native()
         with kbc.connect_closing() as conn:
@@ -304,7 +331,9 @@ class Releases:
         graph=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')['payload']
         for index,item in enumerate(graph['items']):
             if item['cards']['integration']['id']!=run.task:continue
-            if not index:return None
+            if not index:
+                seed=self.store.receipt(graph['seed'],kind='release_seed')['payload']
+                return self.accepted_rollback(run.release,seed)
             _,qa,_=self.closed(graph['items'][index-1]['cards']['integration']['id'],'release_evidence','release_evidence')
             return qa['payload']['artifact']
         raise ValueError('integration is not part of its current graph')
