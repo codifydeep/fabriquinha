@@ -256,3 +256,20 @@ vinculado ao Green `997d9c8ef0e3a883aa5d44bb85a6cac2a275c874569b9d32a2a12cc6c365
 A execução 34 foi despachada automaticamente ao Tech Lead para revisão
 independente. Isso qualifica o uso real do formato compacto nesta entrega;
 ainda não comprova aprovação, integração, homologação ou autonomia completa.
+
+## Primeiro incremento integrado e validado — 28/10
+
+A revisão independente da implementação foi aprovada. O PR
+[codifydeep/descartavel#13](https://github.com/codifydeep/descartavel/pull/13)
+passou no status obrigatório `fabriquinha-local-ci` e foi integrado no commit
+`2d2b7fb3b987748713e6f691d9c10fde9afd4ad2`. DevOps concluiu candidato, rollback
+e restauração; Quality/Security executou QA de navegador na mesma entrega.
+O recibo `2d4e24b09859c0294accad2074a1d54ed305b99beda4671966d599094f93c947`
+comprova os cinco critérios do primeiro incremento e rollback verificado.
+
+O controlador liberou automaticamente o card de testes `t_3bf2dec1`, execução 41,
+para o segundo incremento. O recibo conserva `delivery_approval=false`: o S6
+completo exige entrada do segundo participante, limite de dois jogadores,
+remoção de salas cheias da disponibilidade e regressões do primeiro incremento.
+Canal real, restauração operacional e distribuição também permanecem no plano
+maior de qualificação; esse marco não é prova de autonomia completa.
