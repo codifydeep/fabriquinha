@@ -341,3 +341,20 @@ Isso fornece evidência ao diagnóstico, sem mudar gates, resetar sessões ou
 conceder retries. O teste novo falhou antes do reparo e os 14 testes do adaptador
 passaram depois. A instalação e uma correção de contexto ainda precisam ser
 qualificadas; esta telemetria isolada não resolve a repetição observada.
+
+## Projeção da continuação revisada — 28/10
+
+O contexto operacional agora pode representar a continuação já revisada por
+seus recibos exatos, card de origem e contrato de submissão, em vez de repetir
+o plano anterior inteiro e sua recusa histórica de controles. A validação da
+proposta e da revisão continua ocorrendo antes dessa projeção. Brief aprovado,
+arquitetura, critérios do pacote, baseline e alvos congelados continuam sendo
+fornecidos separadamente, sem mudança nas verificações de entrega.
+
+A leitura somente de evidências reais validou a revisão
+`46486aed02e1bea8a830beb3431b44efd411aa6b3b91419ebb45823cba761e60`:
+o trecho passou de 5.723 para 843 caracteres. Os documentos originais permaneceram
+inalterados. Os 17 testes de releases passaram, incluindo preservação de
+identificadores/contrato e imutabilidade do documento. Isso é redução de
+contexto, não prova de recuperação do modelo; o diagnóstico anexado ainda
+precisa ser revisado antes da instalação conjunta e nova tentativa.

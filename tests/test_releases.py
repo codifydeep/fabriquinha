@@ -14,7 +14,7 @@ from fabriquinha.artifacts import Store, digest
 from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.effects import EffectBlocked
-from fabriquinha.releases import Releases, ordered
+from fabriquinha.releases import Releases, ordered, continuation_context
 from test_delivery_core import configuration
 from test_intake import document, work
 
@@ -27,6 +27,23 @@ def configured():
 
 
 class ReleaseContracts(unittest.TestCase):
+    def test_reviewed_continuation_context_keeps_authority_not_old_plan_prose(self):
+        full=dict(review='a'*64,context_id='b'*64,task='t_12345678',
+            proposal={'plan':'old plan '*10000},context=dict(source='t_abcdef01',
+            control_refusal={'detail':'historical failure '*10000},
+            submission_contract='All frozen targets and independent gates remain required.'))
+        before=json.dumps(full,sort_keys=True)
+        value=continuation_context(full)
+        self.assertEqual(value['review'],full['review'])
+        self.assertEqual(value['context'],full['context_id'])
+        self.assertEqual(value['source'],full['context']['source'])
+        self.assertEqual(value['contract'],full['context']['submission_contract'])
+        self.assertFalse(value['delivery_approval'])
+        self.assertNotIn('old plan',json.dumps(value))
+        self.assertNotIn('historical failure',json.dumps(value))
+        self.assertEqual(json.dumps(full,sort_keys=True),before)
+        self.assertLess(len(json.dumps(value)),1000)
+
     def setUp(self):
         folder=tempfile.TemporaryDirectory();self.addCleanup(folder.cleanup)
         self.store=Store(Path(folder.name)/'private');self.project=Project.parse(configured())

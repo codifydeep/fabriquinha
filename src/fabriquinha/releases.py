@@ -26,6 +26,19 @@ def ordered(tasks):
     return result
 
 
+def continuation_context(continuation):
+    """Reviewed origin is provenance, not a second task for the implementer.
+
+    The caller has verified the full immutable proposal/review. Current brief,
+    architecture, package acceptance and frozen controls are supplied separately.
+    Keep exact historical references and the submission contract, not old failure
+    prose that can be mistaken for unfinished work on a dependent package.
+    """
+    return dict(review=continuation['review'],context=continuation['context_id'],
+        task=continuation['task'],source=continuation['context']['source'],
+        contract=continuation['context']['submission_contract'],delivery_approval=False)
+
+
 class Releases:
     def __init__(self,project,store,board,intake):
         self.project,self.store,self.board,self.intake=project,store,board,intake
@@ -285,9 +298,7 @@ class Releases:
             graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')['payload']
             continuation=reviewed(self.project,self.store,graph['continuation_review'])
             if continuation['task']!=body['continuation_plan']:raise ValueError('exact continuation review required')
-            result['submission_continuation']=dict(proposal=continuation['proposal'],
-                source=continuation['context']['source'],control_refusal=continuation['context']['control_refusal'],
-                contract=continuation['context']['submission_contract'],delivery_approval=False)
+            result['submission_continuation']=continuation_context(continuation)
         return result
 
     def baseline(self,run,body):
