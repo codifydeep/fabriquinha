@@ -53,3 +53,14 @@ P6 exige duas entregas úteis comparáveis, com dois incrementos dependentes e
 recuperação de falha controlada, sem patches do operador após o aceite.
 Preservar o lobby S6 e o modelo atual. Não iniciar outro ensaio genérico para
 substituir essas provas; não declarar o Truco completo entregue.
+
+## Adaptador implementado, ainda não ativado
+
+`channel.py` admite somente comandos explícitos de identidades humanas e destino
+fixados em política privada. `channel_plugin.py` registra `/fabrica`, lê somente
+ContextVars vinculadas ao pedido (sem fallback para identidade do ambiente) e
+executa o Intake em subprocesso fixo com fonte verificada. Não usa shell, não
+encaminha credenciais do modelo e não transforma erro em conversa com agente.
+Testes cobrem destino/remetente incorretos, aprovação incompleta, identidade
+estável de requisição, pausa e isolamento do subprocesso. Ainda faltam integração
+com o gateway instalado, corte da outbox e validação real de ponta a ponta.
