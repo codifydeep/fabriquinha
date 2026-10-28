@@ -26,7 +26,10 @@ CONTROL_SUBMISSION_CONTRACT=('Submit the complete set of 1-8 mutations together 
     'After a partial refusal, retain useful mutations and include them again together with the new ones. '
     'Separate failed submissions do not accumulate coverage. Passing Green or a diagnostic suite does not prove negative-control coverage. '
     'Do not edit the real product into a mutant or change frozen tests.')
-CONTROL_REVIEW_CONTRACT=('Check approved acceptance coverage before approving tests. Every validated Red assertion failure is a mandatory '
+CONTROL_REVIEW_CONTRACT=('Inspect the existing tests before deciding. Expected Red in new behavior tests is not itself a test defect; '
+    'do not require product Green before test review/freezing. Request author changes only for an observed concrete test defect, '
+    'never for hypothetical changes that a later review might find. Valid Red alone does not approve tests. '
+    'Check approved acceptance coverage before approving tests. Every validated Red assertion failure is a mandatory '
     'mutation target. Passing auxiliary checks still run in the full suite. Add control_risks only for passing cases requiring '
     'an additional product negative control, with a concrete reason; never exclude a Red target. Request changes for missing or vacuous behavior tests '
     'or any Red failure that cannot be fixed by implementing product behavior with the tests/configuration unchanged.')

@@ -45,7 +45,16 @@ na prova nativa. P2 foi implementado com contrato explícito para candidatos, di
 preservação da baseline. Restam P3, migração controlada e recuperação do S6 pelos
 agentes; runtime inalterado.
 
-Consumo confirmado antes da pausa: **7.247/8.500 chamadas**, restando 1.253.
+Avaliação semântica isolada: quatro dos cinco casos passaram. No caso de Red
+esperado, o modelo reconheceu a fase corretamente, mas escolheu solicitar mudanças
+sem defeito demonstrado. O ensaio usava contexto genérico, não o contrato completo
+do runtime; portanto não comprova falha de execução do gateway. Foi preservado
+como não aprovado. A próxima avaliação reutiliza o contrato real, agora explícito
+sobre inspecionar testes antes de exigir correções. Isso não aprova o S6.
+Fonte `db0c3d3d` exportada e validada em manutenção; supervisor ainda não migrado.
+Relay novamente parado e política desabilitada após as cinco chamadas.
+
+Consumo confirmado: **7.252/8.500 chamadas**, restando 1.248.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
 US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui

@@ -387,6 +387,27 @@ sem contá-las como falha de produto. Separar encerramento de atividade e da rel
 
 ## Referências e limites da auditoria
 
+### Avaliação semântica antes da migração
+
+Cinco chamadas isoladas ao mesmo Claude Haiku consumiram os números 7.248–7.252.
+Quatro decisões passaram: distinção de clientes HTTP, hipótese não alcançada,
+ausência de evidência nova e teste enfraquecido. O caso de Red esperado falhou:
+o raciocínio reconheceu a fase, mas a operação selecionada pediu mudanças sem
+defeito concreto. Não houve ferramentas de workspace, alteração de card nem
+aprovação de entrega. O resultado original permanece não aprovado.
+
+Limitação metodológica: o primeiro ensaio usou instrução genérica, sem os
+contratos completos da revisão instalada. A avaliação seguinte deve importar
+esses contratos diretamente, sem incluir os gabaritos. A orientação compartilhada
+foi esclarecida: inspecionar primeiro; Red esperado não constitui defeito nem
+aprovação; devolução requer defeito observado. Não se deve inferir autonomia
+a partir de cinco respostas isoladas, mesmo que a repetição passe.
+
+Migração permanece preparada, não concluída: fonte `db0c3d3d` exportada e doctor
+aprovado, backup SQLite restaurado em memória, zero execuções abertas. O relay
+foi desabilitado e parado após a avaliação. A correção de contexto ainda exige
+nova fonte congelada antes de instalar e retomar o S6.
+
 Código: `quality.py` (Red/receipts), `test_revision.py` (comparador), `repairs.py`
 (sucessão limitada), `recovery.py` (blocked/triage/decisões), `hermes.py`
 (contexto/skip_memory), `provider.py` (metadados reportados).
