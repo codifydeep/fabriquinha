@@ -128,3 +128,23 @@ dependências, a prova com interrupção/retomada e a obtenção, pela equipe, d
 observação relevante que justifique reconsiderar o hold. Repetir a mesma suíte
 pré-implementação não demonstra por si só a compatibilidade HTTP/console.
 Runtime instalado e contador de chamadas permanecem inalterados.
+
+### Transferência nativa da entrega preservada
+
+`publish_review_handoff` usa a operação nativa `request_review` sobre a sucessora,
+sem executar novamente o autor. O evento identifica explicitamente uma
+transferência, com o recibo original e a aprovação da proposta. Exige proposta
+concluída como dependência, origem ainda em triagem, ausência de efeitos
+pendentes e autoria/snapshot exatos. Na implementação, conserva também os
+controles originais e a separação entre autor dos testes e revisor.
+
+A prova nativa programada verificou perda de confirmação depois da transferência,
+repetição sem novo evento e preservação de uma revisão já reclamada. O vínculo
+Red original → revisão sucessora foi aceito pelo gate real de autoria. A primeira
+execução da prova falhou por fixture de incidente incompleta; a segunda passou
+com incidente armazenado. Zero chamadas ao modelo ou Docker.
+
+A ativação segue desabilitada: ainda falta publicar o grafo completo e assegurar
+que uma interrupção entre desbloqueio e transferência seja reconciliada antes
+do despacho. Essa prova não qualifica a atualização de dependências nem a
+capacidade do agente de produzir a nova evidência que fundamenta a sucessão.

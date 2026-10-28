@@ -413,6 +413,68 @@ class Repairs:
             completion_contract='local-only',initial_status='blocked',max_retries=2,
             max_runtime_seconds=600,idempotency_key=key)
 
+    def publish_review_handoff(self,conn,card,approval):
+        """Transfer existing evidence through native review, never fake execution.
+
+        The caller must first persist the complete successor graph. A stopped
+        transfer can be repeated; an already claimed review is only observed.
+        """
+        kb,_,_=native();authority=reviewed(self.project,self.store,approval)
+        data=authority['context'];body=card['body']
+        self.r.check_card(conn,card)
+        if (body.get('kind') not in ('tests','implementation') or data.get('repair_kind')!='review' or authority['proposal']['classification']!='reassess'
+                or body.get('inputs',{}).get('reassessment_review')!=approval
+                or card['id']==data['source']):
+            raise ValueError('explicit independently reviewed successor required')
+        plan=kb.get_task(conn,authority['task'])
+        if (not plan or plan.status!='done' or plan.id not in card['parents']
+                or self.r.closed(plan.id,'plan_review','plan_review')[0]!=approval):
+            raise ValueError('native completed proposal parent required')
+        source=kb.get_task(conn,data['source']);latest=kb.latest_run(conn,data['source'])
+        if (not source or source.status!='triage' or not latest or not latest.ended_at
+                or latest.id!=data['source_run'] or digest(json.loads(source.body))!=data['source_contract']):
+            raise ValueError('settled original review changed')
+        if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
+            raise EffectBlocked('settle source effects before transferring review')
+        row=conn.execute("SELECT r.metadata FROM task_events e JOIN task_runs r ON r.id=e.run_id "
+            "WHERE e.task_id=? AND e.kind='review_requested' ORDER BY e.id DESC LIMIT 1",(source.id,)).fetchone()
+        prior=json.loads(row[0]) if row and row[0] else {}
+        field='red' if body['kind']=='tests' else 'green'
+        if prior.get(field)!=data['handoff']:
+            raise ValueError('original native handoff must match approved evidence')
+        record=(Quality(self.project,self.store,None,self.r.board).test_evidence(data['handoff'])
+                if field=='red' else self.store.receipt(data['handoff'],kind='green'))
+        scope=record['binding']
+        if (scope['actor']!=card['owner'] or scope['reviewing'] or scope['task']!=source.id
+                or scope['contract']!=data['source_contract'] or scope['release']!=body['release']
+                or scope['kind']!=body['kind'] or record['payload']['snapshot']!=data['snapshot']):
+            raise ValueError('preserved exact author delivery required')
+        metadata={field:data['handoff'],'reassessment_review':approval,'transfer_only':True}
+        excluded=()
+        if field=='green':
+            controls=self.store.receipt(prior['controls'],kind='controls')
+            if controls['binding']!=scope or controls['payload']['green']!=data['handoff']:
+                raise ValueError('exact original controls required')
+            metadata['controls']=prior['controls']
+            frozen=self.store.receipt(record['payload']['freeze'],kind='tests_frozen')
+            excluded=(frozen['payload']['test_author'],)
+        # A durable native handoff is the acknowledgement. Never dispatch twice.
+        transferred=conn.execute("SELECT r.metadata FROM task_events e JOIN task_runs r ON r.id=e.run_id "
+            "WHERE e.task_id=? AND e.kind='review_requested' ORDER BY e.id LIMIT 1",(card['id'],)).fetchone()
+        if transferred:
+            if json.loads(transferred[0])!=metadata:raise ValueError('successor handoff drift')
+            return card['id']
+        task=self.r.check_card(conn,card)
+        if kb.latest_run(conn,task.id) is not None or task.status not in ('blocked','ready','todo'):
+            raise EffectBlocked('successor already has unrelated activity')
+        if self.r.board.guard:self.r.board.guard()
+        if task.status=='blocked':
+            if not kb.unblock_task(conn,task.id):raise ValueError('successor activation refused')
+        if not kb.request_review(conn,task.id,reviewer=self.project.reviewer(card['owner'],exclude=excluded),
+                summary='Reassessment transfer of preserved delivery; no new author execution',metadata=metadata):
+            raise EffectBlocked('native review transfer awaits satisfied dependencies')
+        return task.id
+
     def propose_fixture(self,conn,anchor,spec,item,incident,decision,graph):
         """A reviewed technical proposal, never an implicit retry or test edit."""
         kb,_,_=native()
