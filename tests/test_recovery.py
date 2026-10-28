@@ -37,7 +37,7 @@ class TechnicalRecovery(unittest.TestCase):
             result=diagnostic.review_probe_feedback()['review_reassessment']
             self.assertTrue(result['eligible'])
             self.assertFalse(result['delivery_approval'])
-            self.assertIn('independently reviewed',result['next_action'])
+            self.assertIn('independent delivery review',result['next_action'])
 
     def test_guidance_projection_preserves_failures_and_authority(self):
         failures=[dict(case='new.test',detail='complete assertion and evidence',frames=[{'line':12}])]

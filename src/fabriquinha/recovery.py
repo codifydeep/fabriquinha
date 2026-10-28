@@ -211,7 +211,7 @@ class Diagnostic:
             body=json.loads(kb.get_task(conn,self.run.task).body)
             if body.get('review_experiment'):
                 result['review_experiment']=body['review_experiment']
-                result['phase_expectation']+=' Use diagnostic_validate with product-only replacements on a disposable copy when needed to test feasibility. No source/test changes or delivery approval. End with hold and concrete findings; a separate independently reviewed proposal owns succession.'
+                result['phase_expectation']+=' Use diagnostic_validate with product-only replacements on a disposable copy when needed to test feasibility. No source/test changes or delivery approval. End with hold and concrete findings; controller admission permits succession to independent delivery review.'
             if self.incident.get('review_escalation') and self.original['kind']=='tests' and self.q.project.delivery_roles:
                 source=json.loads(kb.get_task(conn,self.original['task']).body)
                 if digest(source)!=self.original['contract']:raise ValueError('diagnostic source contract changed')
@@ -319,7 +319,7 @@ class Diagnostic:
                 next_action='Inspect this admission refusal before ending. If feasible, use diagnostic_validate with product-only replacements on a disposable copy to reach the disputed behavior; preserve every test/configuration. Do not repeat the unchanged suite or request an identical Red. If no justified experiment is feasible, hold with that concrete limitation; succession will remain blocked.',
                 delivery_approval=False))
         return dict(review_reassessment=dict(eligible=True,
-            next_action='Record the experiment findings. A separate independently reviewed proposal must authorize succession; this does not freeze tests or approve delivery.',delivery_approval=False))
+            next_action='Record the experiment findings. Controller admission permits independent delivery review; this does not freeze tests or approve delivery.',delivery_approval=False))
 
     @property
     def quality(self):return self.q  # Reuse the bounded fixed-job observation helper.

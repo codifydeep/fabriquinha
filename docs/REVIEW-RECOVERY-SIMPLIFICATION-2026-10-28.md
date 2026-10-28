@@ -1,6 +1,15 @@
 # Simplificação proposta da recuperação de revisão
 
-Estado: proposta para aprovação do proprietário; não implementada nem ativada.
+Estado: aprovada explicitamente pelo proprietário em 28/10/2026; implementação
+em andamento, ainda não ativada na instalação.
+
+Implementação: recibo `review_admission` emitido pelo controlador e revalidado
+na leitura; transferência nativa da entrega original; proposta histórica
+bloqueada sem aprovação; contexto do diagnóstico entregue ao revisor.
+A prova isolada validou recuperação de crash durante aposentadoria da proposta
+e transferência, ausência de duplicação, rejeição de autorrevisão, mudanças
+retornando ao autor e liberação de dependentes após revisão. Essas decisões
+foram programadas, sem chamadas ao modelo: não qualificam autonomia do S6.
 
 ## Evidência e problema
 
@@ -82,3 +91,4 @@ O plano aprovado e o ADR 0007 exigem uma proposta de sucessão com aprovação
 independente antes da nova revisão. Esta proposta remove especificamente essa
 aprovação intermediária. Embora mantenha a revisão independente da entrega,
 é uma alteração do contrato aprovado e não deve ser ativada implicitamente.
+O proprietário concedeu esse aceite na resposta “Aprovar a simplificação delimitada”.

@@ -20,7 +20,7 @@ from fabriquinha.releases import Releases
 from fabriquinha.repairs import Repairs,reviewed
 
 
-def qualify(root,upstream):
+def qualify(root,upstream,*,direct=False):
     if root.exists():raise ValueError('fresh isolated root required')
     root.mkdir(mode=0o700,parents=True);prepare(root,upstream)
     project=Project.parse(dict(version=1,namespace='delivery-kit-review-proof',repository='https://github.com/example/product',
@@ -86,7 +86,9 @@ def qualify(root,upstream):
             probe_claim=kb.claim_task(conn,probe);assert probe_claim
             probe_run=board.current(probe,probe_claim.current_run_id)
             assert probe_run.actor=='cto' and probe_run.kind=='diagnostic'
-            probe_result=store.record('diagnostic_decision',probe_run.binding(),dict(project=project.fingerprint(),incident=incident,action='hold',experiment='evidence',delivery_approval=False))
+            evidence=store.record('diagnostic_experiment',probe_run.binding(),dict(project=project.fingerprint(),incident=incident))
+            facts['new_evidence']=evidence
+            probe_result=store.record('diagnostic_decision',probe_run.binding(),dict(project=project.fingerprint(),incident=incident,action='hold',experiment=evidence,delivery_approval=False))
             assert kb.complete_task(conn,probe,summary='Programmed experiment result',metadata={'diagnosis':probe_result},expected_run_id=probe_run.number)
             assert operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)==probe
             assert kb.claim_task(conn,probe) is None
@@ -98,7 +100,7 @@ def qualify(root,upstream):
                 create(*args,**kwargs)
                 raise OSError('simulated lost acknowledgement after native creation')
             with patch.object(kb,'create_task',side_effect=interrupted):
-                try:operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,'evidence',approved_brief='programmed-brief',graph=graph)
+                try:operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,evidence,approved_brief='programmed-brief',graph=graph)
                 except OSError:pass
                 else:raise AssertionError('missing injected failure')
             assert count()==before+1
@@ -107,34 +109,61 @@ def qualify(root,upstream):
     with kbc.connect_closing() as conn:
         operation=Repairs(Releases(project,store,board,None));anchor=kb.get_task(conn,anchor_id)
         with patch('fabriquinha.repairs.review_failure',return_value=facts),patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
-            proposal=operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,'evidence',approved_brief='programmed-brief',graph=graph)
-            assert operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,'evidence',approved_brief='programmed-brief',graph=graph)==proposal
+            proposal=operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,evidence,approved_brief='programmed-brief',graph=graph)
+            assert operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,evidence,approved_brief='programmed-brief',graph=graph)==proposal
             assert conn.execute('SELECT count(*) FROM tasks').fetchone()[0]==before+1
             assert kb.get_task(conn,ident).status=='triage'
             assert kb.get_task(conn,proposal).status=='blocked'
             assert kb.claim_task(conn,proposal) is None
-            operation.advance_review_probes(conn,anchor,{'approval':'programmed-brief'},graph)
-            assert kb.get_task(conn,proposal).status=='ready'
-            claim=kb.claim_task(conn,proposal);assert claim
-            author=board.current(proposal,claim.current_run_id)
-            assert author.actor=='lead' and not author.reviewing
-            proposal_body=json.loads(kb.get_task(conn,proposal).body)
-            plan=store.record('work_plan',author.binding(),dict(project=project.fingerprint(),
-                approval='programmed-brief',repair_body=proposal_body,
-                document=dict(classification='reassess',reason='Programmed review of changed observation',test_paths=[])))
-            board.review(author,'Programmed technical proposal, not product approval',{'plan':plan})
-            claimed_review=kb.claim_review_task(conn,proposal);assert claimed_review
-            reviewer=board.current(proposal,claimed_review.current_run_id)
-            assert reviewer.actor=='cto' and reviewer.reviewing and reviewer.actor!=author.actor
-            decision=dict(project=project.fingerprint(),plan=plan,
-                verdict=dict(decision='approve',reason='Programmed independent proposal review',findings=[]))
-            forged=store.record('plan_review',{**reviewer.binding(),'actor':'lead'},decision)
-            try:reviewed(project,store,forged)
-            except ValueError:pass
-            else:raise AssertionError('self review accepted')
-            approval=store.record('plan_review',reviewer.binding(),decision)
-            board.finish_review(reviewer,'Programmed proposal approved, delivery remains unapproved',{'plan_review':approval})
+            if direct:
+                assert kb.unblock_task(conn,proposal)
+                old_claim=kb.claim_task(conn,proposal);assert old_claim
+                old_author=board.current(proposal,old_claim.current_run_id)
+                old_plan=store.record('work_plan',old_author.binding(),dict(project=project.fingerprint(),
+                    document=dict(classification='infrastructure',reason='Historical unapproved proposal',test_paths=[])))
+                board.review(old_author,'Historical pending review',{'plan':old_plan})
+                assert kb.get_task(conn,proposal).status=='review'
+                with patch.object(kb,'block_task',side_effect=OSError('interrupted after legacy reopen')):
+                    try:operation.advance_review_probes(conn,anchor,{'approval':'programmed-brief'},graph)
+                    except OSError:pass
+                    else:raise AssertionError('missing legacy retirement interruption')
+                assert kb.get_task(conn,proposal).status=='ready'
+                assert not (releases.folder(anchor)/('review-admission-'+ident+'.json')).exists()
+                operation.advance_review_probes(conn,anchor,{'approval':'programmed-brief'},graph)
+                assert kb.get_task(conn,proposal).status=='blocked'
+                pointer=releases.folder(anchor)/('review-admission-'+ident+'.json')
+                approval=json.loads(pointer.read_text())['receipt']
+                assert store.receipt(approval)['kind']=='review_admission'
+                operation.advance_review_probes(conn,anchor,{'approval':'programmed-brief'},graph)
+                assert json.loads(pointer.read_text())['receipt']==approval
+                assert kb.latest_run(conn,proposal).outcome=='blocked'
+                assert store.receipt(old_plan)['payload']['document']['classification']=='infrastructure'
+                assert not any(json.loads(p.read_text())['kind']=='plan_review' for p in (store.root/'receipts').glob('*.json'))
+            else:
+                assert kb.unblock_task(conn,proposal)  # Historical proposal fixture.
+                assert kb.get_task(conn,proposal).status=='ready'
+                claim=kb.claim_task(conn,proposal);assert claim
+                author=board.current(proposal,claim.current_run_id)
+                assert author.actor=='lead' and not author.reviewing
+                proposal_body=json.loads(kb.get_task(conn,proposal).body)
+                plan=store.record('work_plan',author.binding(),dict(project=project.fingerprint(),
+                    approval='programmed-brief',repair_body=proposal_body,
+                    document=dict(classification='reassess',reason='Programmed review of changed observation',test_paths=[])))
+                board.review(author,'Programmed technical proposal, not product approval',{'plan':plan})
+                claimed_review=kb.claim_review_task(conn,proposal);assert claimed_review
+                reviewer=board.current(proposal,claimed_review.current_run_id)
+                assert reviewer.actor=='cto' and reviewer.reviewing and reviewer.actor!=author.actor
+                decision=dict(project=project.fingerprint(),plan=plan,
+                    verdict=dict(decision='approve',reason='Programmed independent proposal review',findings=[]))
+                forged=store.record('plan_review',{**reviewer.binding(),'actor':'lead'},decision)
+                try:reviewed(project,store,forged)
+                except ValueError:pass
+                else:raise AssertionError('self review accepted')
+                approval=store.record('plan_review',reviewer.binding(),decision)
+                board.finish_review(reviewer,'Programmed proposal approved, delivery remains unapproved',{'plan_review':approval})
             authority=reviewed(project,store,approval)
+            parent=authority['task']
+            assert authority.get('controller_admission',False)==direct
             assert authority['proposal']['classification']=='reassess'
             assert authority['context']['delivery_approval'] is False
             assert kb.get_task(conn,ident).status=='triage'
@@ -143,7 +172,7 @@ def qualify(root,upstream):
                     try:operation.materialize_submission(conn,anchor,graph,approval)
                     except OSError:pass
                     else:raise AssertionError('missing graph interruption')
-                pointer=releases.folder(anchor)/('continuation-'+proposal+'.json')
+                pointer=releases.folder(anchor)/('continuation-'+parent+'.json')
                 saved=store.receipt(json.loads(pointer.read_text())['receipt'])['payload']
                 successor_card=saved['items'][0]['cards']['tests'];successor=successor_card['id']
                 for c in saved['items'][0]['cards'].values():assert kb.get_task(conn,c['id']).status=='blocked'
@@ -174,6 +203,10 @@ def qualify(root,upstream):
                 assert board.input(active,'red',review_handoff=True)==handoff
                 from fabriquinha.quality import Quality
                 assert Quality(project,store,None,board).review_authorship(active,handoff,store.receipt(handoff))==approval
+                from dataclasses import replace
+                try:Quality(project,store,None,board).review_authorship(replace(active,actor=active.author),handoff,store.receipt(handoff))
+                except ValueError:pass
+                else:raise AssertionError('delivery self-review accepted')
                 from fabriquinha.recovery import Recovery
                 diagnostic_snapshot=Recovery(project,store,board).snapshot(conn,kb.get_task(conn,successor),active,{'red':handoff})
                 assert diagnostic_snapshot==snapshot
@@ -186,7 +219,7 @@ def qualify(root,upstream):
                     assert operation.materialize_submission(conn,anchor,graph,approval)==saved
                     assert operation.continue_review(conn,anchor,graph)==saved
                 downstream=saved['items'][0]['cards']['implementation']
-                assert downstream['parents']==[successor,proposal]
+                assert downstream['parents']==[successor,parent]
                 assert kb.claim_task(conn,downstream['id']) is None
                 verdict=dict(decision='changes',reason='Programmed independent request for correction',
                     findings=[dict(path='tests/example.py',reason='Programmed finding')])
@@ -216,7 +249,7 @@ def qualify(root,upstream):
                 dependent_run=board.current(downstream['id'],dependent.current_run_id)
                 assert board.input(dependent_run,'tests')==frozen
                 assert kb.block_task(conn,dependent.id,kind='needs_input',reason='Qualification finished; no model worker',expected_run_id=dependent.current_run_id)
-    result=dict(passed=True,successor_failure_snapshot_resolved=True,automatic_evidence_proposal_activation=True,bounded_native_cto_probe=True,no_probe_retry_after_completion=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
+    result=dict(passed=True,successor_failure_snapshot_resolved=True,direct_controller_admission=direct,legacy_proposal_path=not direct,bounded_native_cto_probe=True,no_probe_retry_after_completion=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
         original_triage_preserved=True,proposal_initially_not_dispatchable=True,independent_native_review=True,self_review_denied=True,programmed_admission=True,
         changes_return_to_original_author=True,corrected_handoff_independently_reviewed=True,dependent_released_after_review=True,immutable_graph_recovered=True,dependent_work_held=True,native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
         model_calls=0,docker_calls=0,delivery_approval=False)
@@ -224,4 +257,5 @@ def qualify(root,upstream):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    args=parser.parse_args();print(json.dumps(qualify(args.root.resolve(),args.upstream.resolve()),indent=2))
+    parser.add_argument('--direct',action='store_true')
+    args=parser.parse_args();print(json.dumps(qualify(args.root.resolve(),args.upstream.resolve(),direct=args.direct),indent=2))

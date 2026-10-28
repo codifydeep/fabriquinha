@@ -18,6 +18,45 @@ REPAIR_PROTOCOL='qa-text-handoff-1'
 FIXTURE_PROTOCOL='unpublished-fixture-1'
 SUBMISSION_PROTOCOL='complete-control-set-3'
 SUBMISSION_PROTOCOLS=('complete-control-set-1','complete-control-set-2',SUBMISSION_PROTOCOL)
+REVIEW_ADMISSION_PROTOCOL='direct-independent-review-1'
+
+
+def review_admission(project,store,key):
+    """Validate controller permission to request review, never an approval."""
+    record=store.receipt(key,kind='review_admission');scope=record['binding'];data=record['payload']
+    if (set(scope)!={'actor','task','release','contract'} or scope['actor']!='controller'
+            or data.get('protocol')!=REVIEW_ADMISSION_PROTOCOL
+            or data.get('project')!=project.fingerprint() or data.get('delivery_approval') is not False
+            or data.get('repair_kind')!='review' or data.get('delivery_review_required') is not True
+            or data.get('plan_review_required') is not False or 'requires_independent_plan_review' in data):
+        raise ValueError('explicit controller review admission required; not delivery approval')
+    facts=review_reassessment(project,store,data['incident'],data['reviewed_diagnosis'],data['handoff'],data['new_evidence'])
+    if any(data.get(k)!=v for k,v in facts.items() if k!='requires_independent_plan_review'):
+        raise ValueError('exact reassessment evidence required')
+    graph=store.receipt(data['prior_graph'],kind='release_graph')
+    experiment=store.receipt(data['new_evidence'],kind='diagnostic_experiment')
+    diagnosis=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
+    ruling=diagnosis['payload']
+    if (graph['binding']!=scope or graph['payload'].get('project')!=project.fingerprint()
+            or experiment['binding'].get('release')!=scope['release']
+            or diagnosis['binding']!=experiment['binding']
+            or ruling.get('project')!=project.fingerprint() or ruling.get('incident')!=data['incident']
+            or ruling.get('experiment')!=data['new_evidence'] or ruling.get('action')!='hold'
+            or ruling.get('delivery_approval') is not False):
+        raise ValueError('exact graph and completed CTO evidence required')
+    return record
+
+
+def record_review_admission(project,store,binding,graph,incident,held,handoff,observation,diagnosis):
+    """Controller-only durable receipt. Native freshness is checked by caller."""
+    facts=review_reassessment(project,store,incident,held,handoff,observation)
+    facts={k:v for k,v in facts.items() if k!='requires_independent_plan_review'}
+    prior=store.record('release_graph',binding,graph)
+    key=store.record('review_admission',binding,dict(**facts,project=project.fingerprint(),
+        protocol=REVIEW_ADMISSION_PROTOCOL,repair_kind='review',prior_graph=prior,current_diagnosis=diagnosis,
+        delivery_review_required=True,plan_review_required=False))
+    review_admission(project,store,key)
+    return key
 
 
 def protocol_failure(data):
@@ -193,7 +232,14 @@ def fixture_failure(project,store,incident,decision,tests,current_snapshot):
 
 
 def reviewed(project,store,key):
-    record=store.receipt(key,kind='plan_review');scope=record['binding']
+    record=store.receipt(key)
+    if record['kind']=='review_admission':
+        record=review_admission(project,store,key);data=record['payload']
+        diagnosis=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
+        return dict(review=key,proposal={'classification':'reassess'},context=data,context_id=key,
+                    task=diagnosis['binding']['task'],controller_admission=True)
+    if record['kind']!='plan_review':raise ValueError('corrective review or explicit controller admission required')
+    scope=record['binding']
     proposed=store.receipt(record['payload']['plan'],kind='work_plan')
     body=proposed['payload'].get('repair_body',{});context=store.receipt(body.get('repair_context'),kind='repair_context')
     author=project.coordination_roles['lead']
@@ -429,6 +475,23 @@ class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
 
+    def succession_parent(self,conn,authority,key):
+        """A completed real CTO experiment or a historical reviewed proposal."""
+        kb,_,_=native();task=kb.get_task(conn,authority['task'])
+        if not task or task.status!='done':raise ValueError('completed native succession parent required')
+        if authority.get('controller_admission'):
+            data=authority['context'];record=self.store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
+            run=kb.latest_run(conn,task.id);body=json.loads(task.body or '{}')
+            if (not run or not run.ended_at or run.outcome!='completed'
+                    or (run.metadata or {}).get('diagnosis')!=data['current_diagnosis']
+                    or record['binding']!=Run(task.id,run.id,task.assignee,'diagnostic',False,task.assignee,
+                                             body.get('release'),digest(body)).binding()
+                    or body.get('source')!=data['source'] or body.get('source_run')!=data['source_run']):
+                raise ValueError('controller admission requires exact completed native CTO experiment')
+        elif self.r.closed(task.id,'plan_review','plan_review')[0]!=key:
+            raise ValueError('native independent proposal completion required')
+        return task
+
     def prepare_review_probe(self,conn,anchor,card,incident,decision,handoff):
         """One native CTO experiment per held review, with unchanged source."""
         kb,_,_=native();source=self.r.check_card(conn,card)
@@ -554,9 +617,8 @@ class Repairs:
                 or body.get('inputs',{}).get('reassessment_review')!=approval
                 or card['id']==data['source']):
             raise ValueError('explicit independently reviewed successor required')
-        plan=kb.get_task(conn,authority['task'])
-        if (not plan or plan.status!='done' or plan.id not in card['parents']
-                or self.r.closed(plan.id,'plan_review','plan_review')[0]!=approval):
+        plan=self.succession_parent(conn,authority,approval)
+        if plan.id not in card['parents']:
             raise ValueError('native completed proposal parent required')
         source=kb.get_task(conn,data['source']);latest=kb.latest_run(conn,data['source'])
         if (not source or source.status!='triage' or not latest or not latest.ended_at
@@ -721,9 +783,7 @@ class Repairs:
             raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
         if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
             raise ValueError('continuation cannot change validation bundle')
-        plan=kb.get_task(conn,authority['task'])
-        if not plan or plan.status!='done' or self.r.closed(plan.id,'plan_review','plan_review')[0]!=approval:
-            raise ValueError('native independent proposal completion required')
+        plan=self.succession_parent(conn,authority,approval)
         path=self.r.folder(anchor)/('continuation-'+plan.id+'.json')
         source_phase=next((phase for i in graph['items'] for phase,c in i['cards'].items() if c['id']==data['source']),None)
         index=next((n for n,i in enumerate(graph['items']) if any(c['id']==data['source'] for c in i['cards'].values())),None)
@@ -796,7 +856,7 @@ class Repairs:
         return result
 
     def advance_review_probes(self,conn,anchor,spec,graph):
-        """Held review -> one CTO SPIKE -> evidence-bound Lead proposal."""
+        """Held review -> CTO evidence -> controller admission, not meta-review."""
         kb,_,_=native();recovery=Recovery(self.project,self.store,self.r.board)
         for item in graph['items']:
             for phase in ('tests','implementation'):
@@ -835,12 +895,41 @@ class Repairs:
                         or data.get('project')!=self.project.fingerprint() or data.get('incident')!=incident
                         or data.get('action')!='hold' or not data.get('experiment')):
                     raise ValueError('exact completed CTO experiment required; source remains held')
-                proposal=self.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,data['experiment'],
-                    approved_brief=spec['approval'],graph=graph)
-                proposed=kb.get_task(conn,proposal)
-                if proposed.status=='blocked' and kb.latest_run(conn,proposal) is None:
-                    if self.r.board.guard:self.r.board.guard()
-                    if not kb.unblock_task(conn,proposal):raise ValueError('native reviewed-evidence proposal activation refused')
+                admission=record_review_admission(self.project,self.store,self.r.binding(anchor),graph,
+                    incident,hold,handoff,data['experiment'],key)
+                self.succession_parent(conn,reviewed(self.project,self.store,admission),admission)
+                # Preserve obsolete meta-review history, without completing or
+                # approving it. Never interrupt a native worker for migration.
+                for previous in recovery.cards(conn):
+                    body=json.loads(previous.body or '{}')
+                    if (body.get('kind')!='plan' or body.get('anchor')!=anchor.id
+                            or body.get('repair_of')!=source.id or not body.get('repair_context')):continue
+                    context=self.store.receipt(body['repair_context'],kind='repair_context')['payload']
+                    if context.get('repair_kind')!='review':continue
+                    old_run=kb.latest_run(conn,previous.id)
+                    if previous.status=='running' or old_run and not old_run.ended_at:
+                        raise EffectBlocked('drain legacy review proposal before direct succession')
+                    if previous.status=='review':
+                        # The admission pointer is published only after retirement.
+                        # A crash after reopen is recovered as the ready case below
+                        # before this controller dispatches any worker.
+                        current=kb.get_task(conn,previous.id);latest_old=kb.latest_run(conn,previous.id)
+                        if current.status!='review' or latest_old and not latest_old.ended_at:
+                            raise EffectBlocked('legacy review became active during migration')
+                        if self.r.board.guard:self.r.board.guard()
+                        if not kb.reopen_review_task(conn,previous.id):raise EffectBlocked('legacy review migration refused')
+                        previous=kb.get_task(conn,previous.id)
+                    if previous.status=='ready':
+                        if self.r.board.guard:self.r.board.guard()
+                        if not kb.block_task(conn,previous.id,kind='needs_input',
+                            reason='Superseded by controller review admission '+admission+'; historical proposal remains unapproved'):
+                            raise EffectBlocked('legacy proposal retirement not acknowledged')
+                    elif previous.status not in ('blocked','triage','done','archived'):
+                        raise EffectBlocked('legacy proposal state requires settled migration')
+                path=self.r.folder(anchor)/('review-admission-'+source.id+'.json')
+                if path.exists() and json.loads(path.read_bytes())!={'receipt':admission}:
+                    raise ValueError('existing direct review admission changed')
+                write_json(path,{'receipt':admission})
 
     def continue_review(self,conn,anchor,graph):
         """Discover completed reviewed successors from durable native records."""
@@ -848,10 +937,20 @@ class Repairs:
         while True:
             sources={c['id'] for i in graph['items'] for c in i['cards'].values()}
             candidates=[]
+            direct_sources=set()
+            for source in sources:
+                path=self.r.folder(anchor)/('review-admission-'+source+'.json')
+                if not path.exists():continue
+                key=json.loads(path.read_bytes())['receipt'];record=review_admission(self.project,self.store,key)
+                previous=self.store.receipt(record['payload']['prior_graph'],kind='release_graph')
+                if record['binding']!=self.r.binding(anchor):raise ValueError('foreign controller admission')
+                if previous['payload']!=graph:continue
+                candidates.append(key);direct_sources.add(source)
             for task in Recovery(self.project,self.store,self.r.board).cards(conn):
                 body=json.loads(task.body or '{}')
                 if (task.status!='done' or body.get('kind')!='plan' or body.get('anchor')!=anchor.id
-                        or body.get('repair_of') not in sources or not body.get('repair_context')):continue
+                        or body.get('repair_of') not in sources or body.get('repair_of') in direct_sources
+                        or not body.get('repair_context')):continue
                 context=self.store.receipt(body['repair_context'],kind='repair_context')['payload']
                 if context.get('repair_kind')!='review':continue
                 previous=self.store.receipt(context['prior_graph'],kind='release_graph')

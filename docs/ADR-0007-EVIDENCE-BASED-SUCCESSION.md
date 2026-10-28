@@ -328,3 +328,12 @@ zero retries. Não se deve incrementar essa versão para repetir tentativas
 sem mudança real de contrato. Prova nativa cobre deduplicação e preservação do
 legado; a recuperação real do S6 continua requisito separado.
 
+
+## Refinamento aprovado em 28/10/2026
+
+Somente recuperação de revisão usa admissão determinística do controlador em
+vez de proposta Lead e aprovação intermediária CTO. A entrega original segue
+para revisão independente; a cópia experimental nunca substitui a entrega.
+O recibo `review_admission` não é `plan_review` nem aprovação de produto.
+As demais modalidades de sucessão preservam seus contratos. Ver
+[plano delimitado](REVIEW-RECOVERY-SIMPLIFICATION-2026-10-28.md).

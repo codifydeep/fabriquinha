@@ -253,3 +253,20 @@ conteúdo staged antes de publicar. Mudanças da automação e entregas de produ
 têm contratos de revisão distintos; nunca transportar uma dispensa entre eles.
 
 Código próprio sob [MIT](LICENSE). Dependências mantêm suas licenças.
+
+### Recuperação de revisão
+
+```mermaid
+flowchart LR
+    B[Revisão bloqueada] --> D[Diagnóstico CTO em cópia descartável]
+    D --> A[Admissão determinística com evidências]
+    A --> R[Revisão independente da entrega original]
+    R -->|Mudanças| I[Autor corrige e submete nova entrega]
+    I --> R
+    R -->|Aprovação vinculada à entrega| G[Próximos gates obrigatórios]
+```
+
+A admissão permite revisar; não aprova testes, código ou release. A proposta
+intermediária de recuperação foi removida apenas desse caminho. A prova nativa
+isolada valida transferência e recuperação de crash com decisões programadas;
+a recuperação real com modelo e a homologação completa do S6 seguem pendentes.

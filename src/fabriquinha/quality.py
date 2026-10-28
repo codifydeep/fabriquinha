@@ -777,6 +777,14 @@ class DeliveryTools:
                     changes.append(change)
                 context['mutations'].append(dict(report=data['report'],changes=changes))
         context.update(baseline=report(red['baseline_job']),red=report(red['red_job']))
+        reader=getattr(self.board,'reassessment_input',None)
+        admission=reader(run) if reader else None
+        if admission:
+            from .repairs import reviewed,context_view
+            authority=reviewed(q.project,self.store,admission)
+            if authority.get('controller_admission'):
+                context['recovery']=context_view(self.store,authority['context'])
+                context['recovery']['delivery_approval']=False
         if evidence['kind']=='test_revision':
             context.update(test_revision=red,historical_red_only=True,
                 correction_validation=report(red['validation_job']),

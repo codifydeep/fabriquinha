@@ -17,7 +17,7 @@ from fabriquinha.config import Project
 from fabriquinha.effects import Pending,write_json
 from fabriquinha.executor import Runner
 from fabriquinha.quality import Quality,product_mutations
-from fabriquinha.repairs import review_reassessment
+from fabriquinha.repairs import review_reassessment,record_review_admission,review_admission
 from fabriquinha.recovery import Diagnostic
 
 
@@ -73,6 +73,12 @@ def qualify(root,image):
         feedback=diagnostic.review_probe_feedback()['review_reassessment']
     assert feedback['eligible'] is True and feedback['delivery_approval'] is False
     admitted=review_reassessment(project,store,incident,hold,red,observation)
+    diagnosis=quality.record(probe,'diagnostic_decision',dict(incident=incident,action='hold',experiment=observation,delivery_approval=False))
+    binding=dict(actor='controller',task='anchor',release='release',contract='anchor-contract')
+    graph=dict(project=project.fingerprint(),items=[])
+    admission=record_review_admission(project,store,binding,graph,incident,hold,red,observation,diagnosis)
+    assert record_review_admission(project,store,binding,graph,incident,hold,red,observation,diagnosis)==admission
+    assert review_admission(project,store,admission)['payload']['delivery_approval'] is False
     assert report['failures'] and not next_report['failures']
     assert admitted['snapshot']==snapshot and admitted['delivery_approval'] is False
     assert (work/'app.py').read_text()=='VALUE = 1\n'
@@ -86,7 +92,7 @@ def qualify(root,image):
     result=dict(passed=True,real_suite_jobs=len(jobs),real_red=True,changed_diagnostic_evidence_admitted=True,
         author_snapshot_preserved=True,tests_exact=True,delivery_approval=False,model_calls=0,native_roles_programmed=True,
         repeated_observation_feedback=refused,changed_observation_feedback=feedback,
-        red=red,incident=incident,hold=hold,observation=observation)
+        red=red,incident=incident,hold=hold,observation=observation,controller_admission=admission)
     write_json(root/'result.json',result);return result
 
 if __name__=='__main__':

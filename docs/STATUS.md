@@ -8,14 +8,18 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Despacho em manutenção; refinamento de contrato aguarda aprovação.** A fonte
+**Despacho em manutenção; simplificação aprovada e em implementação.** A fonte
 `9688d88e` foi instalada e as rodadas 81–83 ainda exigiram implementação antes de
 revisar testes em Red, apesar do contexto corrigido. A execução 84 foi interrompida
 pela pausa operacional; drenagem completa, sem workers ou efeitos pendentes.
 Supervisor descarregado, provedor desabilitado e relay parado. A
 [simplificação proposta](REVIEW-RECOVERY-SIMPLIFICATION-2026-10-28.md) remove
 somente a revisão intermediária da permissão de revisar, mantendo revisão
-independente da entrega e todos os gates. Não foi implementada nem ativada.
+independente da entrega e todos os gates. O proprietário aprovou explicitamente
+a mudança. A admissão está integrada à transferência nativa no código; a prova
+isolada cobre crash, autorrevisão, correções e dependências. Cinco jobs Docker
+reais confirmaram preservação de testes e recusa de observação repetida.
+A instalação e retomada real do S6 ainda estão pendentes.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
