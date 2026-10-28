@@ -312,3 +312,19 @@ passou e os casos adicionais de admissão passaram. A prova de quatro jobs reais
 foi repetida com o novo comparador. A avaliação semântica com o modelo e a
 migração controlada permanecem pendentes; não se declara autonomia com essa
 matriz. Nenhuma chamada paga foi executada nesta etapa.
+# Complemento: feedback durante o SPIKE e migração única
+
+O retorno de `diagnostic_validate` consulta o mesmo gate de admissibilidade da
+reconciliação, sem conceder aprovação. Cinco jobs reais demonstraram recusa de
+observação repetida e admissão de mudança verificável numa cópia, preservando os
+testes. A identidade dos papéis nessa prova é programada, não julgamento autônomo.
+
+O protocolo de SPIKE com feedback é versão 2. Uma instalação antiga pode criar
+uma única sucessora para um SPIKE CTO concluído cuja observação passou pelas
+verificações de escopo/job, mas manteve resultados normalizados idênticos. O
+registro antigo não muda. Execução ativa ou com falha, resultado admissível e
+outros erros não autorizam essa migração. A nova chave é idempotente e conserva
+zero retries. Não se deve incrementar essa versão para repetir tentativas
+sem mudança real de contrato. Prova nativa cobre deduplicação e preservação do
+legado; a recuperação real do S6 continua requisito separado.
+

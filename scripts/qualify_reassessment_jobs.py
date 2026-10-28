@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 import time
 from types import SimpleNamespace
+from contextlib import nullcontext
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.artifacts import Store
 from fabriquinha.board import Run
@@ -16,6 +18,7 @@ from fabriquinha.effects import Pending,write_json
 from fabriquinha.executor import Runner
 from fabriquinha.quality import Quality,product_mutations
 from fabriquinha.repairs import review_reassessment
+from fabriquinha.recovery import Diagnostic
 
 
 def qualify(root,image):
@@ -49,9 +52,26 @@ def qualify(root,image):
     experiment=quality.record(prior,'diagnostic_experiment',dict(incident=incident,snapshot=snapshot,job=job,report=report))
     hold=quality.record(prior,'diagnostic_decision',dict(incident=incident,action='hold',experiment=experiment,delivery_approval=False))
     probe=Run('probe',4,'cto','diagnostic',False,'cto','release','probe-contract')
+    board.input=lambda run,key,**kwargs:{'incident':incident,'held_review':hold}.get(key,baseline)
+    diagnostic=Diagnostic(SimpleNamespace(run=probe),quality)
+    # Only the native task lookup is programmed here. Both observations and the
+    # admission gate are real; this fixture must not claim native dispatch.
+    task=SimpleNamespace(body=json.dumps(dict(review_experiment=dict(handoff=red))))
+    api=(SimpleNamespace(get_task=lambda *args:task),SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)
+    repeated_job,repeated_report=wait(lambda:quality.observe(probe,snapshot,'diagnostic'))
+    diagnostic.experiment=quality.record(probe,'diagnostic_experiment',dict(incident=incident,
+        source_snapshot=snapshot,snapshot=snapshot,job=repeated_job,report=repeated_report))
+    with patch('fabriquinha.recovery.native',return_value=api):
+        refused=diagnostic.review_probe_feedback()['review_reassessment']
+    assert refused['eligible'] is False and refused['delivery_approval'] is False
+    assert 'Do not repeat' in refused['next_action']
     candidate=product_mutations(quality,snapshot,[{'app.py':'VALUE = 2\n'}])[0]
     next_job,next_report=wait(lambda:quality.observe(probe,candidate,'diagnostic'))
     observation=quality.record(probe,'diagnostic_experiment',dict(incident=incident,source_snapshot=snapshot,snapshot=candidate,job=next_job,report=next_report))
+    diagnostic.experiment=observation
+    with patch('fabriquinha.recovery.native',return_value=api):
+        feedback=diagnostic.review_probe_feedback()['review_reassessment']
+    assert feedback['eligible'] is True and feedback['delivery_approval'] is False
     admitted=review_reassessment(project,store,incident,hold,red,observation)
     assert report['failures'] and not next_report['failures']
     assert admitted['snapshot']==snapshot and admitted['delivery_approval'] is False
@@ -60,11 +80,12 @@ def qualify(root,image):
     assert quality.tests(snapshot)==quality.tests(candidate)
     records=[json.loads(p.read_text()) for p in (store.root/'receipts').glob('*.json')]
     jobs=[r for r in records if r['kind']=='suite_job']
-    assert len(jobs)==4
+    assert len(jobs)==5
     assert all(r['payload']['sandbox']==dict(network='none',snapshot='readonly',user='65534:65534') for r in jobs)
     assert not any(r['kind'] in ('green','tests_frozen','delivery_review','release_acceptance') for r in records)
     result=dict(passed=True,real_suite_jobs=len(jobs),real_red=True,changed_diagnostic_evidence_admitted=True,
         author_snapshot_preserved=True,tests_exact=True,delivery_approval=False,model_calls=0,native_roles_programmed=True,
+        repeated_observation_feedback=refused,changed_observation_feedback=feedback,
         red=red,incident=incident,hold=hold,observation=observation)
     write_json(root/'result.json',result);return result
 

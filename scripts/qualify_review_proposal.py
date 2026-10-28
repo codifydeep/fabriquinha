@@ -64,7 +64,23 @@ def qualify(root,upstream):
         facts['reviewed_diagnosis']=hold
         assert kb.complete_task(conn,held_id,summary='Programmed prior hold',metadata={'diagnosis':hold},expected_run_id=held_run.number)
         with patch('fabriquinha.repairs.review_failure',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]):
-            probe=operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)
+            legacy_body=dict(version=1,kind='diagnostic',release=release,stage='cto',
+                source=ident,source_run=claimed.current_run_id,inputs={'incident':incident,'held_review':hold},
+                review_experiment={'handoff':handoff})
+            legacy=kb.create_task(conn,title='Legacy feedback fixture',body=json.dumps(legacy_body),assignee='cto',
+                completion_contract='local-only',idempotency_key=digest([project.fingerprint(),ident,claimed.current_run_id,'review-experiment']))
+            legacy_claim=kb.claim_task(conn,legacy);assert legacy_claim
+            assert operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)==legacy
+            legacy_run=board.current(legacy,legacy_claim.current_run_id)
+            legacy_receipt=store.record('diagnostic_decision',legacy_run.binding(),dict(project=project.fingerprint(),
+                incident=incident,action='hold',experiment='unchanged-evidence',delivery_approval=False))
+            assert kb.complete_task(conn,legacy,summary='Programmed unchanged observation',metadata={'diagnosis':legacy_receipt},expected_run_id=legacy_run.number)
+            with patch('fabriquinha.repairs.review_reassessment',return_value=facts):
+                assert operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)==legacy
+            with patch('fabriquinha.repairs.review_reassessment',side_effect=ValueError('new observed outcome required; changed wording is insufficient')):
+                probe=operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)
+            assert probe!=legacy and kb.get_task(conn,legacy).status=='done'
+            assert json.loads(kb.get_task(conn,probe).body)['escalated_from']==legacy
             assert operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)==probe
             assert kb.get_task(conn,probe).max_retries==0
             probe_claim=kb.claim_task(conn,probe);assert probe_claim

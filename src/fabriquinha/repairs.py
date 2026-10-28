@@ -428,13 +428,46 @@ class Repairs:
                 or task.assignee!=self.project.technical_roles['cto']):
             raise ValueError('completed native CTO hold required')
         data=self.store.receipt(incident,kind='incident')['payload']
+        key=digest([self.project.fingerprint(),source.id,latest.id,'review-experiment-feedback-v2'])
+        successor_exists=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        legacy_key=digest([self.project.fingerprint(),source.id,latest.id,'review-experiment'])
+        legacy=conn.execute('SELECT id FROM tasks WHERE idempotency_key=?',(legacy_key,)).fetchone()
+        predecessor=None
+        if legacy:
+            old=kb.get_task(conn,legacy['id']);previous=kb.latest_run(conn,old.id)
+            # One protocol migration, not another retry counter. Never interrupt
+            # a live/failed legacy probe or replace an already useful result.
+            if old.status!='done' or not previous or not previous.ended_at:return old.id
+            old_body=json.loads(old.body or '{}')
+            if (old_body.get('inputs')!={'incident':incident,'held_review':decision}
+                    or old_body.get('review_experiment',{}).get('handoff')!=handoff):
+                raise ValueError('legacy probe authority changed')
+            diagnosis=(previous.metadata or {}).get('diagnosis')
+            if not diagnosis:return old.id
+            old_decision=self.store.receipt(diagnosis,kind='diagnostic_decision')
+            expected=Run(old.id,previous.id,old.assignee,'diagnostic',False,old.assignee,
+                         body['release'],digest(old_body))
+            if (old.assignee!=self.project.technical_roles['cto'] or previous.outcome!='completed'
+                    or old_decision['binding']!=expected.binding()
+                    or old_decision['payload'].get('project')!=self.project.fingerprint()
+                    or old_decision['payload'].get('incident')!=incident
+                    or old_decision['payload'].get('action')!='hold'):
+                raise ValueError('exact completed legacy CTO probe required')
+            observation=old_decision['payload'].get('experiment')
+            if not observation:return old.id
+            if not successor_exists:
+                try:review_reassessment(self.project,self.store,incident,decision,handoff,observation)
+                except ValueError as error:
+                    if str(error)!='new observed outcome required; changed wording is insufficient':
+                        return old.id
+                else:return old.id
+            predecessor=old.id
         probe=dict(version=1,kind='diagnostic',release=body['release'],stage='cto',
             source=source.id,source_run=latest.id,block_event=data['block_event'],cause=data['cause'],
-            inputs={'incident':incident,'held_review':decision},escalated_from=None,
-            review_experiment=dict(handoff=handoff,anchor=anchor.id,
+            inputs={'incident':incident,'held_review':decision},escalated_from=predecessor,
+            review_experiment=dict(contract=2,handoff=handoff,anchor=anchor.id,
                 objective='Test the held review hypothesis with a bounded product-only experiment on a disposable copy. '
                           'Keep all tests/configuration exact. Report observed differences and limitations; never approve delivery.'))
-        key=digest([self.project.fingerprint(),source.id,latest.id,'review-experiment'])
         existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
         if existing:
             if json.loads(existing['body'])!=probe:raise ValueError('review experiment contract drift')

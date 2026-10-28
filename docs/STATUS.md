@@ -65,6 +65,15 @@ própria resposta de `diagnostic_validate`, enquanto o agente ainda pode agir.
 Não altera o gate, não aprova a entrega e não agenda repetição automática.
 O SPIKE concluído permanece preservado; retomada com o reparo ainda pendente.
 
+O feedback antecipado passou em cinco jobs Docker reais: observação repetida
+recusada e mudança verificável numa cópia admitida, mantendo testes e entrega
+originais. Foi preparada uma migração única do protocolo antigo para o protocolo
+com feedback, somente para um SPIKE CTO concluído com resultados normalizados
+idênticos. Execução antiga permanece intacta; worker ativo não é substituído,
+resultado já admissível é reutilizado e o protocolo novo não ganha retries.
+A prova nativa de criação, deduplicação, revisão e dependências passou. Instalação
+dessa alteração e retomada real ainda pendentes.
+
 Último contador conferido: **7.266/8.500 chamadas**, restando 1.234.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
