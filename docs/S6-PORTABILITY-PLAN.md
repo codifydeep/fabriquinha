@@ -1,11 +1,13 @@
 # S6 — Instalação reproduzível e operação da equipe
 
-**Pausado antes da implementação, em 27/10.** Brief de produto aprovado pelo CEO,
-com aceite preservado fora do intake até a retomada. A [auditoria pré-S6](EXECUTION-REVIEW-2026-10-27.md)
-identificou que o QA atual não demonstra sessões independentes/prazo de três
-segundos, além de divergência com o ADR 0004 na redação de governança. Os
-refinamentos F2/F3 e R1–R4 foram aprovados; o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md)
-registra a implementação em qualificação offline, antes do despacho.
+**Em execução em 28/10.** Brief aprovado e primeiro incremento integrado,
+implantado e validado por QA independente, com rollback verificado. O segundo
+incremento está na autoria dos testes. O S6 completo ainda não está homologado.
+As intervenções, falhas preservadas e recibos estão no
+[registro de recuperação S6](S6-CONTROL-SUBMISSION-RECOVERY.md).
+A [auditoria pré-S6](EXECUTION-REVIEW-2026-10-27.md) originou os refinamentos
+F2/F3 e R1–R4 aprovados; o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) define
+a suíte compartilhada de aceitação usada na prévia e na implantação.
 
 ## Ponto de partida
 
@@ -97,11 +99,14 @@ ou homologação de produto. A suíte do núcleo chegou a 371 testes, também co
 2. **Preparado:** bootstrap aprovado e protegido no outro repositório, identidade
    GitHub explícita e relay/SDK ativados conjuntamente. Backup, integridade e
    leitura nativa da cópia restaurada passaram, sem iniciar serviços nela.
-3. **Em andamento:** brief do lobby com dois incrementos dependentes, apresentado
-   por Produto e aguardando aceite de negócio. Uma devolução do operador antes
-   do aceite corrigiu a exceção indevida de testes; não é uma prova sem intervenção.
-4. **Pendente:** ciclo real após o aceite, recuperação em execução, canal real,
-   upgrade/rollback e instruções suficientes para uma reprodução externa.
+3. **Em andamento:** brief do lobby aprovado; primeiro incremento passou por
+   revisão, PR #13, CI local, implantação, rollback e QA. O controlador liberou
+   os testes do segundo incremento automaticamente. Houve intervenções no
+   controlador; não é uma prova de entrega inteira sem intervenção.
+4. **Pendente:** concluir o segundo incremento com regressões preservadas e
+   homologar o S6; qualificar canal real, restauração operacional e
+   upgrade/rollback da ferramenta, além da reprodução externa documentada.
+   Rollback do produto já demonstrado não substitui recuperação da instalação.
 
 **Identidade GitHub verificada:** o preparo com upstream e ambiente SDK públicos
 novos revelou a ausência de autenticação no perfil de integração, apesar do
