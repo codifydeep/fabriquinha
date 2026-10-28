@@ -75,14 +75,34 @@ def bounded_exec(cid,argv,timeout,*,stdin=False):
             format(min(timeout,120),'g'),*argv]
 
 
-def activity_anchor(project,run,route,recovery_epoch=None):
+def activity_anchor(project,run,route,recovery_epoch=None,*,phase_contract=None):
     identity=dict(project=project.fingerprint(),subject=run.subject(),model=route['model'],
                   provider=route['provider'],api_mode=route['api_mode'])
     if recovery_epoch is not None:
         if not isinstance(recovery_epoch,str) or not re.fullmatch('[a-f0-9]{64}',recovery_epoch):
             raise ValueError('controller-validated diagnostic receipt required for context refresh')
         identity['recovery_epoch']=recovery_epoch
+    if phase_contract is not None:
+        if not isinstance(phase_contract,str) or not re.fullmatch('[a-f0-9]{64}',phase_contract):
+            raise ValueError('controller phase contract digest required')
+        identity['phase_contract']=phase_contract
     return 'fabriquinha-'+digest(identity)[:32]
+
+
+def repair_phase(reviewing,kind):
+    if kind=='submission':
+        action=('Independently review the proposed replacement attempt using plan_review. '
+                if reviewing else 'Prepare a replacement-attempt plan using repair_submit with classification submission when the recorded control gaps are addressable. ')
+        return action+('This is pre-implementation planning after an incomplete negative-control submission, not deployed QA repair. '
+            'Start conditions are the approved brief, preserved snapshot/frozen tests and independent plan review. '
+            'The replacement task will produce new Green, a complete mutation set and a validated delivery_submit handoff; these are completion gates, not start conditions. '
+            'A missing handoff from the failed attempt is not by itself an infrastructure defect. '
+            'Infrastructure or scope holds need a separate actual impediment. Preserve the old triage and decisions. '
+            'This plan never approves the delivery, changes tests, resets a breaker or replaces the independent delivery review.')
+    if kind is not None:raise ValueError('known corrective phase required')
+    return ('Independently review the exact corrective classification, brief authority and explicit QA paths; use plan_review.'
+            if reviewing else 'Classify the recorded deployed QA failure against the approved brief using repair_submit. '
+            'Propose product or test_contract with evidence and explicit existing QA paths. No new brief, whole-release plan, implementation or fabricated evidence.')
 
 
 def sandbox_context(prompt):
@@ -444,7 +464,11 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     gates,operations=register_delivery_tools(sandbox,quality,on_terminal=finished)
     allowed=tool_names(sandbox)|gates
     create_custom_toolset('fabriquinha_activity','Controller-selected delivery activity',tools=sorted(allowed))
-    anchor=activity_anchor(sandbox.project,sandbox.run,route,recovery_epoch)
+    corrective=operations.evidence() if getattr(operations,'repair',False) is True else None
+    corrective_phase=repair_phase(sandbox.run.reviewing,corrective['repair'].get('repair_kind')) if corrective else None
+    # Preserve old sessions, but never resume their contradictory system prompt.
+    phase_contract=digest(corrective_phase) if corrective and corrective['repair'].get('repair_kind')=='submission' else None
+    anchor=activity_anchor(sandbox.project,sandbox.run,route,recovery_epoch,phase_contract=phase_contract)
     session=db.resolve_resume_session_id(anchor);previous=db.get_session(session)
     try:
         history=None
@@ -471,10 +495,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
         phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch. Exploratory terminal calls are limited to '+str(min(120,sandbox.project.timeout_seconds))+' seconds. The delivery_submit gate runs the full suite; partial exploratory runs never qualify delivery. Use its covered/missing control feedback rather than repeating unchanged mutation proposals.'
-        if getattr(operations,'repair',False) is True:
-            phase=('Independently review the exact corrective classification, brief authority and explicit QA paths; use plan_review.'
-                   if sandbox.run.reviewing else
-                   'Classify the recorded deployed QA failure against the approved brief using repair_submit. Propose product or test_contract with evidence and explicit existing QA paths. No new brief, whole-release plan, implementation or fabricated evidence.')
+        if corrective_phase is not None:phase=corrective_phase
         prompt=sandbox_context(prompt)
         if 'terminal' in allowed:terminal_schema(min(120,sandbox.project.timeout_seconds))
         bundle=validation_files(sandbox.project,sandbox.store)[0]

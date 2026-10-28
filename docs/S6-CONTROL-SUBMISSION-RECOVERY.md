@@ -175,3 +175,24 @@ pin copiado, o Hermes criou exatamente uma sucessora ligada ao hold mais recente
 a segunda reconciliação reutilizou o mesmo card. Triagem, holds e board real
 permaneceram intactos. Zero chamadas ao modelo. Essa prova cobre a seleção e
 criação da nova revisão; o julgamento dos agentes segue pendente.
+
+
+## Contradição no prompt de sistema — 28/10
+
+A inspeção do adaptador SDK encontrou uma causa adicional que os ajustes de
+contexto não cobriam: toda atividade de correção recebia a instrução de sistema
+para classificar QA implantado como `product` ou `test_contract`. A ferramenta
+da continuação oferecia `submission`, `infrastructure` e `scope`. A orientação
+de maior prioridade contradizia a fase e os argumentos permitidos.
+
+O adaptador agora escolhe a instrução pelo tipo de correção. A continuação pede
+um plano para iniciar a implementação substituta e situa Green, controles e
+handoff como saídas futuras; QA pós-deploy mantém seu contrato próprio. A sessão
+de continuação inclui o digest dessa instrução em sua identidade. Sessões antigas
+continuam arquivadas; uma retomada comum com a mesma instrução mantém a sessão,
+mas a instrução antiga não contamina uma revisão sob o contrato corrigido.
+415 testes passaram, incluindo separação dos prompts e continuidade/renovação
+da sessão. A proposta real da revisão 3 já foi submetida como `submission`;
+sua revisão foi pausada e drenada antes da atualização. Não é necessário criar
+outra proposta para testar este reparo. A implementação e a entrega continuam
+sem aprovação e dependem do resultado dessa revisão.

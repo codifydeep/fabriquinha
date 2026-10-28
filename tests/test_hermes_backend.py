@@ -59,6 +59,25 @@ class NativeBackendPolicy(unittest.TestCase):
         self.assertNotEqual(recovered,activity_anchor(self.project,self.run,route,'e'*64))
         with self.assertRaises(ValueError):activity_anchor(self.project,self.run,route,'model-declared-recovery')
 
+    def test_submission_system_instruction_and_session_do_not_inherit_deployed_qa_mode(self):
+        from dataclasses import replace
+        from fabriquinha.artifacts import digest
+        from fabriquinha.hermes import repair_phase,activity_anchor
+        route=dict(model='same-model',provider='custom',api_mode='chat_completions')
+        legacy=repair_phase(False,None);author=repair_phase(False,'submission');reviewer=repair_phase(True,'submission')
+        self.assertIn('product or test_contract',legacy)
+        for prompt in (author,reviewer):
+            self.assertNotIn('product or test_contract',prompt)
+            self.assertIn('completion gates, not start conditions',prompt)
+        self.assertIn('repair_submit',author);self.assertIn('plan_review',reviewer)
+        old=activity_anchor(self.project,self.run,route)
+        new=activity_anchor(self.project,self.run,route,phase_contract=digest(author))
+        self.assertNotEqual(old,new)
+        self.assertEqual(new,activity_anchor(self.project,replace(self.run,number=2),route,phase_contract=digest(author)))
+        self.assertNotEqual(new,activity_anchor(self.project,self.run,route,phase_contract=digest(reviewer)))
+        with self.assertRaises(ValueError):activity_anchor(self.project,self.run,route,phase_contract='untrusted')
+        with self.assertRaises(ValueError):repair_phase(False,'unknown')
+
     def test_native_host_workspace_is_not_advertised_as_tool_filesystem(self):
         context='Task: t_example\nWorkspace: dir @ /controller/private/work/card\n## Body\nKeep every criterion.'
         visible=sandbox_context(context)
