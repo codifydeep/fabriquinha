@@ -15,11 +15,34 @@ from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.quality import Quality, suite_report
 from fabriquinha.effects import EffectBlocked
-from fabriquinha.recovery import Diagnostic, Recovery
+from fabriquinha.recovery import Diagnostic, Recovery, guidance_context
 from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_guidance_projection_preserves_failures_and_authority(self):
+        failures=[dict(case='new.test',detail='complete assertion and evidence',frames=[{'line':12}])]
+        guide=[dict(receipt='decision',verdict={'action':'resume','reason':'exact finding'},
+            experiment=dict(job='suite-receipt',snapshot='snapshot',hypothesis='hypothesis',
+                report=dict(tests_run=2,cases=['old.test','new.test'],failures=failures,
+                    errors=['runtime error'],skips=['skip'],unexpected_successes=['unexpected'],
+                    qa_preview=dict(cases=['new.test'],checks=['JOIN'],errors=['browser error'],status='failed'))))]
+        before=json.dumps(guide,sort_keys=True)
+        view=guidance_context(guide);report=view[0]['experiment']['report']
+        self.assertEqual(view[0]['verdict'],guide[0]['verdict'])
+        self.assertEqual(view[0]['receipt'],'decision')
+        self.assertEqual(view[0]['experiment']['job'],'suite-receipt')
+        self.assertEqual(report['failures'],failures)
+        for key in ('errors','skips','unexpected_successes'):
+            self.assertEqual(report[key],guide[0]['experiment']['report'][key])
+        self.assertNotIn('cases',report)
+        self.assertEqual(report['case_inventory'],{'receipt':'suite-receipt','count':2})
+        self.assertEqual(report['qa_preview']['errors'],['browser error'])
+        self.assertEqual(report['qa_preview']['checks'],['JOIN'])
+        self.assertEqual(json.dumps(guide,sort_keys=True),before)
+        view[0]['experiment']['report']['failures'][0]['detail']='changed'
+        self.assertEqual(json.dumps(guide,sort_keys=True),before)
+
     def test_previous_diagnosis_is_evidence_history_not_inherited_instructions(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         prior=Run('old-cto',9,'cto','diagnostic',False,'cto','v1','old-contract')

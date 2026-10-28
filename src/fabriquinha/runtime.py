@@ -25,7 +25,7 @@ from .executor import Runner,seal_validation,validation_files,browser_contract
 from .hermes import Sandbox, run_activity
 from .kanban_lane import native, UPSTREAM_COMMIT
 from .quality import Quality
-from .recovery import Recovery
+from .recovery import Recovery, guidance_context
 from .notifications import Outbox, alerts, validation_progress
 from .publication import Repository, GitHub, Publication
 from .deployment import Deployment
@@ -681,7 +681,7 @@ class Runtime:
                 return
             guidance=self.recovery.guidance(run)
             if guidance:quality.review_after=self.store.receipt(guidance[-1]['receipt'],kind='diagnostic_decision')['binding']['number']
-            if guidance:prompt+='\nController-recorded diagnostic guidance:\n'+json.dumps(guidance)
+            if guidance:prompt+='\nController-recorded diagnostic guidance:\n'+json.dumps(guidance_context(guidance))
             try:route=model_route(self.project,self.root/'route.json')
             except (ValueError,KeyError,TypeError,OSError):raise Held('provider_configuration_changed') from None
             def provider_check():

@@ -358,3 +358,19 @@ inalterados. Os 17 testes de releases passaram, incluindo preservação de
 identificadores/contrato e imutabilidade do documento. Isso é redução de
 contexto, não prova de recuperação do modelo; o diagnóstico anexado ainda
 precisa ser revisado antes da instalação conjunta e nova tentativa.
+
+## Projeção do diagnóstico e preparação da manutenção — 28/10
+
+A projeção enviada ao agente substitui apenas os inventários repetidos de nomes
+de casos por contagem e referência ao recibo completo. Veredito, hipótese,
+snapshot, falhas, frames, erros, skips e resultados inesperados permanecem
+integrais. A autorização de recuperação usa os dados completos originais, nunca
+a projeção de prompt. A prova com o diagnóstico real reduziu 14.223 para 11.364
+caracteres e comparou falhas/veredito idênticos; o teste protege também contra
+mutação do recibo. A suíte completa passou com 420 testes.
+
+O controlador entrou em manutenção drenada, sem runs abertos, sandboxes
+pendentes ou efeitos Docker pendentes. O hold do CTO continua preservado.
+Telemetria e as duas projeções serão instaladas conjuntamente; não houve nova
+chamada ao modelo para qualificar essas alterações. Redução de aproximadamente
+7,7 mil caracteres no prompt observado não prova resolução da repetição.

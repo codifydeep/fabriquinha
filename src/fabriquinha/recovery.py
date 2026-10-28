@@ -12,6 +12,26 @@ from .kanban_lane import native
 from .quality import Quality, DeliveryTools, product_mutations, review_decision, suite_report,PROTECTED
 
 
+def guidance_context(guidance):
+    """Prompt projection only; full checked experiments remain immutable receipts.
+
+    Test inventory names are already in the frozen workspace and suite receipt.
+    Keep every failure/error detail and verdict; omit only repeated inventories.
+    This view must never be used for validation or recovery authorization.
+    """
+    result=json.loads(json.dumps(guidance))
+    for item in result:
+        experiment=item.get('experiment',{});report=experiment.get('report')
+        if not isinstance(report,dict) or not isinstance(experiment.get('job'),str):continue
+        for section in (report,report.get('qa_preview')):
+            if not isinstance(section,dict):continue
+            cases=section.get('cases')
+            if isinstance(cases,list) and all(isinstance(case,str) for case in cases):
+                section['case_inventory']=dict(receipt=experiment['job'],count=len(cases))
+                del section['cases']
+    return result
+
+
 def browser_refusal_context(store,project,binding,key):
     record=store.receipt(key,kind='browser_job');data=record['payload'];identity=data['identity'];report=data['report']
     if (binding.get('kind')!='integration' or binding.get('reviewing') is not True
