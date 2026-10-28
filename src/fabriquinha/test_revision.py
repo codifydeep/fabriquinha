@@ -14,13 +14,15 @@ def shape(node):
 
 
 def fixture_diff(before,after):
-    """Keep module structure and every old test statement; identify additions.
+    """Keep every old statement; identify additive setup, including resource scopes.
 
-    Only straight-line setup using fresh local names and method calls is eligible.
-    No assertion/selector/timeout edits, imports, helpers, hooks, discovery changes,
-    exception handling, early exits, rebinding or monkeypatch assignment.
+    Existing imported functions and methods may be used. Calls are not semantic
+    proof: independent review and execution remain necessary. New with blocks
+    can contain new setup only; they cannot wrap any preserved assertion.
     """
     left=ast.parse(before);right=ast.parse(after)
+    imported={alias.asname or alias.name.split('.')[0] for node in left.body
+              if isinstance(node,(ast.Import,ast.ImportFrom)) for alias in node.names if alias.name!='*'}
     def methods(tree):
         return {(cls.name,method.name):method for cls in tree.body if isinstance(cls,ast.ClassDef)
                 for method in cls.body if isinstance(method,ast.FunctionDef) and method.name.startswith('test')}
@@ -31,30 +33,41 @@ def fixture_diff(before,after):
         current=new[key];index=0;added=[]
         existing={node.id for node in ast.walk(prior) if isinstance(node,ast.Name)}
         fresh=set()
-        for statement in current.body:
-            if index<len(prior.body) and shape(statement)==shape(prior.body[index]):
-                index+=1;continue
-            if isinstance(statement,ast.Assign):
-                targets=statement.targets
-                if len(targets)!=1:raise ValueError('one fresh fixture assignment required')
-                names=([targets[0].id] if isinstance(targets[0],ast.Name) else
-                       [n.id for n in targets[0].elts if isinstance(n,ast.Name)] if isinstance(targets[0],ast.Tuple) else [])
-                if (not names or isinstance(targets[0],ast.Tuple) and len(names)!=len(targets[0].elts)
-                        or len(set(names))!=len(names) or set(names)&(existing|fresh)):
-                    raise ValueError('fixture revision cannot rebind or mutate existing names')
-                expression=statement.value;fresh.update(names)
-            elif isinstance(statement,ast.Expr):expression=statement.value
-            else:raise ValueError('only additive straight-line fixture statements permitted')
-            if not isinstance(expression,ast.Call):raise ValueError('fixture method call required')
+        def bind(target):
+            names=([target.id] if isinstance(target,ast.Name) else
+                   [n.id for n in target.elts if isinstance(n,ast.Name)] if isinstance(target,ast.Tuple) else [])
+            if (not names or isinstance(target,ast.Tuple) and len(names)!=len(target.elts)
+                    or len(set(names))!=len(names) or set(names)&(existing|fresh|imported)):
+                raise ValueError('fixture revision cannot rebind or mutate existing names')
+            fresh.update(names)
+        def call(expression):
+            if not isinstance(expression,ast.Call):raise ValueError('fixture call required')
             for node in ast.walk(expression):
                 if isinstance(node,(ast.Lambda,ast.NamedExpr,ast.Await,ast.Yield,ast.YieldFrom,
                                     ast.ListComp,ast.SetComp,ast.DictComp,ast.GeneratorExp)):
                     raise ValueError('fixture cannot introduce hidden execution flow')
                 if isinstance(node,ast.Call):
-                    if not isinstance(node.func,ast.Attribute):raise ValueError('fixture method calls only')
-                    if node.func.attr.startswith('__') or node.func.attr in ('skipTest','fail','stopTest','addCleanup'):
-                        raise ValueError('test control calls prohibited')
-            added.append(ast.get_source_segment(after,statement))
+                    if isinstance(node.func,ast.Name):
+                        if node.func.id not in imported:raise ValueError('only existing imported functions may be called directly')
+                    elif isinstance(node.func,ast.Attribute):
+                        if node.func.attr.startswith('__') or node.func.attr in ('skipTest','fail','stopTest','addCleanup'):
+                            raise ValueError('test control calls prohibited')
+                    else:raise ValueError('fixture method or existing imported function required')
+        def setup(statement):
+            if isinstance(statement,ast.Assign):
+                if len(statement.targets)!=1:raise ValueError('one fresh fixture assignment required')
+                bind(statement.targets[0]);call(statement.value)
+            elif isinstance(statement,ast.Expr):call(statement.value)
+            elif isinstance(statement,ast.With):
+                for item in statement.items:
+                    call(item.context_expr)
+                    if item.optional_vars is not None:bind(item.optional_vars)
+                for nested in statement.body:setup(nested)
+            else:raise ValueError('only additive fixture setup statements permitted')
+        for statement in current.body:
+            if index<len(prior.body) and shape(statement)==shape(prior.body[index]):
+                index+=1;continue
+            setup(statement);added.append(ast.get_source_segment(after,statement))
         if index!=len(prior.body):raise ValueError('existing test statement changed or removed')
         if added:result['.'.join(key)]=added
         current.body=copy.deepcopy(prior.body)

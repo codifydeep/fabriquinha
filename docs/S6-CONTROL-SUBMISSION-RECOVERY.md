@@ -602,3 +602,19 @@ Essa prova usa diagnóstico e evidências de qualidade programados; qualifica a
 transição, não Red, produto ou autonomia. Zero chamadas ao modelo/Docker. A prova
 inicial parou antes de criar o banco por um campo de configuração ausente no
 script; a execução corrigida usou outra raiz nova e passou. Ambas foram preservadas.
+
+### Correção do comparador: chamadas já importadas e recursos de preparação
+
+A autoria real revelou uma restrição excessiva do comparador: a proposta aprovada
+usava `Request(...)` e `with urlopen(...)`, e uma alternativa de UI usava
+`expect(...)`, todos já importados. O comparador aceitava somente chamadas de
+métodos. Isso impedia preparação legítima sem demonstrar enfraquecimento de teste.
+
+O reparo permite chamadas a funções já importadas e blocos `with` contendo
+somente preparação nova. Preserva a sequência AST de todas as instruções
+anteriores; não permite envolvê-las em um bloco, alterar assertions, adicionar
+imports/helpers, reatribuir nomes existentes, pular testes ou sair antecipadamente.
+A revisão semântica continua obrigatória. Os testes reproduziram a recusa na
+versão anterior e cobrem tentativas de envolver assertions, rebinding e early exit.
+O candidato produzido pelo próprio autor passou na comparação somente leitura;
+não foi editado, congelado ou aprovado por essa prova.

@@ -26,6 +26,25 @@ class FixtureRevision(unittest.TestCase):
         self.assertEqual(list(result),['Capacity.test_capacity'])
         self.assertEqual(len(result['Capacity.test_capacity']),2)
 
+    def test_existing_imports_and_scoped_resource_setup_are_allowed(self):
+        before='from urllib.request import Request, urlopen\n'+OLD
+        setup=("        setup_request = Request('http://example.invalid', method='POST')\n"
+               "        with urlopen(setup_request, timeout=3) as response:\n"
+               "            self.assertIn(response.status, (200, 201))\n")
+        after=before.replace('        watcher =',setup+'        watcher =')
+        self.assertEqual(len(fixture_diff(before,after)['Capacity.test_capacity']),2)
+
+    def test_resource_setup_cannot_wrap_old_assertions_or_rebind_or_exit(self):
+        before='from urllib.request import urlopen\n'+OLD
+        for setup in ("        with urlopen('local') as creator:\n            self.assertTrue(True)\n",
+                      "        with urlopen('local') as response:\n            return\n",
+                      "        with unknown('local') as response:\n            self.assertTrue(True)\n"):
+            with self.subTest(setup=setup),self.assertRaises(ValueError):
+                fixture_diff(before,before.replace('        watcher =',setup+'        watcher ='))
+        after=before.replace('        self.assertEqual(watcher.errors, [])',
+            "        with urlopen('local') as response:\n            self.assertEqual(watcher.errors, [])")
+        with self.assertRaises(ValueError):fixture_diff(before,after)
+
     def test_rejects_removed_or_changed_assertion_and_discovery(self):
         for changed in (NEW.replace('        self.assertEqual(watcher.errors, [])\n',''),
                         NEW.replace('count(creator), 1','count(creator), 0'),

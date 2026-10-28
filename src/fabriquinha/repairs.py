@@ -172,6 +172,7 @@ def context_view(store,value):
                 or sum(manifest[p]['bytes'] for p in paths)>131072):
             raise ValueError('bounded exact frozen fixture sources required for proposal review')
         result['fixture_sources']={p:dict(sha256=manifest[p]['sha256'],text=(store.tree(value['snapshot'])/p).read_text()) for p in paths}
+        result['fixture_syntax']='Add new local assignments and calls to methods or existing imported functions. New with blocks may manage setup resources, but may not wrap preserved statements. No new imports/helpers, rebinding, exits or changes to existing assertions.'
     if value.get('prior_proposal_review'):
         record=store.receipt(value['prior_proposal_review'],kind='plan_review')
         result['prior_proposal_hold']=dict(receipt=value['prior_proposal_review'],verdict=record['payload']['verdict'],
