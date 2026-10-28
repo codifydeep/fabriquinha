@@ -487,3 +487,25 @@ equipe avaliar a implementação e preservar as verificações enquanto isso.
 
 Até essa qualificação, o segundo incremento permanece impedido e visível. O
 primeiro incremento implantado continua preservado; a release não foi homologada.
+
+### Preparação offline do comparador de fixture
+
+`test_revision.fixture_snapshot_diff` limita a análise aos caminhos Python de
+aceitação existentes propostos e aos snapshots exatos. Recusa alterações em
+produto, manifestos, helpers, descoberta, definições e instruções anteriores,
+incluindo assertions, seletores e timeouts. Acréscimos elegíveis são preparação
+linear por chamadas de métodos e atribuições a variáveis locais novas; não aceita
+saída antecipada, controle de fluxo, skip ou reatribuição dos nomes existentes.
+
+Isso é evidência estrutural, não prova de segurança semântica: métodos existentes
+podem ter efeitos colaterais. O resultado não cria recibo, freeze, card, exceção
+de proteção ou aprovação. O caminho instalado de revisão Python continua
+fechado até a integração de proposta independente, novo Red, freeze e substituição
+idempotente da cauda do grafo. Não alterar `correction_diff` para aceitar o
+resultado isoladamente.
+
+Seis testes offline verificam acréscimos, rejeição de enfraquecimentos estruturais,
+paths, descoberta, código alheio e preservação dos snapshots. A simulação do caso
+real foi somente em memória: identificou três instruções de preparação, sem
+escrever o candidato nem executar código do produto. A autoria real caberá ao
+agente de testes. Nenhuma chamada ao modelo nesta preparação.

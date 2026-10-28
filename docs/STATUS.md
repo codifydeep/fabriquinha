@@ -20,16 +20,23 @@ e limite de dois participantes. O QA acrescentou sete testes aos nove testes da
 base. O Tech Lead solicitou a verificação da mensagem visível de rejeição do
 terceiro jogador; o autor corrigiu e a revisão 48 aprovou o snapshot
 `c47bff7e4f48c262c76d441d687478c8ae578a5cd3cd4bf847d1d21303f259fe`.
-A implementação 49 terminou sem operação terminal. O Tech Lead diagnosticou a
-falha de protocolo na execução 50 e retomou o frontend na execução 51, cujo
-processo foi confirmado ativo. Isso comprova encaminhamento e retomada, não
-correção funcional nem entrega do segundo incremento.
+As tentativas seguintes encerraram sem handoff; as duas continuações revisadas
+foram preservadas, sem reset. A execução 58 alterou o produto e não apresentou
+compactações, mas terminou sem submissão. O CTO executou a suíte na execução 59:
+14 de 16 testes passaram. Um teste congelado busca uma sala sem criá-la; a outra
+falha envolve erro de console na rejeição do terceiro jogador e ainda precisa
+ser tratada sem dispensar as verificações existentes.
 
-A fonte instalada é `21b14abd`; supervisor e relay estão ativos. O proprietário
-autorizou o teto de **8.500 chamadas**, aplicado sem reset do contador; a última
-consulta registrada antes desta atualização foi 7.123 chamadas. Esse número é
-um retrato, não um contador ao vivo. Modelo Claude Haiku, saída máxima de 16.384
-tokens, sem fallback. Nenhum gate de qualidade foi dispensado.
+A fonte instalada é `69583463`; supervisor e relay estão ativos. A ferramenta
+`delivery_validate` oferece a suíte completa ao implementador, sem aprovar nem
+submeter a entrega. A revisão de fixture Python está em preparação offline:
+um comparador estrutural preserva instruções anteriores e identifica acréscimos,
+mas ainda não concede autoridade nem substitui revisão independente e evidências.
+O segundo incremento continua impedido; não há novo worker de implementação.
+
+O teto autorizado é **8.500 chamadas**, sem reset; a última consulta foi
+7.201 chamadas. Modelo Claude Haiku, saída máxima de 16.384 tokens, janela de
+contexto de 131.072 e nenhum fallback. Nenhum gate foi dispensado.
 
 ## O que ainda falta
 
