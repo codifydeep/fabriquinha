@@ -177,5 +177,7 @@ O aviso de decisão pendente passa a orientar uma resposta ao bot com
 `/fabrica show CARD`. A consulta mostra o documento completo e os comandos
 vinculados ao card e hash exatos: `answer` para pergunta; `approve` ou `changes`
 para brief. O usuário substitui `YOUR_RESPONSE` por sua decisão. Texto livre não
-se torna aprovação e o aceite continua restrito ao produto. Essa melhoria foi
-validada offline; sua instalação deve preceder a próxima entrada de produto.
+se torna aprovação e o aceite continua restrito ao produto. Essa melhoria passou na suíte de 490 testes e foi instalada na fonte `0472c05`.
+Canal e dispatcher foram observados rodando com essa fonte; relay pronto,
+contador preservado em 7.318/8.500 e homologação HTTP 200. A validação humana
+do comando recebido pelo Telegram continua pendente.
