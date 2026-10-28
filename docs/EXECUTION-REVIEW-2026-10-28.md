@@ -389,6 +389,17 @@ sem contá-las como falha de produto. Separar encerramento de atividade e da rel
 
 ### Avaliação semântica antes da migração
 
+**Resultado da retomada real:** SPIKE CTO execução 74 terminou em hold, com
+seis chamadas. Reconheceu o Red esperado e não reproduziu o conflito alegado,
+mas repetiu a mesma observação. A reconciliação recusou sucessão corretamente.
+O defeito operacional foi o feedback tardio: o agente só veria essa recusa depois
+de terminar. O reparo consulta o mesmo `review_reassessment` dentro da resposta
+de `diagnostic_validate`, devolvendo elegibilidade, motivo e próxima operação.
+Não cria outro gate nem autoriza sucessão. Hold legítimo continua permitido;
+não se cria outro SPIKE idêntico automaticamente. Evidência e decisão da
+execução 74 ficam preservadas. Despacho drenado e provedor parado para manutenção;
+o reparo ainda precisa de validação operacional antes da nova instalação.
+
 **Prova operacional posterior:** `scripts/qualify_native_red_review.py` preparou
 um board isolado, baseline real e Red real. O mesmo Claude Haiku usou o SDK e
 handlers de produção: três leituras, uma busca e `delivery_review`. A revisão

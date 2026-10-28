@@ -8,13 +8,14 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Desenvolvimento e despacho retomados com plano aprovado.** Supervisor executando
-a fonte `4a908186`; relay habilitado, mesmo modelo e teto. A recuperação criou
-automaticamente um SPIKE do CTO para a revisão do segundo incremento.
+**Desenvolvimento retomado; despacho novamente em manutenção.** A fonte
+`4a908186` criou automaticamente o SPIKE do CTO, que terminou com hold e sem
+nova observação admissível. Supervisor descarregado, relay parado e política
+desabilitada; nenhum worker ou efeito pendente na drenagem.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
-e as qualificações delimitadas; o runtime instalado ainda não foi alterado.
+e as qualificações delimitadas que precederam a instalação atual.
 
 O primeiro incremento do lobby passou por revisão independente, PR
 [codifydeep/descartavel#13](https://github.com/codifydeep/descartavel/pull/13),
@@ -34,34 +35,19 @@ A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
 recebendo 409 gera. Isso invalida a equivalência presumida, mas não aprova produto,
 nem resolve por si só corrida entre clientes ou o lifecycle de saída da triagem.
 
-Fonte instalada: `8d6bbd92`. A orientação adicional publicada em `fc202f3a` ainda
-não foi instalada. `delivery_validate`, revisão aditiva de fixture e separação
-de contexto diagnóstico foram implementados e receberam provas delimitadas.
-A auditoria de 28/10 foi somente leitura. Após aprovação do plano, a suíte
-offline passou com 463 testes. Provas nativas programadas cobrem a sucessora,
-dependências, interrupções, solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead foi conectado e passou na prova nativa com
-admissão programada. A prova complementar passou com quatro jobs Docker reais, mantendo a entrega
-original e sem criar aprovação. A autoria transferida no diagnóstico de falha também foi corrigida e verificada
-na prova nativa. P2 foi implementado com contrato explícito para candidatos, diff completo e
-preservação da baseline. Restam P3, migração controlada e recuperação do S6 pelos
-agentes; runtime inalterado.
+Fonte instalada: `4a908186`, com exportação verificada, backup preservado e
+`doctor` aprovado nos nove perfis. A suíte offline passou com 467 testes.
+Provas nativas programadas cobrem sucessão, dependências, interrupções,
+solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead passou
+na prova nativa; uma prova complementar executou quatro jobs Docker reais.
+P2 protege a baseline e apresenta o diff completo dos candidatos à revisão.
+A recuperação real do S6 ainda precisa comprovar o restante do caminho.
 
-Avaliação semântica isolada: quatro dos cinco casos passaram. No caso de Red
-esperado, o modelo reconheceu a fase corretamente, mas escolheu solicitar mudanças
-sem defeito demonstrado. O ensaio usava contexto genérico, não o contrato completo
-do runtime; portanto não comprova falha de execução do gateway. Foi preservado
-como não aprovado. A próxima avaliação reutiliza o contrato real, agora explícito
-sobre inspecionar testes antes de exigir correções. Isso não aprova o S6.
-Segunda avaliação, com contrato compartilhado: 3/5 passaram. O caso de Red
-escolheu aguardar, embora a justificativa mandasse inspecionar; o caso HTTP também
-escolheu aguardar evidência. Não se alterou o gabarito para aceitar esses resultados.
-A ferramenta sintética de classificação não é a ferramenta operacional do Hermes:
-novas repetições desse classificador foram interrompidas. A próxima validação deve
-exercitar as operações reais de revisão e diagnóstico em isolamento, preservando
-os dois resultados como não aprovados e sem inferir falha ou sucesso do S6 deles.
-Fonte `4a908186` exportada, doctor aprovado nos nove perfis e definição do
-supervisor migrada com backup, ainda descarregado. Relay parado, política
-desabilitada, nenhuma retomada do despacho ou alteração dos cards.
+As duas avaliações sintéticas deram 4/5 e 3/5. Em ambas houve discrepância entre
+raciocínio e ação selecionada. Os resultados permanecem não aprovados; não se
+alterou o gabarito. Como a ferramenta classificadora não corresponde à operação
+real do Hermes, suas repetições foram interrompidas e foi realizada a prova
+operacional abaixo. Nenhum desses ensaios aprova o S6.
 
 Validação nativa complementar passou: Red verdadeiro em dois jobs Docker,
 autor/revisor diferentes, três leituras e uma busca via ferramentas reais, seguida
@@ -71,8 +57,15 @@ aprovação de produto. O ensaio simples qualifica a operação de revisão de R
 não a recuperação do S6 nem autonomia ponta a ponta. Após essa prova, o supervisor
 foi iniciado e criou o SPIKE real sem reabertura manual dos cards.
 
-Último contador conferido antes da retomada: **7.260/8.500 chamadas**; a execução
-ativa pode consumir novas chamadas dentro do mesmo teto.
+O SPIKE consumiu seis chamadas e reconheceu Red por funcionalidade ausente, mas
+reexecutou o snapshot original. O gate recusou sucessão porque o resultado não
+trazia nova observação. Identificamos feedback tardio: a recusa só aparecia após
+o encerramento do CTO. O reparo devolve a mesma avaliação de admissibilidade na
+própria resposta de `diagnostic_validate`, enquanto o agente ainda pode agir.
+Não altera o gate, não aprova a entrega e não agenda repetição automática.
+O SPIKE concluído permanece preservado; retomada com o reparo ainda pendente.
+
+Último contador conferido: **7.266/8.500 chamadas**, restando 1.234.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
 US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui

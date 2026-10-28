@@ -20,6 +20,25 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_review_probe_feedback_uses_same_admission_before_terminal_decision(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.experiment='new-observation'
+        task=SimpleNamespace(body=json.dumps(dict(review_experiment=dict(handoff='original-red'))))
+        kb=SimpleNamespace(get_task=lambda *args:task)
+        api=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)
+        with patch('fabriquinha.recovery.native',return_value=api),patch('fabriquinha.repairs.review_reassessment') as gate:
+            gate.side_effect=ValueError('new observed outcome required')
+            result=diagnostic.review_probe_feedback()['review_reassessment']
+            self.assertFalse(result['eligible'])
+            self.assertIn('Do not repeat',result['next_action'])
+            self.assertFalse(result['delivery_approval'])
+            self.assertEqual(gate.call_args.args[-2:],('original-red','new-observation'))
+            gate.side_effect=None;gate.return_value={}
+            result=diagnostic.review_probe_feedback()['review_reassessment']
+            self.assertTrue(result['eligible'])
+            self.assertFalse(result['delivery_approval'])
+            self.assertIn('independently reviewed',result['next_action'])
+
     def test_guidance_projection_preserves_failures_and_authority(self):
         failures=[dict(case='new.test',detail='complete assertion and evidence',frames=[{'line':12}])]
         guide=[dict(receipt='decision',verdict={'action':'resume','reason':'exact finding'},
@@ -168,6 +187,9 @@ class TechnicalRecovery(unittest.TestCase):
         self.assertEqual((self.work/'tests/test_existing.py').read_text(),'baseline test\n')
 
     def setUp(self):
+        kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body='{}'))
+        native_patch=patch('fabriquinha.recovery.native',return_value=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None))
+        native_patch.start();self.addCleanup(native_patch.stop)
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         self.root=Path(temporary.name).resolve();self.store=Store(self.root/'private')
         self.work=self.root/'work';(self.work/'tests').mkdir(parents=True)

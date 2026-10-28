@@ -294,7 +294,32 @@ class Diagnostic:
         observed=self.deployment_observation();extra={} if observed is None else dict(deployment_observation=observed)
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
             snapshot=snapshot,source_snapshot=self.incident['snapshot'],hypothesis=args['hypothesis'],job=job,report=report,**extra))
-        return dict(experiment=self.experiment,report=report,delivery_approval=False,**extra)
+        return dict(experiment=self.experiment,report=report,delivery_approval=False,
+                    **self.review_probe_feedback(),**extra)
+
+    def review_probe_feedback(self):
+        """Expose succession admission before the CTO ends its live activity.
+
+        This is the same gate used by the reconciler, not approval or a new
+        transition. A genuine hold remains possible; no identical retry is
+        scheduled by this feedback.
+        """
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            task=kb.get_task(conn,self.run.task)
+            body=json.loads(task.body or '{}')
+        probe=body.get('review_experiment')
+        if not probe:return {}
+        from .repairs import review_reassessment
+        try:
+            review_reassessment(self.q.project,self.store,self.board.input(self.run,'incident'),
+                self.board.input(self.run,'held_review'),probe['handoff'],self.experiment)
+        except ValueError as error:
+            return dict(review_reassessment=dict(eligible=False,reason=str(error),
+                next_action='Inspect this admission refusal before ending. If feasible, use diagnostic_validate with product-only replacements on a disposable copy to reach the disputed behavior; preserve every test/configuration. Do not repeat the unchanged suite or request an identical Red. If no justified experiment is feasible, hold with that concrete limitation; succession will remain blocked.',
+                delivery_approval=False))
+        return dict(review_reassessment=dict(eligible=True,
+            next_action='Record the experiment findings. A separate independently reviewed proposal must authorize succession; this does not freeze tests or approve delivery.',delivery_approval=False))
 
     @property
     def quality(self):return self.q  # Reuse the bounded fixed-job observation helper.
