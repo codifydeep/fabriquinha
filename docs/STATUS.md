@@ -38,9 +38,9 @@ não foi instalada. `delivery_validate`, revisão aditiva de fixture e separaç�
 de contexto diagnóstico foram implementados e receberam provas delimitadas.
 A auditoria de 28/10 foi somente leitura. Após aprovação do plano, a suíte
 offline passou com 458 testes. Provas nativas programadas cobrem a sucessora,
-dependências, interrupções, solicitação de mudanças e nova revisão. Falta
-qualificar a obtenção de evidência nova e a ativação da proposta pelos agentes,
-além da recuperação real do S6; o runtime continua inalterado.
+dependências, interrupções, solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead foi conectado e passou na prova nativa com
+admissão programada. Falta a prova combinada com job real e a recuperação do S6
+pelos agentes; o runtime continua inalterado.
 
 Consumo confirmado antes da pausa: **7.247/8.500 chamadas**, restando 1.253.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.

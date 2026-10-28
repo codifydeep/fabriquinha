@@ -209,6 +209,9 @@ class Diagnostic:
         kb,kbc,_=native()
         with kbc.connect_closing() as conn:
             body=json.loads(kb.get_task(conn,self.run.task).body)
+            if body.get('review_experiment'):
+                result['review_experiment']=body['review_experiment']
+                result['phase_expectation']+=' Use diagnostic_validate with product-only replacements on a disposable copy when needed to test feasibility. No source/test changes or delivery approval. End with hold and concrete findings; a separate independently reviewed proposal owns succession.'
             if self.incident.get('review_escalation') and self.original['kind']=='tests' and self.q.project.delivery_roles:
                 source=json.loads(kb.get_task(conn,self.original['task']).body)
                 if digest(source)!=self.original['contract']:raise ValueError('diagnostic source contract changed')

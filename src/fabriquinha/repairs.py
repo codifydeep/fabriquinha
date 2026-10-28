@@ -377,6 +377,42 @@ class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
 
+    def prepare_review_probe(self,conn,anchor,card,incident,decision,handoff):
+        """One native CTO experiment per held review, with unchanged source."""
+        kb,_,_=native();source=self.r.check_card(conn,card)
+        facts=review_failure(self.project,self.store,incident,decision,handoff)
+        latest=kb.latest_run(conn,source.id);body=json.loads(source.body)
+        if (source.status!='triage' or not latest or not latest.ended_at
+                or facts['source']!=source.id or facts['source_run']!=latest.id
+                or facts['source_contract']!=digest(body) or body.get('release_anchor')!=anchor.id):
+            raise ValueError('exact settled held review required for experiment')
+        recovery=Recovery(self.project,self.store,self.r.board)
+        if recovery.expired_effects(source.id):raise EffectBlocked('settle source effects before experiment')
+        held=self.store.receipt(decision,kind='diagnostic_decision');scope=held['binding']
+        task=kb.get_task(conn,scope['task']);closed=kb.latest_run(conn,scope['task'])
+        if (not task or task.status!='done' or not closed or closed.id!=scope['number']
+                or closed.outcome!='completed' or (closed.metadata or {}).get('diagnosis')!=decision
+                or scope['contract']!=digest(json.loads(task.body))
+                or task.assignee!=self.project.technical_roles['cto']):
+            raise ValueError('completed native CTO hold required')
+        data=self.store.receipt(incident,kind='incident')['payload']
+        probe=dict(version=1,kind='diagnostic',release=body['release'],stage='cto',
+            source=source.id,source_run=latest.id,block_event=data['block_event'],cause=data['cause'],
+            inputs={'incident':incident,'held_review':decision},escalated_from=None,
+            review_experiment=dict(handoff=handoff,anchor=anchor.id,
+                objective='Test the held review hypothesis with a bounded product-only experiment on a disposable copy. '
+                          'Keep all tests/configuration exact. Report observed differences and limitations; never approve delivery.'))
+        key=digest([self.project.fingerprint(),source.id,latest.id,'review-experiment'])
+        existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        if existing:
+            if json.loads(existing['body'])!=probe:raise ValueError('review experiment contract drift')
+            return existing['id']
+        if self.r.board.guard:self.r.board.guard()
+        return kb.create_task(conn,title='SPIKE review '+source.title,body=json.dumps(probe),
+            assignee=self.project.technical_roles['cto'],parents=[task.id],priority=100,
+            workspace_kind='dir',workspace_path=str(self.store.tree(data['snapshot'])),
+            completion_contract='local-only',max_retries=0,max_runtime_seconds=600,idempotency_key=key)
+
     def prepare_review_proposal(self,conn,anchor,card,incident,decision,handoff,evidence,*,approved_brief,graph):
         """Persist a blocked proposal; activation requires the qualified plan flow.
 
@@ -672,6 +708,53 @@ class Repairs:
                     if self.r.board.guard:self.r.board.guard()
                     if not kb.unblock_task(conn,task.id):raise ValueError('native continuation activation refused')
         return result
+
+    def advance_review_probes(self,conn,anchor,spec,graph):
+        """Held review -> one CTO SPIKE -> evidence-bound Lead proposal."""
+        kb,_,_=native();recovery=Recovery(self.project,self.store,self.r.board)
+        for item in graph['items']:
+            for phase in ('tests','implementation'):
+                card=item['cards'][phase];source=kb.get_task(conn,card['id'])
+                latest=kb.latest_run(conn,card['id'])
+                if not source or source.status!='triage' or not latest or not latest.ended_at:continue
+                holds=[]
+                for task in recovery.cards(conn):
+                    body=json.loads(task.body or '{}')
+                    if (task.status!='done' or body.get('kind')!='diagnostic' or body.get('stage')!='cto'
+                            or body.get('review_experiment') or body.get('source')!=source.id
+                            or body.get('source_run')!=latest.id):continue
+                    row=kb.latest_run(conn,task.id);key=(row.metadata or {}).get('diagnosis') if row else None
+                    if not key:continue
+                    decision=self.store.receipt(key,kind='diagnostic_decision')
+                    incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                    if decision['payload']['action']=='hold' and incident['binding'].get('reviewing') is True:
+                        holds.append((row.id,key,decision['payload']['incident']))
+                if not holds:continue
+                _,hold,incident=max(holds)
+                row=conn.execute("SELECT r.metadata FROM task_events e JOIN task_runs r ON r.id=e.run_id "
+                    "WHERE e.task_id=? AND e.kind='review_requested' ORDER BY e.id DESC LIMIT 1",(source.id,)).fetchone()
+                handoff=json.loads(row[0])['red' if phase=='tests' else 'green'] if row else None
+                probe=self.prepare_review_probe(conn,anchor,card,incident,hold,handoff)
+                task=kb.get_task(conn,probe)
+                if task.status in ('blocked','triage'):
+                    raise EffectBlocked('CTO review experiment stopped; preserve incident and diagnose '+probe)
+                if task.status!='done':continue
+                run=kb.latest_run(conn,probe);key=(run.metadata or {}).get('diagnosis') if run else None
+                if not key:raise EffectBlocked('CTO experiment ended without recorded diagnosis: '+probe)
+                record=self.store.receipt(key,kind='diagnostic_decision')
+                expected=Run(probe,run.id,task.assignee,'diagnostic',False,task.assignee,
+                    json.loads(task.body)['release'],digest(json.loads(task.body)))
+                data=record['payload']
+                if (run.outcome!='completed' or record['binding']!=expected.binding()
+                        or data.get('project')!=self.project.fingerprint() or data.get('incident')!=incident
+                        or data.get('action')!='hold' or not data.get('experiment')):
+                    raise ValueError('exact completed CTO experiment required; source remains held')
+                proposal=self.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,data['experiment'],
+                    approved_brief=spec['approval'],graph=graph)
+                proposed=kb.get_task(conn,proposal)
+                if proposed.status=='blocked' and kb.latest_run(conn,proposal) is None:
+                    if self.r.board.guard:self.r.board.guard()
+                    if not kb.unblock_task(conn,proposal):raise ValueError('native reviewed-evidence proposal activation refused')
 
     def continue_review(self,conn,anchor,graph):
         """Discover completed reviewed successors from durable native records."""

@@ -456,6 +456,7 @@ class Releases:
                     repairs=Repairs(self)
                     effective=repairs.continue_submission(conn,anchor,spec,graph)
                     effective=repairs.continue_review(conn,anchor,effective)
+                    repairs.advance_review_probes(conn,anchor,spec,effective)
                     effective=repairs.reconcile(conn,anchor,spec,effective,services)
                     if effective!=graph:
                         graph=effective;graph_id=self.store.record('release_graph',self.binding(anchor),graph)

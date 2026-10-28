@@ -206,3 +206,25 @@ Testes verificam recusa de enfraquecimento de teste, configuração de descobert
 alterada e origem estrangeira, além da preservação dos arquivos originais.
 Ainda falta criar/ativar o SPIKE como atividade nativa delimitada após o hold e
 ligar seu resultado à proposta Lead/CTO. Não houve instalação nem chamada paga.
+
+### Acionamento nativo do CTO e passagem ao Lead
+
+A reconciliação identifica o hold de revisão concluído pelo CTO e cria um único
+SPIKE nativo por execução de origem. A criação exige card em triagem, contrato
+e handoff exatos, decisão CTO concluída e ausência de efeitos pendentes. O SPIKE
+tem o hold como dependência, prioridade técnica, zero retries automáticos e
+600 segundos de execução. A repetição recupera o mesmo card, inclusive se ele
+já encerrou; não inicia outra tentativa idêntica.
+
+Somente uma conclusão vinculada ao run real do SPIKE pode alimentar a admissão
+de evidência nova. Se admitida, ativa a proposta do Lead; a revisão independente
+do CTO dessa proposta permanece necessária. Resultado ausente, observação
+repetida ou falha deixa o incidente visível, sem liberar a entrega nem recriar
+o experimento. A reconciliação da release inclui esse caminho.
+
+A prova nativa programada passou pelo claim CTO, conclusão, deduplicação, ativação
+da proposta, revisão, sucessora, mudanças solicitadas e liberação do dependente.
+A admissão técnica continua programada nessa prova; os testes unitários cobrem
+a proteção e procedência das evidências. A suíte passou com 458 testes. Falta
+a prova combinada com job real e a inspeção final antes de instalar no S6.
+Nenhuma chamada ao modelo ou container foi iniciada nesta etapa.

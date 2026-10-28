@@ -40,7 +40,7 @@ def qualify(root,upstream):
         handoff=store.record('red',original.binding(),dict(project=project.fingerprint(),snapshot=snapshot))
         board.review(original,'Programmed author delivery',{'red':handoff})
         claimed=kb.claim_review_task(conn,ident);assert claimed
-        incident=store.record('incident',board.current(ident,claimed.current_run_id).binding(),dict(project=project.fingerprint(),snapshot=snapshot))
+        incident=store.record('incident',board.current(ident,claimed.current_run_id).binding(),dict(project=project.fingerprint(),snapshot=snapshot,block_event=1,cause='programmed-review'))
         assert kb.block_task(conn,ident,kind='needs_input',reason='Programmed triage setup',expected_run_id=claimed.current_run_id)
         # Isolated fixture setup, not a production transition or escalation proof.
         conn.execute("UPDATE tasks SET status='triage' WHERE id=?",(ident,))
@@ -56,14 +56,33 @@ def qualify(root,upstream):
         facts=dict(source=ident,source_run=claimed.current_run_id,source_contract=digest(body),snapshot=snapshot,
             handoff=handoff,incident=incident,reviewed_diagnosis='decision',new_evidence='evidence',
             observation_identity=digest('changed observation'),delivery_approval=False,requires_independent_plan_review=True)
+        held_body=dict(version=1,kind='diagnostic',release=release,stage='cto',source=ident,source_run=claimed.current_run_id,inputs={'incident':incident})
+        held_id=kb.create_task(conn,title='Programmed previous hold',body=json.dumps(held_body),assignee='cto',completion_contract='local-only')
+        held_claim=kb.claim_task(conn,held_id);assert held_claim
+        held_run=board.current(held_id,held_claim.current_run_id)
+        hold=store.record('diagnostic_decision',held_run.binding(),dict(project=project.fingerprint(),incident=incident,action='hold',delivery_approval=False))
+        facts['reviewed_diagnosis']=hold
+        assert kb.complete_task(conn,held_id,summary='Programmed prior hold',metadata={'diagnosis':hold},expected_run_id=held_run.number)
+        with patch('fabriquinha.repairs.review_failure',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]):
+            probe=operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)
+            assert operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)==probe
+            assert kb.get_task(conn,probe).max_retries==0
+            probe_claim=kb.claim_task(conn,probe);assert probe_claim
+            probe_run=board.current(probe,probe_claim.current_run_id)
+            assert probe_run.actor=='cto' and probe_run.kind=='diagnostic'
+            probe_result=store.record('diagnostic_decision',probe_run.binding(),dict(project=project.fingerprint(),incident=incident,action='hold',experiment='evidence',delivery_approval=False))
+            assert kb.complete_task(conn,probe,summary='Programmed experiment result',metadata={'diagnosis':probe_result},expected_run_id=probe_run.number)
+            assert operation.prepare_review_probe(conn,anchor,card,incident,hold,handoff)==probe
+            assert kb.claim_task(conn,probe) is None
+            assert kb.get_task(conn,ident).status=='triage'
         count=lambda:conn.execute('SELECT count(*) FROM tasks').fetchone()[0]
         before=count();create=kb.create_task
-        with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
+        with patch('fabriquinha.repairs.review_failure',return_value=facts),patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
             def interrupted(*args,**kwargs):
                 create(*args,**kwargs)
                 raise OSError('simulated lost acknowledgement after native creation')
             with patch.object(kb,'create_task',side_effect=interrupted):
-                try:operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief',graph=graph)
+                try:operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,'evidence',approved_brief='programmed-brief',graph=graph)
                 except OSError:pass
                 else:raise AssertionError('missing injected failure')
             assert count()==before+1
@@ -71,14 +90,15 @@ def qualify(root,upstream):
     # New connection and operation instance represent reconstruction, not retained IDs.
     with kbc.connect_closing() as conn:
         operation=Repairs(Releases(project,store,board,None));anchor=kb.get_task(conn,anchor_id)
-        with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
-            proposal=operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief',graph=graph)
-            assert operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief',graph=graph)==proposal
+        with patch('fabriquinha.repairs.review_failure',return_value=facts),patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
+            proposal=operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,'evidence',approved_brief='programmed-brief',graph=graph)
+            assert operation.prepare_review_proposal(conn,anchor,card,incident,hold,handoff,'evidence',approved_brief='programmed-brief',graph=graph)==proposal
             assert conn.execute('SELECT count(*) FROM tasks').fetchone()[0]==before+1
             assert kb.get_task(conn,ident).status=='triage'
             assert kb.get_task(conn,proposal).status=='blocked'
             assert kb.claim_task(conn,proposal) is None
-            assert kb.unblock_task(conn,proposal)
+            operation.advance_review_probes(conn,anchor,{'approval':'programmed-brief'},graph)
+            assert kb.get_task(conn,proposal).status=='ready'
             claim=kb.claim_task(conn,proposal);assert claim
             author=board.current(proposal,claim.current_run_id)
             assert author.actor=='lead' and not author.reviewing
@@ -177,7 +197,7 @@ def qualify(root,upstream):
                 dependent_run=board.current(downstream['id'],dependent.current_run_id)
                 assert board.input(dependent_run,'tests')==frozen
                 assert kb.block_task(conn,dependent.id,kind='needs_input',reason='Qualification finished; no model worker',expected_run_id=dependent.current_run_id)
-    result=dict(passed=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
+    result=dict(passed=True,automatic_evidence_proposal_activation=True,bounded_native_cto_probe=True,no_probe_retry_after_completion=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
         original_triage_preserved=True,proposal_initially_not_dispatchable=True,independent_native_review=True,self_review_denied=True,programmed_admission=True,
         changes_return_to_original_author=True,corrected_handoff_independently_reviewed=True,dependent_released_after_review=True,immutable_graph_recovered=True,dependent_work_held=True,native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
         model_calls=0,docker_calls=0,delivery_approval=False)
