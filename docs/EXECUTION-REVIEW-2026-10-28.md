@@ -389,6 +389,20 @@ sem contá-las como falha de produto. Separar encerramento de atividade e da rel
 
 ### Avaliação semântica antes da migração
 
+Atualização: a repetição com contrato compartilhado consumiu cinco chamadas
+adicionais (até 7.257) e passou 3/5. A justificativa do Red propôs inspeção, mas
+selecionou espera. O HTTP também selecionou espera por evidência. Não houve
+ação operacional, ferramenta de workspace ou aprovação. Interrompemos novas
+repetições do classificador: a ferramenta sintética não representa as operações
+reais e não deve se tornar outro protocolo de entrega. A próxima prova deve usar
+os handlers reais de revisão/diagnóstico num estado isolado, verificando decisão
+e efeito persistente; manter o mesmo modelo e não flexibilizar achados/testes.
+
+Fonte `4a908186` congelada, doctor sem erros nos nove perfis. Definição do
+supervisor instalada com backup, mas continua descarregado; relay parado,
+provedor desabilitado, despacho pausado. Instalação preparada não é recuperação
+do S6. Os números e a descrição abaixo registram a primeira avaliação.
+
 Cinco chamadas isoladas ao mesmo Claude Haiku consumiram os números 7.248–7.252.
 Quatro decisões passaram: distinção de clientes HTTP, hipótese não alcançada,
 ausência de evidência nova e teste enfraquecido. O caso de Red esperado falhou:

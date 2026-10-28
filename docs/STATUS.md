@@ -51,10 +51,18 @@ sem defeito demonstrado. O ensaio usava contexto genérico, não o contrato comp
 do runtime; portanto não comprova falha de execução do gateway. Foi preservado
 como não aprovado. A próxima avaliação reutiliza o contrato real, agora explícito
 sobre inspecionar testes antes de exigir correções. Isso não aprova o S6.
-Fonte `db0c3d3d` exportada e validada em manutenção; supervisor ainda não migrado.
-Relay novamente parado e política desabilitada após as cinco chamadas.
+Segunda avaliação, com contrato compartilhado: 3/5 passaram. O caso de Red
+escolheu aguardar, embora a justificativa mandasse inspecionar; o caso HTTP também
+escolheu aguardar evidência. Não se alterou o gabarito para aceitar esses resultados.
+A ferramenta sintética de classificação não é a ferramenta operacional do Hermes:
+novas repetições desse classificador foram interrompidas. A próxima validação deve
+exercitar as operações reais de revisão e diagnóstico em isolamento, preservando
+os dois resultados como não aprovados e sem inferir falha ou sucesso do S6 deles.
+Fonte `4a908186` exportada, doctor aprovado nos nove perfis e definição do
+supervisor migrada com backup, ainda descarregado. Relay parado, política
+desabilitada, nenhuma retomada do despacho ou alteração dos cards.
 
-Consumo confirmado: **7.252/8.500 chamadas**, restando 1.248.
+Consumo confirmado: **7.257/8.500 chamadas**, restando 1.243.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
 US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui
