@@ -105,3 +105,16 @@ O ensaio não é um comando de backup de produção. Ainda faltam contador real 
 proxy, configuração secreta, caminhos de worktrees e reconciliação dos efeitos
 externos de uma instalação real. Uma cópia íntegra não autoriza iniciar uma
 segunda instalação nem restaurar uma cota antiga como saldo disponível.
+
+## Corte de ativação instalado
+
+O controlador e o relay foram atualizados para a fonte `6cc51421`, após pausa
+com ausência de workers e efeitos pendentes, parada do dono e backup privado
+legível. Foram arquivados 356 avisos nunca tentados, preservando conteúdo e
+motivo. Nenhum desses avisos foi marcado como entregue.
+
+O destino Telegram escolhido foi configurado e o despacho retomado. Um aviso
+novo de retomada recebeu confirmação de envio, com uma tentativa. O contador
+permaneceu em 7.318/8.500 chamadas; a homologação respondeu HTTP 200. Isso prova
+o transporte de saída, mas ainda não a entrada humana nem o ciclo completo pelo
+canal. O backup de manutenção não equivale a restauração de produção qualificada.
