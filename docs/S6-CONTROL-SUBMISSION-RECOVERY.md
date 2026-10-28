@@ -117,3 +117,24 @@ recusa de aprovação negativa. A proposta que terminou em hold permanece intact
 Antes de retomar, qualificar uma proposta técnica sucessora vinculada ao contexto
 corrigido, com nova revisão independente; não reabrir nem reinterpretar como
 aprovação de implementação a decisão anterior.
+
+
+## Continuação após correção da autoridade do brief
+
+A revisão 2 do contrato de submissão é uma mudança de fonte explicitamente
+qualificada, não uma retentativa automática infinita. Uma proposta antiga ainda
+em andamento continua sendo aguardada. Uma proposta antiga aprovada para
+submissão é reutilizada. Somente um hold concluído e revisado pode receber uma
+proposta sucessora ligada como dependência; o recibo e a decisão anteriores
+permanecem intactos e são apresentados como contexto histórico.
+
+A nova proposta deve ser revisada independentemente sob a autoridade explícita
+do brief. O contexto também apresenta os caminhos e hashes do freeze, sem
+permissão de escrita. Propostas antigas continuam legíveis; não recebem outra
+classificação nem aprovação retroativa. 414 testes passaram, incluindo criação
+idempotente da sucessora, preservação do hold, espera de revisão em curso e
+reutilização de uma aprovação já executável. A qualificação nativa desta revisão
+passou com dois incrementos, 17 atividades SDK e 32 chamadas HTTP locais
+programadas, sem chamadas pagas. Implantação e resultado com agentes reais
+ainda pendentes. O ensaio distingue 11 cards históricos de trabalho dos seis
+cards ativos da entrega; o ambiente foi retirado após registrar as evidências.

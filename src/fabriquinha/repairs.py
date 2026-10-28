@@ -15,7 +15,8 @@ from .recovery import Recovery,browser_refusal_context
 # Controller source revision, never model-supplied. Changed only for a qualified
 # repair-protocol fix, not for documents, timeouts or another identical retry.
 REPAIR_PROTOCOL='qa-text-handoff-1'
-SUBMISSION_PROTOCOL='complete-control-set-1'
+SUBMISSION_PROTOCOL='complete-control-set-2'
+SUBMISSION_PROTOCOLS=('complete-control-set-1',SUBMISSION_PROTOCOL)
 
 
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
@@ -80,7 +81,7 @@ def reviewed(project,store,key):
     if context['payload'].get('repair_kind')=='submission':
         data=context['payload']
         facts=submission_failure(project,store,data['incident'],data['reviewed_diagnosis'],data['tests'],data['snapshot'])
-        if (data.get('submission_protocol')!=SUBMISSION_PROTOCOL or body.get('repair_protocol')!=SUBMISSION_PROTOCOL
+        if (data.get('submission_protocol') not in SUBMISSION_PROTOCOLS or body.get('repair_protocol')!=data.get('submission_protocol')
                 or body.get('repair_of')!=facts['source']
                 or any(data.get(k)!=facts[k] for k in ('source','source_run','source_contract'))):
             raise ValueError('exact scoped submission proposal required')
@@ -115,6 +116,14 @@ def context_view(store,value):
     result={k:value[k] for k in keys if k in value}
     if value.get('reviewed_diagnosis'):
         result['prior_diagnosis']=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')['payload']['verdict']
+    if value.get('repair_kind')=='submission':
+        frozen=store.receipt(value['tests'],kind='tests_frozen')['payload']
+        result['protected_tests']=dict(receipt=value['tests'],snapshot=frozen['snapshot'],files=frozen['tests'],
+            contract='Controller-recorded frozen paths and hashes; read-only evidence, not permission to change tests.')
+    if value.get('prior_proposal_review'):
+        record=store.receipt(value['prior_proposal_review'],kind='plan_review')
+        result['prior_proposal_hold']=dict(receipt=value['prior_proposal_review'],verdict=record['payload']['verdict'],
+            contract='Historical reviewed hold, preserved unchanged. Reassess against current controller-verified brief_authority; this is not permission to implement.')
     return result
 
 
@@ -208,10 +217,25 @@ class Repairs:
             raise EffectBlocked('settle controller effects before a submission proposal')
         if sum(i['cards']['implementation']['id']==source.id for i in graph['items'])!=1:
             raise ValueError('unique source in current release graph required')
+        prior_review=None;prior_task=None
+        # One source-contract upgrade, not a retry counter reset. A pending or
+        # already executable legacy proposal keeps its native lifecycle.
+        legacy_key=digest([self.project.fingerprint(),source.id,latest.id,'complete-control-set-1','proposal'])
+        legacy=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(legacy_key,)).fetchone()
+        if legacy:
+            prior_task=kb.get_task(conn,legacy['id'])
+            if prior_task.status!='done':return prior_task.id
+            prior_review,_,_=self.r.closed(prior_task.id,'plan_review','plan_review')
+            previous=reviewed(self.project,self.store,prior_review)
+            if previous['context']['source']!=source.id or previous['context']['source_run']!=latest.id:
+                raise ValueError('legacy proposal source changed')
+            if previous['proposal']['classification']=='submission':return prior_task.id
+            if previous['proposal']['classification'] not in ('infrastructure','scope'):
+                raise ValueError('only a preserved reviewed hold may receive corrected context')
         prior_graph=self.store.record('release_graph',self.r.binding(anchor),graph)
         context=self.store.record('repair_context',self.r.binding(anchor),dict(**facts,
             project=self.project.fingerprint(),repair_kind='submission',submission_protocol=SUBMISSION_PROTOCOL,
-            prior_graph=prior_graph,
+            prior_graph=prior_graph,prior_proposal_review=prior_review,
             submission_contract=CONTROL_SUBMISSION_CONTRACT,qa_paths=[],package=item['package'],
             architecture=spec['document']['architecture'],observability=spec['document']['observability']))
         body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
@@ -225,7 +249,7 @@ class Repairs:
         if self.r.board.guard:self.r.board.guard()
         return kb.create_task(conn,title='REPAIR SUBMISSION '+item['package']['title'],body=json.dumps(body),
             assignee=self.project.coordination_roles['lead'],workspace_kind='scratch',completion_contract='local-only',
-            parents=[spec['task']],max_retries=2,max_runtime_seconds=600,idempotency_key=key)
+            parents=[spec['task']]+([prior_task.id] if prior_task else []),max_retries=2,max_runtime_seconds=600,idempotency_key=key)
 
     def materialize_submission(self,conn,anchor,graph,approval):
         """Immutable replacement tail; the source triage and completed tests remain."""

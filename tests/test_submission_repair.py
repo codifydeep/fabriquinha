@@ -102,14 +102,59 @@ class SubmissionRepairAdmission(unittest.TestCase):
             conn.execute('UPDATE tasks SET body=?',(json.dumps({'altered':True}),))
             with self.assertRaises(ValueError):operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item]))
 
+    def test_submission_context_exposes_exact_protected_paths_without_edit_authority(self):
+        from fabriquinha.repairs import context_view
+        f=self.fixture
+        result=context_view(f.store,dict(repair_kind='submission',tests=self.freeze))
+        frozen=f.store.receipt(self.freeze)['payload']
+        self.assertEqual(result['protected_tests']['files'],frozen['tests'])
+        self.assertEqual(result['protected_tests']['snapshot'],frozen['snapshot'])
+        self.assertIn('not permission',result['protected_tests']['contract'])
+
+    def test_context_upgrade_preserves_legacy_hold_and_waits_for_new_review(self):
+        f=self.fixture;facts=self.evaluate();(f.work/'app.py').write_text('VALUE = 1\n')
+        source=SimpleNamespace(id=f.implementer.task,status='triage',body=json.dumps(self.source_body),workspace_path=f.work)
+        tests=SimpleNamespace(id='tests',status='done');anchor=SimpleNamespace(id='anchor')
+        legacy=SimpleNamespace(id='old-proposal',status='done')
+        conn=sqlite3.connect(':memory:');self.addCleanup(conn.close);conn.row_factory=sqlite3.Row
+        conn.execute('CREATE TABLE tasks(id TEXT,body TEXT,idempotency_key TEXT)')
+        key=digest([f.project.fingerprint(),source.id,f.implementer.number,'complete-control-set-1','proposal'])
+        conn.execute('INSERT INTO tasks VALUES(?,?,?)',(legacy.id,'{}',key));created=[]
+        def create(connection,**kwargs):
+            created.append(kwargs);connection.execute('INSERT INTO tasks VALUES(?,?,?)',('new-proposal',kwargs['body'],kwargs['idempotency_key']))
+            return 'new-proposal'
+        kb=SimpleNamespace(latest_run=lambda *a:SimpleNamespace(id=f.implementer.number,ended_at=1),
+            get_task=lambda *a:legacy,create_task=create)
+        releases=SimpleNamespace(project=f.project,store=f.store,board=SimpleNamespace(guard=None),
+            check_card=lambda c,card:source if card['id']==source.id else tests,
+            closed=lambda task,*a:('old-review' if task==legacy.id else self.freeze,None,None),
+            binding=lambda a:dict(actor='controller',task=a.id,release='v1',contract='anchor'))
+        spec=dict(task='approved-plan',approval='approved-brief',document=dict(architecture='HTTP',observability='local'))
+        item=dict(cards=dict(implementation={'id':source.id},tests={'id':tests.id}),package=dict(id='first',title='First'))
+        prior=dict(context=facts,proposal={'classification':'infrastructure'})
+        with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),\
+             patch('fabriquinha.repairs.reviewed',return_value=prior):
+            operation=Repairs(releases);args=(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item]))
+            legacy.status='review';self.assertEqual(operation.propose_submission(*args),legacy.id);self.assertEqual(created,[])
+            legacy.status='done';prior['proposal']['classification']='submission'
+            self.assertEqual(operation.propose_submission(*args),legacy.id);self.assertEqual(created,[])
+            prior['proposal']['classification']='infrastructure'
+            self.assertEqual(operation.propose_submission(*args),'new-proposal')
+            self.assertEqual(operation.propose_submission(*args),'new-proposal');self.assertEqual(len(created),1)
+            self.assertEqual(created[0]['parents'],['approved-plan',legacy.id])
+            context=f.store.receipt(json.loads(created[0]['body'])['repair_context'])['payload']
+            self.assertEqual(context['prior_proposal_review'],'old-review')
+            self.assertEqual(conn.execute('SELECT body FROM tasks WHERE id=?',(legacy.id,)).fetchone()[0],'{}')
+            self.assertEqual(source.status,'triage')
+
     def test_continuation_requires_independent_review_of_exact_source_facts(self):
         f=self.fixture;facts=self.evaluate()
-        def approval(actor='cto',source_run=None):
+        def approval(actor='cto',source_run=None,protocol=SUBMISSION_PROTOCOL):
             context={**facts,'project':f.project.fingerprint(),'repair_kind':'submission',
-                'submission_protocol':SUBMISSION_PROTOCOL,'qa_paths':[]}
+                'submission_protocol':protocol,'qa_paths':[]}
             if source_run is not None:context['source_run']=source_run
             key=f.store.record('repair_context',dict(release='v1'),context)
-            body=dict(repair_context=key,repair_protocol=SUBMISSION_PROTOCOL,repair_of=f.implementer.task)
+            body=dict(repair_context=key,repair_protocol=protocol,repair_of=f.implementer.task)
             author=Run('proposal',6,'lead','plan',False,'lead','v1',digest(body))
             proposal=f.store.record('work_plan',author.binding(),dict(project=f.project.fingerprint(),repair_body=body,
                 document=dict(classification='submission',reason='Retain all useful controls in a single submission.',test_paths=[])))
@@ -117,6 +162,8 @@ class SubmissionRepairAdmission(unittest.TestCase):
             return f.store.record('plan_review',reviewer.binding(),dict(project=f.project.fingerprint(),plan=proposal,
                 verdict=dict(decision='approve',reason='The scoped proposal preserves quality gates.',findings=[])))
         self.assertEqual(reviewed(f.project,f.store,approval())['proposal']['classification'],'submission')
+        self.assertEqual(reviewed(f.project,f.store,approval(protocol='complete-control-set-1'))['proposal']['classification'],'submission')
+        with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(protocol='unknown'))
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(actor='lead'))
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(source_run=999))
 

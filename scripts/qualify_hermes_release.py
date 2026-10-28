@@ -231,7 +231,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                         ('diagnostic_decide',decision)]
                     if action=='hold':sequence.insert(0,('diagnostic_decide',{**decision,'action':'resume'}))
                     diagnostic_actions.append((source,action,run.number))
-                elif run.kind=='plan' and native_body(run).get('repair_protocol')=='complete-control-set-1':
+                elif run.kind=='plan' and native_body(run).get('repair_protocol') in ('complete-control-set-1','complete-control-set-2'):
                     sequence=[('plan_review',dict(decision='approve',reason='Independent review preserves tests and all delivery gates.',findings=[]))] if run.reviewing else [('plan_submit',dict(classification='submission',reason='Resubmit all targeted controls together from the same Green snapshot.',test_paths=[]))]
                 elif run.kind=='brief':sequence=[('brief_submit',brief2 if run.release==second_release[0] else brief)]
                 elif run.kind=='plan' and run.reviewing and recovery!='none' and (recovery=='triage' or not plan_faults):

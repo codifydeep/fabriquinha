@@ -24,8 +24,9 @@ incrementos integrados e QA, sem chamadas pagas. O núcleo passou com 411 testes
 A proposta real passou por devolução e revisão, mas terminou em hold de
 infraestrutura porque Lead e CTO leram “NOT APPROVED” no documento histórico.
 O recibo exato do CEO está válido. A correção de contexto acrescenta autoridade
-estruturada e passou com 412 testes; ainda falta instalá-la e qualificar a
-continuação dessa proposta preservada. O runtime foi novamente drenado.
+estruturada. A proposta sucessora preserva o hold e exige nova revisão.
+414 testes e a cadeia nativa de dois incrementos passaram offline; ainda falta
+instalar esta revisão e comprovar a continuação com os agentes reais. O runtime foi novamente drenado.
 Falta comprovar a continuação com a equipe real, preservando o card antigo,
 o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
