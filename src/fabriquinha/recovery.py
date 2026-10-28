@@ -434,8 +434,14 @@ class Recovery:
             kind='red' if source.kind=='tests' else 'green'
             record=(Quality(self.project,self.store,None,self.board).test_evidence(handoff[kind]) if kind=='red'
                     else self.store.receipt(handoff[kind],kind=kind))
-            expected={**source.binding(),'actor':source.author,'reviewing':False}
-            if (not Run(**expected).same_subject(record['binding']) or record['payload']['project']!=self.project.fingerprint()):
+            expected=Run(**{**source.binding(),'actor':source.author,'reviewing':False})
+            body=json.loads(task.body)
+            if digest(body)!=source.contract:raise ValueError('diagnostic source contract changed')
+            authority=body.get('inputs',{}).get('reassessment_review')
+            if authority and not expected.same_subject(record['binding']):
+                from .repairs import reassessment_origin
+                expected=reassessment_origin(self.project,self.store,source,authority,handoff[kind])
+            if (not expected.same_subject(record['binding']) or record['payload']['project']!=self.project.fingerprint()):
                 raise ValueError('review diagnostic must match its exact immutable author handoff')
             return record['payload']['snapshot']
         return self.store.capture(Path(task.workspace_path))
@@ -534,6 +540,7 @@ class Recovery:
         incident=self.store.record('incident',source.binding(),dict(project=self.project.fingerprint(),snapshot=snapshot,
             source=task.id,source_run=row['id'],block_event=event['id'],cause=cause,failure=failure,category=category,
             source_state=task.status,resume_allowed=allowed,controller_effects=effects,
+            **({'reassessment_review':body['inputs']['reassessment_review']} if source.reviewing and body.get('inputs',{}).get('reassessment_review') else {}),
             recovery_limit=None if allowed else 'Native triage or expired controller effect requires a scoped technical repair; preserve phase and breaker, never repeat the mutation.',
             **({'document_kind':source.kind} if source.kind in ('brief','plan') else {}),
             **({'control_refusal':control_refusal} if control_refusal else {}),

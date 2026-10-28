@@ -158,6 +158,9 @@ def qualify(root,upstream):
                 assert board.input(active,'red',review_handoff=True)==handoff
                 from fabriquinha.quality import Quality
                 assert Quality(project,store,None,board).review_authorship(active,handoff,store.receipt(handoff))==approval
+                from fabriquinha.recovery import Recovery
+                diagnostic_snapshot=Recovery(project,store,board).snapshot(conn,kb.get_task(conn,successor),active,{'red':handoff})
+                assert diagnostic_snapshot==snapshot
                 assert operation.publish_review_handoff(conn,successor_card,approval)==successor
                 assert kb.get_task(conn,successor).current_run_id==active.number
                 assert kb.get_task(conn,ident).status=='triage'
@@ -197,7 +200,7 @@ def qualify(root,upstream):
                 dependent_run=board.current(downstream['id'],dependent.current_run_id)
                 assert board.input(dependent_run,'tests')==frozen
                 assert kb.block_task(conn,dependent.id,kind='needs_input',reason='Qualification finished; no model worker',expected_run_id=dependent.current_run_id)
-    result=dict(passed=True,automatic_evidence_proposal_activation=True,bounded_native_cto_probe=True,no_probe_retry_after_completion=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
+    result=dict(passed=True,successor_failure_snapshot_resolved=True,automatic_evidence_proposal_activation=True,bounded_native_cto_probe=True,no_probe_retry_after_completion=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
         original_triage_preserved=True,proposal_initially_not_dispatchable=True,independent_native_review=True,self_review_denied=True,programmed_admission=True,
         changes_return_to_original_author=True,corrected_handoff_independently_reviewed=True,dependent_released_after_review=True,immutable_graph_recovered=True,dependent_work_held=True,native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
         model_calls=0,docker_calls=0,delivery_approval=False)

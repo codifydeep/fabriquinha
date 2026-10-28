@@ -249,3 +249,19 @@ de uma revisão sucessora precisa resolver a autoria transferida, em vez de
 exigir sempre que o recibo original pertença ao card sucessor. Isso deve ser
 corrigido e testado antes de instalar, para não recriar um impedimento no caminho
 de falha. O S6 permanece em manutenção.
+
+### Diagnóstico de falha da revisão sucessora
+
+O diagnóstico resolve agora a autoria transferida pelo contrato exato do card e
+registra essa autorização no incidente. A admissão de outra revisão pode conferir
+a cadeia preservada. O resolvedor retorna o binding real do autor, sem fabricar
+um novo número de execução. Handoffs corrigidos no próprio card continuam usando
+a autoria nova, sem herdar a transferência antiga.
+
+A prova nativa verificou a resolução do snapshot original durante a revisão
+sucessora. Testes verificam recusa de ausência de autoridade e de contrato
+alterado. A transferência posterior reutiliza a cadeia validada de recibos,
+em vez de exigir indevidamente que o autor original pertença ao último card.
+Isso não concede dispensa de revisão ou aprovação. O runtime permanece anterior
+a estas mudanças, e o restante dos itens P2/P3 ainda precisa de fechamento antes
+da retomada paga prevista na auditoria.

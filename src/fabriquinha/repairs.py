@@ -74,8 +74,11 @@ def review_failure(project,store,incident_key,decision_key,handoff):
         raise ValueError('held delivery review required')
     record=(Quality(project,store,None,None).test_evidence(handoff) if source['kind']=='tests'
             else store.receipt(handoff,kind='green'))
-    expected={**source,'actor':source['author'],'reviewing':False}
-    if (not Run(**expected).same_subject(record['binding'])
+    expected=Run(**{**source,'actor':source['author'],'reviewing':False})
+    inherited=incident['payload'].get('reassessment_review')
+    if inherited and not expected.same_subject(record['binding']):
+        expected=reassessment_origin(project,store,Run(**source),inherited,handoff)
+    if (not expected.same_subject(record['binding'])
             or record['payload'].get('project')!=project.fingerprint()):
         raise ValueError('exact author handoff required for review succession')
     snapshot=record['payload']['snapshot']
@@ -220,7 +223,14 @@ def reassessment_origin(project,store,run,approval,handoff):
             or run.actor==run.author or run.actor not in project.reviewers_for(run.author)
             or run.number<=origin['number']):
         raise ValueError('independent successor bound to the exact reassessed handoff required')
-    return Run(**{**origin,'actor':origin['author'],'reviewing':False})
+    record=(Quality(project,store,None,None).test_evidence(handoff) if run.kind=='tests'
+            else store.receipt(handoff,kind='green'))
+    author=record['binding']
+    if (author['actor']!=run.author or author['author']!=run.author or author['reviewing'] is not False
+            or author['kind']!=run.kind or author['release']!=run.release
+            or author['number']>=run.number or record['payload']['project']!=project.fingerprint()):
+        raise ValueError('exact original author receipt required')
+    return Run(**author)
 
 
 def repair_authority(project,store,board,run):
@@ -488,8 +498,9 @@ class Repairs:
         record=(Quality(self.project,self.store,None,self.r.board).test_evidence(data['handoff'])
                 if field=='red' else self.store.receipt(data['handoff'],kind='green'))
         scope=record['binding']
-        if (scope['actor']!=card['owner'] or scope['reviewing'] or scope['task']!=source.id
-                or scope['contract']!=data['source_contract'] or scope['release']!=body['release']
+        # reviewed() already validates the full immutable origin chain, including
+        # a prior transfer. The author receipt need not belong to the latest card.
+        if (scope['actor']!=card['owner'] or scope['reviewing'] or scope['release']!=body['release']
                 or scope['kind']!=body['kind'] or record['payload']['snapshot']!=data['snapshot']):
             raise ValueError('preserved exact author delivery required')
         metadata={field:data['handoff'],'reassessment_review':approval,'transfer_only':True}

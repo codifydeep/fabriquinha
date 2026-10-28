@@ -105,6 +105,7 @@ class SuccessionAdmission(unittest.TestCase):
         origin=dict(task='source',number=7,actor='lead',author='developer',kind='implementation',
                     reviewing=True,release='release',contract='old-contract')
         self.records['incident']['binding']=origin
+        self.records['green']=dict(kind='green',binding={**origin,'number':6,'actor':'developer','reviewing':False},payload=dict(project='project'))
         authority=dict(context=dict(repair_kind='review',incident='incident',handoff='green'),
                        proposal=dict(classification='reassess'))
         successor=Run('successor',10,'lead','implementation',True,'developer','release','new-contract')
@@ -146,3 +147,19 @@ class SuccessionAdmission(unittest.TestCase):
         with patch('fabriquinha.repairs.reassessment_origin') as resolve:
             result=quality.review_authorship(current,'corrected-red',dict(binding=author.binding(),payload=dict(project='project')))
             self.assertIsNone(result);resolve.assert_not_called()
+
+    def test_held_successor_resolves_recorded_transfer_but_no_implicit_authority(self):
+        source=self.records['incident']['binding']
+        source.update(kind='implementation',actor='lead',author='developer',contract='new-contract')
+        author=Run('original',2,'developer','implementation',False,'developer',source['release'],'original-contract')
+        self.records['green']=dict(kind='green',binding=author.binding(),payload=dict(project='project',snapshot='snapshot'))
+        with self.assertRaisesRegex(ValueError,'exact author'):
+            review_failure(self.project,self.store,'incident','decision','green')
+        self.records['incident']['payload']['reassessment_review']='prior-approval'
+        with patch('fabriquinha.repairs.reassessment_origin',return_value=author) as resolve:
+            result=review_failure(self.project,self.store,'incident','decision','green')
+            resolve.assert_called_once_with(self.project,self.store,Run(**source),'prior-approval','green')
+            self.assertEqual(result['source'],'source');self.assertEqual(result['snapshot'],'snapshot')
+            self.records['green']['binding']={**author.binding(),'contract':'tampered'}
+            with self.assertRaisesRegex(ValueError,'exact author'):
+                review_failure(self.project,self.store,'incident','decision','green')
