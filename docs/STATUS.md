@@ -8,51 +8,44 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-A revisão aditiva produziu novo Red na execução 69: 16 casos, sete falhas
-comportamentais e nenhum erro de execução ou skip. O CTO manteve um bloqueio
-baseado na suposta incompatibilidade entre HTTP 409 e console vazio. Um
-[experimento isolado de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstrou que
-409 no cliente Python não gera erro no navegador; 409 no próprio navegador gera.
-A orientação de diagnóstico foi corrigida no código, ainda não instalada.
-A reavaliação nativa do incidente em triagem permanece pendente; nenhuma aprovação,
-reset de contador ou alteração de teste foi feita para contornar o bloqueio.
-
+**Trabalho pausado pelo proprietário.** Pausa persistente, nenhum worker/claim
+pendente; supervisor descarregado, relay parado e política de provedor desabilitada.
+A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
+causas dos bloqueios e um plano proposto. Não autoriza retomada nem muda gates.
 
 O primeiro incremento do lobby passou por revisão independente, PR
 [codifydeep/descartavel#13](https://github.com/codifydeep/descartavel/pull/13),
 CI local obrigatória, implantação, rollback/restauração e QA de navegador.
 Commit integrado: `2d2b7fb3b987748713e6f691d9c10fde9afd4ad2`.
-O recibo `2d4e24b09859c0294accad2074a1d54ed305b99beda4671966d599094f93c947`
-conserva `delivery_approval=false`: comprova o incremento, não a release completa.
+O recibo conserva `delivery_approval=false`: comprova o incremento, não a release.
 
-O controlador liberou automaticamente o segundo incremento, de entrada na sala
-e limite de dois participantes. O QA acrescentou sete testes aos nove testes da
-base. O Tech Lead solicitou a verificação da mensagem visível de rejeição do
-terceiro jogador; o autor corrigiu e a revisão 48 aprovou o snapshot
-`c47bff7e4f48c262c76d441d687478c8ae578a5cd3cd4bf847d1d21303f259fe`.
-As tentativas seguintes encerraram sem handoff; as duas continuações revisadas
-foram preservadas, sem reset. A execução 58 alterou o produto e não apresentou
-compactações, mas terminou sem submissão. O CTO executou a suíte na execução 59:
-14 de 16 testes passaram. Um teste congelado busca uma sala sem criá-la; a outra
-falha envolve erro de console na rejeição do terceiro jogador e ainda precisa
-ser tratada sem dispensar as verificações existentes.
+O segundo incremento está bloqueado na revisão dos testes. Depois de corrigir
+uma fixture que buscava uma sala sem criá-la, a execução 69 produziu novo Red:
+16 casos, sete falhas comportamentais, nenhum erro de execução ou skip.
+Ainda não existe aprovação independente dessa revisão nem Green correspondente.
+O card de testes está em triagem; implementação e integração sucessoras não começaram.
 
-A fonte instalada é `8d6bbd92`; supervisor e relay estão ativos. A ferramenta
-`delivery_validate` oferece a suíte completa ao implementador, sem aprovar nem
-submeter a entrega. A revisão de fixture Python nova e ainda não publicada agora
-possui proposta independente, novo Red, novo freeze e substituição idempotente
-da cauda do grafo. A transição foi qualificada no Kanban real isolado, com
-evidências de qualidade programadas; isso não comprova autonomia nem correção
-do produto. A proposta técnica foi aprovada. A autoria encontrou uma restrição excessiva do
-comparador para chamadas já importadas e blocos de preparação; o reparo passou
-em testes e foi instalado. O contexto diagnóstico de fixture também foi separado
-do reparo legado pós-deploy; a suíte completa tem 446 testes verdes. O CTO
-autorizou retomar o QA dentro da proposta aprovada. Ainda não há novo Red ou
-aprovação dos testes corrigidos.
+O CTO manteve hold pela suposta incompatibilidade entre HTTP 409 e console vazio.
+A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
+409 recebido pelo Python não gera erro no navegador; um fetch do próprio navegador
+recebendo 409 gera. Isso invalida a equivalência presumida, mas não aprova produto,
+nem resolve por si só corrida entre clientes ou o lifecycle de saída da triagem.
 
-O teto autorizado é **8.500 chamadas**, sem reset; a última consulta foi
-7.232 chamadas. Modelo Claude Haiku, saída máxima de 16.384 tokens, janela de
-contexto de 131.072 e nenhum fallback. Nenhum gate foi dispensado.
+Fonte instalada: `8d6bbd92`. A orientação adicional publicada em `fc202f3a` ainda
+não foi instalada. `delivery_validate`, revisão aditiva de fixture e separação
+de contexto diagnóstico foram implementados e receberam provas delimitadas.
+A última suíte executada teve 446 testes verdes. Nenhum teste foi reexecutado
+nem agente iniciado durante a auditoria de 28/10.
+
+Consumo confirmado antes da pausa: **7.247/8.500 chamadas**, restando 1.253.
+Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
+A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
+US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui
+o assistente operador. Nenhum gate, contador ou evidência anterior foi dispensado.
+
+Prontidão estimada para autonomia no escopo Python/HTTP atual: **cerca de 60%**,
+com método e limites na auditoria. Não é probabilidade de sucesso ou fração do
+esforço restante. A qualificação do Truco completo continua fora desse indicador.
 
 ## O que ainda falta
 

@@ -1,4 +1,10 @@
-# Roadmap vigente — 27 de outubro de 2026
+# Roadmap e referência de revisão — 28 de outubro de 2026
+
+**Execução pausada pelo proprietário.** A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md)
+propõe priorizar uma recuperação reutilizável, revisão controlada de candidatos
+e conclusão do S6 existente. A proposta não altera contratos ou autoriza despacho.
+O histórico aprovado abaixo permanece referência; o [STATUS](STATUS.md) prevalece
+para a situação operacional atual.
 
 **Correções offline antes da implementação S6.** O CEO aprovou o brief; o aceite
 já foi aplicado ao intake e o CTO aprovou o plano de dois incrementos. A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md)

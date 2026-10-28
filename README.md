@@ -9,18 +9,16 @@ qualidade, publicação e implantação. Multica e Temporal não são dependênc
 desse caminho. A instalação legada está preservada e pausada.
 
 [Status atual](docs/STATUS.md) · [Próximos passos](docs/ROADMAP.md) ·
-[Revisão crítica de 27/10/2026](docs/EXECUTION-REVIEW-2026-10-27.md) ·
+[Revisão crítica de 28/10/2026](docs/EXECUTION-REVIEW-2026-10-28.md) ·
 [Documentação](docs/README.md)
 
-**Aceitação compartilhada instalada; S6 retomado com plano aprovado.** O escopo de produto foi aprovado,
-mas a auditoria identificou incompatibilidade entre o QA atual e a aceitação em
-sessões independentes, além de divergência na autoridade para corrigir testes.
-O proprietário aprovou o plano e os refinamentos do [ADR 0006](docs/ADR-0006-SHARED-ACCEPTANCE.md).
-O preparo operacional local passou e os agentes aprovaram o planejamento S6.
-O reparo de extensão aditiva de critérios passou na cadeia offline e foi instalado,
-sem editar os testes anteriores; o mesmo board foi retomado. A entrega real
-e as provas de canal/restore ainda estão pendentes. Os diagramas abaixo representam
-a implementação atual.
+**Execução pausada para balanço.** S4 técnico foi qualificado sem intervenção;
+S5 foi homologado com assistência. O primeiro incremento S6 passou por PR/CI,
+implantação e QA, mas o segundo permanece em triagem na revisão dos testes.
+A [auditoria atual](docs/EXECUTION-REVIEW-2026-10-28.md) distingue esses resultados
+da autonomia geral e propõe simplificar a recuperação antes de ampliar a equipe.
+Canal real do CEO, restauração operacional e reprodução externa continuam pendentes.
+Os diagramas abaixo descrevem capacidades existentes, não serviços ativos nesta pausa.
 
 ## O que queremos construir
 

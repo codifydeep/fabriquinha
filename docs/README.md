@@ -1,6 +1,6 @@
 # Documentação da Fabriquinha
 
-Referência: **27 de outubro de 2026**. Plataforma experimental; S4 técnico
+Referência: **28 de outubro de 2026**. Trabalho pausado. Plataforma experimental; S4 técnico
 qualificado, autonomia geral e distribuição ainda não concluídas. Documentos públicos descrevem contratos,
 arquitetura, resultados agregados e limites. Instalações, transcrições, bancos,
 snapshots e recibos operacionais completos permanecem privados.
@@ -8,7 +8,9 @@ snapshots e recibos operacionais completos permanecem privados.
 ## Ordem de leitura
 
 1. [Status atual](STATUS.md): o que foi comprovado e o que falta.
-2. [Revisão antes do S6, 27/10](EXECUTION-REVIEW-2026-10-27.md): capacidade de
+2. [Balanço de 28/10](EXECUTION-REVIEW-2026-10-28.md): percentuais com régua explícita,
+   bloqueio atual, custos conferidos e plano proposto, sem retomada.
+   [Revisão antes do S6, 27/10](EXECUTION-REVIEW-2026-10-27.md): capacidade de
    aceitação entre sessões, autoridade técnica, operação, memória e custos;
    refinamentos aprovados e em qualificação no [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md).
    A [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md)

@@ -5,7 +5,10 @@ das etapas ainda não qualificadas. A presença de um módulo não comprova sua
 ativação no runtime. Não descreve uma arquitetura futura como se Temporal já
 estivesse instalado.
 
-Estado de referência revisto: **26 de outubro de 2026**. Componentes existentes
+Referência histórica de implementação: **26 de outubro de 2026**.
+O estado operacional de 28/10 é **pausado**; a [auditoria atual](EXECUTION-REVIEW-2026-10-28.md)
+descreve as lacunas de recuperação e a fonte instalada. As seções legadas abaixo
+não são instruções de retomada. Componentes existentes
 não significam fluxo completo qualificado; consulte [STATUS.md](STATUS.md) e a
 [auditoria da execução](EXECUTION-REVIEW-2026-10-26.md). O refinamento F1 foi
 aprovado no [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) e implementado:
