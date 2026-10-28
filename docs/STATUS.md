@@ -8,10 +8,10 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Desenvolvimento retomado; despacho novamente em manutenção.** A fonte
-`4a908186` criou automaticamente o SPIKE do CTO, que terminou com hold e sem
-nova observação admissível. Supervisor descarregado, relay parado e política
-desabilitada; nenhum worker ou efeito pendente na drenagem.
+**Desenvolvimento e despacho retomados.** Fonte `c490c7d0` instalada com backup
+e doctor aprovado. O controlador criou a retomada única do SPIKE do CTO,
+execução 75, preservando a execução 74 como concluída sem evidência admissível.
+Supervisor e relay ativos, mesmo modelo e teto; o resultado novo está pendente.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
@@ -35,7 +35,7 @@ A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
 recebendo 409 gera. Isso invalida a equivalência presumida, mas não aprova produto,
 nem resolve por si só corrida entre clientes ou o lifecycle de saída da triagem.
 
-Fonte instalada: `4a908186`, com exportação verificada, backup preservado e
+Fonte instalada: `c490c7d0`, com exportação verificada, backup preservado e
 `doctor` aprovado nos nove perfis. A suíte offline passou com 467 testes.
 Provas nativas programadas cobrem sucessão, dependências, interrupções,
 solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead passou
@@ -63,7 +63,7 @@ trazia nova observação. Identificamos feedback tardio: a recusa só aparecia a
 o encerramento do CTO. O reparo devolve a mesma avaliação de admissibilidade na
 própria resposta de `diagnostic_validate`, enquanto o agente ainda pode agir.
 Não altera o gate, não aprova a entrega e não agenda repetição automática.
-O SPIKE concluído permanece preservado; retomada com o reparo ainda pendente.
+O SPIKE concluído permanece preservado; a retomada com o reparo está em execução.
 
 O feedback antecipado passou em cinco jobs Docker reais: observação repetida
 recusada e mudança verificável numa cópia admitida, mantendo testes e entrega
@@ -71,8 +71,9 @@ originais. Foi preparada uma migração única do protocolo antigo para o protoc
 com feedback, somente para um SPIKE CTO concluído com resultados normalizados
 idênticos. Execução antiga permanece intacta; worker ativo não é substituído,
 resultado já admissível é reutilizado e o protocolo novo não ganha retries.
-A prova nativa de criação, deduplicação, revisão e dependências passou. Instalação
-dessa alteração e retomada real ainda pendentes.
+A prova nativa de criação, deduplicação, revisão e dependências passou. A alteração
+foi instalada e criou a execução 75 automaticamente; sua conclusão e os demais
+handoffs continuam pendentes.
 
 Último contador conferido: **7.266/8.500 chamadas**, restando 1.234.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
