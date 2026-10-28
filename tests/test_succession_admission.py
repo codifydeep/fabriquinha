@@ -5,7 +5,10 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.repairs import held_incident,review_failure,review_reassessment,repair_document
+from unittest.mock import patch
+from dataclasses import replace
+from fabriquinha.board import Run
+from fabriquinha.repairs import held_incident,review_failure,review_reassessment,repair_document,reassessment_origin
 
 class SuccessionAdmission(unittest.TestCase):
     def setUp(self):
@@ -96,3 +99,23 @@ class SuccessionAdmission(unittest.TestCase):
                 repair_document({**value,'classification':classification},context)
         with self.assertRaises(ValueError):
             repair_document({**value,'test_paths':['tests/test_existing.py']},context)
+
+    def test_successor_lineage_preserves_original_authorship_and_rejects_foreign_review(self):
+        self.project.reviewers_for=lambda author:['lead']
+        origin=dict(task='source',number=7,actor='lead',author='developer',kind='implementation',
+                    reviewing=True,release='release',contract='old-contract')
+        self.records['incident']['binding']=origin
+        authority=dict(context=dict(repair_kind='review',incident='incident',handoff='green'),
+                       proposal=dict(classification='reassess'))
+        successor=Run('successor',10,'lead','implementation',True,'developer','release','new-contract')
+        with patch('fabriquinha.repairs.reviewed',return_value=authority):
+            prior=reassessment_origin(self.project,self.store,successor,'approval','green')
+            self.assertEqual(prior.task,'source');self.assertEqual(prior.actor,'developer')
+            self.assertEqual(prior.contract,'old-contract');self.assertFalse(prior.reviewing)
+            for changes in ({'task':'source'},{'number':6},{'release':'foreign'},
+                            {'actor':'developer'},{'reviewing':False},{'author':'other'}):
+                with self.subTest(changes=changes),self.assertRaises(ValueError):
+                    reassessment_origin(self.project,self.store,replace(successor,**changes),'approval','green')
+            with self.assertRaises(ValueError):
+                reassessment_origin(self.project,self.store,successor,'approval','other-handoff')
+        self.assertEqual(self.records['incident']['binding'],origin)

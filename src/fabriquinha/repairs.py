@@ -200,6 +200,25 @@ def reviewed(project,store,key):
     return dict(review=key,proposal=proposal,context=context['payload'],context_id=body['repair_context'],task=scope['task'])
 
 
+def reassessment_origin(project,store,run,approval,handoff):
+    """Resolve old authorship through an independently reviewed succession.
+
+    Does not copy/rebind a Red or Green receipt. The caller must additionally
+    verify that this exact approval is an input of the current native card.
+    No approval from the original delivery is inherited by the successor.
+    """
+    authority=reviewed(project,store,approval);context=authority['context']
+    incident=store.receipt(context['incident'],kind='incident');origin=incident['binding']
+    if (context.get('repair_kind')!='review' or authority['proposal']['classification']!='reassess'
+            or context.get('handoff')!=handoff or run.reviewing is not True
+            or run.task==origin['task'] or run.kind!=origin['kind']
+            or run.release!=origin['release'] or run.author!=origin['author']
+            or run.actor==run.author or run.actor not in project.reviewers_for(run.author)
+            or run.number<=origin['number']):
+        raise ValueError('independent successor bound to the exact reassessed handoff required')
+    return Run(**{**origin,'actor':origin['author'],'reviewing':False})
+
+
 def repair_authority(project,store,board,run):
     reader=getattr(board,'repair_input',None)
     key=reader(run) if reader else None

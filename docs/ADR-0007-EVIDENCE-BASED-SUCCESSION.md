@@ -99,3 +99,16 @@ sem reivindicar nova aprovação humana. Após a ativação explícita somente n
 ensaio isolado, Lead submeteu e CTO revisou pelo Kanban nativo. Autorrevisão foi
 recusada. A aprovação da proposta conservou `delivery_approval=false` e a origem
 em triagem. A materialização da sucessora ainda não foi implementada/qualificada.
+
+### Vínculo de autoria entre origem e sucessora
+
+A inspeção dos gates encontrou um requisito adicional: Red, Green e freeze
+conferem card/contrato de autoria. Copiar ou renomear recibos para a sucessora
+falsificaria essa origem. `reassessment_origin` prepara a resolução explícita do
+vínculo por proposta independente, mantendo recibos e autoria originais. Recusa
+outro handoff, release, autor, autorrevisão e execução anterior à origem.
+
+Esse resolvedor ainda não substitui verificações dos gates. Antes de conectá-lo,
+o controlador deve conferir que a aprovação exata é input do card nativo atual;
+a nova revisão deve gerar seus próprios recibos, sem herdar aprovação antiga.
+A materialização do grafo e a prova completa permanecem pendentes.
