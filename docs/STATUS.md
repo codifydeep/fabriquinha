@@ -1,12 +1,29 @@
 # Status do projeto — 28 de outubro de 2026
 
-**S4 técnico qualificado; S5 homologado com assistência; primeiro incremento S6
-integrado e validado. O objetivo geral continua aberto.** A execução usa Hermes
-SDK + Kanban nativos e operações determinísticas. Multica e Temporal não
-participam desse caminho. A distribuição pública e a retomada do Truco completo
-ainda não estão qualificadas.
+**S6 homologado com assistência anterior na automação.** Os dois incrementos
+foram integrados e o QA final passou em 28/10/2026. Isso não qualifica autonomia
+completa nem o Truco completo. Hermes SDK + Kanban permanecem como execução;
+Multica e Temporal não participam deste caminho.
 
-## Estado atual do S6
+## Entrega S6 comprovada
+
+- URL local: http://127.0.0.1:54618
+- Commit: `41928a48fae5aecafb170d82e13a2bc13d5d9c5b`.
+- PRs [13](https://github.com/codifydeep/descartavel/pull/13) e
+  [14](https://github.com/codifydeep/descartavel/pull/14), integrados.
+- Suíte completa: 16 casos; controles negativos: 7 jobs cobrindo 14 casos.
+- QA implantado: 14 casos de navegador passaram; regressão do primeiro incremento preservada.
+- CI `fabriquinha-local-ci`, implantação, rollback e restauração no commit final.
+- Recibo controlador `c96240707ab2e3379817de7b20b14b722fb9a73524a7e1ed8ccda7169dbf0e63`, estado `HOMOLOGADA`.
+
+Após a última correção da automação, a equipe pediu mudanças, corrigiu testes,
+resolveu um impedimento via CTO, congelou testes, implementou, completou controles,
+revisou código e integrou/implantou/validou sem edição manual do produto.
+O ciclo completo continua classificado como **assistido**, pois exigiu correções
+anteriores do controlador. Próximas saídas: P5 (canal real e operação pública) e
+P6 (duas entregas comparáveis sem assistência técnica depois do aceite).
+
+## Histórico da recuperação do S6 (anterior à homologação)
 
 **Simplificação instalada; validação real retomada.** A fonte
 `fec67b28` passou por 474 testes, prova nativa de transferência/crash e cinco
