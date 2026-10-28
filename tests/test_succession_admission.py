@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.repairs import held_incident,review_failure
+from fabriquinha.repairs import held_incident,review_failure,review_reassessment
 
 class SuccessionAdmission(unittest.TestCase):
     def setUp(self):
@@ -69,3 +69,20 @@ class SuccessionAdmission(unittest.TestCase):
         self.records['incident']['binding']['reviewing']=False
         with self.assertRaisesRegex(ValueError,'held delivery review'):
             review_failure(self.project,self.store,'incident','decision','absent')
+
+    def test_new_wording_cannot_unlock_review_but_changed_observation_is_bound(self):
+        source=self.records['incident']['binding']
+        source.update(kind='implementation',actor='lead',author='developer',contract='contract')
+        author={**source,'number':6,'actor':'developer','reviewing':False}
+        self.records['green']=dict(kind='green',binding=author,payload=dict(project='project',snapshot='snapshot'))
+        old=self.records['experiment'];old['payload']['report']={'failures':['old']}
+        new=copy.deepcopy(old);new['payload'].update(hypothesis='New prose',job='job')
+        self.records['new']=new
+        def assess():return review_reassessment(self.project,self.store,'incident','decision','green','new')
+        with self.assertRaisesRegex(ValueError,'new wording'):assess()
+        new['payload']['report']={'failures':[]}
+        self.records['job']=dict(kind='suite_job',binding=new['binding'],payload=dict(report={'failures':[]},identity=dict(snapshot='snapshot',project='project')))
+        facts=assess();self.assertFalse(facts['delivery_approval'])
+        self.assertEqual(facts['new_evidence'],'new')
+        self.records['job']['payload']['identity']['snapshot']='foreign'
+        with self.assertRaisesRegex(ValueError,'exact controller job'):assess()

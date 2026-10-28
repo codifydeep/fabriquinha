@@ -65,3 +65,10 @@ procedência: ainda não criam sucessora nem concedem aprovação ou escrita.
 
 Próxima fronteira: proposta nativa com evidência nova e materialização idempotente
 da sucessora. O despacho S6 permanece desabilitado até a qualificação dessa cadeia.
+
+A preparação da proposta de revisão agora existe como operação não ativada:
+exige relatório novo vinculado ao job exato e cria um card inicialmente bloqueado.
+Texto de hipótese diferente não basta. A deduplicação usa origem/execução e
+identidade da observação, não um contador novo de protocolo. Faltam qualificação
+nativa de criação/reinício, revisão da proposta e materialização da sucessora;
+nenhuma dessas capacidades é declarada instalada ou operacional por este código.

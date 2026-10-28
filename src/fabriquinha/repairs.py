@@ -85,6 +85,31 @@ def review_failure(project,store,incident_key,decision_key,handoff):
         delivery_approval=False,requires_independent_plan_review=True)
 
 
+def review_reassessment(project,store,incident,decision,handoff,evidence):
+    """Require changed observed results, not another hypothesis or receipt ID."""
+    facts=review_failure(project,store,incident,decision,handoff)
+    held=store.receipt(decision,kind='diagnostic_decision')
+    prior=store.receipt(held['payload']['experiment'],kind='diagnostic_experiment')
+    current=store.receipt(evidence,kind='diagnostic_experiment')
+    scope,data=current['binding'],current['payload']
+    if (scope.get('kind')!='diagnostic' or scope.get('reviewing') is not False
+            or scope.get('actor')!=project.technical_roles['cto']
+            or scope.get('release')!=held['binding']['release']
+            or data.get('project')!=project.fingerprint() or data.get('incident')!=incident
+            or data.get('snapshot')!=facts['snapshot']
+            or not isinstance(data.get('report'),dict) or not data['report']
+            or data['report']==prior['payload'].get('report')
+            or not isinstance(data.get('job'),str) or not data['job']):
+        raise ValueError('new scoped CTO observation required; new wording is insufficient')
+    observation=store.receipt(data['job'],kind='suite_job')
+    if (observation['binding']!=scope or observation['payload'].get('report')!=data['report']
+            or observation['payload'].get('identity',{}).get('snapshot')!=facts['snapshot']
+            or observation['payload'].get('identity',{}).get('project')!=project.fingerprint()):
+        raise ValueError('new observation requires its exact controller job')
+    return {**facts,'new_evidence':evidence,
+        'observation_identity':digest([facts['snapshot'],data['report']])}
+
+
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
     """Read-only admission facts; never releases triage or creates a task.
 
@@ -309,6 +334,42 @@ class RepairTools(DraftTools):
 class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
+
+    def prepare_review_proposal(self,conn,anchor,card,incident,decision,handoff,evidence):
+        """Persist a blocked proposal; activation requires the qualified plan flow.
+
+        No source transition or worker dispatch occurs here. The same observation
+        on the same native execution resolves to the same immutable proposal.
+        """
+        kb,_,_=native();source=self.r.check_card(conn,card)
+        facts=review_reassessment(self.project,self.store,incident,decision,handoff,evidence)
+        latest=kb.latest_run(conn,source.id)
+        body=json.loads(source.body)
+        if (source.status!='triage' or not latest or not latest.ended_at
+                or facts['source']!=source.id or facts['source_run']!=latest.id
+                or facts['source_contract']!=digest(body)
+                or body.get('release_anchor')!=anchor.id):
+            raise ValueError('exact settled native review required')
+        if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
+            raise EffectBlocked('settle controller effects before review succession')
+        context=self.store.record('repair_context',self.r.binding(anchor),
+            dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[]))
+        proposal=dict(version=1,kind='plan',release=body['release'],anchor=anchor.id,
+            repair_of=source.id,repair_context=context,inputs={})
+        key=digest([self.project.fingerprint(),source.id,latest.id,'review',facts['observation_identity']])
+        existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        if existing:
+            previous=json.loads(existing['body'])
+            old=self.store.receipt(previous['repair_context'],kind='repair_context')['payload']
+            if ({**old,'new_evidence':facts['new_evidence']}!=dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[])
+                    or {**previous,'repair_context':context}!=proposal):
+                raise ValueError('review succession proposal drift')
+            return existing['id']
+        if self.r.board.guard:self.r.board.guard()
+        return kb.create_task(conn,title='REASSESS '+source.title,body=json.dumps(proposal),
+            assignee=self.project.coordination_roles['lead'],workspace_kind='scratch',
+            completion_contract='local-only',initial_status='blocked',max_retries=2,
+            max_runtime_seconds=600,idempotency_key=key)
 
     def propose_fixture(self,conn,anchor,spec,item,incident,decision,graph):
         """A reviewed technical proposal, never an implicit retry or test edit."""
