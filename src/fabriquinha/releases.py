@@ -36,7 +36,10 @@ def continuation_context(continuation):
     """
     return dict(review=continuation['review'],context=continuation['context_id'],
         task=continuation['task'],source=continuation['context']['source'],
-        contract=continuation['context']['submission_contract'],delivery_approval=False)
+        contract=(
+            'Reassess the preserved author delivery independently. Recovery grants no freeze or delivery approval; all phase-specific TDD, review and delivery gates remain required.'
+            if continuation['context'].get('repair_kind')=='review'
+            else continuation['context']['submission_contract']),delivery_approval=False)
 
 
 class Releases:

@@ -44,6 +44,14 @@ class ReleaseContracts(unittest.TestCase):
         self.assertEqual(json.dumps(full,sort_keys=True),before)
         self.assertLess(len(json.dumps(value)),1000)
 
+    def test_review_continuation_needs_no_submission_contract(self):
+        value=continuation_context(dict(review='admission',context_id='admission',
+            task='t_12345678',controller_admission=True,
+            context=dict(source='t_abcdef01',repair_kind='review')))
+        self.assertIn('independently',value['contract'])
+        self.assertFalse(value['delivery_approval'])
+        self.assertEqual(value['review'],'admission')
+
     def setUp(self):
         folder=tempfile.TemporaryDirectory();self.addCleanup(folder.cleanup)
         self.store=Store(Path(folder.name)/'private');self.project=Project.parse(configured())
