@@ -618,3 +618,18 @@ A revisão semântica continua obrigatória. Os testes reproduziram a recusa na
 versão anterior e cobrem tentativas de envolver assertions, rebinding e early exit.
 O candidato produzido pelo próprio autor passou na comparação somente leitura;
 não foi editado, congelado ou aprovado por essa prova.
+
+### Diagnóstico de fixture separado do reparo legado
+
+A revisão de fixture compartilhava `classification=test_contract` com o reparo
+legado de texto de QA. O diagnóstico herdava a instrução “não é um novo Red” e
+executava sua observação como fase Green, contradizendo a preparação na base
+original. Isso foi separado por `repair_kind=fixture`.
+
+Para fixture, o diagnóstico observa a suíte imutável em fase diagnóstica e recusa
+todas as substituições, inclusive de produto. Reconhece a base original e o
+candidato ainda não congelado; hash diferente não é por si só inconsistência.
+Mantém a autoridade limitada aos caminhos aprovados, o novo Red e a revisão
+independente. O reparo legado mantém seu comportamento anterior. Um teste novo
+reproduziu o uso indevido da fase Green e passou após a separação, cobrindo também
+recusa de escrita e ausência de execução adicional após a recusa.

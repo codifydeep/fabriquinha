@@ -136,6 +136,21 @@ class TechnicalRecovery(unittest.TestCase):
             diagnostic.decide(dict(action='resume',reason='Change product wording',findings=[dict(path='app.py',line=1,detail='Edit the app')]))
         self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
 
+    def test_fixture_diagnosis_uses_diagnostic_phase_and_never_rewrites_candidate(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.repair=dict(context=dict(repair_kind='fixture'),
+            proposal=dict(classification='test_contract',test_paths=['tests/test_existing.py']))
+        self.quality.observe=Mock(return_value=('observed-job',dict(failures=[{'case':'new behavior'}])))
+        diagnostic.validate(dict(hypothesis='Observe expected Red on the original product base'))
+        self.quality.observe.assert_called_once_with(self.run,self.snapshot,'diagnostic')
+        for replacements in ({'tests/test_existing.py':'changed'},{'app.py':'changed'}):
+            with self.assertRaisesRegex(ValueError,'read-only'):
+                diagnostic.validate(dict(hypothesis='Do not rewrite the fixture',replacements=replacements))
+        self.assertEqual(self.quality.observe.call_count,1)
+        self.assertIn('fresh Red',diagnostic.correction_expectation())
+        self.assertIn('original product baseline',diagnostic.correction_expectation())
+        self.assertNotIn('not a new feature Red',diagnostic.correction_expectation())
+
     def test_implementation_diagnosis_keeps_product_experiments_and_frozen_tests(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.original={**diagnostic.original,'kind':'implementation'}

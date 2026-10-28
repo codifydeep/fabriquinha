@@ -114,6 +114,24 @@ class Diagnostic:
     def qa_correction(self):
         return self.original['kind']=='tests' and self.repair and self.repair['proposal']['classification']=='test_contract'
 
+    def fixture_correction(self):
+        return self.qa_correction() and self.repair.get('context',{}).get('repair_kind')=='fixture'
+
+    def correction_expectation(self):
+        if self.fixture_correction():
+            return ('Authorized unpublished fixture revision on the original product baseline. '
+                'Missing new product behavior is expected: diagnose fresh Red, not completed implementation. '
+                'The candidate may differ from its old freeze only by the independently approved additive setup; '
+                'a changed hash before a new independent freeze is expected, not stale evidence by itself. '
+                'Check the actual proposed setup and existing statements. Return author corrections within the approved paths; '
+                'do not edit the source, demand Green before Red or transfer technical choices to the CEO. '
+                'Other implementation findings remain visible for the implementation phase and cannot waive any later gate. '
+                'The previous implementation snapshot is separate from this test-author baseline. '
+                'diagnostic_validate is read-only evidence; a fresh delivery_submit and independent test review remain required.')
+        return ('Authorized QA expected-text correction, not a new feature Red. The independent corrective plan permits only its listed QA text paths. '
+            'Diagnose all frozen-preview failures against the approved brief. Do not tell the author to edit product code or preserve a known incorrect QA expectation; '
+            'do not silently override the reviewed authority. diagnostic_validate runs both full suite and QA preview; negative results remain observations, not approval.')
+
     def deployment_observation(self):
         if self.original['kind']!='integration' or not self.q.project.delivery_roles:return None
         from .deployment import Deployment
@@ -153,7 +171,7 @@ class Diagnostic:
             if isinstance(approval,str):
                 from .intake import Intake
                 result['approved_brief']=Intake(self.q.project,self.store,self.board).approved(approval)[1]['payload']['document']
-            result['phase_expectation']='Authorized QA expected-text correction, not a new feature Red. The independent corrective plan permits only its listed QA text paths. Diagnose all frozen-preview failures against the approved brief. Do not tell the author to edit product code or preserve a known incorrect QA expectation; do not silently override the reviewed authority. diagnostic_validate runs both full suite and QA preview; negative results remain observations, not approval.'
+            result['phase_expectation']=self.correction_expectation()
         if self.incident.get('control_refusal'):
             from .quality import CONTROL_SUBMISSION_CONTRACT
             result['last_control_refusal']=control_refusal_context(self.store,self.q.project,self.original,
@@ -235,7 +253,9 @@ class Diagnostic:
             self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
                 snapshot=snapshot,hypothesis=args['hypothesis'],validator=document_kind,document=candidate,report=report))
             return dict(experiment=self.experiment,report=report,delivery_approval=False)
-        correction=self.qa_correction()
+        correction=self.qa_correction() and not self.fixture_correction()
+        if self.fixture_correction() and 'replacements' in args:
+            raise ValueError('fixture diagnosis is read-only; return scoped guidance to the author')
         if 'replacements' in args:
             if correction:
                 with tempfile.TemporaryDirectory(prefix='.diagnostic-qa-',dir=self.store.root.parent) as folder:
