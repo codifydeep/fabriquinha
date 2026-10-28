@@ -105,6 +105,19 @@ class NativeBackendPolicy(unittest.TestCase):
         self.assertNotIn('private',message)
         self.assertIn('missing_terminal_operation',str(incomplete_activity({},8192)))
 
+    def test_missing_handoff_includes_only_bounded_compression_diagnostics(self):
+        compressor=SimpleNamespace(compression_count=5, _ineffective_compression_count=2,
+            _previous_summary='SECRET private summary')
+        message=str(incomplete_activity({'api_calls':13},16384,compressor=compressor))
+        self.assertIn('"compressions": 5',message)
+        self.assertIn('"ineffective_compressions": 2',message)
+        self.assertNotIn('SECRET',message)
+        self.assertIn('missing_terminal_operation',message)
+        malformed=SimpleNamespace(compression_count=True,_ineffective_compression_count='SECRET')
+        message=str(incomplete_activity({},16384,compressor=malformed))
+        self.assertNotIn('compressions',message)
+        self.assertNotIn('SECRET',message)
+
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory();self.addCleanup(self.temporary.cleanup)
         self.root=Path(self.temporary.name).resolve()

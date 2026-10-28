@@ -142,7 +142,7 @@ def request_policy(activity,output_limit):
             **({'max_tokens':output_limit} if output_limit is not None else {})}
 
 
-def incomplete_activity(result, output_limit):
+def incomplete_activity(result, output_limit, *, compressor=None):
     """Retain actionable SDK state without copying response text or credentials."""
     result=result if isinstance(result,dict) else {}
     error=result.get('error')
@@ -151,6 +151,13 @@ def incomplete_activity(result, output_limit):
     state=dict(code=code,output_limit=output_limit,failed=result.get('failed') is True)
     calls=result.get('api_calls')
     if type(calls) is int and 0<=calls<=1000:state['api_calls']=calls
+    # Read numeric telemetry from the pinned native compressor only. Never copy
+    # summaries/transcripts; an ineffective compaction is evidence, not authority
+    # to reset a session, retry work or bypass a delivery gate.
+    for source,target in (('compression_count','compressions'),
+                          ('_ineffective_compression_count','ineffective_compressions')):
+        value=getattr(compressor,source,None)
+        if type(value) is int and 0<=value<=1000:state[target]=value
     return ValueError('activity ended without a controller-validated native handoff; SDK status '+json.dumps(state))
 
 
@@ -552,7 +559,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
         if not terminal and stop_requested and stop_requested():
             from .operations import ActivityPaused
             raise ActivityPaused('SDK activity interrupted by operational pause')
-        if not terminal:raise incomplete_activity(result,output_limit)
+        if not terminal:raise incomplete_activity(result,output_limit,compressor=getattr(agent,'context_compressor',None))
         return dict(transition=terminal,session=agent.session_id,resumed=bool(previous),recovery_epoch=recovery_epoch,
                     sdk_exit=result.get('turn_exit_reason',result.get('exit_reason')),delivery_approval=False)
     finally:

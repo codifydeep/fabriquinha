@@ -317,3 +317,27 @@ e preservou a suíte anterior verde. A execução 48 foi despachada ao Tech Lead
 para nova revisão. Esse retorno ocorreu sem edição manual dos testes ou
 aprovação pelo operador. Ainda não comprova aprovação da revisão, Green,
 integração ou homologação do segundo incremento.
+
+## Contexto e diagnóstico da segunda implementação — 28/10
+
+A tentativa 51 terminou sem handoff validado após 13 chamadas. O log registra
+cinco compactações e bloqueio por compactação ineficaz, acompanhado de releituras.
+O CTO, execução 52, preservou o incidente em hold: a suíte ainda mostra nove
+casos verdes e sete comportamentos de entrada na sala ausentes. Não há Green
+nem evidência de alteração funcional concluída. Esse resultado não autoriza
+outra tentativa idêntica ou mudanças nos testes congelados.
+
+A medição do prompt inicial corrige uma interpretação preliminar: cerca de
+6.396 caracteres vêm do contexto nativo; o restante dos 53.409 caracteres inclui
+contexto estruturado do pacote e diagnóstico. O comentário nativo tem apenas
+uma referência DIAG. Portanto, não se deve atribuir o volume a comentários
+históricos nem removê-los indiscriminadamente. O experimento anexado contém
+11.019 caracteres de relatório, além do veredito e de sua referência durável.
+
+Foi preparado um reparo de observabilidade no adaptador: erros de handoff
+incluem contadores numéricos delimitados de compactação e ineficácia, lidos do
+compressor nativo fixado. Resumos, respostas e credenciais não são copiados.
+Isso fornece evidência ao diagnóstico, sem mudar gates, resetar sessões ou
+conceder retries. O teste novo falhou antes do reparo e os 14 testes do adaptador
+passaram depois. A instalação e uma correção de contexto ainda precisam ser
+qualificadas; esta telemetria isolada não resolve a repetição observada.
