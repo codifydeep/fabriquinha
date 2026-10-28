@@ -5,21 +5,23 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 em hold técnico após duas submissões incompletas de controles negativos.**
+**S6 retomado após qualificação offline da continuação revisada.**
 O teste Red foi aprovado independentemente e congelado; a implementação chegou
 a Green. Lead executou diagnóstico e retomou o autor; a repetição escalou ao
 CTO, que preservou a triagem. Nenhum controle foi dispensado e não houve PR ou
-homologação S6. O runtime foi drenado para manutenção. Consumo observado:
-7.029/7.064; a ampliação solicitada permanece pendente.
+homologação S6. O runtime foi drenado para manutenção e a fonte `a6f59bb8` foi instalada,
+sem troca dos validadores. Supervisor e relay foram conferidos; o despacho foi
+retomado dentro da cota existente, a partir de 7.029/7.064. A ampliação solicitada
+permanece pendente; nenhum aumento foi aplicado.
 
-O reparo de orientação passou offline com 402 testes, mas ainda não está instalado.
+O reparo de orientação passou offline com 402 testes e está instalado.
 A admissão somente leitura reconheceu os vínculos reais preservados. A criação
 idempotente e a revisão independente da proposta passaram offline (409 testes
 no total). A continuação e sua reconciliação já estão implementadas em fonte,
 com testes de interrupção e remapeamento das dependências. O board real não foi
 alterado. A qualificação isolada no Hermes nativo passou: 17 atividades SDK, dois
 incrementos integrados e QA, sem chamadas pagas. O núcleo passou com 411 testes.
-Falta instalar e observar a equipe real, preservando o card antigo,
+Falta comprovar a continuação com a equipe real, preservando o card antigo,
 o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do

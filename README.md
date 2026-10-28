@@ -76,8 +76,8 @@ relatórios continuam impedindo aprovação em todos os gates de entrega.
 
 A [continuação após submissão incompleta](docs/S6-CONTROL-SUBMISSION-RECOVERY.md)
 passou na qualificação offline com participantes programados. Ela reutiliza Lead, CTO e
-Kanban, preserva a triagem histórica e exige novos gates para a entrega. Ainda
-não está instalada nem comprovada com agentes reais; não constitui recuperação
+Kanban, preserva a triagem histórica e exige novos gates para a entrega. Está instalada, mas ainda
+não foi comprovada com agentes reais; não constitui recuperação
 genérica de qualquer impedimento.
 
 Uma orientação técnica aplicada abre contexto SDK novo, reconstituído pelos

@@ -1,7 +1,7 @@
 # S6 — submissão de controles e recuperação limitada
 
 Estado: orientação e continuação qualificadas offline no Hermes nativo.
-Instalação e continuação real ainda pendentes. Não é aprovação de entrega nem autorização para reset.
+Fonte `a6f59bb8` instalada; continuação real retomada, resultado ainda pendente. Não é aprovação de entrega nem autorização para reset.
 
 ## Evidência e causa
 
@@ -91,8 +91,10 @@ uma mutação idêntica foi rejeitada antes da execução; outra não derrubava 
 algum. A prova aprovada quebrou somente o navegador, deixando a API correta,
 para exercitar cobertura parcial real. Os gates não foram modificados.
 
-Próximos passos: instalar a fonte publicada durante manutenção, conferir a
-admissão contra os mesmos fatos do S6 e retomar sob a cota autorizada. Manter
+A fonte publicada foi instalada durante manutenção, passou na admissão dos
+nove perfis e o despacho foi retomado sob o teto existente de 7.064, a partir
+de 7.029 chamadas. O bundle congelado não mudou. Próximo passo: observar a
+continuação executada e revisada pelos agentes reais. Manter
 visível a distinção entre incidente histórico e continuação ativa. A prova não
 qualifica recuperação genérica de infraestrutura, mudança de escopo ou qualquer
 falha após implantação. Canal, restauração e distribuição R4 continuam pendentes.
