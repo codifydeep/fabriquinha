@@ -54,3 +54,14 @@ hipótese ainda não alcançada e operação realmente disponível.
 Critério: a equipe consegue produzir uma próxima ação válida a partir de nova
 informação sem alterar o controlador para cada incidente. Troca de modelo,
 outro serviço, novo banco e recomeço do produto ficam fora deste trabalho.
+
+## Implementação em andamento
+
+A admissão comum `held_incident` substitui a duplicação no reparo de submissão.
+A preparação `review_failure` vincula uma revisão triada ao handoff imutável do
+seu autor; não usa o workspace mutável como evidência. Confere projeto, release,
+card, contrato, autoria, snapshot e diagnóstico CTO. Ambas são verificações de
+procedência: ainda não criam sucessora nem concedem aprovação ou escrita.
+
+Próxima fronteira: proposta nativa com evidência nova e materialização idempotente
+da sucessora. O despacho S6 permanece desabilitado até a qualificação dessa cadeia.

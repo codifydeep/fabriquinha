@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.repairs import held_incident
+from fabriquinha.repairs import held_incident,review_failure
 
 class SuccessionAdmission(unittest.TestCase):
     def setUp(self):
@@ -48,3 +48,24 @@ class SuccessionAdmission(unittest.TestCase):
                 self.records['decision']['binding'][field]=value
                 with self.assertRaises(ValueError):self.admit()
                 self.records['decision']['binding'][field]=original
+
+    def test_implementation_review_uses_exact_author_snapshot(self):
+        source=self.records['incident']['binding']
+        source.update(kind='implementation',actor='lead',author='developer',contract='contract')
+        author={**source,'number':6,'actor':'developer','reviewing':False}
+        self.records['green']=dict(kind='green',binding=author,payload=dict(project='project',snapshot='snapshot'))
+        facts=review_failure(self.project,self.store,'incident','decision','green')
+        self.assertEqual(facts['snapshot'],'snapshot')
+        self.assertFalse(facts['delivery_approval'])
+        for field,value in [('actor','lead'),('task','other'),('contract','other'),('release','other')]:
+            with self.subTest(field=field):
+                original=author[field];author[field]=value
+                with self.assertRaises(ValueError):review_failure(self.project,self.store,'incident','decision','green')
+                author[field]=original
+        self.records['green']['payload']['snapshot']='different'
+        with self.assertRaises(ValueError):review_failure(self.project,self.store,'incident','decision','green')
+
+    def test_authorship_is_not_a_delivery_review(self):
+        self.records['incident']['binding']['reviewing']=False
+        with self.assertRaisesRegex(ValueError,'held delivery review'):
+            review_failure(self.project,self.store,'incident','decision','absent')

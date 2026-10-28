@@ -61,6 +61,30 @@ def held_incident(project,store,incident_key,decision_key,current_snapshot):
     return incident,decision
 
 
+def review_failure(project,store,incident_key,decision_key,handoff):
+    """Bind a held review to the author's immutable handoff, never its workspace.
+
+    Used as admission evidence for a successor proposal, not as permission to
+    approve, edit tests or reset the native source. Native freshness and new
+    independent evidence remain required when materializing the proposal.
+    """
+    incident=store.receipt(incident_key,kind='incident')
+    source=incident['binding']
+    if source.get('reviewing') is not True or source.get('kind') not in ('tests','implementation'):
+        raise ValueError('held delivery review required')
+    record=(Quality(project,store,None,None).test_evidence(handoff) if source['kind']=='tests'
+            else store.receipt(handoff,kind='green'))
+    expected={**source,'actor':source['author'],'reviewing':False}
+    if (not Run(**expected).same_subject(record['binding'])
+            or record['payload'].get('project')!=project.fingerprint()):
+        raise ValueError('exact author handoff required for review succession')
+    snapshot=record['payload']['snapshot']
+    held_incident(project,store,incident_key,decision_key,snapshot)
+    return dict(source=source['task'],source_run=source['number'],source_contract=source['contract'],
+        snapshot=snapshot,handoff=handoff,incident=incident_key,reviewed_diagnosis=decision_key,
+        delivery_approval=False,requires_independent_plan_review=True)
+
+
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
     """Read-only admission facts; never releases triage or creates a task.
 
