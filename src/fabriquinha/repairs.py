@@ -669,6 +669,28 @@ class Repairs:
                     if not kb.unblock_task(conn,task.id):raise ValueError('native continuation activation refused')
         return result
 
+    def continue_review(self,conn,anchor,graph):
+        """Discover completed reviewed successors from durable native records."""
+        seen=set()
+        while True:
+            sources={c['id'] for i in graph['items'] for c in i['cards'].values()}
+            candidates=[]
+            for task in Recovery(self.project,self.store,self.r.board).cards(conn):
+                body=json.loads(task.body or '{}')
+                if (task.status!='done' or body.get('kind')!='plan' or body.get('anchor')!=anchor.id
+                        or body.get('repair_of') not in sources or not body.get('repair_context')):continue
+                context=self.store.receipt(body['repair_context'],kind='repair_context')['payload']
+                if context.get('repair_kind')!='review':continue
+                previous=self.store.receipt(context['prior_graph'],kind='release_graph')
+                if previous['binding']!=self.r.binding(anchor) or previous['payload']!=graph:continue
+                approval,_,_=self.r.closed(task.id,'plan_review','plan_review')
+                candidates.append(approval)
+            if not candidates:return graph
+            if len(candidates)!=1 or candidates[0] in seen:
+                raise EffectBlocked('ambiguous or circular review succession; require technical diagnosis')
+            seen.add(candidates[0])
+            graph=self.materialize_submission(conn,anchor,graph,candidates[0])
+
     def continue_submission(self,conn,anchor,spec,graph):
         """Reconcile a bounded pre-merge correction through existing plan roles."""
         kb,_,_=native()

@@ -415,10 +415,14 @@ class Quality:
         expected=replace(run,actor=run.author,reviewing=False)
         reader=getattr(self.board,'reassessment_input',None)
         approval=reader(run) if reader else None
-        if approval is not None:
+        if approval is not None and not expected.same_subject(record['binding']):
             if not isinstance(approval,str):raise ValueError('exact native reassessment input required')
             from .repairs import reassessment_origin
             expected=reassessment_origin(self.project,self.store,run,approval,key)
+        else:
+            # After requested changes the author submits under the successor's
+            # own contract. That is a new delivery, not the transferred origin.
+            approval=None
         if (not expected.same_subject(record['binding'])
                 or record['payload']['project']!=self.project.fingerprint()):
             raise ValueError('review must match exact authorship and contract')

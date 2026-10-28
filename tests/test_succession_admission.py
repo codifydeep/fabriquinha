@@ -136,3 +136,13 @@ class SuccessionAdmission(unittest.TestCase):
             record['binding']={**old.binding(),'contract':'tampered'}
             with self.assertRaisesRegex(ValueError,'exact authorship'):
                 quality.review_authorship(current,'red',record)
+
+    def test_corrected_successor_delivery_uses_new_authorship_not_old_reassessment(self):
+        from fabriquinha.quality import Quality
+        current=Run('successor',10,'lead','tests',True,'developer','release','new-contract')
+        author=replace(current,number=9,actor='developer',reviewing=False)
+        board=SimpleNamespace(reassessment_input=lambda run:'old-transfer-approval')
+        quality=Quality(self.project,self.store,None,board)
+        with patch('fabriquinha.repairs.reassessment_origin') as resolve:
+            result=quality.review_authorship(current,'corrected-red',dict(binding=author.binding(),payload=dict(project='project')))
+            self.assertIsNone(result);resolve.assert_not_called()

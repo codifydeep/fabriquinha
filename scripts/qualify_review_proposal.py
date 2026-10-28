@@ -145,12 +145,41 @@ def qualify(root,upstream):
                     completed=operation.materialize_submission(conn,anchor,graph,approval)
                     assert completed==saved
                     assert operation.materialize_submission(conn,anchor,graph,approval)==saved
+                    assert operation.continue_review(conn,anchor,graph)==saved
                 downstream=saved['items'][0]['cards']['implementation']
                 assert downstream['parents']==[successor,proposal]
                 assert kb.claim_task(conn,downstream['id']) is None
+                verdict=dict(decision='changes',reason='Programmed independent request for correction',
+                    findings=[dict(path='tests/example.py',reason='Programmed finding')])
+                review=store.record('test_review',active.binding(),dict(project=project.fingerprint(),red=handoff,snapshot=snapshot,verdict=verdict))
+                board.finish_review(active,'Correct the observed issue',{'review':review},changes=True)
+                assert kb.get_task(conn,successor).assignee=='author'
+                assert board.pending_review_transfers(conn)==[]
+                correction=kb.claim_task(conn,successor);assert correction
+                correcting=board.current(successor,correction.current_run_id)
+                assert correcting.actor=='author' and not correcting.reviewing
+                feedback=board.review_feedback(correcting,store)
+                assert len(feedback)==1 and feedback[0]['receipt']==review
+                corrected=store.record('red',correcting.binding(),dict(project=project.fingerprint(),snapshot=snapshot))
+                board.review(correcting,'Programmed corrected delivery',{'red':corrected})
+                rereview=kb.claim_review_task(conn,successor);assert rereview
+                checking=board.current(successor,rereview.current_run_id)
+                assert checking.actor=='lead' and checking.reviewing
+                assert board.input(checking,'red',review_handoff=True)==corrected
+                assert corrected!=handoff
+                try:Quality(project,store,None,board).tests_review(checking,handoff,dict(decision='approve',reason='Obsolete',findings=[]))
+                except ValueError as error:assert 'obsolete' in str(error)
+                else:raise AssertionError('obsolete author delivery accepted')
+                assert Quality(project,store,None,board).review_authorship(checking,corrected,store.receipt(corrected)) is None
+                frozen=store.record('tests_frozen',checking.binding(),dict(project=project.fingerprint(),red=corrected,snapshot=snapshot,programmed=True))
+                board.finish_review(checking,'Programmed independent completion',{'tests':frozen})
+                dependent=kb.claim_task(conn,downstream['id']);assert dependent
+                dependent_run=board.current(downstream['id'],dependent.current_run_id)
+                assert board.input(dependent_run,'tests')==frozen
+                assert kb.block_task(conn,dependent.id,kind='needs_input',reason='Qualification finished; no model worker',expected_run_id=dependent.current_run_id)
     result=dict(passed=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
         original_triage_preserved=True,proposal_initially_not_dispatchable=True,independent_native_review=True,self_review_denied=True,programmed_admission=True,
-        immutable_graph_recovered=True,dependent_work_held=True,native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
+        changes_return_to_original_author=True,corrected_handoff_independently_reviewed=True,dependent_released_after_review=True,immutable_graph_recovered=True,dependent_work_held=True,native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
         model_calls=0,docker_calls=0,delivery_approval=False)
     write_json(root/'result.json',result);return result
 

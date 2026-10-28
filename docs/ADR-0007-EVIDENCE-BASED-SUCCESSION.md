@@ -169,3 +169,20 @@ Ainda não instalado: faltam a descoberta/ativação automática da proposta com
 evidência nova, o caminho de mudanças solicitadas após reavaliação e a prova
 completa até fechamento dos dependentes. O bloqueio de despacho é uma proteção
 transitória, não uma solução para um incidente que permaneça sem responsável.
+
+### Mudanças solicitadas e descoberta da continuação aprovada
+
+O fluxo nativo programado agora percorre solicitação de mudanças, retorno ao
+autor original, consulta do feedback persistente, novo handoff e outra revisão
+independente. O gate rejeitou o Red antigo depois da nova submissão. Uma entrega
+corrigida sob o contrato da sucessora usa sua própria autoria, sem reutilizar
+a autoridade de transferência da entrega anterior. A implementação dependente
+só pôde ser reclamada após o fechamento da nova revisão. Os recibos de qualidade
+nessa prova são programados; não constituem novo Red/Green real do produto.
+
+A reconciliação da release descobre propostas de reavaliação já concluídas a
+partir do Kanban e do grafo anterior exato, materializa a continuação e reconstrói
+a cadeia sem memória em processo. Propostas ambíguas ou circulares são recusadas.
+Isso ainda não cria ou aprova automaticamente uma proposta: falta qualificar a
+obtenção da evidência nova e sua passagem aos responsáveis Lead/CTO. A instalação
+real continua em manutenção, sem novas chamadas pagas.

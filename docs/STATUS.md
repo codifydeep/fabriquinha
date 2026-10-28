@@ -37,9 +37,10 @@ Fonte instalada: `8d6bbd92`. A orientação adicional publicada em `fc202f3a` ai
 não foi instalada. `delivery_validate`, revisão aditiva de fixture e separação
 de contexto diagnóstico foram implementados e receberam provas delimitadas.
 A auditoria de 28/10 foi somente leitura. Após aprovação do plano, a suíte
-offline passou com 455 testes; os gates de autoria foram conectados à autoridade
-explícita de sucessão. A materialização e a prova ponta a ponta dessa recuperação
-continuam pendentes; nenhum agente foi iniciado nesta implementação offline.
+offline passou com 457 testes. Provas nativas programadas cobrem a sucessora,
+dependências, interrupções, solicitação de mudanças e nova revisão. Falta
+qualificar a obtenção de evidência nova e a ativação da proposta pelos agentes,
+além da recuperação real do S6; o runtime continua inalterado.
 
 Consumo confirmado antes da pausa: **7.247/8.500 chamadas**, restando 1.253.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
