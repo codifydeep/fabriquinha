@@ -1,7 +1,7 @@
 # S6 — submissão de controles e recuperação limitada
 
 Estado: orientação e continuação qualificadas offline no Hermes nativo.
-Fonte `a6f59bb8` instalada; continuação real retomada, resultado ainda pendente. Não é aprovação de entrega nem autorização para reset.
+Fonte `a6f59bb8` instalada; a proposta real terminou em hold. Reparo de contexto em manutenção. Não é aprovação de entrega nem autorização para reset.
 
 ## Evidência e causa
 
@@ -98,3 +98,22 @@ continuação executada e revisada pelos agentes reais. Manter
 visível a distinção entre incidente histórico e continuação ativa. A prova não
 qualifica recuperação genérica de infraestrutura, mudança de escopo ou qualquer
 falha após implantação. Canal, restauração e distribuição R4 continuam pendentes.
+
+
+## Limite encontrado com os agentes reais
+
+A proposta real teve uma devolução e uma revisão aprovada como hold de
+infraestrutura. Lead e CTO inferiram que faltava aprovação do CEO porque o
+texto preservado do brief ainda dizia “NOT APPROVED”. O recibo de aprovação
+exato existe e passou na validação; o documento não precisa ser reescrito nem
+aprovado novamente. Não se trata de autorização para ignorar o hold técnico.
+
+A correção em fonte expõe `brief_authority` separadamente do documento: recibo,
+revisão, release, decisão, ator e limites. Planejamento, correções e atividades
+de entrega passam a receber essa autoridade validada. O contrato esclarece que
+rótulos de rascunho são históricos e que o aceite de negócio não dispensa gates.
+412 testes passaram, incluindo rascunho contraditório, release divergente e
+recusa de aprovação negativa. A proposta que terminou em hold permanece intacta.
+Antes de retomar, qualificar uma proposta técnica sucessora vinculada ao contexto
+corrigido, com nova revisão independente; não reabrir nem reinterpretar como
+aprovação de implementação a decisão anterior.

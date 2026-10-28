@@ -57,7 +57,7 @@ class IntakeContracts(unittest.TestCase):
         kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body='{}'))
         api=SimpleNamespace(connect_closing=lambda:nullcontext(None))
         with patch('fabriquinha.intake.native',return_value=(kb,api,None)), \
-                patch.object(tools.intake,'approved',return_value=({'binding':{'release':run.release}}, {'payload':{'document':document()}})), \
+                patch.object(tools.intake,'approved',return_value=({'binding':{'release':run.release,'brief':'exact-brief'}}, {'payload':{'document':document()}})), \
                 patch.object(tools.intake,'previous',return_value=None,create=True):
             evidence=tools.evidence()
         self.assertIn('previous_reviews',evidence)
@@ -145,6 +145,20 @@ class IntakeContracts(unittest.TestCase):
             with self.subTest(changes=changes),self.assertRaises(ValueError):intake.approved(bad)
         bad=self.store.record('brief_approval',binding,dict(project=self.project.fingerprint(),decision='changes'))
         with self.assertRaises(ValueError):intake.approved(bad)
+
+    def test_verified_approval_is_explicit_even_when_draft_prose_says_not_approved(self):
+        doc={**document(),'summary':'PROPOSED BRIEF, NOT APPROVED. Await CEO approval.'}
+        proposal=self.store.record('product_brief',self.run.binding(),dict(project=self.project.fingerprint(),document=doc))
+        binding=dict(actor='ceo',task=self.run.task,release=self.run.release,brief=proposal)
+        approval=self.store.record('brief_approval',binding,dict(project=self.project.fingerprint(),decision='approve'))
+        intake=Intake(self.project,self.store,self.board)
+        result=intake.authority(approval,self.run.release)
+        self.assertEqual(result['status'],'approved');self.assertEqual(result['brief'],proposal)
+        self.assertEqual(result['receipt'],approval)
+        self.assertEqual(intake.approved(approval)[1]['payload']['document'],doc)
+        with self.assertRaises(ValueError):intake.authority(approval,'foreign')
+        denied=self.store.record('brief_approval',binding,dict(project=self.project.fingerprint(),decision='changes'))
+        with self.assertRaises(ValueError):intake.authority(denied,self.run.release)
 
     def test_independent_plan_review_cannot_rewrite_or_invent_a_release_success(self):
         activity=DraftActivity(self.project,self.store,self.board,replace(self.run,kind='plan',reviewing=True,actor='cto',author='lead'))

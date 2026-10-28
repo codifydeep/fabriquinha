@@ -5,7 +5,7 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 retomado após qualificação offline da continuação revisada.**
+**S6 em manutenção: a equipe confundiu texto histórico do brief com seu estado de aprovação.**
 O teste Red foi aprovado independentemente e congelado; a implementação chegou
 a Green. Lead executou diagnóstico e retomou o autor; a repetição escalou ao
 CTO, que preservou a triagem. Nenhum controle foi dispensado e não houve PR ou
@@ -21,6 +21,11 @@ no total). A continuação e sua reconciliação já estão implementadas em fon
 com testes de interrupção e remapeamento das dependências. O board real não foi
 alterado. A qualificação isolada no Hermes nativo passou: 17 atividades SDK, dois
 incrementos integrados e QA, sem chamadas pagas. O núcleo passou com 411 testes.
+A proposta real passou por devolução e revisão, mas terminou em hold de
+infraestrutura porque Lead e CTO leram “NOT APPROVED” no documento histórico.
+O recibo exato do CEO está válido. A correção de contexto acrescenta autoridade
+estruturada e passou com 412 testes; ainda falta instalá-la e qualificar a
+continuação dessa proposta preservada. O runtime foi novamente drenado.
 Falta comprovar a continuação com a equipe real, preservando o card antigo,
 o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a

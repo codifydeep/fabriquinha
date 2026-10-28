@@ -254,7 +254,8 @@ class Releases:
         from .repairs import repair_authority,context_view
         authority=repair_authority(self.project,self.store,self.board,run)
         technical=authority['context'] if authority else proposed['payload']['document']
-        result=dict(approved_brief=brief['payload']['document'],package=body['package'],criteria=body['criteria'],
+        result=dict(approved_brief=brief['payload']['document'],
+            brief_authority=self.intake.authority(proposed['payload']['approval'],run.release),package=body['package'],criteria=body['criteria'],
             repair=({**authority,'context':context_view(self.store,authority['context'])} if authority else None),
             required_control_cases=controls,
             architecture=technical['architecture'],observability=technical['observability'],

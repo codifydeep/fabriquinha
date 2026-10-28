@@ -151,6 +151,17 @@ class Intake:
         brief(proposal['payload']['document'])
         return record,proposal
 
+    def authority(self,approval,release):
+        """Expose verified approval separately from immutable proposal prose."""
+        record,proposal=self.approved(approval)
+        if record['binding']['release']!=release:raise ValueError('foreign approved brief')
+        return dict(status='approved',decision='approve',actor='ceo',receipt=approval,
+            brief=record['binding']['brief'],release=release,document_unchanged=True,
+            contract='This controller-verified receipt approves the exact document and its criteria. '
+                'Draft labels such as proposed or not approved are historical prose, not current approval state. '
+                'Do not request the same business approval again. New scope still requires a new decision; '
+                'this receipt does not approve implementation, tests, review, merge or deployment.')
+
     def terminal(self,anchor):
         if anchor.status!='done':return False
         kb,kbc,_=native()
@@ -306,7 +317,7 @@ class DraftTools:
         if self.run.kind=='brief':return dict(original_objective=body['objective'],execution=execution,**memory)
         approval=self.a.board.input(self.run,'approved_brief');record,proposal=self.intake.approved(approval)
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
-        result=dict(approved_brief=proposal['payload']['document'],available_owners=list(self.a.project.reviewers),
+        result=dict(approved_brief=proposal['payload']['document'],brief_authority=self.intake.authority(approval,self.run.release),available_owners=list(self.a.project.reviewers),
                     execution=execution,work_unit_contract=PACKAGE_CONTRACT,**memory)
         result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
         if result['previous_reviews']:
