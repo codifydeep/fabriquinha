@@ -196,3 +196,20 @@ da sessão. A proposta real da revisão 3 já foi submetida como `submission`;
 sua revisão foi pausada e drenada antes da atualização. Não é necessário criar
 outra proposta para testar este reparo. A implementação e a entrega continuam
 sem aprovação e dependem do resultado dessa revisão.
+
+## Resultado da retomada — 28/10
+
+A fonte `b72b3f07` foi instalada com o provedor desabilitado e o supervisor
+parado; a admissão dos nove perfis e do GitHub passou antes da retomada.
+O CTO concluiu a revisão 28 do card `t_b92b0f2c`: aprovou o plano como
+`submission`, distinguindo condições de início dos gates de entrega.
+O recibo independente `46486aed02e1bea8a830beb3431b44efd411aa6b3b91419ebb45823cba761e60`
+autoriza somente a continuação. O controlador materializou o grafo sucessor e
+iniciou automaticamente o frontend no card `t_b7e81da1` (execução 29).
+
+Isso comprova o handoff real desta recuperação, não a entrega do S6. A triagem
+anterior e os testes congelados permanecem preservados. A nova implementação
+continua obrigada a apresentar Green novo, o conjunto completo de controles
+negativos, revisão independente, PR, CI, implantação e QA. O segundo incremento
+e as validações restantes de autonomia também continuam pendentes. O teto
+específico foi mantido em 7.064 chamadas, sem fallback.
