@@ -6,7 +6,7 @@ corrections. No graph reset, test deletion, arbitrary exception or old approval.
 import json
 from .artifacts import digest
 from .board import Run
-from .effects import EffectBlocked
+from .effects import EffectBlocked,write_json
 from .intake import DraftTools,text,texts
 from .kanban_lane import native
 from .quality import Quality,suite_report,preview_evidence
@@ -189,7 +189,7 @@ class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
 
-    def propose_submission(self,conn,anchor,spec,item,incident,decision):
+    def propose_submission(self,conn,anchor,spec,item,incident,decision,graph):
         """Document-only native handoff; activation of replacement work is separate."""
         from .quality import CONTROL_SUBMISSION_CONTRACT
         kb,_,_=native()
@@ -206,8 +206,12 @@ class Repairs:
             raise ValueError('native source changed since CTO diagnosis')
         if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
             raise EffectBlocked('settle controller effects before a submission proposal')
+        if sum(i['cards']['implementation']['id']==source.id for i in graph['items'])!=1:
+            raise ValueError('unique source in current release graph required')
+        prior_graph=self.store.record('release_graph',self.r.binding(anchor),graph)
         context=self.store.record('repair_context',self.r.binding(anchor),dict(**facts,
             project=self.project.fingerprint(),repair_kind='submission',submission_protocol=SUBMISSION_PROTOCOL,
+            prior_graph=prior_graph,
             submission_contract=CONTROL_SUBMISSION_CONTRACT,qa_paths=[],package=item['package'],
             architecture=spec['document']['architecture'],observability=spec['document']['observability']))
         body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
@@ -222,6 +226,110 @@ class Repairs:
         return kb.create_task(conn,title='REPAIR SUBMISSION '+item['package']['title'],body=json.dumps(body),
             assignee=self.project.coordination_roles['lead'],workspace_kind='scratch',completion_contract='local-only',
             parents=[spec['task']],max_retries=2,max_runtime_seconds=600,idempotency_key=key)
+
+    def materialize_submission(self,conn,anchor,graph,approval):
+        """Immutable replacement tail; the source triage and completed tests remain."""
+        from .executor import validation_files
+        kb,_,_=native();authority=reviewed(self.project,self.store,approval);data=authority['context']
+        if data.get('repair_kind')!='submission' or authority['proposal']['classification']!='submission':
+            raise EffectBlocked('independently approved submission continuation required')
+        previous=self.store.receipt(data['prior_graph'],kind='release_graph')
+        if previous['binding']!=self.r.binding(anchor) or previous['payload']!=graph:
+            raise ValueError('proposal must refer to the exact unchanged release graph')
+        if graph.get('submission_depth',0)>=2 or any(i.get('repair_context') for i in graph['items']):
+            raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
+        if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
+            raise ValueError('continuation cannot change validation bundle')
+        plan=kb.get_task(conn,authority['task'])
+        if not plan or plan.status!='done' or self.r.closed(plan.id,'plan_review','plan_review')[0]!=approval:
+            raise ValueError('native independent proposal completion required')
+        path=self.r.folder(anchor)/('continuation-'+plan.id+'.json')
+        index=next((n for n,i in enumerate(graph['items']) if i['cards']['implementation']['id']==data['source']),None)
+        if index is None:raise ValueError('continuation source missing from graph')
+        if path.exists():
+            record=self.store.receipt(json.loads(path.read_bytes())['receipt'],kind='release_graph')
+            result=record['payload']
+            if (record['binding']!=self.r.binding(anchor) or result.get('continuation_review')!=approval
+                    or result.get('previous_graph')!=data['prior_graph']):raise ValueError('continuation pointer changed')
+        else:
+            for n,item in enumerate(graph['items']):
+                for phase,card in item['cards'].items():
+                    task=self.r.check_card(conn,card);latest=kb.latest_run(conn,task.id)
+                    if n<index or n==index and phase=='tests':
+                        if task.status!='done':raise ValueError('completed prefix and frozen tests required')
+                    elif task.id==data['source']:
+                        if task.status!='triage' or not latest or latest.id!=data['source_run'] or not latest.ended_at:
+                            raise ValueError('source triage changed before replacement')
+                        if self.store.capture(task.workspace_path)!=data['snapshot']:raise ValueError('source snapshot changed')
+                    elif latest is not None or task.status not in ('todo','ready','blocked'):
+                        raise EffectBlocked('downstream activity already started; preserve it')
+            mapping={};items=list(graph['items'][:index]);retired=[]
+            for n,item in enumerate(graph['items'][index:],start=index):
+                cards={}
+                for phase in ('tests','implementation','integration'):
+                    old=item['cards'][phase]
+                    if n==index and phase=='tests':cards[phase]=old;continue
+                    body=json.loads(json.dumps(old['body']));body['continuation_plan']=plan.id
+                    for name,value in body['inputs'].items():
+                        if value.startswith('parent:'):
+                            _,parent,key=value.split(':',2);body['inputs'][name]='parent:'+mapping.get(parent,parent)+':'+key
+                    parents=[mapping.get(parent,parent) for parent in old['parents']]
+                    # Hold all replacement work behind the independently closed proposal.
+                    if plan.id not in parents:parents.append(plan.id)
+                    workspace=self.store.root.parent/'work'/self.r.binding(anchor)['release']/('continuation-'+plan.id)/item['package']['id']/phase
+                    workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
+                    if n==index and phase=='implementation':
+                        if not any(workspace.iterdir()):self.store.checkout(data['snapshot'],workspace)
+                        elif self.store.capture(workspace)!=data['snapshot']:raise ValueError('unfinished replacement workspace changed')
+                    ident=kb.create_task(conn,title=phase.upper()+' '+item['package']['title'],body=json.dumps(body),
+                        assignee=old['owner'],parents=parents,workspace_kind='dir',workspace_path=str(workspace),
+                        completion_contract=old['completion_contract'],initial_status='blocked',max_retries=2,max_runtime_seconds=600,
+                        idempotency_key=digest([self.r.binding(anchor)['release'],plan.id,item['package']['id'],phase,'submission']))
+                    mapping[old['id']]=ident;retired.append(old['id'])
+                    cards[phase]=dict(id=ident,body=body,parents=parents,workspace=str(workspace),owner=old['owner'],completion_contract=old['completion_contract'])
+                items.append({**item,'cards':cards})
+            result={**graph,'items':items,'previous_graph':data['prior_graph'],'continuation_review':approval,
+                'superseded_cards':sorted(set(graph.get('superseded_cards',[]))|set(retired)),
+                'submission_depth':graph.get('submission_depth',0)+1}
+            receipt=self.store.record('release_graph',self.r.binding(anchor),result);write_json(path,{'receipt':receipt})
+        # No worker may start until the whole replacement graph is durable.
+        for item in result['items']:
+            for card in item['cards'].values():
+                task=self.r.check_card(conn,card)
+                if task.status=='blocked' and kb.latest_run(conn,task.id) is None:
+                    if self.r.board.guard:self.r.board.guard()
+                    if not kb.unblock_task(conn,task.id):raise ValueError('native continuation activation refused')
+        return result
+
+    def continue_submission(self,conn,anchor,spec,graph):
+        """Reconcile a bounded pre-merge correction through existing plan roles."""
+        kb,_,_=native()
+        for item in graph['items']:
+            source=kb.get_task(conn,item['cards']['implementation']['id'])
+            if not source or source.status!='triage':continue
+            latest=kb.latest_run(conn,source.id)
+            if not latest or not latest.ended_at:continue
+            decisions=[]
+            for task in Recovery(self.project,self.store,self.r.board).cards(conn):
+                body=json.loads(task.body or '{}')
+                if (body.get('kind')!='diagnostic' or body.get('source')!=source.id
+                        or body.get('source_run')!=latest.id or body.get('stage')!='cto' or task.status!='done'):continue
+                row=kb.latest_run(conn,task.id);key=(row.metadata or {}).get('diagnosis') if row else None
+                if not key:continue
+                decision=self.store.receipt(key,kind='diagnostic_decision')
+                incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                if incident['payload'].get('control_refusal') and incident['binding'].get('reviewing') is False:
+                    decisions.append((decision['payload']['incident'],key))
+            if not decisions:continue
+            if len(decisions)!=1:raise ValueError('one exact CTO disposition required for continuation')
+            if graph.get('submission_depth',0)>=2:raise EffectBlocked('two reviewed submission continuations exhausted; new technical preconditions required')
+            proposal=self.propose_submission(conn,anchor,spec,item,*decisions[0],graph)
+            task=kb.get_task(conn,proposal)
+            if task.status!='done':return graph
+            approval,_,_=self.r.closed(task.id,'plan_review','plan_review')
+            replacement=self.materialize_submission(conn,anchor,graph,approval)
+            return self.continue_submission(conn,anchor,spec,replacement)
+        return graph
 
     def context(self,conn,item,anchor,services,spec):
         kb,_,_=native();card=item['cards']['integration'];task=kb.get_task(conn,card['id'])

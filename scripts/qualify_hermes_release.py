@@ -128,7 +128,8 @@ class FixtureRuntime(Runtime):
         with patch('fabriquinha.runtime.subprocess.Popen',spawn):return super().spawn(*args,**kwargs)
 
 
-def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None,acceptance_suite=False):
+def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None,acceptance_suite=False,submission_recovery=False):
+    if submission_recovery and (not acceptance_suite or recovery!='none' or continuity):raise ValueError('submission recovery requires isolated shared-acceptance scenario')
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -153,14 +154,15 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         pause=runtime.control.pause()
         old=json.loads((root/'installation.json').read_bytes())['validation_bundle']
         runtime.configure_acceptance(old)
-        # An older pin with identical fixture behavior exercises graph binding
-        # migration before quality, independently of product/test changes.
-        pin=json.loads((root/'installation.json').read_bytes())
-        older=root/'older-validator';shutil.copytree(runtime.store.tree(pin['validation_bundle']),older)
-        file=older/'browser.py';file.chmod(0o600);file.write_bytes(file.read_bytes()+b'\n# older qualification pin\n')
-        prior=runtime.store.capture(older)
-        write_json(root/'installation.json',{**pin,'validation_bundle':prior})
-        write_json(root/'upgrade-before-tests.json',dict(bundle=prior))
+        if not submission_recovery:
+            # An older pin with identical fixture behavior exercises graph binding
+            # migration before quality, independently of product/test changes.
+            pin=json.loads((root/'installation.json').read_bytes())
+            older=root/'older-validator';shutil.copytree(runtime.store.tree(pin['validation_bundle']),older)
+            file=older/'browser.py';file.chmod(0o600);file.write_bytes(file.read_bytes()+b'\n# older qualification pin\n')
+            prior=runtime.store.capture(older)
+            write_json(root/'installation.json',{**pin,'validation_bundle':prior})
+            write_json(root/'upgrade-before-tests.json',dict(bundle=prior))
         with runtime.control.lock():runtime.control.resume(pause['episode'])
     if network_pool:reserve_fixture_networks(runtime.project,network_pool)
     if recovery!='none':write_json(root/'recovery-mode.json',dict(mode=recovery))
@@ -205,7 +207,9 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
     app3=app3.replace('</script>',"document.querySelector('#thanks').onclick=async()=>{const r=await fetch('/thanks?name='+encodeURIComponent(document.querySelector('#name').value));document.querySelector('#thanks-result').textContent=(await r.json()).message;};</script>")
     app3=app3.replace("        elif url.path == '/':", "        elif url.path == '/thanks':\n            status, value = 200, {'message': 'Thanks, '+parse_qs(url.query).get('name', ['World'])[0]}\n        elif url.path == '/':")
     test3=test1.replace('Greeting','Thanks').replace('test_named_greeting','test_named_thanks').replace('/greeting?','/thanks?').replace('Hello, Ada','Thanks, Ada')
-    sequences={};requests={};bindings={};plan_faults=[];diagnostic_actions=[];guidance_seen=[]
+    sequences={};requests={};bindings={};plan_faults=[];diagnostic_actions=[];guidance_seen=[];submission_faults=[]
+    def native_body(run):
+        with kbc.connect_closing() as conn:return json.loads(kb.get_task(conn,run.task).body)
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_POST(self):
@@ -227,6 +231,8 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                         ('diagnostic_decide',decision)]
                     if action=='hold':sequence.insert(0,('diagnostic_decide',{**decision,'action':'resume'}))
                     diagnostic_actions.append((source,action,run.number))
+                elif run.kind=='plan' and native_body(run).get('repair_protocol')=='complete-control-set-1':
+                    sequence=[('plan_review',dict(decision='approve',reason='Independent review preserves tests and all delivery gates.',findings=[]))] if run.reviewing else [('plan_submit',dict(classification='submission',reason='Resubmit all targeted controls together from the same Green snapshot.',test_paths=[]))]
                 elif run.kind=='brief':sequence=[('brief_submit',brief2 if run.release==second_release[0] else brief)]
                 elif run.kind=='plan' and run.reviewing and recovery!='none' and (recovery=='triage' or not plan_faults):
                     plan_faults.append(run.number);sequence=[(None,'I will review this plan later.')]
@@ -256,6 +262,11 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                                 ('write_file',dict(path='/workspace/tests/acceptance.'+package+'.json',content=json.dumps(dict(version=2,criteria=coverage)))),sequence[-1]]
                     else:sequence=[('write_file',dict(path='/workspace/app.py',content=app)),
                         ('delivery_submit',{'mutations':[{'app.py':app.replace('Thanks, ','Wrong, ') if third else app.replace('Hello, ','Wrong, ') if first else app.replace('Goodbye, ','Wrong, ')}]})]
+                if submission_recovery and run.kind=='implementation' and not run.reviewing and not native_body(run).get('continuation_plan'):
+                    submission_faults.append(run.number)
+                    # Break browser behavior only; the API target remains uncovered.
+                    sequence=[('write_file',dict(path='/workspace/app.py',content=app)),
+                        ('delivery_submit',{'mutations':[{'app.py':app.replace("textContent=(await r.json()).message", "textContent='Wrong'")}]}),(None,'The implementation is ready; controls will follow later.')]
                 sequences[run.number]=sequence
                 if recovery!='none' and run.kind=='plan' and run.reviewing and sequence[0][0]=='plan_review':
                     assert 'Controller-recorded diagnostic guidance' in str(body['messages'])
@@ -288,7 +299,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             board=status.get('board',{})
             with kbc.connect_closing() as conn:
                 blocked={r[0] for r in conn.execute("SELECT id FROM task_runs WHERE outcome IN ('blocked','crashed','timed_out','spawn_failed','gave_up')")}
-            expected=set(plan_faults)
+            expected=set(plan_faults)|set(submission_faults)
             if acceptance_suite and (root/'upgrade-requested.json').exists():
                 upgrade_task=json.loads((root/'upgrade-requested.json').read_bytes())['task']
                 with kbc.connect_closing() as conn:
@@ -342,7 +353,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                 automatic_cto_assignment=True,source_review_failures=2,local_http_requests=count,
                 release_homologated=False,paid_calls=0,model_judgment=False,delivery_approval=False)
             write_json(root/'receipt.json',result);return result
-        if acceptance_suite:
+        if acceptance_suite and not submission_recovery:
             until(lambda:(root/'upgrade-requested.json').exists())
             until(settled)
             service.send_signal(signal.SIGTERM);service.wait(timeout=15);assert service.returncode==0
@@ -401,6 +412,16 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             assert data['packages'][0]['commit']!=data['packages'][1]['commit']
             assert set(data['criteria'])==({'GREET','BYE','REGRESSION','NAMED'} if acceptance_suite else {'GREET','BYE'}) and len({p['pr'] for p in data['packages']})==2
             assert all(kb.get_task(conn,c['id']).status=='done' for i in graph['items'] for c in i['cards'].values())
+        if submission_recovery:
+            assert len(submission_faults)==2
+            source_id=bindings[submission_faults[0]]['task']
+            assert bindings[submission_faults[1]]['task']==source_id
+            with kbc.connect_closing() as conn:
+                source=kb.get_task(conn,source_id);assert source.status=='triage' and source.block_recurrences==2
+            assert graph['submission_depth']==1 and source_id in graph['superseded_cards']
+            previous=runtime.store.receipt(graph['previous_graph'],kind='release_graph')['payload']
+            assert graph['items'][0]['cards']['tests']==previous['items'][0]['cards']['tests']
+            assert graph['items'][1]['cards']['tests']['body']['inputs']['baseline']=='parent:'+graph['items'][0]['cards']['integration']['id']+':baseline'
         if continuity:
             prior_acceptance=acceptance;prior_data=data
             previous_qa=runtime.store.receipt(prior_data['final_qa'],kind='release_evidence')['payload']
@@ -435,8 +456,10 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             branch_bases_chained=True,old_tests_preserved=True,final_criteria=data['criteria'],
             release_gate_exercised=True,delivery_approval=False,migration=False,url=data['url'])
         result['wal_lifetime_probe']=wal
-        if acceptance_suite:result.update(browser_contract=2,same_acceptance_preview_and_deploy=True,regression_gate_coverage=True,
-            pre_quality_upgrade_kept_cards=True,interrupted_graph_upgrade_recovered=True,half_upgrade_dispatch_refused=True)
+        if submission_recovery:result.update(reviewed_submission_continuation=True,original_triage_preserved=True,frozen_tests_reused=True,
+            new_gates_and_dependent_increment=True,generated_work_cards=11,active_delivery_cards=6)
+        if acceptance_suite:result.update(browser_contract=2,same_acceptance_preview_and_deploy=True,regression_gate_coverage=True)
+        if acceptance_suite and not submission_recovery:result.update(pre_quality_upgrade_kept_cards=True,interrupted_graph_upgrade_recovered=True,half_upgrade_dispatch_refused=True)
         if continuity:result.update(releases=2,subsequent_release_rollback_qualified=True,work_packages=3,generated_work_cards=9)
         if recovery=='recover':
             assert len(plan_faults)==1 and len(guidance_seen)==1
@@ -461,6 +484,7 @@ if __name__=='__main__':
     parser.add_argument('--continuity',action='store_true',help='Also deliver a subsequent release using the prior homologated rollback')
     parser.add_argument('--network-pool',help='Explicit nonoverlapping private /27, split into two owned /28 test networks')
     parser.add_argument('--acceptance-suite',action='store_true',help='Qualify version 2 shared Python acceptance and controller gate coverage')
+    parser.add_argument('--submission-recovery',action='store_true',help='Qualify reviewed pre-merge continuation after two incomplete control submissions')
     args=parser.parse_args();root,upstream=args.root.resolve(),args.upstream.resolve()
     if args.mode=='worker':FixtureRuntime(root,upstream).worker(args.task,args.run)
     elif args.mode=='serve':
@@ -470,6 +494,6 @@ if __name__=='__main__':
             FixtureRuntime(root,upstream).serve(stop,interval=0.25)
     elif args.mode=='retire':retire_fixture(root,upstream)
     else:
-        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool,acceptance_suite=args.acceptance_suite),indent=2))
+        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool,acceptance_suite=args.acceptance_suite,submission_recovery=args.submission_recovery),indent=2))
         except BaseException as error:
             write_json(root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False));raise

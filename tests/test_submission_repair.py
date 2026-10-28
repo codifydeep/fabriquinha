@@ -19,7 +19,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
                 'technical_roles':dict(lead='lead',cto='cto'),
                 'coordination_roles':dict(product='product',lead='lead')}):self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
-        f=self.fixture;self.source_body=dict(version=1,kind='implementation',release='v1',release_anchor='anchor')
+        f=self.fixture;self.source_body=dict(version=1,kind='implementation',release='v1',release_anchor='anchor',inputs={'tests':'parent:tests:tests'})
         f.implementer=replace(f.implementer,contract=digest(self.source_body))
         self.freeze=f.freeze([dict(case='passing_risk',reason='Independent behavior risk')])
         green,mutant=f.green_and_mutant()
@@ -94,13 +94,13 @@ class SubmissionRepairAdmission(unittest.TestCase):
         item=dict(cards=dict(implementation={'id':source.id},tests={'id':tests.id}),package=dict(id='first',title='First'))
         with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]):
             operation=Repairs(releases)
-            first=operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'])
-            self.assertEqual(operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis']),first)
+            first=operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item]))
+            self.assertEqual(operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item])),first)
             self.assertEqual(len(created),1);self.assertEqual(source.status,'triage')
             self.assertEqual(created[0]['assignee'],'lead');self.assertEqual(created[0]['parents'],['approved-plan'])
             self.assertEqual(json.loads(created[0]['body'])['repair_of'],source.id)
             conn.execute('UPDATE tasks SET body=?',(json.dumps({'altered':True}),))
-            with self.assertRaises(ValueError):operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'])
+            with self.assertRaises(ValueError):operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item]))
 
     def test_continuation_requires_independent_review_of_exact_source_facts(self):
         f=self.fixture;facts=self.evaluate()
@@ -119,6 +119,108 @@ class SubmissionRepairAdmission(unittest.TestCase):
         self.assertEqual(reviewed(f.project,f.store,approval())['proposal']['classification'],'submission')
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(actor='lead'))
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(source_run=999))
+
+    def test_dispatch_waits_for_review_then_follows_replacement_without_reset(self):
+        f=self.fixture;facts=self.evaluate();source=f.implementer.task
+        row=SimpleNamespace(id=f.implementer.number,ended_at=1)
+        tasks={source:SimpleNamespace(id=source,status='triage'),
+               'diagnosis':SimpleNamespace(id='diagnosis',status='done',body=json.dumps(dict(
+                   kind='diagnostic',source=source,source_run=row.id,stage='cto'))),
+               'proposal':SimpleNamespace(id='proposal',status='review'),
+               'replacement':SimpleNamespace(id='replacement',status='ready')}
+        def latest(conn,ident):
+            return SimpleNamespace(metadata={'diagnosis':facts['reviewed_diagnosis']}) if ident=='diagnosis' else row
+        kb=SimpleNamespace(get_task=lambda conn,ident:tasks.get(ident),latest_run=latest)
+        releases=SimpleNamespace(project=f.project,store=f.store,board=Mock(),closed=Mock(return_value=('approved',None,None)))
+        operation=Repairs(releases);operation.propose_submission=Mock(return_value='proposal')
+        graph=dict(items=[dict(cards=dict(implementation={'id':source}))])
+        replacement=dict(items=[dict(cards=dict(implementation={'id':'replacement'}))],submission_depth=1)
+        operation.materialize_submission=Mock(return_value=replacement)
+        with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),\
+             patch('fabriquinha.repairs.Recovery.cards',return_value=[tasks['diagnosis']]):
+            self.assertEqual(operation.continue_submission(None,None,None,graph),graph)
+            operation.materialize_submission.assert_not_called();releases.closed.assert_not_called()
+            tasks['proposal'].status='done'
+            self.assertEqual(operation.continue_submission(None,None,None,graph),replacement)
+            releases.closed.assert_called_once_with('proposal','plan_review','plan_review')
+            self.assertEqual(tasks[source].status,'triage')
+            from fabriquinha.effects import EffectBlocked
+            with self.assertRaises(EffectBlocked):operation.continue_submission(None,None,None,{**graph,'submission_depth':2})
+            self.assertEqual(operation.materialize_submission.call_count,1)
+
+    def test_replacement_tail_preserves_tests_dependencies_and_recovers_after_graph_write(self):
+        from fabriquinha.releases import Releases
+        from fabriquinha.effects import write_json
+        f=self.fixture;facts=self.evaluate()
+        source_work=f.root/'source-work';f.work.rename(source_work);f.work=source_work
+        (f.work/'app.py').write_text('VALUE = 1\n')
+        conn=sqlite3.connect(':memory:');self.addCleanup(conn.close)
+        conn.execute('CREATE TABLE task_links(parent_id TEXT,child_id TEXT)')
+        tasks={};keys={};counter=[0];created=[];activated=[]
+        def task(ident,body,parents,status,workspace,owner='backend'):
+            value=SimpleNamespace(id=ident,body=json.dumps(body),status=status,assignee=owner,workspace_kind='dir',
+                workspace_path=str(workspace),completion_contract='local-only')
+            tasks[ident]=value
+            conn.executemany('INSERT INTO task_links VALUES(?,?)',[(p,ident) for p in parents])
+            return dict(id=ident,body=body,parents=parents,workspace=str(workspace),owner=owner,completion_contract='local-only')
+        first_tests=task('tests',dict(kind='tests',inputs={}),[],'done',f.work)
+        first_impl=task('implementation',self.source_body,['tests'],'triage',f.work)
+        first_integration=task('integration',dict(kind='integration',inputs={'delivery':'parent:implementation:delivery'}),['implementation'],'todo',f.work)
+        second_tests=task('tests2',dict(kind='tests',inputs={'baseline':'parent:integration:baseline','base_commit':'parent:integration:base_commit'}),['integration'],'todo',f.work)
+        second_impl=task('implementation2',dict(kind='implementation',inputs={'tests':'parent:tests2:tests'}),['tests2'],'todo',f.work)
+        second_integration=task('integration2',dict(kind='integration',inputs={'delivery':'parent:implementation2:delivery'}),['implementation2'],'todo',f.work)
+        original={key:vars(value).copy() for key,value in tasks.items()}
+        anchor=SimpleNamespace(id='anchor',body=json.dumps({'release':'v1'}));plan='t_11223344'
+        tasks[plan]=SimpleNamespace(id=plan,status='done')
+        items=[dict(package=dict(id='first',title='First'),cards=dict(tests=first_tests,implementation=first_impl,integration=first_integration)),
+               dict(package=dict(id='second',title='Second'),cards=dict(tests=second_tests,implementation=second_impl,integration=second_integration))]
+        graph=dict(project=f.project.fingerprint(),items=items,validation_bundle='bundle')
+        releases=Releases(f.project,f.store,SimpleNamespace(guard=None),Mock());releases.closed=Mock(return_value=('approval',None,None))
+        releases.folder=lambda a:f.store.root/'releases'/digest('v1')
+        old=f.store.record('release_graph',releases.binding(anchor),graph)
+        authority=dict(task=plan,proposal=dict(classification='submission'),context={**facts,'repair_kind':'submission','prior_graph':old})
+        target=releases.folder(anchor)/('continuation-'+plan+'.json')
+        def latest(connection,ident):
+            return SimpleNamespace(id=f.implementer.number,ended_at=1) if ident=='implementation' else None
+        def create(connection,**kwargs):
+            key=kwargs['idempotency_key']
+            if key in keys:return keys[key]
+            counter[0]+=1;ident='t_'+format(counter[0],'08x');keys[key]=ident;created.append(ident)
+            task(ident,json.loads(kwargs['body']),kwargs['parents'],kwargs['initial_status'],kwargs['workspace_path'],kwargs['assignee'])
+            return ident
+        def unblock(connection,ident):
+            self.assertTrue(target.exists(),'the graph must be durable before activation')
+            tasks[ident].status='ready';activated.append(ident);return True
+        kb=SimpleNamespace(get_task=lambda c,i:tasks.get(i),latest_run=latest,create_task=create,unblock_task=unblock)
+        def interrupted(path,value):
+            write_json(path,value)
+            if path==target:raise OSError('after graph persistence')
+        with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch('fabriquinha.releases.native',return_value=(kb,None,None)),\
+             patch('fabriquinha.repairs.reviewed',return_value=authority),patch('fabriquinha.executor.validation_files',return_value=('bundle',{})):
+            operation=Repairs(releases)
+            from fabriquinha.effects import EffectBlocked
+            tasks['tests2'].status='running'
+            with self.assertRaises(EffectBlocked):operation.materialize_submission(conn,anchor,graph,'approval')
+            tasks['tests2'].status='todo';self.assertEqual(created,[])
+            (f.work/'app.py').write_text('VALUE = 99\n')
+            with self.assertRaises(ValueError):operation.materialize_submission(conn,anchor,graph,'approval')
+            (f.work/'app.py').write_text('VALUE = 1\n');self.assertEqual(created,[])
+            with patch('fabriquinha.repairs.write_json',side_effect=OSError('before graph persistence')),self.assertRaises(OSError):
+                operation.materialize_submission(conn,anchor,graph,'approval')
+            self.assertEqual(len(created),5);self.assertEqual(activated,[]);self.assertFalse(target.exists())
+            with patch('fabriquinha.repairs.write_json',side_effect=interrupted),self.assertRaises(OSError):
+                operation.materialize_submission(conn,anchor,graph,'approval')
+            self.assertEqual(len(created),5);self.assertEqual(activated,[])
+            result=operation.materialize_submission(conn,anchor,graph,'approval')
+            self.assertEqual(operation.materialize_submission(conn,anchor,graph,'approval'),result)
+            self.assertEqual(len(created),5);self.assertEqual(len(activated),5)
+            self.assertEqual(result['items'][0]['cards']['tests'],first_tests)
+            new_first=result['items'][0]['cards'];new_second=result['items'][1]['cards']
+            self.assertEqual(new_second['tests']['body']['inputs']['baseline'],'parent:'+new_first['integration']['id']+':baseline')
+            self.assertIn(new_first['integration']['id'],new_second['tests']['parents'])
+            self.assertEqual(f.store.capture(new_first['implementation']['workspace']),self.snapshot)
+            self.assertEqual({key:vars(tasks[key]) for key in original},original)
+            self.assertEqual(set(result['superseded_cards']),set(original)-{'tests'})
 
 
 if __name__=='__main__':unittest.main()

@@ -15,8 +15,11 @@ homologação S6. O runtime foi drenado para manutenção. Consumo observado:
 O reparo de orientação passou offline com 402 testes, mas ainda não está instalado.
 A admissão somente leitura reconheceu os vínculos reais preservados. A criação
 idempotente e a revisão independente da proposta passaram offline (409 testes
-no total), ainda sem conexão ao despacho ou alteração do board real.
-Falta qualificar a continuação limitada após triagem, preservando o card antigo,
+no total). A continuação e sua reconciliação já estão implementadas em fonte,
+com testes de interrupção e remapeamento das dependências. O board real não foi
+alterado. A qualificação isolada no Hermes nativo passou: 17 atividades SDK, dois
+incrementos integrados e QA, sem chamadas pagas. O núcleo passou com 411 testes.
+Falta instalar e observar a equipe real, preservando o card antigo,
 o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
 capacidade de QA entre sessões e a divergência de autoridade técnica antes do

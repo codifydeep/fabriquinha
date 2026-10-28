@@ -1,7 +1,7 @@
 # S6 — submissão de controles e recuperação limitada
 
-Estado: correção de orientação validada offline; instalação e continuação após
-triagem ainda pendentes. Não é aprovação de entrega nem autorização para reset.
+Estado: orientação e continuação qualificadas offline no Hermes nativo.
+Instalação e continuação real ainda pendentes. Não é aprovação de entrega nem autorização para reset.
 
 ## Evidência e causa
 
@@ -53,10 +53,46 @@ triagem, execução, decisão/experimento do CTO, recusa negativa, snapshot e fr
 independente. Rejeita divergências e efeitos pendentes; não cria cards nem libera
 o breaker. Os vínculos também foram conferidos nas evidências reais preservadas
 do S6, sem chamadas ao modelo. A criação idempotente da proposta também está implementada em fonte, ainda
-sem ligação ao despacho: somente Lead, classificação de submissão limitada,
+com reconciliação do despacho em fonte: somente Lead, classificação de submissão limitada,
 revisão independente do CTO vinculada aos mesmos fatos e nenhuma alteração
 do card em triagem. Classificações de infraestrutura/escopo continuam holds.
-A substituição do trecho ainda não iniciado e a qualificação nativa ponta a ponta
-permanecem pendentes. Testes de unidade dessa etapa não representam retomada real.
+A substituição do trecho ainda não iniciado está implementada. Ela conserva o
+prefixo concluído e o freeze, remapeia as dependências posteriores e só ativa os
+novos cards depois de persistir todo o grafo. Interrupções antes e depois dessa
+gravação são reexecutadas sem duplicar cards. O limite é de duas continuações
+revisadas; esgotá-lo mantém o impedimento, nunca homologa a release.
+
+A reconciliação aguarda conclusão nativa da revisão independente. Recusa mudança
+do snapshot, início de trabalho posterior, troca do bundle e tentativa de usar
+esta continuação para corrigir uma entrega já implantada. Os cards históricos
+permanecem intactos e ligados pelo campo `superseded_cards`; esse vínculo não
+significa resolução de incidente. A qualificação nativa ponta a ponta passou. Isso não representa retomada real.
 A orientação e a admissão isoladas não fecham essa lacuna de autonomia. A cota adicional aguarda autorização e não foi
 aplicada; trabalho offline pode prosseguir sem chamadas ao modelo.
+
+
+## Resultado da qualificação offline
+
+411 testes do núcleo passaram. A prova nativa completou duas falhas de submissão,
+diagnóstico Lead/CTO, proposta do Lead, revisão independente, continuação,
+integração de dois incrementos e QA no ambiente implantado. Foram 17 atividades
+SDK e 32 chamadas HTTP locais programadas, sem chamadas pagas. Hermes, Docker,
+testes, revisão de evidências e implantação foram reais; autores, revisores e
+transporte GitHub foram programados. Não é comprovação de julgamento do modelo.
+
+O grafo final usou seis cards de entrega e preservou cinco cards substituídos:
+onze cards de trabalho no histórico, além da proposta e dos diagnósticos. O
+recibo inicial nomeava os seis cards finais como `generated_work_cards`; esse
+rótulo foi corrigido no emissor para distinguir total histórico e grafo ativo.
+Os recibos antigos não foram reescritos.
+
+Duas preparações anteriores foram drenadas e preservadas como não qualificadas:
+uma mutação idêntica foi rejeitada antes da execução; outra não derrubava teste
+algum. A prova aprovada quebrou somente o navegador, deixando a API correta,
+para exercitar cobertura parcial real. Os gates não foram modificados.
+
+Próximos passos: instalar a fonte publicada durante manutenção, conferir a
+admissão contra os mesmos fatos do S6 e retomar sob a cota autorizada. Manter
+visível a distinção entre incidente histórico e continuação ativa. A prova não
+qualifica recuperação genérica de infraestrutura, mudança de escopo ou qualquer
+falha após implantação. Canal, restauração e distribuição R4 continuam pendentes.

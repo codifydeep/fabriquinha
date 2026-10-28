@@ -133,6 +133,10 @@ class Releases:
 
     def graph_path(self,anchor,body):
         repair=body.get('repair_plan')
+        continuation=body.get('continuation_plan')
+        if continuation is not None:
+            if repair is not None or not re.fullmatch(r't_[a-f0-9]{8}',continuation):raise ValueError('one native continuation plan required')
+            return self.folder(anchor)/('continuation-'+continuation+'.json')
         if repair is not None and not re.fullmatch(r't_[a-f0-9]{8}',repair):raise ValueError('native corrective plan identity required')
         return self.folder(anchor)/(('repair-'+repair+'.json') if repair else 'graph.json')
 
@@ -275,6 +279,14 @@ class Releases:
             result['browser']='Change only expected text in the explicitly authorized existing QA files; preserve all IDs, actions, selectors, paths and unit tests. Match the brief and deterministic UI wording; do not add requirements or weaken business coverage.'
         if mode==2:
             result['browser']='Add acceptance_*.py tests subclassing AcceptanceTest and acceptance.*.json criterion coverage. The same frozen suite runs in preview and deployment; use self.target and self.new_context(). Preserve every existing test/manifest. Review behavior coverage independently, including timing and independent sessions where required.'
+        if body.get('continuation_plan'):
+            from .repairs import reviewed
+            graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')['payload']
+            continuation=reviewed(self.project,self.store,graph['continuation_review'])
+            if continuation['task']!=body['continuation_plan']:raise ValueError('exact continuation review required')
+            result['submission_continuation']=dict(proposal=continuation['proposal'],
+                source=continuation['context']['source'],control_refusal=continuation['context']['control_refusal'],
+                contract=continuation['context']['submission_contract'],delivery_approval=False)
         return result
 
     def baseline(self,run,body):
@@ -360,7 +372,7 @@ class Releases:
         if body.get('repair_plan'):
             from .repairs import repair_authority
             return repair_authority(self.project,self.store,self.board,run)['context']['artifact']
-        graph=self.store.receipt(json.loads((self.folder(anchor)/'graph.json').read_bytes())['receipt'],kind='release_graph')['payload']
+        graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')['payload']
         for index,item in enumerate(graph['items']):
             if item['cards']['integration']['id']!=run.task:continue
             if not index:
@@ -416,7 +428,9 @@ class Releases:
                     if spec is None:continue
                     graph_id,graph=self.materialize(conn,anchor,spec,services)
                     from .repairs import Repairs
-                    effective=Repairs(self).reconcile(conn,anchor,spec,graph,services)
+                    repairs=Repairs(self)
+                    effective=repairs.continue_submission(conn,anchor,spec,graph)
+                    effective=repairs.reconcile(conn,anchor,spec,effective,services)
                     if effective!=graph:
                         graph=effective;graph_id=self.store.record('release_graph',self.binding(anchor),graph)
                     self.accept(conn,anchor,spec,graph_id,graph,services)
