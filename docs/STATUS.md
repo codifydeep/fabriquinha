@@ -27,12 +27,14 @@ compactações, mas terminou sem submissão. O CTO executou a suíte na execuç�
 falha envolve erro de console na rejeição do terceiro jogador e ainda precisa
 ser tratada sem dispensar as verificações existentes.
 
-A fonte instalada é `69583463`; supervisor e relay estão ativos. A ferramenta
+A fonte instalada é `6d5c9b94`; supervisor e relay estão ativos. A ferramenta
 `delivery_validate` oferece a suíte completa ao implementador, sem aprovar nem
-submeter a entrega. A revisão de fixture Python está em preparação offline:
-um comparador estrutural preserva instruções anteriores e identifica acréscimos,
-mas ainda não concede autoridade nem substitui revisão independente e evidências.
-O segundo incremento continua impedido; não há novo worker de implementação.
+submeter a entrega. A revisão de fixture Python nova e ainda não publicada agora
+possui proposta independente, novo Red, novo freeze e substituição idempotente
+da cauda do grafo. A transição foi qualificada no Kanban real isolado, com
+evidências de qualidade programadas; isso não comprova autonomia nem correção
+do produto. A equipe iniciou a proposta técnica. Ainda não há novo Red ou
+aprovação dos testes corrigidos.
 
 O teto autorizado é **8.500 chamadas**, sem reset; a última consulta foi
 7.201 chamadas. Modelo Claude Haiku, saída máxima de 16.384 tokens, janela de
