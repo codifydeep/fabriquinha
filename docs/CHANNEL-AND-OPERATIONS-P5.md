@@ -74,3 +74,14 @@ A outbox agora permite arquivar somente chaves explícitas de mensagens nunca
 tentadas. O conteúdo e motivo ficam preservados; o estado não é `delivered`.
 Mensagens incertas/tentadas são recusadas, e novos avisos continuam enviáveis
 após reinício. O corte deve ocorrer com o remetente parado ou pausado.
+
+## Transporte restrito
+
+O runner genérico do gateway também inicia cron e aceita caminhos conversacionais.
+Para manter a separação, `channel_gateway.py` incorpora diretamente o adaptador
+Telegram nativo do Hermes e encaminha somente `/fabrica` ao mesmo handler.
+Não implementa polling/reconexão próprios, não inicia cron, agentes ou dispatcher.
+A autorização é aplicada antes e depois da construção do evento; bots, eventos
+internos e eventos sem autoridade de controle são recusados. Mensagens pendentes
+são preservadas no cold boot. A dependência Telegram usa a versão 22.8 fixada
+pelo próprio upstream. A instalação e o teste Telegram real seguem pendentes.

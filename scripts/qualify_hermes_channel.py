@@ -49,11 +49,22 @@ assert 'refused' in handle('status')
 tokens=set_session_vars(platform='telegram',chat_id='-123',chat_type='group',user_id='999',message_id='11')
 try:assert 'refused' in handle('status')
 finally:clear_session_vars(tokens)
+from fabriquinha.channel_gateway import Commands
+from gateway.platforms.event import MessageEvent
+from gateway.session import SessionSource
+from gateway.config import Platform
+import asyncio
+commands=Commands(dict(version=1,chat_id='-123',user_ids=['456'],thread_id=None))
+event=MessageEvent(text='/fabrica status',source=SessionSource(platform=Platform.TELEGRAM,
+    chat_id='-123',chat_type='group',user_id='456'),message_id='12')
+assert json.loads(asyncio.run(commands.message(event)))['paused']
+event.allow_gateway_control=False
+assert asyncio.run(commands.message(event)) is None
 assert before=={k:os.environ.get(k) for k in before}
 from fabriquinha.kanban_lane import native
 _,kbc,_=native()
 with kbc.connect_closing() as conn:assert conn.execute('SELECT COUNT(*) FROM tasks').fetchone()[0]==0
-print(json.dumps(dict(passed=True,native_context=True,real_status_subprocess=True,paused_mutation_refused=True,
+print(json.dumps(dict(passed=True,native_context=True,native_message_event=True,real_status_subprocess=True,paused_mutation_refused=True,
     stale_environment_refused=True,wrong_user_refused=True,gateway_environment_preserved=True,
     telegram_messages=0,model_calls=0,delivery_approval=False)))
 '''
