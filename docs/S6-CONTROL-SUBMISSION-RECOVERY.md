@@ -588,3 +588,17 @@ legados e de implementação.
 Pendente antes de instalar: qualificação com o Kanban Hermes real numa raiz
 isolada, incluindo a criação idempotente e a retomada da transição. Os testes
 unitários usam um adaptador de Kanban controlado; não são prova de autonomia.
+
+### Transição qualificada no Kanban real
+
+`scripts/qualify_fixture_transition.py` executou numa raiz isolada com o upstream
+fixado, banco e operações reais do Hermes. A proposta foi reivindicada pelo Lead,
+encaminhada para revisão e concluída pelo CTO em outra execução nativa. As falhas
+injetadas antes e depois da gravação do grafo preservaram os cards antigos e não
+duplicaram os três substitutos. O Kanban recusou reivindicar a implementação antes
+de concluir os testes dependentes. `submission_depth=2` permaneceu intacto.
+
+Essa prova usa diagnóstico e evidências de qualidade programados; qualifica a
+transição, não Red, produto ou autonomia. Zero chamadas ao modelo/Docker. A prova
+inicial parou antes de criar o banco por um campo de configuração ausente no
+script; a execução corrigida usou outra raiz nova e passou. Ambas foram preservadas.
