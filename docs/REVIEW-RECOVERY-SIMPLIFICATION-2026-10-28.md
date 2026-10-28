@@ -1,7 +1,7 @@
 # Simplificação proposta da recuperação de revisão
 
 Estado: aprovada explicitamente pelo proprietário em 28/10/2026; implementação
-em andamento, ainda não ativada na instalação.
+instalada em `9096013b`; recuperação real em validação.
 
 Implementação: recibo `review_admission` emitido pelo controlador e revalidado
 na leitura; transferência nativa da entrega original; proposta histórica
@@ -62,7 +62,7 @@ autoridade do CEO sobre brief e exceções. Não alterar o modelo.
    atual e o snapshot exato. Mudanças voltam ao autor e invalidam aprovações antigas.
 6. Liberar dependentes apenas após a revisão da entrega. Para testes, isso exige
    freeze independente; para implementação, Green, controles negativos e revisão.
-7. Proposta histórica não aprovada fica preservada como substituída pelo contrato
+7. Proposta histórica não aprovada fica arquivada como substituída pelo contrato
    novo, não marcada como aprovada. Não editar retroativamente suas decisões.
 8. Mesma observação recusada não ganha repetição por novo recibo ou reenvio.
    Impedimento real continua visível com dono e próxima ação; sem sucesso fictício.
@@ -92,3 +92,17 @@ independente antes da nova revisão. Esta proposta remove especificamente essa
 aprovação intermediária. Embora mantenha a revisão independente da entrega,
 é uma alteração do contrato aprovado e não deve ser ativada implicitamente.
 O proprietário concedeu esse aceite na resposta “Aprovar a simplificação delimitada”.
+
+## Ativação e limite da evidência
+
+A ativação preservou a proposta antiga arquivada e transferiu a entrega para
+revisão nativa. Um erro de contexto (`submission_contract`) impediu a primeira
+execução; foi corrigido, testado e reconstruído offline com o contexto real.
+O card retornou à revisão sem nova evidência ou aprovação fabricada. Isso
+continua sendo uma retomada assistida; autonomia só pode ser avaliada pelo
+resultado posterior dos agentes e dos gates completos.
+
+A aposentadoria usa arquivamento nativo, com cópia durável do workspace,
+para impedir que o recuperador trate a proposta substituída como impedimento
+ativo. O diagnóstico desnecessário originado por esse bloqueio foi arquivado
+após drenagem, sem aprovação de entrega.

@@ -130,7 +130,7 @@ def qualify(root,upstream,*,direct=False):
                 assert kb.get_task(conn,proposal).status=='ready'
                 assert not (releases.folder(anchor)/('review-admission-'+ident+'.json')).exists()
                 operation.advance_review_probes(conn,anchor,{'approval':'programmed-brief'},graph)
-                assert kb.get_task(conn,proposal).status=='blocked'
+                assert kb.get_task(conn,proposal).status=='archived'
                 pointer=releases.folder(anchor)/('review-admission-'+ident+'.json')
                 approval=json.loads(pointer.read_text())['receipt']
                 assert store.receipt(approval)['kind']=='review_admission'

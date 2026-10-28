@@ -926,6 +926,16 @@ class Repairs:
                             raise EffectBlocked('legacy proposal retirement not acknowledged')
                     elif previous.status not in ('blocked','triage','done','archived'):
                         raise EffectBlocked('legacy proposal state requires settled migration')
+                    # Blocked is recoverable, not retirement. Archive through
+                    # the native API so recovery cannot diagnose this old plan.
+                    if previous.status!='archived':
+                        workspace=Path(previous.workspace_path) if previous.workspace_path else None
+                        preserved=self.store.capture(workspace) if workspace and workspace.is_dir() else None
+                        self.store.record('retired_review_proposal',self.r.binding(anchor),dict(
+                            project=self.project.fingerprint(),task=previous.id,admission=admission,
+                            snapshot=preserved,delivery_approval=False))
+                        if self.r.board.guard:self.r.board.guard()
+                        if not kb.archive_task(conn,previous.id):raise EffectBlocked('legacy proposal archival not acknowledged')
                 path=self.r.folder(anchor)/('review-admission-'+source.id+'.json')
                 if path.exists() and json.loads(path.read_bytes())!={'receipt':admission}:
                     raise ValueError('existing direct review admission changed')

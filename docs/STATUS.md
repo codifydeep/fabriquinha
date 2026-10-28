@@ -8,12 +8,15 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Simplificação instalada; ajuste de integração em manutenção.** A fonte
+**Simplificação instalada; validação real retomada.** A fonte
 `fec67b28` passou por 474 testes, prova nativa de transferência/crash e cinco
-jobs Docker reais. O controlador preservou a proposta antiga bloqueada e criou
+jobs Docker reais. O controlador preservou a proposta antiga arquivada e criou
 uma revisão independente sucessora. O worker encontrou `KeyError` ao montar
 contexto: recuperação de revisão ainda era tratada como recuperação de submissão.
-O despacho foi drenado; a correção separa os contratos sem alterar evidências.
+O despacho foi drenado; `9096013b` separa os contratos sem alterar evidências.
+A reconstrução offline do contexto real e 475 testes passaram. O mesmo card
+voltou nativamente à revisão, com a falha anterior preservada; supervisor e
+relay foram reativados. Modelo e teto de 8.500 chamadas permanecem.
 Ainda não há aprovação real da nova revisão nem conclusão do segundo incremento.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
@@ -38,8 +41,8 @@ A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
 recebendo 409 gera. Isso invalida a equivalência presumida, mas não aprova produto,
 nem resolve por si só corrida entre clientes ou o lifecycle de saída da triagem.
 
-Fonte instalada: `9688d88e`, com exportação verificada, backup preservado e
-`doctor` aprovado nos nove perfis. A suíte offline passou com 467 testes.
+Fonte instalada: `9096013b`, com exportação verificada, backup preservado e
+`doctor` aprovado nos nove perfis. A suíte offline passou com 475 testes.
 Provas nativas programadas cobrem sucessão, dependências, interrupções,
 solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead passou
 na prova nativa; uma prova complementar executou quatro jobs Docker reais.
@@ -284,3 +287,8 @@ que não incluía o cooldown nativo de cinco minutos. O prazo da prova foi ajust
 timeouts dos workers e cooldown de produção não mudaram. O deployment descartável
 final foi retirado após salvar evidências. Essa prova programada não é autonomia
 do modelo. A instalação real registra a manutenção adicional e mantém o histórico.
+
+A aposentadoria usa arquivamento nativo, com cópia durável do workspace,
+para impedir que o recuperador trate a proposta substituída como impedimento
+ativo. O diagnóstico desnecessário originado por esse bloqueio foi arquivado
+após drenagem, sem aprovação de entrega.
