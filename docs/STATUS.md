@@ -17,7 +17,9 @@ O despacho foi drenado; `9096013b` separa os contratos sem alterar evidências.
 A reconstrução offline do contexto real e 475 testes passaram. O mesmo card
 voltou nativamente à revisão, com a falha anterior preservada; supervisor e
 relay foram reativados. Modelo e teto de 8.500 chamadas permanecem.
-Ainda não há aprovação real da nova revisão nem conclusão do segundo incremento.
+A execução 96 concluiu o freeze independente dos testes corrigidos. O Frontend
+iniciou automaticamente a implementação sucessora (execução 97). Ainda não há
+Green, revisão de código ou homologação do segundo incremento.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
@@ -32,8 +34,11 @@ O recibo conserva `delivery_approval=false`: comprova o incremento, não a relea
 O segundo incremento está bloqueado na revisão dos testes. Depois de corrigir
 uma fixture que buscava uma sala sem criá-la, a execução 69 produziu novo Red:
 16 casos, sete falhas comportamentais, nenhum erro de execução ou skip.
-Ainda não existe aprovação independente dessa revisão nem Green correspondente.
-O card de testes está em triagem; implementação e integração sucessoras não começaram.
+O Red histórico foi preservado. Após solicitação de mudanças, o autor submeteu
+novo Red; uma dúvida posterior foi resolvida pelo CTO e a revisão retomou
+automaticamente. O Tech Lead congelou os testes na execução 96 e liberou a
+implementação. O card original permanece como histórico; a sucessão não
+converteu aprovações antigas em evidência da nova entrega.
 
 O CTO manteve hold pela suposta incompatibilidade entre HTTP 409 e console vazio.
 A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
