@@ -38,6 +38,28 @@ class NotificationDelivery(unittest.TestCase):
         return self.outbox.enqueue(key,dict(task='t_12345678',run=1,actor='backend',mode='tests',event='started',
             text='backend iniciou testes em t_12345678'))
 
+    def test_activation_cut_preserves_history_without_sending_it(self):
+        old=self.message();before=self.outbox.records()[0]['message']
+        first=self.outbox.archive_unsent([old],reason='Before channel activation')
+        self.assertEqual(first,self.outbox.archive_unsent([old],reason='Before channel activation'))
+        self.assertEqual(self.outbox.records()[0]['message'],before)
+        restarted=Outbox(self.project,self.store,clock=lambda:self.clock[0])
+        self.assertEqual(restarted.summary()['archived'],1)
+        self.assertEqual(restarted.summary()['delivered'],0)
+        self.assertEqual(self.message(),old)
+        new=self.message('new');transport=Mock(destination='sink',version='one')
+        transport.send.return_value={'message_id':1}
+        restarted.flush(transport)
+        transport.send.assert_called_once()
+        self.assertEqual(transport.send.call_args.args[1],new)
+
+    def test_activation_cut_cannot_hide_attempted_or_uncertain_delivery(self):
+        old=self.message();other=self.message('other')
+        path=self.outbox.root/(other+'.json');record=json.loads(path.read_bytes())
+        record.update(state='uncertain',attempts=1);self.outbox.save(path,record)
+        with self.assertRaises(ValueError):self.outbox.archive_unsent([old,other],reason='activation')
+        self.assertEqual(json.loads((self.outbox.root/(old+'.json')).read_bytes())['state'],'queued')
+
     def test_known_nonacceptance_retries_after_restart_but_does_not_duplicate(self):
         key=self.message();attempts=[]
         class Transport:

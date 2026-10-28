@@ -64,3 +64,13 @@ encaminha credenciais do modelo e não transforma erro em conversa com agente.
 Testes cobrem destino/remetente incorretos, aprovação incompleta, identidade
 estável de requisição, pausa e isolamento do subprocesso. Ainda faltam integração
 com o gateway instalado, corte da outbox e validação real de ponta a ponta.
+
+A prova `qualify_hermes_channel.py` passou com ContextVars reais do Hermes e
+subprocesso real de status: remetente incorreto, ambiente obsoleto e mutação
+durante pausa foram recusados; o ambiente do gateway permaneceu intacto.
+Isso não substitui um comando recebido pelo Telegram.
+
+A outbox agora permite arquivar somente chaves explícitas de mensagens nunca
+tentadas. O conteúdo e motivo ficam preservados; o estado não é `delivered`.
+Mensagens incertas/tentadas são recusadas, e novos avisos continuam enviáveis
+após reinício. O corte deve ocorrer com o remetente parado ou pausado.

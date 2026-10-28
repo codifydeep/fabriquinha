@@ -117,11 +117,38 @@ class Outbox:
                         or type(record['attempts']) is not int or record['attempts']<0
                         or type(record['created']) not in (int,float) or type(record['next_at']) not in (int,float)
                         or digest(record['identity'])!=path.stem or record['identity'].get('project')!=self.project.fingerprint()
-                        or record['state'] not in ('queued','sending','uncertain','rejected','delivered')):
+                        or record['state'] not in ('queued','sending','uncertain','rejected','delivered','archived')):
                     raise ValueError('invalid notification record')
             except (ValueError,OSError):record=dict(key=path.stem,state='corrupt',created=0)
             records.append(record)
         return sorted(records,key=lambda record:(record['created'],record['key']))
+
+    def archive_unsent(self,keys,*,reason):
+        """Explicit activation cut; caller must keep the sender stopped/paused.
+
+        Preserve messages in place, never call them delivered and never retire
+        an attempted/uncertain send. Exact keys make interrupted cuts resumable.
+        """
+        if (not isinstance(keys,list) or len(set(keys))!=len(keys)
+                or any(not isinstance(k,str) or not re.fullmatch('[a-f0-9]{64}',k) for k in keys)
+                or not isinstance(reason,str) or not 1<=len(reason)<=500):
+            raise ValueError('exact notification keys and bounded archival reason required')
+        def eligible(record):
+            if (record.get('state') not in ('queued','archived') or record.get('attempts')!=0
+                    or record.get('destination') is not None
+                    or record.get('state')=='archived' and record.get('archive_reason')!=reason):
+                raise ValueError('only never-attempted notifications may be archived')
+        records={r['key']:r for r in self.records()}
+        for key in keys:
+            if key not in records:raise ValueError('unknown notification key')
+            eligible(records[key])
+        for key in keys:
+            with self.journal.lock(key):
+                path=self.root/(key+'.json');record=json.loads(path.read_bytes());eligible(record)
+                if record['state']=='archived':continue
+                record.update(state='archived',archive_reason=reason,archived_at=self.clock())
+                self.save(path,record)
+        return dict(archived=len(keys),keys_digest=digest(sorted(keys)),delivered=0)
 
     def capture(self,conn):
         with self.journal.lock('cursor'):
@@ -182,7 +209,7 @@ class Outbox:
         for record in self.records():
             if limit<=0:break
             key=record['key'];path=self.root/(key+'.json')
-            if record['state'] in ('delivered','corrupt'):continue
+            if record['state'] in ('delivered','archived','corrupt'):continue
             with self.journal.lock(key):
                 record=json.loads(path.read_bytes())
                 version=getattr(transport,'version',transport.destination)
@@ -213,7 +240,7 @@ class Outbox:
                 if throttle.exists() and self.clock()<json.loads(throttle.read_bytes())['until']:break
 
     def summary(self):
-        result={state:0 for state in ('queued','sending','uncertain','rejected','delivered','corrupt')}
+        result={state:0 for state in ('queued','sending','uncertain','rejected','delivered','archived','corrupt')}
         for record in self.records():result[record['state']]+=1
         path=self.root/'error.json'
         result['last_error']=json.loads(path.read_bytes()) if path.exists() else None
