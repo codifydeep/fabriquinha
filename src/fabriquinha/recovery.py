@@ -125,6 +125,8 @@ class Diagnostic:
                 'a changed hash before a new independent freeze is expected, not stale evidence by itself. '
                 'Check the actual proposed setup and existing statements. Return author corrections within the approved paths; '
                 'do not edit the source, demand Green before Red or transfer technical choices to the CEO. '
+                'A product-only diagnostic_validate replacement is a disposable SPIKE on a copy; tests and configuration remain exact. '
+                'Its result tests a hypothesis and never becomes the author delivery or approval. '
                 'Other implementation findings remain visible for the implementation phase and cannot waive any later gate. '
                 'The previous implementation snapshot is separate from this test-author baseline. '
                 'A failure on this pre-implementation baseline does not prove that a proposed implementation is impossible. '
@@ -132,7 +134,7 @@ class Diagnostic:
                 'Do not infer a required browser request or status from a separate API probe. '
                 'A conflict claim needs evidence that the same required execution cannot satisfy both assertions, not only that an earlier implementation failed. '
                 'At CTO level you own the technical ruling; requesting another CTO ruling is not a next action. '
-                'diagnostic_validate is read-only evidence; a fresh delivery_submit and independent test review remain required.')
+                'diagnostic_validate never alters the author delivery; a fresh delivery_submit and independent test review remain required.')
         return ('Authorized QA expected-text correction, not a new feature Red. The independent corrective plan permits only its listed QA text paths. '
             'Diagnose all frozen-preview failures against the approved brief. Do not tell the author to edit product code or preserve a known incorrect QA expectation; '
             'do not silently override the reviewed authority. diagnostic_validate runs both full suite and QA preview; negative results remain observations, not approval.')
@@ -259,8 +261,6 @@ class Diagnostic:
                 snapshot=snapshot,hypothesis=args['hypothesis'],validator=document_kind,document=candidate,report=report))
             return dict(experiment=self.experiment,report=report,delivery_approval=False)
         correction=self.qa_correction() and not self.fixture_correction()
-        if self.fixture_correction() and 'replacements' in args:
-            raise ValueError('fixture diagnosis is read-only; return scoped guidance to the author')
         if 'replacements' in args:
             if correction:
                 with tempfile.TemporaryDirectory(prefix='.diagnostic-qa-',dir=self.store.root.parent) as folder:
@@ -290,7 +290,7 @@ class Diagnostic:
         job,report=DeliveryTools.wait(self,lambda:self.q.observe(self.run,snapshot,'green' if correction else 'diagnostic'))
         observed=self.deployment_observation();extra={} if observed is None else dict(deployment_observation=observed)
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
-            snapshot=snapshot,hypothesis=args['hypothesis'],job=job,report=report,**extra))
+            snapshot=snapshot,source_snapshot=self.incident['snapshot'],hypothesis=args['hypothesis'],job=job,report=report,**extra))
         return dict(experiment=self.experiment,report=report,delivery_approval=False,**extra)
 
     @property

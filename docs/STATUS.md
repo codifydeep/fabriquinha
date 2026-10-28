@@ -37,7 +37,7 @@ Fonte instalada: `8d6bbd92`. A orientação adicional publicada em `fc202f3a` ai
 não foi instalada. `delivery_validate`, revisão aditiva de fixture e separação
 de contexto diagnóstico foram implementados e receberam provas delimitadas.
 A auditoria de 28/10 foi somente leitura. Após aprovação do plano, a suíte
-offline passou com 457 testes. Provas nativas programadas cobrem a sucessora,
+offline passou com 458 testes. Provas nativas programadas cobrem a sucessora,
 dependências, interrupções, solicitação de mudanças e nova revisão. Falta
 qualificar a obtenção de evidência nova e a ativação da proposta pelos agentes,
 além da recuperação real do S6; o runtime continua inalterado.

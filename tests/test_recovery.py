@@ -143,10 +143,16 @@ class TechnicalRecovery(unittest.TestCase):
         self.quality.observe=Mock(return_value=('observed-job',dict(failures=[{'case':'new behavior'}])))
         diagnostic.validate(dict(hypothesis='Observe expected Red on the original product base'))
         self.quality.observe.assert_called_once_with(self.run,self.snapshot,'diagnostic')
-        for replacements in ({'tests/test_existing.py':'changed'},{'app.py':'changed'}):
-            with self.assertRaisesRegex(ValueError,'read-only'):
-                diagnostic.validate(dict(hypothesis='Do not rewrite the fixture',replacements=replacements))
-        self.assertEqual(self.quality.observe.call_count,1)
+        with self.assertRaisesRegex(ValueError,'operation_forbidden'):
+            diagnostic.validate(dict(hypothesis='Do not rewrite the fixture',replacements={'tests/test_existing.py':'changed'}))
+        experiment=diagnostic.validate(dict(hypothesis='Probe product feasibility on a disposable copy',replacements={'app.py':'VALUE = 2\n'}))
+        data=self.store.receipt(experiment['experiment'],kind='diagnostic_experiment')['payload']
+        self.assertEqual(data['source_snapshot'],self.snapshot)
+        self.assertNotEqual(data['snapshot'],self.snapshot)
+        self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
+        self.assertEqual((self.store.tree(data['snapshot'])/'tests/test_existing.py').read_text(),'baseline test\n')
+        self.assertFalse(experiment['delivery_approval'])
+        self.assertEqual(self.quality.observe.call_count,2)
         self.assertIn('fresh Red',diagnostic.correction_expectation())
         self.assertIn('original product baseline',diagnostic.correction_expectation())
         self.assertNotIn('not a new feature Red',diagnostic.correction_expectation())
@@ -331,6 +337,36 @@ class TechnicalRecovery(unittest.TestCase):
         with patch('fabriquinha.recovery.native',return_value=(kb,None,None)):
             with self.assertRaisesRegex(EffectBlocked,'two recoveries'):recovery.apply(Mock(),tasks[-1])
         kb.unblock_task.assert_not_called()
+
+
+    def test_reassessment_spike_keeps_exact_tests_and_never_replaces_author_snapshot(self):
+        from fabriquinha.repairs import review_reassessment
+        scope=replace(self.run,actor='cto',author='cto').binding()
+        prior=self.store.record('diagnostic_experiment',scope,dict(incident=self.incident,snapshot=self.snapshot,report={'failures':['old']}))
+        hold=self.store.record('diagnostic_decision',scope,dict(experiment=prior))
+        facts=dict(snapshot=self.snapshot,delivery_approval=False)
+        def candidate(changes):
+            with tempfile.TemporaryDirectory(dir=self.root) as folder:
+                work=Path(folder);self.store.checkout(self.snapshot,work)
+                for path,value in changes.items():(work/path).write_text(value)
+                return self.store.capture(work)
+        def evidence(snapshot,source=None):
+            report={'failures':[]}
+            job=self.store.record('suite_job',scope,dict(report=report,identity=dict(snapshot=snapshot,project=self.project.fingerprint())))
+            return self.store.record('diagnostic_experiment',scope,dict(project=self.project.fingerprint(),incident=self.incident,
+                snapshot=snapshot,source_snapshot=source or self.snapshot,report=report,job=job))
+        product=candidate({'app.py':'VALUE = 2\n'})
+        with patch('fabriquinha.repairs.review_failure',return_value=facts):
+            result=review_reassessment(self.project,self.store,self.incident,hold,'original-handoff',evidence(product))
+            self.assertEqual(result['snapshot'],self.snapshot)
+            self.assertFalse(result['delivery_approval'])
+            for changes in ({'tests/test_existing.py':'weakened'},{'pytest.ini':'[pytest]\naddopts=-k nothing'}):
+                with self.subTest(changes=changes),self.assertRaises(ValueError):
+                    review_reassessment(self.project,self.store,self.incident,hold,'original-handoff',evidence(candidate(changes)))
+            with self.assertRaisesRegex(ValueError,'scoped CTO'):
+                review_reassessment(self.project,self.store,self.incident,hold,'original-handoff',evidence(product,source='foreign'))
+        self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
+        self.assertEqual((self.store.tree(self.snapshot)/'app.py').read_text(),'VALUE = 1\n')
 
 
 if __name__=='__main__':unittest.main()

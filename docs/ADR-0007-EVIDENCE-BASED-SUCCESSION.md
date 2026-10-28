@@ -186,3 +186,23 @@ a cadeia sem memória em processo. Propostas ambíguas ou circulares são recusa
 Isso ainda não cria ou aprova automaticamente uma proposta: falta qualificar a
 obtenção da evidência nova e sua passagem aos responsáveis Lead/CTO. A instalação
 real continua em manutenção, sem novas chamadas pagas.
+
+### Experimento técnico sobre cópia descartável
+
+A admissão anterior exigia que toda observação nova viesse do mesmo snapshot
+executado novamente. Isso impedia o CTO de testar a hipótese de viabilidade do
+produto durante diagnóstico de fixture. O executor de mutações de produto já
+existente agora pode ser usado também nesse diagnóstico: somente arquivos de
+produto existentes, em cópia, com testes e configuração exatamente preservados.
+A entrega do autor e o snapshot do handoff não são alterados.
+
+O recibo registra snapshot de origem e snapshot experimental. A admissão da
+reavaliação exige o job exato do experimento, relatório diferente do anterior e
+reconfere a proteção de testes/configuração. A sucessora continua referenciando
+a entrega original, nunca o experimento. Resultado diagnóstico não é Green de
+entrega, freeze, aprovação, merge ou dispensa de controles.
+
+Testes verificam recusa de enfraquecimento de teste, configuração de descoberta
+alterada e origem estrangeira, além da preservação dos arquivos originais.
+Ainda falta criar/ativar o SPIKE como atividade nativa delimitada após o hold e
+ligar seu resultado à proposta Lead/CTO. Não houve instalação nem chamada paga.

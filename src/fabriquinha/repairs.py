@@ -96,18 +96,22 @@ def review_reassessment(project,store,incident,decision,handoff,evidence):
             or scope.get('actor')!=project.technical_roles['cto']
             or scope.get('release')!=held['binding']['release']
             or data.get('project')!=project.fingerprint() or data.get('incident')!=incident
-            or data.get('snapshot')!=facts['snapshot']
+            or data.get('source_snapshot',data.get('snapshot'))!=facts['snapshot']
             or not isinstance(data.get('report'),dict) or not data['report']
             or data['report']==prior['payload'].get('report')
             or not isinstance(data.get('job'),str) or not data['job']):
         raise ValueError('new scoped CTO observation required; new wording is insufficient')
     observation=store.receipt(data['job'],kind='suite_job')
     if (observation['binding']!=scope or observation['payload'].get('report')!=data['report']
-            or observation['payload'].get('identity',{}).get('snapshot')!=facts['snapshot']
+            or observation['payload'].get('identity',{}).get('snapshot')!=data['snapshot']
             or observation['payload'].get('identity',{}).get('project')!=project.fingerprint()):
         raise ValueError('new observation requires its exact controller job')
+    if data['snapshot']!=facts['snapshot']:
+        # Reuse the same exact protection as disposable product mutations. A
+        # diagnostic candidate is evidence only, never the successor delivery.
+        Quality(project,store,None,None).protect(facts['snapshot'],data['snapshot'],exact_tests=True)
     return {**facts,'new_evidence':evidence,
-        'observation_identity':digest([facts['snapshot'],data['report']])}
+        'observation_identity':digest([facts['snapshot'],data['snapshot'],data['report']])}
 
 
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
