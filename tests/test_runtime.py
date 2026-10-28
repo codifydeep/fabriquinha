@@ -339,7 +339,18 @@ class NativeRuntime(unittest.TestCase):
         with patch('fabriquinha.runtime.native',return_value=(None,api,dispatcher)), \
              patch.object(self.runtime,'settle'),patch.object(self.runtime,'wake_integrations'), \
              patch.object(self.runtime.recovery,'reconcile'), \
+             patch.object(self.runtime.board,'pending_review_transfers',return_value=[]), \
              patch.object(self.runtime,'check_admission',return_value=dict(ready=False,missing_profiles=[])):
+            self.runtime.tick()
+        self.assertEqual(dispatcher.dispatch_once.call_args.kwargs['max_spawn'],0)
+
+    def test_pending_review_transfer_prevents_dispatch_despite_ready_admission(self):
+        api=SimpleNamespace(connect_closing=lambda:nullcontext(Mock()));dispatcher=Mock()
+        with patch('fabriquinha.runtime.native',return_value=(None,api,dispatcher)), \
+             patch.object(self.runtime,'settle'),patch.object(self.runtime,'wake_integrations'), \
+             patch.object(self.runtime.recovery,'reconcile'), \
+             patch.object(self.runtime.board,'pending_review_transfers',return_value=['successor']), \
+             patch.object(self.runtime,'check_admission',return_value=dict(ready=True,missing_profiles=[])):
             self.runtime.tick()
         self.assertEqual(dispatcher.dispatch_once.call_args.kwargs['max_spawn'],0)
 

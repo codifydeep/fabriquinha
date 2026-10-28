@@ -130,6 +130,16 @@ class Board:
             raise ValueError('current reviewed package criteria required')
         return tuple(criteria)
 
+    def pending_review_transfers(self,conn):
+        """Ready transfer cards must be reconciled before any native dispatch."""
+        pending=[]
+        for row in conn.execute("SELECT id,body FROM tasks WHERE status IN ('ready','todo')"):
+            body=json.loads(row['body'] or '{}')
+            if not body.get('inputs',{}).get('reassessment_review'):continue
+            event=conn.execute("SELECT 1 FROM task_events WHERE task_id=? AND kind='review_requested' LIMIT 1",(row['id'],)).fetchone()
+            if event is None:pending.append(row['id'])
+        return sorted(pending)
+
     def reassessment_input(self,run):
         self.ensure(run)
         kb,kbc,_=native()

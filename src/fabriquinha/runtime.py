@@ -471,7 +471,9 @@ class Runtime:
             self.integration_issues=self.wake_integrations(conn)
             self.recovery_issues=self.recovery.reconcile(conn,self.settle)
             admission=self.check_admission()
-            return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers if admission['ready'] else 0,
+            transfers=self.board.pending_review_transfers(conn)
+            if transfers:self.release_issues['pending_review_transfers']=dict(cards=transfers,owner=(self.project.coordination_roles or {}).get('lead','lead'))
+            return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers if admission['ready'] and not transfers else 0,
                 max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)
 
     def park_integration(self,run,*,now=None):

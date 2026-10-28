@@ -373,7 +373,7 @@ class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
 
-    def prepare_review_proposal(self,conn,anchor,card,incident,decision,handoff,evidence,*,approved_brief):
+    def prepare_review_proposal(self,conn,anchor,card,incident,decision,handoff,evidence,*,approved_brief,graph):
         """Persist a blocked proposal; activation requires the qualified plan flow.
 
         No source transition or worker dispatch occurs here. The same observation
@@ -394,8 +394,11 @@ class Repairs:
             raise ValueError('exact settled native review required')
         if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
             raise EffectBlocked('settle controller effects before review succession')
+        if sum(c['id']==source.id for i in graph['items'] for c in i['cards'].values())!=1:
+            raise ValueError('unique review source in current graph required')
+        prior=self.store.record('release_graph',self.r.binding(anchor),graph)
         context=self.store.record('repair_context',self.r.binding(anchor),
-            dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[]))
+            dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[],prior_graph=prior))
         proposal=dict(version=1,kind='plan',release=body['release'],anchor=anchor.id,
             repair_of=source.id,repair_context=context,inputs={'approved_brief':approved_brief})
         key=digest([self.project.fingerprint(),source.id,latest.id,'review',facts['observation_identity']])
@@ -403,7 +406,7 @@ class Repairs:
         if existing:
             previous=json.loads(existing['body'])
             old=self.store.receipt(previous['repair_context'],kind='repair_context')['payload']
-            if ({**old,'new_evidence':facts['new_evidence']}!=dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[])
+            if ({**old,'new_evidence':facts['new_evidence']}!=dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[],prior_graph=prior)
                     or {**previous,'repair_context':context}!=proposal):
                 raise ValueError('review succession proposal drift')
             return existing['id']
@@ -580,14 +583,14 @@ class Repairs:
         """Immutable replacement tail; the source triage and completed tests remain."""
         from .executor import validation_files
         kb,_,_=native();authority=reviewed(self.project,self.store,approval);data=authority['context']
-        fixture=data.get('repair_kind')=='fixture'
-        expected='test_contract' if fixture else 'submission'
-        if data.get('repair_kind') not in ('submission','fixture') or authority['proposal']['classification']!=expected:
+        fixture=data.get('repair_kind')=='fixture';reassessment=data.get('repair_kind')=='review'
+        expected='reassess' if reassessment else 'test_contract' if fixture else 'submission'
+        if data.get('repair_kind') not in ('submission','fixture','review') or authority['proposal']['classification']!=expected:
             raise EffectBlocked('independently approved continuation required')
         previous=self.store.receipt(data['prior_graph'],kind='release_graph')
         if previous['binding']!=self.r.binding(anchor) or previous['payload']!=graph:
             raise ValueError('proposal must refer to the exact unchanged release graph')
-        if ((graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2)
+        if ((not reassessment and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
                 or any(i.get('repair_context') for i in graph['items'])):
             raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
         if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
@@ -596,7 +599,10 @@ class Repairs:
         if not plan or plan.status!='done' or self.r.closed(plan.id,'plan_review','plan_review')[0]!=approval:
             raise ValueError('native independent proposal completion required')
         path=self.r.folder(anchor)/('continuation-'+plan.id+'.json')
-        index=next((n for n,i in enumerate(graph['items']) if i['cards']['implementation']['id']==data['source']),None)
+        source_phase=next((phase for i in graph['items'] for phase,c in i['cards'].items() if c['id']==data['source']),None)
+        index=next((n for n,i in enumerate(graph['items']) if any(c['id']==data['source'] for c in i['cards'].values())),None)
+        if source_phase not in ('tests','implementation'):raise ValueError('reviewable source phase required')
+        replace_tests=fixture or reassessment and source_phase=='tests'
         if index is None:raise ValueError('continuation source missing from graph')
         if path.exists():
             record=self.store.receipt(json.loads(path.read_bytes())['receipt'],kind='release_graph')
@@ -607,7 +613,7 @@ class Repairs:
             for n,item in enumerate(graph['items']):
                 for phase,card in item['cards'].items():
                     task=self.r.check_card(conn,card);latest=kb.latest_run(conn,task.id)
-                    if n<index or n==index and phase=='tests':
+                    if n<index or n==index and phase=='tests' and (fixture or not replace_tests):
                         if task.status!='done':raise ValueError('completed prefix and frozen tests required')
                     elif task.id==data['source']:
                         if task.status!='triage' or not latest or latest.id!=data['source_run'] or not latest.ended_at:
@@ -620,11 +626,13 @@ class Repairs:
                 cards={}
                 for phase in ('tests','implementation','integration'):
                     old=item['cards'][phase]
-                    if n==index and phase=='tests' and not fixture:cards[phase]=old;continue
+                    if n==index and phase=='tests' and not replace_tests:cards[phase]=old;continue
                     body=json.loads(json.dumps(old['body']));body['continuation_plan']=plan.id
                     for name,value in body['inputs'].items():
                         if value.startswith('parent:'):
                             _,parent,key=value.split(':',2);body['inputs'][name]='parent:'+mapping.get(parent,parent)+':'+key
+                    if reassessment and old['id']==data['source']:
+                        body['inputs']['reassessment_review']=approval
                     if fixture and n==index:
                         body['inputs']['repair_review']=approval
                         if phase=='tests':body['inputs']['baseline']=data['snapshot']
@@ -633,7 +641,7 @@ class Repairs:
                     if plan.id not in parents:parents.append(plan.id)
                     workspace=self.store.root.parent/'work'/self.r.binding(anchor)['release']/('continuation-'+plan.id)/item['package']['id']/phase
                     workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
-                    if n==index and phase=='implementation' and not fixture:
+                    if n==index and ((phase=='implementation' and not fixture and not reassessment) or (reassessment and phase==source_phase)):
                         if not any(workspace.iterdir()):self.store.checkout(data['snapshot'],workspace)
                         elif self.store.capture(workspace)!=data['snapshot']:raise ValueError('unfinished replacement workspace changed')
                     ident=kb.create_task(conn,title=phase.upper()+' '+item['package']['title'],body=json.dumps(body),
@@ -645,9 +653,13 @@ class Repairs:
                 items.append({**item,'cards':cards})
             result={**graph,'items':items,'previous_graph':data['prior_graph'],'continuation_review':approval,
                 'superseded_cards':sorted(set(graph.get('superseded_cards',[]))|set(retired)),
-                'submission_depth':graph.get('submission_depth',0)+(0 if fixture else 1),
+                'submission_depth':graph.get('submission_depth',0)+(0 if fixture or reassessment else 1),
                 **({'fixture_depth':graph.get('fixture_depth',0)+1} if fixture else {})}
             receipt=self.store.record('release_graph',self.r.binding(anchor),result);write_json(path,{'receipt':receipt})
+        # Transfer review before releasing any downstream worker. On restart the
+        # native handoff is acknowledged without creating another author run.
+        if reassessment:
+            self.publish_review_handoff(conn,result['items'][index]['cards'][source_phase],approval)
         # No worker may start until the whole replacement graph is durable.
         for item in result['items']:
             for card in item['cards'].values():

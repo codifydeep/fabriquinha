@@ -33,19 +33,27 @@ def qualify(root,upstream):
         anchor_id=kb.create_task(conn,title='Isolated release',body=json.dumps(dict(release=release)),initial_status='blocked')
         anchor=kb.get_task(conn,anchor_id)
         body=dict(version=1,kind='tests',release=release,release_anchor=anchor_id,inputs={})
-        work=root/'work';work.mkdir()
+        work=root/'work';work.mkdir();snapshot=store.capture(work)
         ident=kb.create_task(conn,title='Original source',body=json.dumps(body),assignee='author',completion_contract='local-only',workspace_kind='dir',workspace_path=str(work))
         claimed=kb.claim_task(conn,ident);assert claimed
         original=board.current(ident,claimed.current_run_id)
-        handoff=store.record('red',original.binding(),dict(project=project.fingerprint(),snapshot='snapshot'))
+        handoff=store.record('red',original.binding(),dict(project=project.fingerprint(),snapshot=snapshot))
         board.review(original,'Programmed author delivery',{'red':handoff})
         claimed=kb.claim_review_task(conn,ident);assert claimed
-        incident=store.record('incident',board.current(ident,claimed.current_run_id).binding(),dict(project=project.fingerprint(),snapshot='snapshot'))
+        incident=store.record('incident',board.current(ident,claimed.current_run_id).binding(),dict(project=project.fingerprint(),snapshot=snapshot))
         assert kb.block_task(conn,ident,kind='needs_input',reason='Programmed triage setup',expected_run_id=claimed.current_run_id)
         # Isolated fixture setup, not a production transition or escalation proof.
         conn.execute("UPDATE tasks SET status='triage' WHERE id=?",(ident,))
         card=dict(id=ident,body=body,owner='author',completion_contract='local-only',workspace=str(work),parents=[])
-        facts=dict(source=ident,source_run=claimed.current_run_id,source_contract=digest(body),snapshot='snapshot',
+        cards={'tests':card}
+        for phase,parent,field in (('implementation',ident,'tests'),('integration',None,'delivery')):
+            parent=parent or cards['implementation']['id']
+            child_body=dict(version=1,kind=phase,release=release,release_anchor=anchor_id,inputs={field:'parent:'+parent+':'+field})
+            child=kb.create_task(conn,title='Pending '+phase,body=json.dumps(child_body),assignee='author',parents=[parent],
+                workspace_kind='dir',workspace_path=str(work),completion_contract='local-only')
+            cards[phase]=dict(id=child,body=child_body,owner='author',parents=[parent],workspace=str(work),completion_contract='local-only')
+        graph=dict(project=project.fingerprint(),validation_bundle='programmed-bundle',items=[dict(package=dict(id='item',title='Item'),cards=cards)])
+        facts=dict(source=ident,source_run=claimed.current_run_id,source_contract=digest(body),snapshot=snapshot,
             handoff=handoff,incident=incident,reviewed_diagnosis='decision',new_evidence='evidence',
             observation_identity=digest('changed observation'),delivery_approval=False,requires_independent_plan_review=True)
         count=lambda:conn.execute('SELECT count(*) FROM tasks').fetchone()[0]
@@ -55,7 +63,7 @@ def qualify(root,upstream):
                 create(*args,**kwargs)
                 raise OSError('simulated lost acknowledgement after native creation')
             with patch.object(kb,'create_task',side_effect=interrupted):
-                try:operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief')
+                try:operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief',graph=graph)
                 except OSError:pass
                 else:raise AssertionError('missing injected failure')
             assert count()==before+1
@@ -64,8 +72,8 @@ def qualify(root,upstream):
     with kbc.connect_closing() as conn:
         operation=Repairs(Releases(project,store,board,None));anchor=kb.get_task(conn,anchor_id)
         with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
-            proposal=operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief')
-            assert operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief')==proposal
+            proposal=operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief',graph=graph)
+            assert operation.prepare_review_proposal(conn,anchor,card,'incident','decision',handoff,'evidence',approved_brief='programmed-brief',graph=graph)==proposal
             assert conn.execute('SELECT count(*) FROM tasks').fetchone()[0]==before+1
             assert kb.get_task(conn,ident).status=='triage'
             assert kb.get_task(conn,proposal).status=='blocked'
@@ -94,12 +102,23 @@ def qualify(root,upstream):
             assert authority['proposal']['classification']=='reassess'
             assert authority['context']['delivery_approval'] is False
             assert kb.get_task(conn,ident).status=='triage'
-            successor_body={**body,'inputs':{'reassessment_review':approval}}
-            successor_work=root/'successor';successor_work.mkdir()
-            successor=kb.create_task(conn,title='Reassessment only',body=json.dumps(successor_body),assignee='author',
-                parents=[proposal],workspace_kind='dir',workspace_path=str(successor_work),completion_contract='local-only',initial_status='blocked')
-            successor_card=dict(id=successor,body=successor_body,owner='author',parents=[proposal],
-                workspace=str(successor_work),completion_contract='local-only')
+            with patch('fabriquinha.executor.validation_files',return_value=('programmed-bundle',{})):
+                with patch.object(operation,'publish_review_handoff',side_effect=OSError('interrupted before transfer')):
+                    try:operation.materialize_submission(conn,anchor,graph,approval)
+                    except OSError:pass
+                    else:raise AssertionError('missing graph interruption')
+                pointer=releases.folder(anchor)/('continuation-'+proposal+'.json')
+                saved=store.receipt(json.loads(pointer.read_text())['receipt'])['payload']
+                successor_card=saved['items'][0]['cards']['tests'];successor=successor_card['id']
+                for c in saved['items'][0]['cards'].values():assert kb.get_task(conn,c['id']).status=='blocked'
+            # Crash after native unblock but before request_review: runtime must
+            # not dispatch this ready card as a fresh author execution.
+            with patch('fabriquinha.quality.Quality.test_evidence',return_value=store.receipt(handoff)):
+                with patch.object(kb,'request_review',side_effect=OSError('before handoff')):
+                    try:operation.publish_review_handoff(conn,successor_card,approval)
+                    except OSError:pass
+                    else:raise AssertionError('missing pre-handoff interruption')
+            assert board.pending_review_transfers(conn)==[successor]
             native_request=kb.request_review
             with patch('fabriquinha.quality.Quality.test_evidence',return_value=store.receipt(handoff)):
                 def lost_transfer(*args,**kwargs):
@@ -110,6 +129,7 @@ def qualify(root,upstream):
                     except OSError:pass
                     else:raise AssertionError('missing handoff failure injection')
                 assert kb.get_task(conn,successor).status=='review'
+                assert board.pending_review_transfers(conn)==[]
                 assert operation.publish_review_handoff(conn,successor_card,approval)==successor
                 assert conn.execute("SELECT count(*) FROM task_events WHERE task_id=? AND kind='review_requested'",(successor,)).fetchone()[0]==1
                 claimed=kb.claim_review_task(conn,successor);assert claimed
@@ -121,9 +141,16 @@ def qualify(root,upstream):
                 assert operation.publish_review_handoff(conn,successor_card,approval)==successor
                 assert kb.get_task(conn,successor).current_run_id==active.number
                 assert kb.get_task(conn,ident).status=='triage'
+                with patch('fabriquinha.executor.validation_files',return_value=('programmed-bundle',{})):
+                    completed=operation.materialize_submission(conn,anchor,graph,approval)
+                    assert completed==saved
+                    assert operation.materialize_submission(conn,anchor,graph,approval)==saved
+                downstream=saved['items'][0]['cards']['implementation']
+                assert downstream['parents']==[successor,proposal]
+                assert kb.claim_task(conn,downstream['id']) is None
     result=dict(passed=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
         original_triage_preserved=True,proposal_initially_not_dispatchable=True,independent_native_review=True,self_review_denied=True,programmed_admission=True,
-        native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
+        immutable_graph_recovered=True,dependent_work_held=True,native_delivery_transfer=True,transfer_lost_ack_recovered=True,active_review_preserved=True,
         model_calls=0,docker_calls=0,delivery_approval=False)
     write_json(root/'result.json',result);return result
 

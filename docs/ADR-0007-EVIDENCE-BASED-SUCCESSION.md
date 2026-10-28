@@ -148,3 +148,24 @@ A ativação segue desabilitada: ainda falta publicar o grafo completo e assegur
 que uma interrupção entre desbloqueio e transferência seja reconciliada antes
 do despacho. Essa prova não qualifica a atualização de dependências nem a
 capacidade do agente de produzir a nova evidência que fundamenta a sucessão.
+
+### Grafo de sucessão e janela de interrupção
+
+A proposta de reavaliação agora fixa o grafo anterior. A materialização reutiliza
+o mecanismo existente de continuação: preserva o prefixo concluído e a origem
+em triagem, cria a sucessora e as dependências ainda não iniciadas, grava o grafo
+antes de liberar trabalho e transfere a entrega original para revisão. Não
+consome nem reinicia o contador de reparos de implementação ou fixture.
+
+A prova nativa programada verifica interrupção depois da gravação do grafo,
+dependências apontando para a nova revisão e implementação impedida de iniciar
+antes dela. Outra interrupção ocorre após desbloquear e antes de transferir: o
+controlador identifica a transferência incompleta e não despacha workers até
+a reconciliação. O estado fica visível em `pending_review_transfers`. A repetição
+com revisão ativa não altera seu claim. A prova anterior de correção de fixture
+também passou novamente. Nenhuma dessas provas usou o modelo ou Docker.
+
+Ainda não instalado: faltam a descoberta/ativação automática da proposta com
+evidência nova, o caminho de mudanças solicitadas após reavaliação e a prova
+completa até fechamento dos dependentes. O bloqueio de despacho é uma proteção
+transitória, não uma solução para um incidente que permaneça sem responsável.
