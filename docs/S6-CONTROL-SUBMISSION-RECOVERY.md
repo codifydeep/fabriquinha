@@ -289,3 +289,16 @@ permanece limitada ao valor configurado; sem o override, o transporte reproduziu
 a duplicação. Zero chamadas ao modelo nessa prova. Isso valida o teto na
 requisição, não a capacidade de terminar uma geração dentro dele. A autoria do
 segundo incremento e sua recuperação ainda precisam terminar no fluxo real.
+
+## Diagnóstico da autoria de testes incrementais — 28/10
+
+Lead e CTO interpretaram a suíte antiga verde como impedimento ao Red do segundo
+incremento; o hold do CTO chegou a sugerir falhas nos casos congelados anteriores.
+Essa decisão permanece como histórico, sem autoridade para enfraquecer testes.
+A orientação de diagnóstico foi corrigida: testes antigos verdes são a base de
+regressão; a autoria deve acrescentar testes do novo escopo e produzir Red neles.
+Retomar a autoria precede Red, enquanto implementação continua bloqueada até
+Red real e freeze independente. O erro de limite de saída é uma pré-condição de
+transporte separada da ausência de testes novos. Os 38 testes de recuperação
+passaram. A reavaliação técnica usará o vínculo de predecessor já existente,
+sem novo mecanismo de retry nem edição retroativa do hold.

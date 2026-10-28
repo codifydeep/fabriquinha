@@ -112,8 +112,14 @@ class Diagnostic:
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
         result['phase_expectation']=(
-            'Tests author: product behavior is not implemented yet. Assertion failures are expected Red; test errors need author repair. '
-            'Do not require Green or start implementation before independent test freeze.'
+            'Tests author: add new acceptance tests for the current increment before its product implementation. '
+            'Existing baseline tests may all pass; this is expected regression protection, not an impediment to resuming test authorship. '
+            'A passing diagnostic on an unchanged baseline does not mean new tests cannot produce Red. '
+            'Never ask the author to make old frozen tests fail, weaken them, or modify product behavior to manufacture Red. '
+            'New test assertion failures are expected Red; new test errors need author repair. '
+            'Resume authoring may precede Red; Red and independent test freeze remain mandatory before implementation. '
+            'For an output-budget failure, separate the request-policy defect from the unfinished test work; '
+            'small complete tool calls can continue within the authorized cap once the transport precondition is corrected.'
             if self.original['kind']=='tests' and not self.original['reviewing'] else
             'Review the existing immutable handoff; do not reproduce Red or edit the author.'
             if self.original['reviewing'] else
