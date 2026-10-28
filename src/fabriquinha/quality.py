@@ -410,28 +410,41 @@ class Quality:
         if not set(self.board.criteria(run))<=ids:
             raise ValueError('browser scenarios must cover every current package acceptance criterion before Red')
 
+    def review_authorship(self,run,key,record):
+        from dataclasses import replace
+        expected=replace(run,actor=run.author,reviewing=False)
+        reader=getattr(self.board,'reassessment_input',None)
+        approval=reader(run) if reader else None
+        if approval is not None:
+            if not isinstance(approval,str):raise ValueError('exact native reassessment input required')
+            from .repairs import reassessment_origin
+            expected=reassessment_origin(self.project,self.store,run,approval,key)
+        if (not expected.same_subject(record['binding'])
+                or record['payload']['project']!=self.project.fingerprint()):
+            raise ValueError('review must match exact authorship and contract')
+        return approval
+
     def tests_review(self, run, red_id, decision, *, control_risks=None):
         self.check(run, 'tests', reviewing=True)
         if self.board.input(run, 'red', review_handoff=True) != red_id:
             raise ValueError('obsolete test review input')
         red = self.test_evidence(red_id)
         data = red['payload']
-        if (red['binding']['task'] != run.task or red['binding']['contract'] != run.contract
-                or red['binding']['actor'] != run.author or data['project'] != self.project.fingerprint()):
-            raise ValueError('review must match exact test authorship and contract')
+        approval=self.review_authorship(run,red_id,red)
+        lineage={'reassessment':approval} if approval else {}
         snapshot = data['snapshot']
         verdict = review_decision(decision, self.store.manifest(snapshot), self.store.tree(snapshot))
         risks=[] if control_risks is None else control_risks
         if verdict['decision']=='approve':
             self.browser_tests(run,snapshot);targets=self.control_plan(red,risks)
         elif risks!=[]:raise ValueError('only approval may freeze additional control risks')
-        review = self.record(run, 'test_review', dict(red=red_id, snapshot=snapshot, verdict=verdict,control_risks=risks))
+        review = self.record(run, 'test_review', dict(red=red_id, snapshot=snapshot, verdict=verdict,control_risks=risks,**lineage))
         if verdict['decision'] != 'approve':
             return review
         return self.record(run, 'tests_frozen', dict(control_contract=CONTROL_CONTRACT,control_cases=targets,
             red=red_id, review=review, snapshot=snapshot,
             baseline=data['baseline'], tests=self.tests(snapshot), cases=data['cases'],
-            new_cases=data['new_cases'], test_author=red['binding']['actor'],
+            new_cases=data['new_cases'], test_author=red['binding']['actor'],**lineage,
             **({'revision':red_id} if red['kind']=='test_revision' else {})))
 
     def freeze(self, run, freeze_id):
@@ -449,8 +462,18 @@ class Quality:
         if data.get('control_contract')!=CONTROL_CONTRACT or data.get('project')!=self.project.fingerprint():
             raise ValueError('frozen tests use a historical control contract; new independent review required')
         red=self.test_evidence(data['red']);review=self.store.receipt(data['review'],kind='test_review')
-        if red['kind']=='regression_red' or red['payload'].get('fixture_revision') is not None:
-            origin,scope=red['binding'],receipt['binding']
+        origin,scope=red['binding'],receipt['binding']
+        if data.get('reassessment'):
+            from .repairs import reassessment_origin
+            from .board import Run
+            expected=reassessment_origin(self.project,self.store,Run(**scope),data['reassessment'],data['red'])
+            if not expected.same_subject(origin) or review['payload'].get('reassessment')!=data['reassessment']:
+                raise ValueError('freeze requires exact independently reassessed origin')
+            scope={**scope,'task':origin['task'],'contract':origin['contract']}
+        elif review['payload'].get('reassessment'):
+            raise ValueError('freeze omitted reassessment authority')
+        if red['kind']=='regression_red' or red['payload'].get('fixture_revision') is not None or data.get('reassessment'):
+
             if (scope['kind']!='tests' or scope['reviewing'] is not True or scope['task']!=origin['task']
                     or scope['release']!=origin['release'] or scope['contract']!=origin['contract']
                     or scope['author']!=origin['actor'] or scope['actor'] not in self.project.reviewers_for(origin['actor'])
@@ -541,8 +564,8 @@ class Quality:
         green = self.store.receipt(green_id, kind='green')
         controls = self.store.receipt(controls_id, kind='controls')
         data = green['payload']; frozen = self.freeze(run, data['freeze'])
-        if (green['binding']['task'] != run.task or green['binding']['contract'] != run.contract
-                or green['binding']['actor'] != run.author or run.actor == frozen['test_author']
+        approval=self.review_authorship(run,green_id,green)
+        if (run.actor == frozen['test_author']
                 or controls['payload']['green'] != green_id or controls['binding'] != green['binding']):
             raise ValueError('independent review of exact current delivery required')
         job, report = self.observe(run, data['snapshot'], 'delivery')
@@ -551,6 +574,7 @@ class Quality:
         decision = review_decision(decision, self.store.manifest(data['snapshot']), self.store.tree(data['snapshot']))
         return self.record(run, 'delivery_review', dict(green=green_id, controls=controls_id,
             snapshot=data['snapshot'], validation_job=job, verdict=decision,
+            **({'reassessment':approval} if approval else {}),
             merge_authorized=False, delivery_approval=False))
 
     def review_recurrence(self,run,verdict):

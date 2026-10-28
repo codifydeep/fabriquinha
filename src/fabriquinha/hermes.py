@@ -209,11 +209,10 @@ class Sandbox:
                 from .quality import Quality
                 record=Quality(project,store,None,board).test_evidence(key)
             else:record=store.receipt(key,kind='green')
-            binding=record['binding']
-            if (binding['task']!=run.task or binding['contract']!=run.contract
-                    or binding['release']!=run.release or binding['actor']!=run.author
-                    or record['payload']['project']!=project.fingerprint()):
-                raise ValueError('exact current immutable review handoff required')
+            from .quality import Quality
+            try:Quality(project,store,None,board).review_authorship(run,key,record)
+            except ValueError as exc:
+                raise ValueError('exact current immutable review handoff required') from exc
             self.workspace=store.tree(record['payload']['snapshot'])
         else:
             self.workspace=board.workspace(run).resolve()

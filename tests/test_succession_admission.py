@@ -119,3 +119,20 @@ class SuccessionAdmission(unittest.TestCase):
             with self.assertRaises(ValueError):
                 reassessment_origin(self.project,self.store,successor,'approval','other-handoff')
         self.assertEqual(self.records['incident']['binding'],origin)
+
+    def test_quality_requires_native_card_authority_for_foreign_authorship(self):
+        from fabriquinha.quality import Quality
+        old=Run('source',6,'developer','tests',False,'developer','release','old-contract')
+        current=Run('successor',10,'lead','tests',True,'developer','release','new-contract')
+        record=dict(binding=old.binding(),payload=dict(project='project'))
+        board=SimpleNamespace(reassessment_input=lambda run:None)
+        quality=Quality(self.project,self.store,None,board)
+        with self.assertRaisesRegex(ValueError,'exact authorship'):
+            quality.review_authorship(current,'red',record)
+        board.reassessment_input=lambda run:'approved'
+        with patch('fabriquinha.repairs.reassessment_origin',return_value=old) as resolve:
+            self.assertEqual(quality.review_authorship(current,'red',record),'approved')
+            resolve.assert_called_once_with(self.project,self.store,current,'approved','red')
+            record['binding']={**old.binding(),'contract':'tampered'}
+            with self.assertRaisesRegex(ValueError,'exact authorship'):
+                quality.review_authorship(current,'red',record)

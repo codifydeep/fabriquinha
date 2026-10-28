@@ -112,3 +112,19 @@ Esse resolvedor ainda não substitui verificações dos gates. Antes de conectá
 o controlador deve conferir que a aprovação exata é input do card nativo atual;
 a nova revisão deve gerar seus próprios recibos, sem herdar aprovação antiga.
 A materialização do grafo e a prova completa permanecem pendentes.
+
+### Integração offline dos gates de autoria
+
+O card nativo fornece a aprovação explícita `reassessment_review`. A revisão de
+testes, a revisão da implementação e o sandbox de leitura consultam a mesma
+verificação de autoria. Sem essa autoridade, um recibo de outro card continua
+recusado. Quando aplicável, a revisão nova e seu freeze registram a aprovação da
+sucessão; o Red/Green original não é copiado nem reescrito. A leitura do freeze
+reconfere essa linhagem. A suíte offline passou com 455 testes.
+
+Isso ainda não materializa uma sucessora nem autoriza despacho. Permanecem
+pendentes o handoff nativo da entrega preservada, a atualização segura das
+dependências, a prova com interrupção/retomada e a obtenção, pela equipe, de uma
+observação relevante que justifique reconsiderar o hold. Repetir a mesma suíte
+pré-implementação não demonstra por si só a compatibilidade HTTP/console.
+Runtime instalado e contador de chamadas permanecem inalterados.
