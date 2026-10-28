@@ -20,7 +20,8 @@ REVIEW_FINDINGS_CONTRACT=('findings lists blocking defects only. approve require
     'put positive observations in reason. changes or escalate requires at least one concrete finding.')
 CONTROL_CONTRACT = 2
 CONTROL_SUBMISSION_CONTRACT=('Submit the complete set of 1-8 mutations together in one delivery_submit call. '
-    'Each mutation maps existing product paths to complete replacement file contents, not patches. '
+    'Each mutation maps existing product paths to either complete replacement strings or exact edits {before: old text, after: new text}. '
+    'Prefer exact edits: before must be nonempty and occur exactly once in the original Green file; no regex or commands. '
     'Each starts independently from the same Green snapshot; their failing behavior targets are combined within that call only. '
     'After a partial refusal, retain useful mutations and include them again together with the new ones. '
     'Separate failed submissions do not accumulate coverage. Passing Green or a diagnostic suite does not prove negative-control coverage. '
@@ -571,14 +572,26 @@ def product_mutations(quality,snapshot,proposals):
     for proposal in proposals:
         if not isinstance(proposal,dict) or not 1<=len(proposal)<=16:
             raise ValueError('bounded product-file replacements required')
+        replacements={}
         for path,content in proposal.items():
-            if path not in manifest or not isinstance(content,str) or len(content)>131072:
+            if path not in manifest:
+                raise ValueError('mutation may replace only an existing product file')
+            if isinstance(content,dict):
+                if (set(content)!={'before','after'} or any(not isinstance(x,str) or len(x)>131072 for x in content.values())
+                        or not content['before'] or content['before']==content['after']):
+                    raise ValueError('exact mutation edit requires distinct bounded before/after strings')
+                original=(store.tree(snapshot)/path).read_text()
+                if original.count(content['before'])!=1:
+                    raise ValueError('mutation before text must occur exactly once in the Green file')
+                content=original.replace(content['before'],content['after'],1)
+            if not isinstance(content,str) or len(content)>131072:
                 raise ValueError('mutation may replace only a bounded existing product file')
             total+=len(content)
             if total>1024*1024:raise ValueError('mutation proposals exceed total bound')
+            replacements[path]=content
         with tempfile.TemporaryDirectory(prefix='.delivery-mutant-',dir=store.root.parent) as folder:
             work=Path(folder);store.checkout(snapshot,work)
-            for path,content in proposal.items():(work/path).write_text(content)
+            for path,content in replacements.items():(work/path).write_text(content)
             mutant=store.capture(work)
         quality.protect(snapshot,mutant,exact_tests=True)
         if mutant==snapshot or mutant in result:raise ValueError('distinct behavior-changing controls required')

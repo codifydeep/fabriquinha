@@ -266,7 +266,7 @@ class Releases:
                 'If existing baseline tests already fail, submit the UNCHANGED baseline to confirm a known regression at the controller SHA; '
                 'independent review must validate all exact existing failures before a product-only fix. Never duplicate tests to bypass baseline failure. '
                 'Never change old tests/configs or reduce discovery. Implementer: Green uses the exact frozen inventory. '
-                'delivery_submit mutations are disposable full replacements of existing product files, not patches; never tests/configs. '
+                'delivery_submit mutations are disposable full replacements or exact before/after edits of existing product files; never tests/configs. '
                 'Controls must fail by assertions and collectively cover every required_control_cases target frozen by independent review. '
                 'Passing auxiliary tests remain protected and run in the complete suite; never corrupt tests to kill a mutant. '
                 'Controller executes all evidence, never accept prose pass claims. '

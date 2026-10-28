@@ -408,7 +408,10 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
         if sandbox.run.kind=='implementation':
             schema.update(required=['mutations'],properties=dict(mutations=dict(type='array',minItems=1,maxItems=8,
                 items=dict(type='object',minProperties=1,maxProperties=16,
-                           additionalProperties=dict(type='string',maxLength=131072)))))
+                           additionalProperties=dict(anyOf=[dict(type='string',maxLength=131072),
+                               dict(type='object',additionalProperties=False,required=['before','after'],
+                                    properties=dict(before=dict(type='string',minLength=1,maxLength=131072),
+                                                    after=dict(type='string',maxLength=131072)))])))))
         operation=operations.submit
         description=('Validate the actual workspace and request independent review. '
             'Tests phase: real Red. Implementation: Green and behavior-changing product mutations. '

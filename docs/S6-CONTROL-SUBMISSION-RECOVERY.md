@@ -213,3 +213,23 @@ continua obrigada a apresentar Green novo, o conjunto completo de controles
 negativos, revisão independente, PR, CI, implantação e QA. O segundo incremento
 e as validações restantes de autonomia também continuam pendentes. O teto
 específico foi mantido em 7.064 chamadas, sem fallback.
+
+## Redução do custo de expressão dos controles — 28/10
+
+A execução 29 confirmou Green, mas encerrou sem handoff após controles
+incompletos. O Tech Lead realizou diagnóstico independente e retomou o frontend
+na execução 31. Isso demonstra a recuperação desse incidente, sem aprovação da
+entrega. A transcrição mostrou anúncios de seis mutações que enviavam apenas
+duas: o formato exigia repetir um arquivo de aproximadamente 7,5 KB por controle.
+
+A fonte passa a aceitar, além de conteúdo completo, `{before, after}` por arquivo
+em cada mutação. O trecho original deve existir exatamente uma vez no snapshot
+Green. Não há regex, shell, alteração do workspace ou acúmulo entre submissões.
+Cada mutação continua independente, sujeita à proteção dos testes e à execução
+da suíte completa. O conjunto deve cobrir todos os alvos congelados, como antes.
+
+O teste novo falhou antes da implementação; os 416 testes passaram depois,
+incluindo ausência/ambiguidade do trecho, formato inválido, tentativa de alterar
+teste e preservação do original. A alternativa está validada offline, ainda não
+instalada no ensaio ativo; não é evidência de que o agente consegue concluir os
+controles ou a entrega.

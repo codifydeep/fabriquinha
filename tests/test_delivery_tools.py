@@ -76,6 +76,25 @@ class ModelDeliveryOperations(unittest.TestCase):
         self.assertEqual((self.store.tree(result[0])/'tests/test_existing.py').read_text(),'baseline test\n')
         self.assertEqual((self.workspace/'app.py').read_text(),'VALUE = 1\n')
 
+    def test_exact_mutation_edits_are_independent_and_preserve_source(self):
+        edits=[{'app.py':{'before':'VALUE = 1','after':'VALUE = 0'}},
+               {'app.py':{'before':'VALUE = 1','after':'VALUE = 2'}}]
+        result=self.tools.mutants(self.baseline,edits)
+        self.assertEqual([(self.store.tree(x)/'app.py').read_text() for x in result],
+                         ['VALUE = 0\n','VALUE = 2\n'])
+        self.assertEqual((self.workspace/'app.py').read_text(),'VALUE = 1\n')
+        for edit in ({'before':'','after':'x'}, {'before':'missing','after':'x'},
+                     {'before':'VALUE','after':'VALUE'}, {'before':'VALUE','after':'x','count':1},
+                     {'before':1,'after':'x'}):
+            with self.subTest(edit=edit),self.assertRaises(ValueError):
+                self.tools.mutants(self.baseline,[{'app.py':edit}])
+        with self.assertRaises(ValueError):
+            self.tools.mutants(self.baseline,[{'tests/test_existing.py':{'before':'baseline','after':'weakened'}}])
+        (self.workspace/'app.py').write_text('VALUE VALUE\n')
+        repeated=self.store.capture(self.workspace)
+        with self.assertRaises(ValueError):
+            self.tools.mutants(repeated,[{'app.py':{'before':'VALUE','after':'x'}}])
+
     def test_author_cannot_use_review_operation(self):
         with self.assertRaises(ValueError):self.tools.review(dict(decision='approve',reason='invalid self review',findings=[]))
         self.assertEqual(self.events,[])
