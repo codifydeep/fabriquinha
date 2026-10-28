@@ -233,3 +233,15 @@ incluindo ausência/ambiguidade do trecho, formato inválido, tentativa de alter
 teste e preservação do original. A alternativa está validada offline, ainda não
 instalada no ensaio ativo; não é evidência de que o agente consegue concluir os
 controles ou a entrega.
+
+## Compatibilidade da reconciliação — 28/10
+
+Após a autorização do teto de 8.500 chamadas, a execução 32 retomou o mesmo card.
+A reconciliação detectou que o texto explicativo atualizado dos controles mudava
+o hash de contexto de uma proposta histórica. A correção preserva o texto do
+recibo original ao revalidar uma proposta existente; todos os demais fatos,
+vínculos e o corpo do card continuam comparados. Novas propostas recebem a
+orientação atual. Não se reescrevem aprovação, contexto histórico ou evidências.
+O teste de mudança de orientação falhou antes do reparo e passou depois;
+a suíte completa passou com 416 testes. A instalação dessa correção é necessária
+para a reconciliação continuar depois da atividade do frontend.

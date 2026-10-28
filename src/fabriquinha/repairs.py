@@ -246,17 +246,25 @@ class Repairs:
             if previous['proposal']['classification']=='submission':return prior_task.id
             if previous['proposal']['classification'] not in ('infrastructure','scope'):
                 raise ValueError('only a preserved reviewed hold may receive corrected context')
+        key=digest([self.project.fingerprint(),source.id,latest.id,SUBMISSION_PROTOCOL,'proposal'])
+        existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        submission_contract=CONTROL_SUBMISSION_CONTRACT
+        if existing:
+            saved=json.loads(existing['body'])
+            if not isinstance(saved,dict) or not isinstance(saved.get('repair_context'),str):
+                raise ValueError('existing submission proposal differs; preserve it')
+            prior=self.store.receipt(saved['repair_context'],kind='repair_context')
+            if prior['binding']!=self.r.binding(anchor):raise ValueError('proposal context authority changed')
+            submission_contract=prior['payload']['submission_contract']
         prior_graph=self.store.record('release_graph',self.r.binding(anchor),graph)
         context=self.store.record('repair_context',self.r.binding(anchor),dict(**facts,
             project=self.project.fingerprint(),repair_kind='submission',submission_protocol=SUBMISSION_PROTOCOL,
             prior_graph=prior_graph,prior_proposal_review=prior_review,
-            submission_contract=CONTROL_SUBMISSION_CONTRACT,qa_paths=[],package=item['package'],
+            submission_contract=submission_contract,qa_paths=[],package=item['package'],
             architecture=spec['document']['architecture'],observability=spec['document']['observability']))
         body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
             repair_of=source.id,repair_context=context,repair_protocol=SUBMISSION_PROTOCOL,
             inputs={'approved_brief':spec['approval']})
-        key=digest([self.project.fingerprint(),source.id,latest.id,SUBMISSION_PROTOCOL,'proposal'])
-        existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
         if existing:
             if json.loads(existing['body'])!=body:raise ValueError('existing submission proposal differs; preserve it')
             return existing['id']

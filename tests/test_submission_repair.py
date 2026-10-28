@@ -96,6 +96,8 @@ class SubmissionRepairAdmission(unittest.TestCase):
             operation=Repairs(releases)
             first=operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item]))
             self.assertEqual(operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item])),first)
+            with patch('fabriquinha.quality.CONTROL_SUBMISSION_CONTRACT','New tool help; same evidence gates'):
+                self.assertEqual(operation.propose_submission(conn,anchor,spec,item,facts['incident'],facts['reviewed_diagnosis'],dict(items=[item])),first)
             self.assertEqual(len(created),1);self.assertEqual(source.status,'triage')
             self.assertEqual(created[0]['assignee'],'lead');self.assertEqual(created[0]['parents'],['approved-plan'])
             self.assertEqual(json.loads(created[0]['body'])['repair_of'],source.id)
