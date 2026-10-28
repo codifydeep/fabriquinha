@@ -1,7 +1,9 @@
 # Balanço crítico e plano proposto — 28 de outubro de 2026
 
-**Auditoria durante pausa solicitada. Não autoriza retomada, instalação ou mudança
-de contrato.** Fonte examinada: `fc202f3a`; runtime instalado: `8d6bbd92`.
+**Auditoria originalmente produzida durante a pausa.** O proprietário aprovou
+o plano e os refinamentos posteriormente em 28/10 e solicitou continuidade,
+mantendo o modelo atual. Ver [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md).
+O retrato auditado abaixo permanece histórico; aprovação não equivale a instalação. Fonte examinada: `fc202f3a`; runtime instalado: `8d6bbd92`.
 Supervisor descarregado, relay parado, política desabilitada e pausa persistente
 conferidos. Nenhuma chamada ao modelo, ensaio de produto, alteração de card ou
 reclassificação de entrega foi feita nesta auditoria. Foram lidos código,

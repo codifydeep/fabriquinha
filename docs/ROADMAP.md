@@ -1,10 +1,11 @@
 # Roadmap e referência de revisão — 28 de outubro de 2026
 
-**Execução pausada pelo proprietário.** A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md)
-propõe priorizar uma recuperação reutilizável, revisão controlada de candidatos
-e conclusão do S6 existente. A proposta não altera contratos ou autoriza despacho.
-O histórico aprovado abaixo permanece referência; o [STATUS](STATUS.md) prevalece
-para a situação operacional atual.
+**Retomada autorizada em 28/10, mantendo o modelo.** O plano da
+[auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) e seus refinamentos foram
+aprovados; o [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) delimita a
+implementação. Prioridade: P0/P1/P2 e qualificação offline antes do novo despacho.
+A infraestrutura permanece sob manutenção até essa validação; isso não significa
+que o desenvolvimento esteja novamente pausado. Nenhuma entrega foi aprovada.
 
 **Correções offline antes da implementação S6.** O CEO aprovou o brief; o aceite
 já foi aplicado ao intake e o CTO aprovou o plano de dois incrementos. A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md)
