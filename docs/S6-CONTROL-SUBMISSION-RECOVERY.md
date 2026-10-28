@@ -273,3 +273,19 @@ completo exige entrada do segundo participante, limite de dois jogadores,
 remoção de salas cheias da disponibilidade e regressões do primeiro incremento.
 Canal real, restauração operacional e distribuição também permanecem no plano
 maior de qualificação; esse marco não é prova de autonomia completa.
+
+## Limite de saída nas continuações — 28/10
+
+A autoria dos testes do segundo incremento terminou com
+`output_budget_exceeds_policy`: após truncamento, a recuperação nativa tentou
+32.768 tokens, acima dos 16.384 autorizados. O relay recusou corretamente.
+O adaptador agora fixa `max_tokens` também no `request_overrides` suportado pelo
+SDK. Não há patch no upstream, aumento de orçamento ou flexibilização do relay.
+A atribuição de atividade continua no cabeçalho da requisição.
+
+A suíte passou com 417 testes. Uma prova offline no transporte real do upstream
+confirmou que a tentativa de duplicar cada um dos quatro limites suportados
+permanece limitada ao valor configurado; sem o override, o transporte reproduziu
+a duplicação. Zero chamadas ao modelo nessa prova. Isso valida o teto na
+requisição, não a capacidade de terminar uma geração dentro dele. A autoria do
+segundo incremento e sua recuperação ainda precisam terminar no fluxo real.

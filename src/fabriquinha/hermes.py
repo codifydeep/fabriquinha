@@ -133,6 +133,15 @@ def terminal_schema(limit):
     registry.register(**fields,override=True)
 
 
+def request_policy(activity,output_limit):
+    if output_limit is not None and (type(output_limit) is not int or output_limit not in OUTPUT_LIMITS):
+        raise ValueError('authorized output limit required')
+    # Native truncation recovery may boost its ephemeral cap. The supported
+    # request override keeps the actual wire request inside operator policy.
+    return {'extra_headers':{'X-Fabriquinha-Activity':activity},
+            **({'max_tokens':output_limit} if output_limit is not None else {})}
+
+
 def incomplete_activity(result, output_limit):
     """Retain actionable SDK state without copying response text or credentials."""
     result=result if isinstance(result,dict) else {}
@@ -505,7 +514,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
         activity=sandbox.store.record('model_activity',sandbox.run.binding(),{'project':sandbox.project.fingerprint(),
             **({'validation_bundle':bundle} if bundle else {})})
         agent=AIAgent(**activity_route(route,activity),max_tokens=output_limit,max_iterations=40,enabled_toolsets=['fabriquinha_activity'],disabled_toolsets=['kanban'],
-            request_overrides={'extra_headers':{'X-Fabriquinha-Activity':activity}},
+            request_overrides=request_policy(activity,output_limit),
             quiet_mode=True,skip_context_files=True,skip_memory=True,skip_background_review=True,
             session_db=db,session_id=session,cwd='/workspace',run_budget_seconds=run_seconds,
             fallback_model=None,ephemeral_system_prompt=phase)

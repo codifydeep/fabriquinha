@@ -19,6 +19,15 @@ from test_delivery_core import configuration
 
 
 class NativeBackendPolicy(unittest.TestCase):
+    def test_request_policy_pins_output_and_keeps_activity_accounting(self):
+        for limit in adapter.OUTPUT_LIMITS:
+            value=adapter.request_policy('a'*64,limit)
+            self.assertEqual(value['max_tokens'],limit)
+            self.assertEqual(value['extra_headers'],{'X-Fabriquinha-Activity':'a'*64})
+        self.assertNotIn('max_tokens',adapter.request_policy('a'*64,None))
+        for invalid in (True,0,32768,'16384'):
+            with self.subTest(limit=invalid),self.assertRaises(ValueError):adapter.request_policy('a'*64,invalid)
+
     def test_activity_address_is_inherited_without_changing_the_stored_route(self):
         route=dict(base_url='http://127.0.0.1:1234/v1',model='fixture',api_key='fixture-only',provider='custom',api_mode='chat_completions')
         before=dict(route)
