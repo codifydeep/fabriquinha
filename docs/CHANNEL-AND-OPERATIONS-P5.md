@@ -54,7 +54,7 @@ recuperação de falha controlada, sem patches do operador após o aceite.
 Preservar o lobby S6 e o modelo atual. Não iniciar outro ensaio genérico para
 substituir essas provas; não declarar o Truco completo entregue.
 
-## Adaptador implementado, ainda não ativado
+## Adaptador implementado e transporte instalado
 
 `channel.py` admite somente comandos explícitos de identidades humanas e destino
 fixados em política privada. `channel_plugin.py` registra `/fabrica`, lê somente
@@ -84,4 +84,24 @@ Não implementa polling/reconexão próprios, não inicia cron, agentes ou dispa
 A autorização é aplicada antes e depois da construção do evento; bots, eventos
 internos e eventos sem autoridade de controle são recusados. Mensagens pendentes
 são preservadas no cold boot. A dependência Telegram usa a versão 22.8 fixada
-pelo próprio upstream. A instalação e o teste Telegram real seguem pendentes.
+pelo próprio upstream. O transporte está instalado como serviço supervisionado, em modo somente comandos.
+O adaptador nativo conectou e registrou estado `running`; o teste de resposta
+real pelo grupo continua pendente. Essa observação não qualifica o canal inteiro.
+
+A consulta de ativação é `/fabrica@techlead_truco_poc_bot status` no grupo
+existente. Consultas não acionam o modelo. Os gateways legados permanecem
+parados; o corte do histórico da outbox e os avisos automáticos ainda precisam
+ser ativados de forma controlada, sem disparar mensagens antigas.
+
+## Restauração offline com dados
+
+`qualify_state_restore.py` cria uma instalação sintética pausada, um card nativo
+bloqueado, snapshot, recibo e aviso nunca enviado. Sob exclusão do dono do
+runtime, verifica SQLite, copia e confere os hashes dos arquivos; abre a cópia
+restaurada e verifica os mesmos dados e episódio de pausa. O ensaio passou com
+19 arquivos, zero workers, chamadas de modelo ou efeitos externos.
+
+O ensaio não é um comando de backup de produção. Ainda faltam contador real do
+proxy, configuração secreta, caminhos de worktrees e reconciliação dos efeitos
+externos de uma instalação real. Uma cópia íntegra não autoriza iniciar uma
+segunda instalação nem restaurar uma cota antiga como saldo disponível.
