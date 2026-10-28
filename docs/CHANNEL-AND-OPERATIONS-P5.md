@@ -118,3 +118,32 @@ novo de retomada recebeu confirmação de envio, com uma tentativa. O contador
 permaneceu em 7.318/8.500 chamadas; a homologação respondeu HTTP 200. Isso prova
 o transporte de saída, mas ainda não a entrada humana nem o ciclo completo pelo
 canal. O backup de manutenção não equivale a restauração de produção qualificada.
+
+## Inspeção do backup real
+
+`verify_installation_backup.py` extrai somente para uma raiz privada nova, recusa
+symlinks/entradas externas, compara os arquivos com o arquivo compactado e abre
+SQLite somente para leitura. A inspeção do backup de manutenção passou: 4.027
+arquivos, 47 cards, 104 execuções encerradas, 61 snapshots e 387 recibos íntegros.
+A pausa e o provedor desabilitado estavam preservados; contador salvo: 7.318.
+Nenhum serviço da cópia foi iniciado, nenhum contador foi escrito no volume vivo.
+
+A inspeção comprova recuperabilidade dos dados, não retomada operacional. Não
+iniciar diretamente essa cópia: caminhos absolutos ainda podem apontar para a
+instalação original. Uma recuperação real exige:
+
+1. Drenar e parar o dono original e o consumidor do canal; confirmar identidade
+   dos processos e efeitos pendentes. Não executar duas instalações do projeto.
+2. Manter o contador/holds mais recentes do volume do provedor. Se esse volume
+   foi perdido, comparar todas as evidências disponíveis e manter o provedor
+   bloqueado até reconciliar consumo; nunca tratar backup antigo como nova cota.
+3. Restaurar no caminho original ou migrar explicitamente todas as referências
+   vinculadas. Validar fonte, upstream, contratos, credenciais e recursos Docker.
+4. Reconciliar PR/SHA/status e implantação reais antes de repetir qualquer efeito.
+   Avisos enviados ou incertos após o backup não podem voltar a ser enviados
+   apenas porque a cópia os mostra como pendentes.
+5. Iniciar somente pausado, verificar dono único e ausência de workers antigos;
+   liberar o episódio exato de pausa apenas após essas verificações.
+
+Esses passos ainda precisam de ensaio operacional com falha controlada. A
+ferramenta de inspeção deliberadamente não oferece `resume` nem reinstala cota.

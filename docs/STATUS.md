@@ -23,6 +23,17 @@ O ciclo completo continua classificado como **assistido**, pois exigiu correçõ
 anteriores do controlador. Próximas saídas: P5 (canal real e operação pública) e
 P6 (duas entregas comparáveis sem assistência técnica depois do aceite).
 
+## P5 — canal e recuperação
+
+Canal Telegram instalado com um único bot e comandos explícitos, sem modelo
+para consultas. O aviso novo de retomada recebeu confirmação; 356 avisos antigos
+foram arquivados como não enviados. Falta confirmar a entrada humana no grupo.
+
+A restauração sintética preservou card, snapshot, recibo, outbox e pausa. O backup
+real também passou na inspeção offline: 47 cards, 104 execuções encerradas,
+61 snapshots e 387 recibos íntegros. Isso ainda não qualifica reinício recuperado
+com reconciliação dos efeitos externos. Ver [plano e limites P5](CHANNEL-AND-OPERATIONS-P5.md).
+
 ## Histórico da recuperação do S6 (anterior à homologação)
 
 **Simplificação instalada; validação real retomada.** A fonte
