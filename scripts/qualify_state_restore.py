@@ -20,6 +20,7 @@ sys.path.insert(0,str(ROOT/'src'))
 from fabriquinha.effects import write_json
 from fabriquinha.runtime import Runtime, Owner
 from fabriquinha.kanban_lane import native
+from fabriquinha.provider import Ledger,Held
 
 
 def manifest(root):
@@ -52,6 +53,12 @@ def qualify(root,upstream):
     snapshot=runtime.store.capture(workspace)
     receipt=runtime.store.record('restore-fixture',{'task':card},{'snapshot':snapshot})
     notice=runtime.outbox.enqueue('restore-fixture',{'text':'Pending synthetic notification'})
+    # Synthetic meter only. The real provider volume is never copied/reset here.
+    meter=source/'fixture-meter';meter.mkdir(mode=0o700)
+    write_json(meter/'calls.json',{'calls':7})
+    write_json(meter/'relay-hold.json',{'category':'transport_unknown','call_number':7})
+    ledger=Ledger(meter,10);meter_before=ledger.state()
+
     # Freeze under the same exclusive owner used by the service. No worker or
     # channel is ever started in this fixture; production needs those drained too.
     with Owner(source):
@@ -75,6 +82,12 @@ def qualify(root,upstream):
         assert kb.get_task(conn,card).status=='blocked'
         assert conn.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
         assert conn.execute('SELECT COUNT(*) FROM task_runs').fetchone()[0]==0
+    recovered_meter=Ledger(restored/'fixture-meter',10)
+    assert recovered_meter.state()==meter_before
+    try:recovered_meter.reserve()
+    except Held as error:assert error.code=='transport_unknown'
+    else:raise AssertionError('restored uncertain send allowed a new reservation')
+    assert recovered_meter.state()==meter_before
     for target in (source,restored):
         assert not (target/'route.json').exists() and not (target/'notifications.json').exists()
     # Start the real restored dispatcher while fenced, then restart it. The
@@ -113,7 +126,8 @@ def qualify(root,upstream):
     result=dict(sqlite_integrity=True,blocked_card_preserved=True,snapshot_verified=True,receipt_verified=True,
         queued_notification_preserved=True,pause_episode_preserved=True,files_verified=len(before),
         model_calls=0,workers_started=0,external_effects=0,production_restore_qualified=False,
-        provider_counter_restore_qualified=False,synthetic_offline_restore=True,restored_dispatcher_restarted_paused=True,duplicate_owner_refused=True)
+        provider_counter_restore_qualified=False,synthetic_offline_restore=True,restored_dispatcher_restarted_paused=True,duplicate_owner_refused=True,
+        synthetic_counter_preserved=True,uncertain_send_hold_preserved=True,reservation_while_held_refused=True)
     write_json(root/'receipt.json',result)
     print(json.dumps(result,indent=2))
     return result

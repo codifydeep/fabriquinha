@@ -12,13 +12,14 @@ desse caminho. A instalação legada está preservada e pausada.
 [Revisão crítica de 28/10/2026](docs/EXECUTION-REVIEW-2026-10-28.md) ·
 [Documentação](docs/README.md)
 
-**Desenvolvimento retomado; agentes sob manutenção.** S4 técnico foi qualificado sem intervenção;
-S5 foi homologado com assistência. O primeiro incremento S6 passou por PR/CI,
-implantação e QA, mas o segundo permanece em triagem na revisão dos testes.
-A [auditoria atual](docs/EXECUTION-REVIEW-2026-10-28.md) distingue esses resultados
-da autonomia geral e fundamentou o plano aprovado para simplificar a recuperação antes de ampliar a equipe.
-Canal real do CEO, restauração operacional e reprodução externa continuam pendentes.
-Os diagramas abaixo descrevem capacidades existentes, não serviços ativos nesta pausa.
+**S6 homologado com assistência; P5 em validação.** Os dois incrementos do
+lobby passaram por revisão, PR/CI, implantação, rollback e QA. O ciclo permanece
+assistido pelas correções anteriores da automação. Canal Telegram instalado com
+um único bot e comandos explícitos; saída confirmada, entrada humana ainda pendente.
+A cópia sintética foi restaurada e reiniciada sob pausa; o backup real passou na
+inspeção de dados. Recuperação operacional completa e duas entregas comparáveis
+sem intervenção técnica continuam pendentes. Veja [evidências P5](docs/CHANNEL-AND-OPERATIONS-P5.md).
+Os diagramas descrevem a arquitetura instalada, sem prometer autonomia geral.
 
 ## O que queremos construir
 
@@ -35,7 +36,9 @@ pausa humana ou dependência externa também não significa cancelamento.
 
 ```mermaid
 flowchart LR
-    CEO[Proprietário: brief e decisões de negócio] --> K[Hermes Kanban]
+    CEO[Proprietário: brief e decisões de negócio] --> TG[Telegram: comando explícito e identidade humana]
+    TG --> IN[Intake: card e revisão exatos]
+    IN --> K[Hermes Kanban]
     LS[launchd opcional: supervisão macOS] --> C[Controlador nativo: pausa e lock único]
     C --> K
     A[Admissão: imagens, disco e redes reservadas] --> K
@@ -56,6 +59,7 @@ flowchart LR
     H -.-> HM[Última decisão homologada: contexto histórico limitado]
     HM -.-> W
     K --> O[Outbox persistente e status]
+    O --> TG
     W --> U[Relay: consumo por atividade]
     K --> R[Diagnóstico técnico Lead / CTO]
     V -.->|recusa vinculada ao diagnóstico| R
@@ -204,8 +208,9 @@ já passou em probes TDD/QA sobre Linux ARM64; o instalador completo continua em
 
 ## Situação das validações
 
-Em 27/10/2026, o núcleo passou em 386 testes (Python 3.14.10), também sem
-`site-packages`. A [entrada operacional de S6](docs/S6-PORTABILITY-PLAN.md)
+Em 28/10/2026, a suíte passou em 490 testes. As provas operacionais do Hermes
+usam o SDK preparado em Python 3.14.10; as qualificações históricas mantêm seus
+ambientes e limites próprios. A [entrada operacional de S6](docs/S6-PORTABILITY-PLAN.md)
 passou em clone/board novos, sob pausa, com fonte verificada e lock exclusivo;
 isso ainda não é uma instalação completa ou nova entrega de produto.
 O preparo público também verificou nove perfis, recusa de configuração antiga
@@ -227,7 +232,7 @@ controlador ou dos artefatos após o aceite do brief. Foram 31 chamadas e
 US$ 0,074938 reportados. Os PRs 57/58 permanecem assistidos. O [S5](docs/HERMES-S5-QUALIFICATION.md) entregou Reset/Undo com 29 testes,
 memória entre perfis e recuperação real, preservando sete intervenções externas.
 Ainda faltam ciclo limpo nessa fronteira, atribuição auxiliar completa e uma
-instalação reproduzível em outro repositório. Telegram real ainda não está configurado nesta fronteira.
+instalação reproduzível em outro repositório. O canal Telegram está instalado, mas sua interação humana completa ainda não foi qualificada.
 Veja o [roadmap](docs/ROADMAP.md).
 
 ## Retirada de recursos de teste

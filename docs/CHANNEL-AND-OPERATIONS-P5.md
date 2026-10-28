@@ -181,3 +181,9 @@ se torna aprovação e o aceite continua restrito ao produto. Essa melhoria pass
 Canal e dispatcher foram observados rodando com essa fonte; relay pronto,
 contador preservado em 7.318/8.500 e homologação HTTP 200. A validação humana
 do comando recebido pelo Telegram continua pendente.
+
+
+A restauração sintética também passou com o ledger real sobre dados fictícios:
+contador 7, teto 10 e hold de envio incerto na chamada 7 sobreviveram à cópia.
+O ledger recusou nova reserva enquanto bloqueado, sem incrementar o contador.
+Não houve substituição do volume real nem afirmação de consumo reconciliado.

@@ -1,5 +1,22 @@
 # Roadmap e referência de revisão — 28 de outubro de 2026
 
+## Prioridade atual
+
+- P4 concluído: S6 homologado com assistência; manter essa classificação.
+- P5: saída Telegram confirmada, entrada humana pendente. Restauração sintética
+  com reinício pausado e bloqueio de consumo passou; backup real íntegro.
+  Faltam recuperação operacional completa, rollback qualificado e interação
+  objetivo → pergunta → resposta vinculada → entrega no canal real.
+- P6: nova versão útil do lobby, dois incrementos dependentes e falha controlada,
+  sem patch da plataforma ou edição manual do produto após o aceite. Repetir
+  outra entrega comparável antes de alegar repetibilidade.
+- Objetivo sugerido da próxima versão: cancelamento de salas e propagação aos
+  outros navegadores. Ainda aguarda escolha do CEO e brief de Produto.
+
+Detalhes e limites: [P5](CHANNEL-AND-OPERATIONS-P5.md) e [status](STATUS.md).
+
+## Histórico das decisões (não descreve o estado atual)
+
 **Retomada autorizada em 28/10, mantendo o modelo.** O plano da
 [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) e seus refinamentos foram
 aprovados; o [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) delimita a
