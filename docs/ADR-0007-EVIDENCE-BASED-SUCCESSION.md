@@ -72,3 +72,17 @@ Texto de hipótese diferente não basta. A deduplicação usa origem/execução 
 identidade da observação, não um contador novo de protocolo. Faltam qualificação
 nativa de criação/reinício, revisão da proposta e materialização da sucessora;
 nenhuma dessas capacidades é declarada instalada ou operacional por este código.
+
+### Prova nativa de persistência da proposta
+
+`scripts/qualify_review_proposal.py` passou com Hermes upstream fixado, em raiz
+isolada. Usou evidências de admissão programadas: qualifica a persistência nativa,
+não a decisão semântica. Uma interrupção após criação e antes da confirmação foi
+seguida de reconstrução com conexão/operação novas. A repetição recuperou o mesmo
+card: zero duplicações, origem ainda triada, proposta bloqueada e claim recusado.
+Zero chamadas ao modelo ou Docker; nenhuma aprovação de entrega.
+
+A primeira tentativa foi recusada porque a fixture não declarou o workspace do
+card de origem. A fixture foi corrigida e a falha preservada. Não houve redução
+da verificação de contrato. Revisão da proposta, materialização da sucessora e
+obtenção de evidência nova pela equipe continuam pendentes de qualificação.
