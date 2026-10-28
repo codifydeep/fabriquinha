@@ -118,13 +118,15 @@ class SubmissionRepairAdmission(unittest.TestCase):
         legacy=SimpleNamespace(id='old-proposal',status='done')
         conn=sqlite3.connect(':memory:');self.addCleanup(conn.close);conn.row_factory=sqlite3.Row
         conn.execute('CREATE TABLE tasks(id TEXT,body TEXT,idempotency_key TEXT)')
-        key=digest([f.project.fingerprint(),source.id,f.implementer.number,'complete-control-set-1','proposal'])
-        conn.execute('INSERT INTO tasks VALUES(?,?,?)',(legacy.id,'{}',key));created=[]
+        key=digest([f.project.fingerprint(),source.id,f.implementer.number,'complete-control-set-2','proposal'])
+        conn.execute('INSERT INTO tasks VALUES(?,?,?)',(legacy.id,'{}',key))
+        older=digest([f.project.fingerprint(),source.id,f.implementer.number,'complete-control-set-1','proposal'])
+        conn.execute('INSERT INTO tasks VALUES(?,?,?)',('oldest-proposal','{}',older));created=[]
         def create(connection,**kwargs):
             created.append(kwargs);connection.execute('INSERT INTO tasks VALUES(?,?,?)',('new-proposal',kwargs['body'],kwargs['idempotency_key']))
             return 'new-proposal'
         kb=SimpleNamespace(latest_run=lambda *a:SimpleNamespace(id=f.implementer.number,ended_at=1),
-            get_task=lambda *a:legacy,create_task=create)
+            get_task=lambda c,ident:legacy if ident==legacy.id else None,create_task=create)
         releases=SimpleNamespace(project=f.project,store=f.store,board=SimpleNamespace(guard=None),
             check_card=lambda c,card:source if card['id']==source.id else tests,
             closed=lambda task,*a:('old-review' if task==legacy.id else self.freeze,None,None),
@@ -163,6 +165,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
                 verdict=dict(decision='approve',reason='The scoped proposal preserves quality gates.',findings=[])))
         self.assertEqual(reviewed(f.project,f.store,approval())['proposal']['classification'],'submission')
         self.assertEqual(reviewed(f.project,f.store,approval(protocol='complete-control-set-1'))['proposal']['classification'],'submission')
+        self.assertEqual(reviewed(f.project,f.store,approval(protocol='complete-control-set-2'))['proposal']['classification'],'submission')
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(protocol='unknown'))
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(actor='lead'))
         with self.assertRaises(ValueError):reviewed(f.project,f.store,approval(source_run=999))

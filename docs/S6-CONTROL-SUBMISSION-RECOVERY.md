@@ -158,3 +158,20 @@ reais distintos; nenhuma aprovação antiga é reinterpretada nem gate removido.
 A decisão da revisão 2 está preservada. O ajuste ainda precisa ser instalado e
 uma eventual nova revisão deve ter vínculo explícito com as decisões anteriores;
 não repetir chamadas idênticas nem desbloquear a implementação diretamente.
+
+
+## Aplicação do ajuste de fases — 28/10
+
+A revisão 3 seleciona o predecessor mais recente entre as revisões de contrato
+conhecidas. A seleção é fixada pela fonte do controlador; o agente não pode
+inventar uma revisão nem gerar outra tentativa idêntica. Propostas pendentes
+são aguardadas e aprovações executáveis são reutilizadas. Holds concluídos
+permanecem registrados e exigem nova revisão independente.
+
+414 testes passaram. Uma prova direcionada usou cópia SQLite do board real,
+recibos e snapshots preservados, com escrita em armazenamento isolado. A primeira
+preparação omitiu o pin da instalação e foi corretamente recusada. Com o mesmo
+pin copiado, o Hermes criou exatamente uma sucessora ligada ao hold mais recente;
+a segunda reconciliação reutilizou o mesmo card. Triagem, holds e board real
+permaneceram intactos. Zero chamadas ao modelo. Essa prova cobre a seleção e
+criação da nova revisão; o julgamento dos agentes segue pendente.

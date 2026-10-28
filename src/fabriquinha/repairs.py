@@ -15,8 +15,8 @@ from .recovery import Recovery,browser_refusal_context
 # Controller source revision, never model-supplied. Changed only for a qualified
 # repair-protocol fix, not for documents, timeouts or another identical retry.
 REPAIR_PROTOCOL='qa-text-handoff-1'
-SUBMISSION_PROTOCOL='complete-control-set-2'
-SUBMISSION_PROTOCOLS=('complete-control-set-1',SUBMISSION_PROTOCOL)
+SUBMISSION_PROTOCOL='complete-control-set-3'
+SUBMISSION_PROTOCOLS=('complete-control-set-1','complete-control-set-2',SUBMISSION_PROTOCOL)
 
 
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
@@ -229,10 +229,13 @@ class Repairs:
         if sum(i['cards']['implementation']['id']==source.id for i in graph['items'])!=1:
             raise ValueError('unique source in current release graph required')
         prior_review=None;prior_task=None
-        # One source-contract upgrade, not a retry counter reset. A pending or
-        # already executable legacy proposal keeps its native lifecycle.
-        legacy_key=digest([self.project.fingerprint(),source.id,latest.id,'complete-control-set-1','proposal'])
-        legacy=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(legacy_key,)).fetchone()
+        # Explicit source-contract upgrades, never worker-selected retries.
+        # Follow the newest predecessor; its context retains earlier decisions.
+        legacy=None
+        for protocol in reversed(SUBMISSION_PROTOCOLS[:-1]):
+            legacy_key=digest([self.project.fingerprint(),source.id,latest.id,protocol,'proposal'])
+            legacy=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(legacy_key,)).fetchone()
+            if legacy:break
         if legacy:
             prior_task=kb.get_task(conn,legacy['id'])
             if prior_task.status!='done':return prior_task.id
