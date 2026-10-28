@@ -99,6 +99,15 @@ def repair_phase(reviewing,kind):
             'A missing handoff from the failed attempt is not by itself an infrastructure defect. '
             'Infrastructure or scope holds need a separate actual impediment. Preserve the old triage and decisions. '
             'This plan never approves the delivery, changes tests, resets a breaker or replaces the independent delivery review.')
+    if kind=='fixture':
+        action=('Independently review the technical fixture proposal using plan_review. ' if reviewing else
+                'Use repair_submit to propose test_contract only for evidence-backed additive fixture setup corrections. ')
+        return action+('This is a proposal concerning unpublished tests: no product changes, test edits or delivery approval here. '
+            'Require the exact CTO diagnosis, original freeze, approved brief and eligible test paths. '
+            'The later test task must produce fresh Red and independent test review; these are completion gates, not start conditions for this proposal. '
+            'Preserve all existing statements, assertions, selectors, timeouts, helpers, manifests and prior control targets. '
+            'Inspect setup/action/assertion to separate fixture defects from product defects. '
+            'Use infrastructure or scope with a concrete reason if this narrow repair is unsuitable; no counter reset or identical retries.')
     if kind is not None:raise ValueError('known corrective phase required')
     return ('Independently review the exact corrective classification, brief authority and explicit QA paths; use plan_review.'
             if reviewing else 'Classify the recorded deployed QA failure against the approved brief using repair_submit. '
@@ -496,7 +505,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     corrective=operations.evidence() if getattr(operations,'repair',False) is True else None
     corrective_phase=repair_phase(sandbox.run.reviewing,corrective['repair'].get('repair_kind')) if corrective else None
     # Preserve old sessions, but never resume their contradictory system prompt.
-    phase_contract=digest(corrective_phase) if corrective and corrective['repair'].get('repair_kind')=='submission' else None
+    phase_contract=digest(corrective_phase) if corrective and corrective['repair'].get('repair_kind') in ('submission','fixture') else None
     anchor=activity_anchor(sandbox.project,sandbox.run,route,recovery_epoch,phase_contract=phase_contract)
     session=db.resolve_resume_session_id(anchor);previous=db.get_session(session)
     try:

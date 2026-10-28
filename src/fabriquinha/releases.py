@@ -298,7 +298,20 @@ class Releases:
             graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')['payload']
             continuation=reviewed(self.project,self.store,graph['continuation_review'])
             if continuation['task']!=body['continuation_plan']:raise ValueError('exact continuation review required')
-            result['submission_continuation']=continuation_context(continuation)
+            if continuation['context'].get('repair_kind')=='fixture':
+                result['fixture_revision']=context_view(self.store,continuation['context'])
+                if run.kind=='tests' and authority:
+                    result['tdd']=('Correct only additive setup in repair.proposal.test_paths. Preserve every old statement, assertion, '
+                        'selector, timeout, helper and manifest. Independently review setup/action/assertion, not only failure status. '
+                        'delivery_submit executes the original published baseline and a fresh Red with the corrected candidate. '
+                        'It cannot reuse old Red or approve the new fixture. Independent test review freezes a new version, '
+                        'preserving the complete old inventory and negative-control targets. No product changes.')
+                    result['browser']='Use only the existing browser protocol and helpers; fix the reviewed missing setup without changing business coverage.'
+                elif run.kind=='implementation' and authority:
+                    result['tdd']=('Continue preserved product work using the newly reviewed frozen tests. Use delivery_validate for the full suite, '
+                        'then submit fresh Green and the complete negative-control set for this exact revision. '
+                        'Do not change tests, reuse old Green or infer approval from the fixture repair proposal.')
+            else:result['submission_continuation']=continuation_context(continuation)
         return result
 
     def baseline(self,run,body):

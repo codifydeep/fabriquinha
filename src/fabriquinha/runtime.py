@@ -696,7 +696,14 @@ class Runtime:
             self.board.guard=guard
             if run.kind=='implementation' and not run.reviewing:
                 work=self.board.workspace(run);frozen=quality.freeze(run,self.board.input(run,'tests'))
-                if not any(work.iterdir()):self.store.checkout(frozen['snapshot'],work)
+                if not any(work.iterdir()):
+                    from .repairs import repair_authority
+                    authority=repair_authority(self.project,self.store,self.board,run)
+                    seed=frozen['snapshot']
+                    if authority and authority['context'].get('repair_kind')=='fixture':
+                        from .test_revision import implementation_seed
+                        seed=implementation_seed(self.project,self.store,quality,authority,frozen)
+                    self.store.checkout(seed,work)
                 else:quality.protect(frozen['snapshot'],self.store.capture(work),exact_tests=True)
             sandbox=(DraftActivity if run.kind in ('brief','plan') else Sandbox)(self.project,self.store,self.board,run)
             prompt='Delivery activity '+json.dumps(run.binding(),sort_keys=True)+'\n'+prompt

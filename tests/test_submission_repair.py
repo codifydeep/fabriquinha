@@ -214,10 +214,19 @@ class SubmissionRepairAdmission(unittest.TestCase):
             releases.closed.assert_called_once_with('proposal','plan_review','plan_review')
             self.assertEqual(tasks[source].status,'triage')
             from fabriquinha.effects import EffectBlocked
-            with self.assertRaises(EffectBlocked):operation.continue_submission(None,None,None,{**graph,'submission_depth':2})
+            operation.propose_fixture=Mock(return_value='proposal');tasks['proposal'].status='review'
+            bounded={**graph,'submission_depth':2}
+            self.assertEqual(operation.continue_submission(None,None,None,bounded),bounded)
+            operation.propose_fixture.assert_called_once()
             self.assertEqual(operation.materialize_submission.call_count,1)
 
     def test_replacement_tail_preserves_tests_dependencies_and_recovers_after_graph_write(self):
+        self.replacement_tail()
+
+    def test_fixture_tail_replaces_tests_without_reset_and_recovers_after_graph_write(self):
+        self.replacement_tail(fixture=True)
+
+    def replacement_tail(self,fixture=False):
         from fabriquinha.releases import Releases
         from fabriquinha.effects import write_json
         f=self.fixture;facts=self.evaluate()
@@ -243,11 +252,16 @@ class SubmissionRepairAdmission(unittest.TestCase):
         tasks[plan]=SimpleNamespace(id=plan,status='done')
         items=[dict(package=dict(id='first',title='First'),cards=dict(tests=first_tests,implementation=first_impl,integration=first_integration)),
                dict(package=dict(id='second',title='Second'),cards=dict(tests=second_tests,implementation=second_impl,integration=second_integration))]
-        graph=dict(project=f.project.fingerprint(),items=items,validation_bundle='bundle')
+        graph=dict(project=f.project.fingerprint(),items=items,validation_bundle='bundle',submission_depth=2 if fixture else 0)
         releases=Releases(f.project,f.store,SimpleNamespace(guard=None),Mock());releases.closed=Mock(return_value=('approval',None,None))
         releases.folder=lambda a:f.store.root/'releases'/digest('v1')
         old=f.store.record('release_graph',releases.binding(anchor),graph)
         authority=dict(task=plan,proposal=dict(classification='submission'),context={**facts,'repair_kind':'submission','prior_graph':old})
+        if fixture:
+            authority['proposal']['classification']='test_contract'
+            authority['context'].update(repair_kind='fixture',implementation_snapshot=self.snapshot,
+                snapshot=f.store.receipt(self.freeze)['payload']['snapshot'])
+        expected_count=6 if fixture else 5
         target=releases.folder(anchor)/('continuation-'+plan+'.json')
         def latest(connection,ident):
             return SimpleNamespace(id=f.implementer.number,ended_at=1) if ident=='implementation' else None
@@ -276,20 +290,28 @@ class SubmissionRepairAdmission(unittest.TestCase):
             (f.work/'app.py').write_text('VALUE = 1\n');self.assertEqual(created,[])
             with patch('fabriquinha.repairs.write_json',side_effect=OSError('before graph persistence')),self.assertRaises(OSError):
                 operation.materialize_submission(conn,anchor,graph,'approval')
-            self.assertEqual(len(created),5);self.assertEqual(activated,[]);self.assertFalse(target.exists())
+            self.assertEqual(len(created),expected_count);self.assertEqual(activated,[]);self.assertFalse(target.exists())
             with patch('fabriquinha.repairs.write_json',side_effect=interrupted),self.assertRaises(OSError):
                 operation.materialize_submission(conn,anchor,graph,'approval')
-            self.assertEqual(len(created),5);self.assertEqual(activated,[])
+            self.assertEqual(len(created),expected_count);self.assertEqual(activated,[])
             result=operation.materialize_submission(conn,anchor,graph,'approval')
             self.assertEqual(operation.materialize_submission(conn,anchor,graph,'approval'),result)
-            self.assertEqual(len(created),5);self.assertEqual(len(activated),5)
-            self.assertEqual(result['items'][0]['cards']['tests'],first_tests)
+            self.assertEqual(len(created),expected_count);self.assertEqual(len(activated),expected_count)
+            if not fixture:self.assertEqual(result['items'][0]['cards']['tests'],first_tests)
+            else:
+                self.assertEqual(result['submission_depth'],2);self.assertEqual(result['fixture_depth'],1)
+                self.assertNotEqual(result['items'][0]['cards']['tests']['id'],first_tests['id'])
             new_first=result['items'][0]['cards'];new_second=result['items'][1]['cards']
             self.assertEqual(new_second['tests']['body']['inputs']['baseline'],'parent:'+new_first['integration']['id']+':baseline')
             self.assertIn(new_first['integration']['id'],new_second['tests']['parents'])
-            self.assertEqual(f.store.capture(new_first['implementation']['workspace']),self.snapshot)
+            if not fixture:self.assertEqual(f.store.capture(new_first['implementation']['workspace']),self.snapshot)
+            else:
+                from pathlib import Path
+                self.assertEqual(list(Path(new_first['implementation']['workspace']).iterdir()),[])
+                self.assertEqual(new_first['tests']['body']['inputs']['baseline'],authority['context']['snapshot'])
+                self.assertEqual(new_first['implementation']['body']['inputs']['repair_review'],'approval')
             self.assertEqual({key:vars(tasks[key]) for key in original},original)
-            self.assertEqual(set(result['superseded_cards']),set(original)-{'tests'})
+            self.assertEqual(set(result['superseded_cards']),set(original)-(set() if fixture else {'tests'}))
 
 
 if __name__=='__main__':unittest.main()

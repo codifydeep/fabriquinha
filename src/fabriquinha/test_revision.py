@@ -127,3 +127,28 @@ def verify_red_revision(project,store,quality,record):
             or set(value['cases'])!=set(previous['cases']) or set(value['new_cases'])!=set(previous['new_cases'])):
         raise ValueError('new Red must preserve the exact reviewed fixture scope and inventory')
     return set(previous['control_cases'])
+
+
+def implementation_seed(project,store,quality,authority,frozen):
+    """Carry product work forward only after the revised tests are frozen.
+
+    Never edit the old worker or old snapshot. The returned immutable snapshot
+    combines preserved product work with the independently frozen exact tests.
+    """
+    import tempfile
+    from pathlib import Path
+    context=authority['context']
+    red=store.receipt(frozen['red'],kind='red')
+    if (red['payload'].get('fixture_revision')!=dict(authority=authority['review'],tests=context['tests'])
+            or red['payload']['snapshot']!=frozen['snapshot']):
+        raise ValueError('exact independently frozen fixture revision required for product seed')
+    revision_context(project,store,quality,authority,frozen['snapshot'])
+    source=context['implementation_snapshot']
+    quality.protect(context['snapshot'],source,exact_tests=True)
+    with tempfile.TemporaryDirectory(prefix='.fixture-seed-',dir=store.root.parent) as folder:
+        work=Path(folder);store.checkout(source,work)
+        for path in authority['proposal']['test_paths']:
+            (work/path).write_bytes((store.tree(frozen['snapshot'])/path).read_bytes())
+        snapshot=store.capture(work)
+    quality.protect(frozen['snapshot'],snapshot,exact_tests=True)
+    return snapshot

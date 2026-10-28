@@ -29,6 +29,15 @@ class FixtureProposal(unittest.TestCase):
         with patch('fabriquinha.executor.browser_contract',return_value=1):
             with self.assertRaises(ValueError):fixture_failure(self.project,self.store,'incident','decision',self.freeze,self.candidate)
 
+    def test_proposal_receives_complete_frozen_sources_not_author_workspace(self):
+        from fabriquinha.repairs import context_view
+        context=dict(repair_kind='fixture',tests=self.freeze,snapshot=self.frozen_snapshot,qa_paths=[self.path])
+        result=context_view(self.store,context)
+        self.assertEqual(result['fixture_sources'][self.path]['text'],fixtures.OLD)
+        self.assertNotEqual(result['fixture_sources'][self.path]['text'],(self.work/self.path).read_text())
+        for update in ({'qa_paths':['app.py']},{'snapshot':self.candidate},{'qa_paths':[self.path,self.path]}):
+            with self.assertRaises(ValueError):context_view(self.store,{**context,**update})
+
     def test_proposal_cannot_authorize_product_or_business_change(self):
         context=dict(repair_kind='fixture',qa_paths=[self.path])
         proposal=dict(classification='test_contract',reason='Missing setup before the assertion.',test_paths=[self.path])

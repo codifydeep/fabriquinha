@@ -558,3 +558,33 @@ manteve `delivery_approval=false`. Os testes offline cobrem idempotência, revis
 por perfil permitido, divergência de protocolo/origem e recusa de mudanças de
 produto/escopo. Ainda falta materializar e reconciliar a cauda revisada do grafo,
 qualificar a interrupção nessa transição e instalar o conjunto completo.
+
+### Cauda revisada e preservação do trabalho — preparação offline
+
+A materialização existente foi estendida para a proposta `fixture`, sem outro
+motor de workflow. Nessa modalidade, substitui também o card de testes do
+incremento afetado, além de implementação/integração e dependentes ainda não
+iniciados. Todos nascem bloqueados; somente o grafo completo e durável permite
+liberá-los. Preserva cards antigos, prefixo concluído, versão do validador e
+`submission_depth`; registra `fixture_depth=1`. Outra revisão pelo mesmo caminho
+não é autorizada automaticamente.
+
+A implementação nova começa vazia até o novo freeze. O controlador então cria
+um snapshot que preserva o produto da tentativa anterior e incorpora somente os
+arquivos de teste da revisão exata. Revalida os testes completos antes de entregar
+o workspace. Não sobrescreve o workspace antigo e não importa seu antigo Green.
+A repetição da composição produz a mesma identidade. Workers já iniciados continuam
+protegidos pela conferência dos testes congelados, sem re-semeadura de trabalho.
+
+Os testes de falha antes/depois da persistência do grafo verificam ausência de
+ativação parcial, duplicação de cards e mudança dos cards originais. Também
+verificam remapeamento das dependências e preservação da implementação na nova
+base. A proposta recebe os fontes completos e hashes do snapshot congelado, até
+128 KiB, porque a fase documental não possui acesso a arquivos/terminal; exceder
+esse limite é impedimento explícito, nunca truncamento silencioso. As instruções
+de sistema e a identidade da sessão distinguem proposta de fixture de reparos
+legados e de implementação.
+
+Pendente antes de instalar: qualificação com o Kanban Hermes real numa raiz
+isolada, incluindo a criação idempotente e a retomada da transição. Os testes
+unitários usam um adaptador de Kanban controlado; não são prova de autonomia.

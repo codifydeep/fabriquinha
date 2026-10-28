@@ -87,6 +87,16 @@ class NativeBackendPolicy(unittest.TestCase):
         with self.assertRaises(ValueError):activity_anchor(self.project,self.run,route,phase_contract='untrusted')
         with self.assertRaises(ValueError):repair_phase(False,'unknown')
 
+    def test_fixture_plan_is_not_an_implementation_or_deployed_repair(self):
+        from fabriquinha.hermes import repair_phase
+        author=repair_phase(False,'fixture');reviewer=repair_phase(True,'fixture')
+        self.assertIn('repair_submit',author);self.assertIn('plan_review',reviewer)
+        for value in (author,reviewer):
+            self.assertIn('unpublished',value)
+            self.assertIn('fresh Red',value)
+            self.assertIn('not start conditions',value)
+            self.assertIn('no product changes',value)
+
     def test_native_host_workspace_is_not_advertised_as_tool_filesystem(self):
         context='Task: t_example\nWorkspace: dir @ /controller/private/work/card\n## Body\nKeep every criterion.'
         visible=sandbox_context(context)

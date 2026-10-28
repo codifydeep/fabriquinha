@@ -80,6 +80,26 @@ class FixtureRed(unittest.TestCase):
         record=self.submit()
         self.assertEqual(self.quality.control_plan(record,[]),['existing','new'])
 
+    def test_implementation_seed_preserves_product_with_only_reviewed_new_tests(self):
+        from fabriquinha.test_revision import implementation_seed
+        (self.work/self.path).write_text(OLD)
+        (self.work/'app.py').write_text('preserved implementation work')
+        source=self.store.capture(self.work)
+        self.authority['context']['implementation_snapshot']=source
+        self.submit()
+        review=replace(self.run,number=6,actor='lead',reviewing=True)
+        key=self.quality.tests_review(review,self.red,dict(decision='approve',reason='Setup reviewed.',findings=[]))
+        frozen=self.quality.frozen_plan(self.store.receipt(key))
+        seed=implementation_seed(self.project,self.store,self.quality,self.authority,frozen)
+        self.assertEqual(implementation_seed(self.project,self.store,self.quality,self.authority,frozen),seed)
+        self.assertEqual((self.store.tree(seed)/'app.py').read_text(),'preserved implementation work')
+        self.assertEqual((self.store.tree(seed)/self.path).read_text(),NEW)
+        self.assertEqual((self.store.tree(source)/self.path).read_text(),OLD)
+        with self.assertRaises(ValueError):
+            implementation_seed(self.project,self.store,self.quality,self.authority,{**frozen,'snapshot':self.frozen_snapshot})
+        self.authority['context']['implementation_snapshot']=self.candidate
+        with self.assertRaises(ValueError):implementation_seed(self.project,self.store,self.quality,self.authority,frozen)
+
     def test_still_requires_red_and_green_baseline(self):
         self.all_green=True
         with self.assertRaises(ValueError):self.submit()
