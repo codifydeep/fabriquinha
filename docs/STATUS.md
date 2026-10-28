@@ -41,7 +41,7 @@ A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
 recebendo 409 gera. Isso invalida a equivalência presumida, mas não aprova produto,
 nem resolve por si só corrida entre clientes ou o lifecycle de saída da triagem.
 
-Fonte instalada: `9096013b`, com exportação verificada, backup preservado e
+Fonte instalada: `c59897d8`, com exportação verificada, backup preservado e
 `doctor` aprovado nos nove perfis. A suíte offline passou com 475 testes.
 Provas nativas programadas cobrem sucessão, dependências, interrupções,
 solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead passou

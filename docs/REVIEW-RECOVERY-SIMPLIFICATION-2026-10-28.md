@@ -1,7 +1,7 @@
 # Simplificação proposta da recuperação de revisão
 
 Estado: aprovada explicitamente pelo proprietário em 28/10/2026; implementação
-instalada em `9096013b`; recuperação real em validação.
+instalada em `c59897d8`; recuperação real em validação.
 
 Implementação: recibo `review_admission` emitido pelo controlador e revalidado
 na leitura; transferência nativa da entrega original; proposta histórica
