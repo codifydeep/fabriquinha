@@ -228,3 +228,24 @@ A admissão técnica continua programada nessa prova; os testes unitários cobre
 a proteção e procedência das evidências. A suíte passou com 458 testes. Falta
 a prova combinada com job real e a inspeção final antes de instalar no S6.
 Nenhuma chamada ao modelo ou container foi iniciada nesta etapa.
+
+### Prova com jobs reais de validação
+
+`scripts/qualify_reassessment_jobs.py` executou quatro jobs Docker reais com a
+imagem local existente: baseline, Red, diagnóstico da entrega original e
+experimento em cópia. O relatório diferente foi admitido pela função real de
+sucessão, sem mocks nessa validação. As identidades de papel são programadas;
+a prova nativa separada cobre o Kanban e esta cobre jobs/procedência/proteções.
+Não equivalem ainda a um ciclo autônomo do modelo.
+
+Os jobs usaram rede desabilitada, snapshot somente leitura e usuário sem
+privilégios. Testes e snapshot original permaneceram idênticos. Nenhum recibo de
+Green, freeze, aprovação de entrega ou homologação foi criado. O executor
+retirou seus containers após preservar os resultados; nenhuma imagem nova foi
+construída. Não houve chamada ao modelo.
+
+A inspeção antes da instalação encontrou uma pendência adicional: o diagnóstico
+de uma revisão sucessora precisa resolver a autoria transferida, em vez de
+exigir sempre que o recibo original pertença ao card sucessor. Isso deve ser
+corrigido e testado antes de instalar, para não recriar um impedimento no caminho
+de falha. O S6 permanece em manutenção.
