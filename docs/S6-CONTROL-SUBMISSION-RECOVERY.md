@@ -245,3 +245,14 @@ orientação atual. Não se reescrevem aprovação, contexto histórico ou evid�
 O teste de mudança de orientação falhou antes do reparo e passou depois;
 a suíte completa passou com 416 testes. A instalação dessa correção é necessária
 para a reconciliação continuar depois da atividade do frontend.
+
+## Controles reais concluídos — 28/10
+
+Com a fonte `c5b54d41`, a reconciliação deixou de apresentar o conflito histórico.
+Na execução 33, o frontend submeteu seis mutações (cinco no formato compacto).
+O controlador comprovou Green e cobertura dos sete alvos congelados; recibo de
+controles `91dc763109ea3e758b373bd7dc6ceea6dc1d742e65598d2141842572cc949951`,
+vinculado ao Green `997d9c8ef0e3a883aa5d44bb85a6cac2a275c874569b9d32a2a12cc6c365839f`.
+A execução 34 foi despachada automaticamente ao Tech Lead para revisão
+independente. Isso qualifica o uso real do formato compacto nesta entrega;
+ainda não comprova aprovação, integração, homologação ou autonomia completa.
