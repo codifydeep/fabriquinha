@@ -30,6 +30,12 @@ class ProfilePolicy(unittest.TestCase):
         write_json(self.home/'config.yaml',configuration())
         write_json(self.root/'installation.json',dict(project=self.project.fingerprint(),profile_contract=contract()))
 
+    def test_old_small_window_requires_explicit_profile_migration(self):
+        old=configuration();old['model']['context_length']=65536
+        write_json(self.home/'config.yaml',old)
+        result=inspect_profile(self.root,'backend',loader=lambda home:old)
+        self.assertFalse(result['ready'])
+
     def test_configuration_is_independent_and_inspection_never_exposes_config(self):
         first=configuration();first['terminal']['backend']='local'
         self.assertEqual(configuration()['terminal']['backend'],'fabriquinha')

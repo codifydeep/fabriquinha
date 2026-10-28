@@ -396,3 +396,25 @@ A admissão somente leitura do incidente real da execução 51 passou e manteve
 `delivery_approval=false`; nenhum card foi criado por essa prova. O novo teste
 falhou antes do reparo e a suíte completa passou com 421 testes. Ainda falta
 instalar essa extensão e validar a proposta/execução real; manutenção continua.
+
+## Janela de contexto: capacidade anunciada e limite instalado — 28/10
+
+A tentativa 55 repetiu o encerramento sem handoff, agora com telemetria:
+12 chamadas, três compactações e duas ineficazes. O pedido ativo estava
+preservado pelo marcador nativo STILL IN PROGRESS; ferramentas de escrita
+estavam disponíveis. Portanto, não há evidência para alterar o protocolo nativo
+de preservação da tarefa ou permissões do sandbox.
+
+A consulta pública a [OpenRouter models](https://openrouter.ai/api/v1/models)
+retornou `context_length=1000000` para `anthropic/claude-haiku-5.5`. O perfil
+instalado limitava o SDK a 65.536. Preparou-se uma janela moderada de 131.072,
+sem mudar modelo, saída de 16.384, número de iterações, teto de chamadas ou
+fallback. No compressor upstream fixado, o cálculo offline do limiar com reserva
+de saída passou de 41.779 para 97.484 tokens. Não é promessa de menor custo:
+a hipótese é evitar releituras e resumos repetidos, a medir no fluxo real.
+
+A admissão rejeita o perfil antigo sob a fonte nova; a migração precisa ocorrer
+sob manutenção drenada, com backup e atualização explícita do contrato instalado.
+Não instalar a configuração durante um worker ativo. Outros modelos só podem ser
+qualificados se sua capacidade comportar essa janela; não presumir capacidade
+por nome. O teste de rejeição do perfil antigo falhou antes da alteração.

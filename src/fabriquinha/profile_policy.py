@@ -17,7 +17,9 @@ class ProfileRefused(ValueError):
 
 
 def configuration():
-    return dict(model={'streaming':False,'context_length':65536},
+    # Keep a bounded working window below the qualified provider capacity.
+    # 64k forced repeated compaction during a single implementation activity.
+    return dict(model={'streaming':False,'context_length':131072},
         auxiliary={'title_generation':{'enabled':False}},tools={'tool_search':{'enabled':'off'}},
         terminal={'backend':'fabriquinha','cwd':'/workspace'})
 
