@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.repairs import held_incident,review_failure,review_reassessment
+from fabriquinha.repairs import held_incident,review_failure,review_reassessment,repair_document
 
 class SuccessionAdmission(unittest.TestCase):
     def setUp(self):
@@ -86,3 +86,13 @@ class SuccessionAdmission(unittest.TestCase):
         self.assertEqual(facts['new_evidence'],'new')
         self.records['job']['payload']['identity']['snapshot']='foreign'
         with self.assertRaisesRegex(ValueError,'exact controller job'):assess()
+
+    def test_review_proposal_never_grants_test_or_product_changes(self):
+        context=dict(repair_kind='review',qa_paths=[])
+        value=dict(classification='reassess',reason='Changed observation addresses the review hypothesis',test_paths=[])
+        self.assertEqual(repair_document(value,context),value)
+        for classification in ('test_contract','product','submission'):
+            with self.subTest(classification=classification),self.assertRaises(ValueError):
+                repair_document({**value,'classification':classification},context)
+        with self.assertRaises(ValueError):
+            repair_document({**value,'test_paths':['tests/test_existing.py']},context)

@@ -99,6 +99,12 @@ def repair_phase(reviewing,kind):
             'A missing handoff from the failed attempt is not by itself an infrastructure defect. '
             'Infrastructure or scope holds need a separate actual impediment. Preserve the old triage and decisions. '
             'This plan never approves the delivery, changes tests, resets a breaker or replaces the independent delivery review.')
+    if kind=='review':
+        return (('Independently assess the reassessment proposal with plan_review. ' if reviewing else
+                 'Use repair_submit to propose reassess, infrastructure or scope with empty test_paths. ')+
+            'Compare the actual previous and current controller observations. A different hypothesis alone is not evidence. '
+            'Reassessment preserves the immutable author handoff and all delivery gates; no test edits, approval or breaker reset. '
+            'If the observation does not address the impediment, state the remaining technical action rather than approving another identical retry.')
     if kind=='fixture':
         action=('Independently review the technical fixture proposal using plan_review. ' if reviewing else
                 'Use repair_submit to propose test_contract only for evidence-backed additive fixture setup corrections. ')
@@ -505,7 +511,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
     corrective=operations.evidence() if getattr(operations,'repair',False) is True else None
     corrective_phase=repair_phase(sandbox.run.reviewing,corrective['repair'].get('repair_kind')) if corrective else None
     # Preserve old sessions, but never resume their contradictory system prompt.
-    phase_contract=digest(corrective_phase) if corrective and corrective['repair'].get('repair_kind') in ('submission','fixture') else None
+    phase_contract=digest(corrective_phase) if corrective and corrective['repair'].get('repair_kind') in ('submission','fixture','review') else None
     anchor=activity_anchor(sandbox.project,sandbox.run,route,recovery_epoch,phase_contract=phase_contract)
     session=db.resolve_resume_session_id(anchor);previous=db.get_session(session)
     try:

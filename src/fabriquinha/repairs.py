@@ -185,6 +185,12 @@ def reviewed(project,store,key):
                 or body.get('repair_of')!=facts['source']
                 or any(data.get(k)!=facts[k] for k in ('source','source_run','source_contract'))):
             raise ValueError('exact scoped submission proposal required')
+    if context['payload'].get('repair_kind')=='review':
+        data=context['payload']
+        facts=review_reassessment(project,store,data['incident'],data['reviewed_diagnosis'],
+            data['handoff'],data['new_evidence'])
+        if body.get('repair_of')!=facts['source'] or any(data.get(k)!=v for k,v in facts.items()):
+            raise ValueError('exact observed review succession required')
     if context['payload'].get('repair_kind')=='fixture':
         data=context['payload']
         facts=fixture_failure(project,store,data['incident'],data['reviewed_diagnosis'],data['tests'],data['implementation_snapshot'])
@@ -206,7 +212,8 @@ def repair_authority(project,store,board,run):
 def repair_document(value,context):
     if not isinstance(value,dict) or set(value)!={'classification','reason','test_paths'}:
         raise ValueError('repair classification, brief-grounded reason and explicit test paths required')
-    allowed=(('submission','infrastructure','scope') if context.get('repair_kind')=='submission' else
+    allowed=(('reassess','infrastructure','scope') if context.get('repair_kind')=='review' else
+             ('submission','infrastructure','scope') if context.get('repair_kind')=='submission' else
              ('test_contract','infrastructure','scope') if context.get('repair_kind')=='fixture' else
              ('product','test_contract','infrastructure','scope'))
     if value['classification'] not in allowed:raise ValueError('permitted corrective classifications: '+', '.join(allowed))
@@ -237,6 +244,13 @@ def context_view(store,value):
             raise ValueError('bounded exact frozen fixture sources required for proposal review')
         result['fixture_sources']={p:dict(sha256=manifest[p]['sha256'],text=(store.tree(value['snapshot'])/p).read_text()) for p in paths}
         result['fixture_syntax']='Add new local assignments and calls to methods or existing imported functions. New with blocks may manage setup resources, but may not wrap preserved statements. No new imports/helpers, rebinding, exits or changes to existing assertions.'
+    if value.get('repair_kind')=='review':
+        decision=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')
+        prior=store.receipt(decision['payload']['experiment'],kind='diagnostic_experiment')
+        current=store.receipt(value['new_evidence'],kind='diagnostic_experiment')
+        result['observations']=dict(previous=prior['payload']['report'],current=current['payload']['report'],
+            receipt=value['new_evidence'],snapshot=value['snapshot'],handoff=value['handoff'])
+        result['authority']='Observed difference permits consideration, not approval. Preserve source triage and independently review the same author handoff.'
     if value.get('prior_proposal_review'):
         record=store.receipt(value['prior_proposal_review'],kind='plan_review')
         result['prior_proposal_hold']=dict(receipt=value['prior_proposal_review'],verdict=record['payload']['verdict'],
@@ -307,6 +321,11 @@ class RepairTools(DraftTools):
                 'it does not approve tests, implementation or delivery. Infrastructure/scope remain visible holds. '
                 'Do not change product, reset retries or ask the CEO to debug technical fixtures.')
             result['repair_classifications']=['test_contract','infrastructure','scope']
+        if context['payload'].get('repair_kind')=='review':
+            result['contract']=('Assess whether the new controller observation supports another independent review of the exact immutable handoff. '
+                'Use reassess with no test_paths only when that observation addresses the impediment; otherwise hold as infrastructure or scope. '
+                'This proposal cannot edit tests, approve code, reset triage, or waive delivery gates. Technical decisions belong to Lead/CTO.')
+            result['repair_classifications']=['reassess','infrastructure','scope']
         return result
 
     def submit(self,args):

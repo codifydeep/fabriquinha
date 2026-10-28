@@ -86,3 +86,9 @@ A primeira tentativa foi recusada porque a fixture não declarou o workspace do
 card de origem. A fixture foi corrigida e a falha preservada. Não houve redução
 da verificação de contrato. Revisão da proposta, materialização da sucessora e
 obtenção de evidência nova pela equipe continuam pendentes de qualificação.
+
+O contrato da proposta passou a admitir `reassess`, `infrastructure` ou `scope`,
+sempre sem caminhos de teste. A revisão independente revalida a origem e o job
+da observação, e o contexto apresenta os dois relatórios. O SDK distingue esta
+fase da correção de fixture e do reparo pós-deploy. Isso não habilita sucessora
+nem escrita; a cadeia nativa completa e sua ativação continuam pendentes.
