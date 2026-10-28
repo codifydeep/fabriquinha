@@ -170,3 +170,12 @@ identidade verificável (por exemplo, reinício do dispatcher com worker vivo),
 sem matar processo por nome ou reiniciar uma execução por timeout de observação.
 As métricas vêm do Kanban, recibos, GitHub, implantação e ledger existentes;
 não criar um novo coordenador ou outra fonte de verdade para medi-las.
+
+## Orientação de resposta no canal
+
+O aviso de decisão pendente passa a orientar uma resposta ao bot com
+`/fabrica show CARD`. A consulta mostra o documento completo e os comandos
+vinculados ao card e hash exatos: `answer` para pergunta; `approve` ou `changes`
+para brief. O usuário substitui `YOUR_RESPONSE` por sua decisão. Texto livre não
+se torna aprovação e o aceite continua restrito ao produto. Essa melhoria foi
+validada offline; sua instalação deve preceder a próxima entrada de produto.

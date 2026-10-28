@@ -165,6 +165,7 @@ class NotificationDelivery(unittest.TestCase):
         self.assertEqual(records[0]['message']['event'],'business_input_pending')
         self.assertEqual(records[0]['message']['actor'],'ceo')
         self.assertNotIn('Technical owner',records[0]['message']['text'])
+        self.assertIn('/fabrica show t_12345678',records[0]['message']['text'])
 
     def test_repeated_same_validation_job_cannot_keep_refreshing_progress(self):
         board=Mock();quality=Quality(self.project,self.store,None,board)

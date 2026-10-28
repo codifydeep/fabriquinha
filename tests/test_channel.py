@@ -5,7 +5,7 @@ import sys
 import unittest
 from unittest.mock import Mock,patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.channel import command,session_identity,execute
+from fabriquinha.channel import command,session_identity,execute,format_pending
 
 class Channel(unittest.TestCase):
     def setUp(self):
@@ -59,3 +59,15 @@ class Channel(unittest.TestCase):
         runtime.intake.start.assert_not_called()
 
 if __name__=='__main__':unittest.main()
+
+class PendingInstructions(unittest.TestCase):
+    def test_question_and_brief_offer_only_their_scoped_decisions(self):
+        value=dict(task='t_12345678',request='a'*64,audience='ceo',scope='product',document={'summary':'Keep existing tests'})
+        question=format_pending({**value,'kind':'product_question'})
+        self.assertIn('/fabrica answer t_12345678 '+'a'*64+' YOUR_RESPONSE',question)
+        self.assertNotIn('/fabrica approve',question)
+        brief=format_pending({**value,'kind':'product_brief'})
+        self.assertIn('/fabrica approve',brief);self.assertIn('/fabrica changes',brief)
+        self.assertNotIn('/fabrica answer',brief)
+        self.assertIn('Keep existing tests',brief)
+        with self.assertRaises(ValueError):format_pending({**value,'kind':'product_brief','scope':'technical'})

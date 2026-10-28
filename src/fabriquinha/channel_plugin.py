@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-from .channel import command,session_identity
+from .channel import command,session_identity,format_pending
 from .source import verify
 
 
@@ -22,7 +22,7 @@ def handle(raw):
         if set(config)!={'source','digest','python','root','upstream','policy'}:
             raise ValueError('fixed channel installation binding required')
         identity=session_identity();policy=private_json(config['policy'])
-        command(raw,policy,identity)  # Reject before spawning a subprocess.
+        operation=command(raw,policy,identity)  # Reject before spawning a subprocess.
         verify(Path(config['source']),config['digest'])
         env={k:v for k,v in os.environ.items() if k in ('PATH','HOME','TMPDIR','LANG')}
         env.update(PYTHONPATH=str(Path(config['source'])/'src'),PYTHONNOUSERSITE='1',
@@ -32,6 +32,7 @@ def handle(raw):
             input=json.dumps(dict(raw=raw,identity=identity)),capture_output=True,text=True,
             timeout=30,env=env,check=False)
         if result.returncode:return 'Command not completed. Check the exact card/request and operator status; no delivery approval is implied.'
+        if operation['operation']=='show':return format_pending(json.loads(result.stdout))
         return result.stdout.strip() or 'No pending product question for this card.'
     except subprocess.TimeoutExpired:
         return 'Outcome not confirmed. Check status before resending; do not assume approval or failure.'

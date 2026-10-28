@@ -179,7 +179,8 @@ class Outbox:
                     key='run:'+str(row['run_id'])+':started' if event=='started' else 'event:'+str(row['id'])
                     description=EVENTS[row['kind']]
                     if row['kind']=='review_requested' and isinstance(body,dict) and body.get('kind')=='brief':
-                        description='Awaiting scoped CEO business input; not technical, budget or delivery approval'
+                        description=('Awaiting scoped CEO business input; not technical, budget or delivery approval'
+                            +f'\nReply to this bot with /fabrica show {task} to read the request and exact response commands.')
                     if row['kind']=='completed' and isinstance(body,dict) and body.get('kind')=='release':
                         description='Release closed without qualified acceptance; technical diagnosis required'
                         proof=conn.execute('SELECT metadata FROM task_runs WHERE id=?',(row['run_id'],)).fetchone()
@@ -288,7 +289,7 @@ def alerts(outbox,cards,store,*,now,alert_after=600,escalate_after=1800):
                 if event=='stalled':continue  # Business waits do not escalate to the CTO as technical stalls.
                 request=card['business_input']['request']
                 outbox.enqueue(key,dict(task=card['id'],run=None,actor='ceo',mode='brief',event='business_input_pending',
-                    text=f'[{outbox.project.namespace}] {card["id"]} | CEO business response pending: {request}. Not technical or budget approval.'))
+                    text=f'[{outbox.project.namespace}] {card["id"]} | CEO business response pending: {request}. Not technical or budget approval.\nReply to this bot with /fabrica show {card["id"]} to read the request and response commands.'))
                 continue
             text=f'[{outbox.project.namespace}] {card["id"]} | {actor} | {event}\nNo new controller-validated evidence for {int(age)}s. Technical owner: {owner}. Not a delivery result.'
             outbox.enqueue(key,dict(task=card['id'],run=card['current_run_id'],actor=actor,mode='monitor',event=event,text=text))

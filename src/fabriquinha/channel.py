@@ -48,6 +48,24 @@ def command(raw,policy,identity):
     raise ValueError('use status, show CARD, start LABEL OBJECTIVE or approve|changes|answer CARD HASH TEXT')
 
 
+
+def format_pending(value):
+    """Explain the existing scoped response; never infer or submit a decision."""
+    import json
+    if value is None:return 'No pending product question for this card.'
+    if (value.get('kind') not in ('product_brief','product_question')
+            or value.get('audience')!='ceo' or value.get('scope')!='product'
+            or not re.fullmatch('t_[a-f0-9]{8}',value.get('task',''))
+            or not re.fullmatch('[a-f0-9]{64}',value.get('request',''))):
+        raise ValueError('exact scoped pending response required')
+    prefix=f"{value['task']} | {value['kind']}\n"
+    document=json.dumps(value['document'],ensure_ascii=False,indent=2)
+    decisions=('answer',) if value['kind']=='product_question' else ('approve','changes')
+    commands='\n'.join(f"/fabrica {decision} {value['task']} {value['request']} YOUR_RESPONSE" for decision in decisions)
+    return (prefix+document+'\n\nReply to this bot with one command below, replacing YOUR_RESPONSE with your decision.\n'
+            +commands+'\nThis applies only to this product request. It does not approve technical gates, tools, budget or delivery.')
+
+
 def execute(runtime,value):
     """Runtime lives in a separate process: Hermes binding changes process env."""
     operation=value['operation']
