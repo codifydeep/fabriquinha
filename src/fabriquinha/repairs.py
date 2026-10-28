@@ -347,8 +347,8 @@ class RepairTools(DraftTools):
             result['repair_classifications']=['submission','infrastructure','scope']
         if context['payload'].get('repair_kind')=='fixture':
             result['contract']=('Classify the exact CTO diagnosis against the approved brief. '
-                'test_contract proposes only additive setup corrections in listed unpublished acceptance files. '
-                'No removal or modification of existing statements, assertions, selectors, timeouts, helpers or manifests. '
+                'test_contract proposes scoped corrections in listed unpublished acceptance files. '
+                'Preserve integrated baseline, inventory, assertions, discovery and prior control targets. Imports/helpers are reviewable within approved candidate paths; a structural diff is advisory, not semantic approval. '
                 'Inspect setup, action and assertion; a failing Red alone does not establish a product defect. '
                 'Independent approval authorizes a new test candidate, fresh Red on the original base, and independent freeze; '
                 'it does not approve tests, implementation or delivery. Infrastructure/scope remain visible holds. '

@@ -121,9 +121,9 @@ class Diagnostic:
         if self.fixture_correction():
             return ('Authorized unpublished fixture revision on the original product baseline. '
                 'Missing new product behavior is expected: diagnose fresh Red, not completed implementation. '
-                'The candidate may differ from its old freeze only by the independently approved additive setup; '
+                'The candidate may differ from its old freeze only by the independently approved candidate correction; '
                 'a changed hash before a new independent freeze is expected, not stale evidence by itself. '
-                'Check the actual proposed setup and existing statements. Return author corrections within the approved paths; '
+                'Review the full setup/action/assertion diff against the approved scope; reject weakened coverage. Return author corrections within the approved paths; '
                 'do not edit the source, demand Green before Red or transfer technical choices to the CEO. '
                 'A product-only diagnostic_validate replacement is a disposable SPIKE on a copy; tests and configuration remain exact. '
                 'Its result tests a hypothesis and never becomes the author delivery or approval. '

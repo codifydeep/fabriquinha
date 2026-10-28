@@ -107,11 +107,11 @@ def repair_phase(reviewing,kind):
             'If the observation does not address the impediment, state the remaining technical action rather than approving another identical retry.')
     if kind=='fixture':
         action=('Independently review the technical fixture proposal using plan_review. ' if reviewing else
-                'Use repair_submit to propose test_contract only for evidence-backed additive fixture setup corrections. ')
+                'Use repair_submit to propose test_contract only for evidence-backed corrections of explicitly scoped unpublished test candidates. ')
         return action+('This is a proposal concerning unpublished tests: no product changes, test edits or delivery approval here. '
             'Require the exact CTO diagnosis, original freeze, approved brief and eligible test paths. '
             'The later test task must produce fresh Red and independent test review; these are completion gates, not start conditions for this proposal. '
-            'Preserve all existing statements, assertions, selectors, timeouts, helpers, manifests and prior control targets. '
+            'Preserve integrated baseline, test inventory, assertions, discovery and prior control targets. Imports/helpers may change within approved candidate paths; review the complete diff and reject weakened behavior coverage. '
             'Inspect setup/action/assertion to separate fixture defects from product defects. '
             'Use infrastructure or scope with a concrete reason if this narrow repair is unsuitable; no counter reset or identical retries.')
     if kind is not None:raise ValueError('known corrective phase required')

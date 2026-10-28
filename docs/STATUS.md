@@ -37,12 +37,13 @@ Fonte instalada: `8d6bbd92`. A orientação adicional publicada em `fc202f3a` ai
 não foi instalada. `delivery_validate`, revisão aditiva de fixture e separação
 de contexto diagnóstico foram implementados e receberam provas delimitadas.
 A auditoria de 28/10 foi somente leitura. Após aprovação do plano, a suíte
-offline passou com 459 testes. Provas nativas programadas cobrem a sucessora,
+offline passou com 463 testes. Provas nativas programadas cobrem a sucessora,
 dependências, interrupções, solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead foi conectado e passou na prova nativa com
 admissão programada. A prova complementar passou com quatro jobs Docker reais, mantendo a entrega
 original e sem criar aprovação. A autoria transferida no diagnóstico de falha também foi corrigida e verificada
-na prova nativa. Restam fechar os itens P2/P3 da auditoria e validar a recuperação
-do S6 pelos agentes; runtime inalterado.
+na prova nativa. P2 foi implementado com contrato explícito para candidatos, diff completo e
+preservação da baseline. Restam P3, migração controlada e recuperação do S6 pelos
+agentes; runtime inalterado.
 
 Consumo confirmado antes da pausa: **7.247/8.500 chamadas**, restando 1.253.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.

@@ -305,11 +305,11 @@ class Quality:
         fixture=None
         if authority and authority['context'].get('repair_kind')=='fixture':
             from .test_revision import revision_context
-            previous=revision_context(self.project,self.store,self,authority,candidate)
+            previous=revision_context(self.project,self.store,self,authority,candidate,contract=2)
             if (baseline!=previous['snapshot'] or self.store.receipt(authority['review'])['binding']['release']!=run.release):
                 raise ValueError('exact frozen fixture workspace and release required')
             baseline=previous['baseline']
-            fixture=dict(authority=authority['review'],tests=authority['context']['tests'])
+            fixture=dict(authority=authority['review'],tests=authority['context']['tests'],contract=2)
         elif authority and authority['proposal']['classification']=='test_contract':
             self.correction_diff(baseline,candidate,authority['proposal']['test_paths'])
             if baseline!=authority['context']['snapshot']:raise ValueError('test correction base changed')
@@ -780,6 +780,13 @@ class DeliveryTools:
                 instructions='Review this new expected-text correction against the approved brief and repair authority. Historical Red remains historical; no new failing test is claimed. Preserve every unit test, action and control target.')
         elif evidence['kind']=='regression_red':
             context.update(regression_red=red,instructions='Known regression at the controller base SHA: independently confirm the existing expectation and every exact assertion failure. No new test is claimed. Preserve all tests and require a product-only fix, full Green and negative controls before independent delivery approval.')
+        if red.get('fixture_revision',{}).get('contract')==2:
+            from .repairs import reviewed
+            from .test_revision import fixture_snapshot_diff
+            authority=reviewed(q.project,self.store,red['fixture_revision']['authority'])
+            context['candidate_revision']=fixture_snapshot_diff(self.store,authority['context']['snapshot'],red['snapshot'],authority['proposal']['test_paths'],q.project.tests_dir,candidate=True)
+            context['candidate_scope']=dict(authority=red['fixture_revision']['authority'],proposal=authority['proposal'])
+            context['candidate_review_contract']='Review the complete diff against the approved scope. Structural findings are advisory. Preserve behavior coverage and baseline, explain setup/action/assertion and why Red is expected; do not approve weaker assertions or accept a passing case as sufficient evidence.'
         context['mandatory_red_targets']=sorted({failure['case'] for failure in context['red']['failures']})
         context['passing_cases']=sorted(set(context['red']['cases'])-set(context['mandatory_red_targets']))
         return context

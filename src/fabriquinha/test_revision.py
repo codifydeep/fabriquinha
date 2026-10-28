@@ -7,6 +7,7 @@ No installed gate currently grants an exception from this result alone.
 """
 import ast
 import copy
+import difflib
 
 
 def shape(node):
@@ -76,7 +77,33 @@ def fixture_diff(before,after):
     return result
 
 
-def fixture_snapshot_diff(store,before,after,paths,tests_dir):
+def candidate_diff(before,after):
+    """Bounded review evidence, not a proof of semantic equivalence."""
+    left,right=ast.parse(before),ast.parse(after)
+    def cases(tree):
+        return {(cls.name,node.name):node for cls in tree.body if isinstance(cls,ast.ClassDef)
+                for node in cls.body if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)) and node.name.startswith('test')}
+    old,new=cases(left),cases(right)
+    if old.keys()!=new.keys():raise ValueError('test inventory changed')
+    def assertions(node):
+        return sum(isinstance(n,ast.Assert) or isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
+                   and n.func.attr.startswith('assert') for n in ast.walk(node))
+    for key in old:
+        if assertions(new[key])<assertions(old[key]):raise ValueError('candidate removed assertions')
+    prohibited={'skip','skipIf','skipUnless','skipTest','expectedFailure','load_tests','__unittest_skip__','__unittest_expecting_failure__'}
+    for node in ast.walk(right):
+        if isinstance(node,ast.Name) and node.id in prohibited or isinstance(node,ast.Attribute) and node.attr in prohibited:
+            raise ValueError('candidate cannot suppress test execution')
+        if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)) and node.name=='load_tests':
+            raise ValueError('candidate cannot change discovery')
+    diff=''.join(difflib.unified_diff(before.splitlines(True),after.splitlines(True),fromfile='previous',tofile='candidate'))
+    if not diff or len(diff)>24000:raise ValueError('bounded complete candidate diff required; split the correction')
+    try:structural=dict(additive=True,findings=fixture_diff(before,after))
+    except ValueError as error:structural=dict(additive=False,reason=str(error))
+    return dict(diff=diff,structural=structural,semantic_review_required=True)
+
+
+def fixture_snapshot_diff(store,before,after,paths,tests_dir,*,candidate=False):
     """Bound structural findings to the exact proposed snapshot and paths.
 
     The caller must still verify the independently approved correction proposal;
@@ -98,11 +125,13 @@ def fixture_snapshot_diff(store,before,after,paths,tests_dir):
     for path in sorted(changed):
         if left[path]['executable']!=right[path]['executable']:
             raise ValueError('fixture file mode must remain unchanged')
-        result[path]=fixture_diff((store.tree(before)/path).read_text(),(store.tree(after)/path).read_text())
+        result[path]=(candidate_diff if candidate else fixture_diff)((store.tree(before)/path).read_text(),(store.tree(after)/path).read_text())
+    if candidate and sum(len(item['diff']) for item in result.values())>24000:
+        raise ValueError('bounded complete candidate diff required; split the correction')
     return result
 
 
-def revision_context(project,store,quality,authority,candidate):
+def revision_context(project,store,quality,authority,candidate,*,contract=1):
     """Read independently reviewed authority; return the original Red baseline.
 
     Only unpublished fixture corrections with the unchanged product qualify.
@@ -117,7 +146,8 @@ def revision_context(project,store,quality,authority,candidate):
     if (context['snapshot']!=previous['snapshot']
             or freeze['binding']['release']!=review['binding']['release']):
         raise ValueError('fixture source must be the exact old freeze')
-    fixture_snapshot_diff(store,previous['snapshot'],candidate,authority['proposal']['test_paths'],project.tests_dir)
+    if type(contract) is not int or contract not in (1,2):raise ValueError('unknown candidate revision contract')
+    fixture_snapshot_diff(store,previous['snapshot'],candidate,authority['proposal']['test_paths'],project.tests_dir,candidate=contract==2)
     quality.protect(previous['baseline'],candidate)
     return previous
 
@@ -126,10 +156,10 @@ def verify_red_revision(project,store,quality,record):
     """Recheck new Red's provenance and preserve the old control target set."""
     from .repairs import reviewed
     value=record['payload'];revision=value['fixture_revision']
-    if not isinstance(revision,dict) or set(revision)!={'authority','tests'}:
+    if not isinstance(revision,dict) or set(revision) not in ({'authority','tests'},{'authority','tests','contract'}):
         raise ValueError('exact fixture provenance required')
     authority=reviewed(project,store,revision['authority'])
-    previous=revision_context(project,store,quality,authority,value['snapshot'])
+    previous=revision_context(project,store,quality,authority,value['snapshot'],contract=revision.get('contract',1))
     review=store.receipt(revision['authority'],kind='plan_review')
     old=store.receipt(revision['tests'],kind='tests_frozen')
     if (record['kind']!='red' or record['binding']['kind']!='tests' or record['binding']['reviewing']
@@ -152,10 +182,11 @@ def implementation_seed(project,store,quality,authority,frozen):
     from pathlib import Path
     context=authority['context']
     red=store.receipt(frozen['red'],kind='red')
-    if (red['payload'].get('fixture_revision')!=dict(authority=authority['review'],tests=context['tests'])
+    revision=red['payload'].get('fixture_revision',{})
+    if ({k:v for k,v in revision.items() if k!='contract'}!=dict(authority=authority['review'],tests=context['tests'])
             or red['payload']['snapshot']!=frozen['snapshot']):
         raise ValueError('exact independently frozen fixture revision required for product seed')
-    revision_context(project,store,quality,authority,frozen['snapshot'])
+    revision_context(project,store,quality,authority,frozen['snapshot'],contract=revision.get('contract',1))
     source=context['implementation_snapshot']
     quality.protect(context['snapshot'],source,exact_tests=True)
     with tempfile.TemporaryDirectory(prefix='.fixture-seed-',dir=store.root.parent) as folder:

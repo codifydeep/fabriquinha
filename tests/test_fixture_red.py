@@ -59,7 +59,7 @@ class FixtureRed(unittest.TestCase):
         record=self.submit()
         self.assertEqual(record['kind'],'red')
         self.assertEqual(self.jobs,[(self.baseline,'baseline'),(self.candidate,'red')])
-        self.assertEqual(record['payload']['fixture_revision'],dict(authority=self.review,tests=self.freeze))
+        self.assertEqual(record['payload']['fixture_revision'],dict(authority=self.review,tests=self.freeze,contract=2))
         review=replace(self.run,number=6,actor='lead',reviewing=True)
         frozen=self.quality.tests_review(review,self.red,dict(decision='approve',reason='Fixture setup reviewed independently.',findings=[]))
         data=self.quality.frozen_plan(self.store.receipt(frozen))
@@ -68,6 +68,25 @@ class FixtureRed(unittest.TestCase):
         forged=self.store.receipt(frozen);forged['binding']['actor']='unassigned'
         with self.assertRaises(ValueError):self.quality.frozen_plan(forged)
         self.assertEqual((self.store.tree(self.frozen_snapshot)/self.path).read_text(),OLD)
+
+    def test_candidate_import_has_complete_review_diff_and_legacy_stays_strict(self):
+        from fabriquinha.quality import DeliveryTools
+        (self.work/self.path).write_text('from urllib.request import urlopen\n'+NEW)
+        self.candidate=self.store.capture(self.work)
+        record=self.submit()
+        reviewer=replace(self.run,number=6,actor='lead',reviewing=True)
+        sandbox=SimpleNamespace(project=self.project,store=self.store,board=self.board,run=reviewer)
+        context=DeliveryTools(sandbox,self.quality).evidence()
+        report=context['candidate_revision'][self.path]
+        self.assertIn('+from urllib.request import urlopen',report['diff'])
+        self.assertFalse(report['structural']['additive'])
+        self.assertTrue(report['semantic_review_required'])
+        self.assertEqual(context['candidate_scope']['authority'],self.review)
+        old={**record['payload'],'fixture_revision':dict(authority=self.review,tests=self.freeze)}
+        legacy=self.store.record('red',self.run.binding(),old)
+        self.red=legacy
+        with self.assertRaises(ValueError):
+            self.quality.tests_review(reviewer,legacy,dict(decision='approve',reason='Cannot reinterpret a legacy receipt',findings=[]))
 
     def test_preserves_additional_independent_control_targets(self):
         old=self.store.receipt(self.freeze)['payload']

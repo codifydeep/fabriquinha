@@ -265,3 +265,29 @@ em vez de exigir indevidamente que o autor original pertença ao último card.
 Isso não concede dispensa de revisão ou aprovação. O runtime permanece anterior
 a estas mudanças, e o restante dos itens P2/P3 ainda precisa de fechamento antes
 da retomada paga prevista na auditoria.
+
+### P2 — Revisão de candidatos sem regra sintática universal
+
+Novos recibos de Red de correção candidata usam `fixture_revision.contract=2`.
+A autorização continua sendo a proposta independente, com arquivos existentes
+explicitamente listados; o produto e a baseline entregue permanecem protegidos.
+O comparador AST aditivo passa a ser relatório auxiliar para esse contrato.
+Imports e helpers legítimos podem mudar dentro dos caminhos autorizados.
+
+Permanecem bloqueados redução da quantidade de asserções por caso, remoção ou
+renomeação de casos, skips, alteração da descoberta, mudanças fora dos caminhos
+aprovados, modo do arquivo e alteração da baseline. A execução reconfere o
+inventário completo e um Red apropriado; os controles obrigatórios anteriores
+são preservados. Contagem/AST não provam que uma asserção continua forte: o
+revisor precisa analisar a cobertura e os controles precisam demonstrá-la.
+
+O contexto do revisor contém proposta autorizada, diff completo e relatório
+estrutural. O diff agregado é limitado a 24.000 caracteres; uma correção maior
+precisa ser dividida, nunca silenciosamente truncada. Recibos sem a versão nova
+continuam usando o gate histórico: um teste confirmou que um candidato com
+import novo não pode ser reinterpretado como aprovado sob o contrato antigo.
+
+A suíte passou com 463 testes. A documentação/instruções do agente refletem o
+novo escopo. Nenhuma entrega S6 recebeu aprovação, nenhum teste histórico foi
+reescrito e o runtime ainda não foi atualizado. P3 e a migração controlada
+continuam pendentes.

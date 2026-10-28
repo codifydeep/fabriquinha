@@ -92,4 +92,29 @@ class SnapshotFixtureRevision(unittest.TestCase):
                 else:target.write_bytes(old)
             self.assertEqual((store.tree(before)/path).read_text(),OLD)
 
+class CandidateRevision(unittest.TestCase):
+    def test_new_import_and_helper_are_reviewable_without_claiming_semantic_safety(self):
+        from fabriquinha.test_revision import candidate_diff
+        revised='from urllib.request import urlopen\n'+NEW.replace('return self.new_context()','return self.new_context()  # documented helper')
+        result=candidate_diff(OLD,revised)
+        self.assertFalse(result['structural']['additive'])
+        self.assertTrue(result['semantic_review_required'])
+        self.assertIn('+from urllib.request import urlopen',result['diff'])
+        with self.assertRaises(ValueError):fixture_diff(OLD,revised)
+
+    def test_removed_assertion_skip_and_inventory_changes_remain_blocked(self):
+        from fabriquinha.test_revision import candidate_diff
+        for value in (NEW.replace('        self.assertEqual(watcher.errors, [])\n',''),
+                      NEW.replace('test_capacity','disabled_capacity'),
+                      NEW.replace('    def test_capacity','    @unittest.skip("no")\n    def test_capacity'),
+                      NEW+'\ndef load_tests(loader,tests,pattern): return []\n'):
+            with self.subTest(value=value),self.assertRaises(ValueError):candidate_diff(OLD,value)
+
+    def test_changed_expectation_requires_semantic_review_not_structural_approval(self):
+        from fabriquinha.test_revision import candidate_diff
+        result=candidate_diff(OLD,NEW.replace('count(creator), 1','count(creator), 0'))
+        self.assertTrue(result['semantic_review_required'])
+        self.assertFalse(result['structural']['additive'])
+        self.assertIn('count(creator), 0',result['diff'])
+
 if __name__=='__main__':unittest.main()
