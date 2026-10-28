@@ -11,6 +11,9 @@ from pathlib import Path
 import shutil
 import sqlite3
 import sys
+import subprocess
+import signal
+import time
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
@@ -32,7 +35,6 @@ def qualify(root,upstream):
     root=Path(root).resolve()
     if root.exists():raise ValueError('fresh private root required')
     if root.is_relative_to(ROOT):
-        import subprocess
         if subprocess.run(['git','-C',str(ROOT),'check-ignore','--quiet',str(root)]).returncode:
             raise ValueError('private ignored destination required')
     root.mkdir(parents=True,mode=0o700)
@@ -75,10 +77,43 @@ def qualify(root,upstream):
         assert conn.execute('SELECT COUNT(*) FROM task_runs').fetchone()[0]==0
     for target in (source,restored):
         assert not (target/'route.json').exists() and not (target/'notifications.json').exists()
+    # Start the real restored dispatcher while fenced, then restart it. The
+    # fixture has no transport or model route, and must never acquire a worker.
+    env={key:os.environ[key] for key in ('PATH','HOME','TMPDIR','LANG') if key in os.environ}
+    env.update(PYTHONPATH=str(ROOT/'src'),PYTHONDONTWRITEBYTECODE='1',PYTHONNOUSERSITE='1')
+    args=[sys.executable,'-B','-m','fabriquinha.runtime','serve','--root',str(restored),
+          '--upstream',str(Path(upstream).resolve()),'--interval','0.1']
+    pids=[]
+    for index in range(2):
+        with (root/('restored-service-'+str(index)+'.log')).open('xb') as log:
+            service=subprocess.Popen(args,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT)
+        try:
+            deadline=time.monotonic()+45
+            while True:
+                if service.poll() is not None:raise RuntimeError('restored service exited; inspect private log')
+                status_path=restored/'status.json'
+                status=json.loads(status_path.read_bytes()) if status_path.exists() else {}
+                if status.get('dispatcher_pid')==service.pid and status.get('dispatcher_state')=='running':break
+                if time.monotonic()>deadline:raise TimeoutError('restored dispatcher readiness not observed')
+                time.sleep(.1)
+            assert status['board']['control']['paused'] and status['board']['control']['episode']==pause['episode']
+            assert status['board']['control']['drained']
+            duplicate=subprocess.run(args,env=env,capture_output=True,timeout=15)
+            assert duplicate.returncode!=0
+            pids.append(service.pid)
+        finally:
+            if service.poll() is None:service.send_signal(signal.SIGTERM)
+            service.wait(timeout=15)
+        assert service.returncode==0
+    with sqlite3.connect(restored/'home/kanban.db') as conn:
+        assert conn.execute('SELECT COUNT(*) FROM task_runs').fetchone()[0]==0
+    restored_notice=next(x for x in recovered.outbox.records() if x['key']==notice)
+    assert restored_notice['state']=='queued' and restored_notice['attempts']==0
+    assert len(set(pids))==2
     result=dict(sqlite_integrity=True,blocked_card_preserved=True,snapshot_verified=True,receipt_verified=True,
         queued_notification_preserved=True,pause_episode_preserved=True,files_verified=len(before),
         model_calls=0,workers_started=0,external_effects=0,production_restore_qualified=False,
-        provider_counter_restore_qualified=False,synthetic_offline_restore=True)
+        provider_counter_restore_qualified=False,synthetic_offline_restore=True,restored_dispatcher_restarted_paused=True,duplicate_owner_refused=True)
     write_json(root/'receipt.json',result)
     print(json.dumps(result,indent=2))
     return result

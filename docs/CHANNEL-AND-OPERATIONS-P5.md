@@ -147,3 +147,26 @@ instalação original. Uma recuperação real exige:
 
 Esses passos ainda precisam de ensaio operacional com falha controlada. A
 ferramenta de inspeção deliberadamente não oferece `resume` nem reinstala cota.
+
+A qualificação sintética foi ampliada para iniciar o dispatcher real da cópia
+restaurada, pará-lo e reiniciá-lo. Ambos os processos observaram o mesmo episódio
+de pausa e estado drenado; a tentativa de segundo dono foi recusada. Nenhum
+worker foi criado e o aviso original permaneceu pendente com zero tentativas.
+Isso qualifica o reinício pausado da cópia sintética, não recuperação no meio de
+uma entrega real. Essa falha controlada continua prevista no P6.
+
+## Preparação da prova P6
+
+A versão seguinte deve evoluir o lobby existente e preservar sua regressão. Foi
+proposto ao CEO cancelar salas ainda aguardando oponente, seguido da propagação
+do cancelamento aos demais navegadores e tratamento de uma entrada concorrente.
+Esse objetivo ainda aguarda escolha; não é um brief aprovado nem autoriza iniciar
+implementação. Produto deverá esclarecer e submeter o brief pelo canal real.
+
+Após o aceite, congelar a versão da automação usada na prova. Registrar todo
+patch operacional como intervenção e manter o denominador, mesmo se a versão
+posteriormente for homologada. A falha controlada deve ser recuperável e ter
+identidade verificável (por exemplo, reinício do dispatcher com worker vivo),
+sem matar processo por nome ou reiniciar uma execução por timeout de observação.
+As métricas vêm do Kanban, recibos, GitHub, implantação e ledger existentes;
+não criar um novo coordenador ou outra fonte de verdade para medi-las.
