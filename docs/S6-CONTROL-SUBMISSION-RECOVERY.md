@@ -534,3 +534,27 @@ A instalação ativa ainda não cria propostas `fixture`: a integração nativa 
 proposta, autoria e substituição da cauda do grafo permanece pendente. Os testes
 desta etapa isolam a autoridade da proposta para verificar o protocolo de
 qualidade; não constituem prova de revisão real por agentes nem de retomada S6.
+
+### Proposta técnica nativa — preparação offline
+
+`Repairs.propose_fixture` prepara um card de proposta do Tech Lead, sem alterar
+ou liberar o implementador triado. Requer diagnóstico/experimento exatos do CTO,
+freeze concluído, snapshot atual, contrato nativo inalterado, ausência de efeitos
+pendentes e vínculo único com o grafo. Somente arquivos de aceitação Python novos,
+ausentes da base publicada, entram na lista de caminhos elegíveis. Testes já
+publicados não recebem essa exceção.
+
+A proposta usa a revisão independente existente e aceita somente correção de
+fixture, impedimento de infraestrutura ou questão de escopo. Uma aprovação é
+revalidada contra as evidências originais e o protocolo `unpublished-fixture-1`.
+Não dispensa a revisão posterior do candidato de testes. A chave idempotente
+preserva o mesmo card em repetições; divergência de corpo ou de origem é recusada.
+O contador de continuações anteriores não é alterado. Uma segunda revisão de
+fixture sob o mesmo caminho permanece impedida.
+
+A admissão somente leitura com os recibos reais da execução 58 e do diagnóstico
+59 passou e retornou os três arquivos novos de aceitação; criou zero cards e
+manteve `delivery_approval=false`. Os testes offline cobrem idempotência, revisão
+por perfil permitido, divergência de protocolo/origem e recusa de mudanças de
+produto/escopo. Ainda falta materializar e reconciliar a cauda revisada do grafo,
+qualificar a interrupção nessa transição e instalar o conjunto completo.

@@ -15,6 +15,7 @@ from .recovery import Recovery,browser_refusal_context
 # Controller source revision, never model-supplied. Changed only for a qualified
 # repair-protocol fix, not for documents, timeouts or another identical retry.
 REPAIR_PROTOCOL='qa-text-handoff-1'
+FIXTURE_PROTOCOL='unpublished-fixture-1'
 SUBMISSION_PROTOCOL='complete-control-set-3'
 SUBMISSION_PROTOCOLS=('complete-control-set-1','complete-control-set-2',SUBMISSION_PROTOCOL)
 
@@ -81,6 +82,23 @@ def submission_failure(project,store,incident_key,decision_key,tests,current_sna
         requires_fresh_green_and_controls=True)
 
 
+def fixture_failure(project,store,incident,decision,tests,current_snapshot):
+    """Only an unintegrated, independently frozen new fixture is eligible."""
+    from .executor import browser_contract
+    if browser_contract(project,store)!=2:raise ValueError('shared Python acceptance required')
+    facts=submission_failure(project,store,incident,decision,tests,current_snapshot)
+    quality=Quality(project,store,None,None)
+    frozen=quality.frozen_plan(store.receipt(tests,kind='tests_frozen'))
+    quality.protect(frozen['baseline'],frozen['snapshot'])
+    baseline=store.manifest(frozen['baseline']);snapshot=store.manifest(frozen['snapshot'])
+    prefix=project.tests_dir+'/acceptance_'
+    eligible=sorted(path for path in snapshot if path not in baseline and path.startswith(prefix)
+                    and path.endswith('.py') and '/' not in path[len(project.tests_dir)+1:])
+    if not eligible:raise ValueError('only new unpublished acceptance fixtures may be proposed')
+    return {**facts,'implementation_snapshot':current_snapshot,'snapshot':frozen['snapshot'],
+            'red_baseline':frozen['baseline'],'qa_paths':eligible}
+
+
 def reviewed(project,store,key):
     record=store.receipt(key,kind='plan_review');scope=record['binding']
     proposed=store.receipt(record['payload']['plan'],kind='work_plan')
@@ -103,6 +121,12 @@ def reviewed(project,store,key):
                 or body.get('repair_of')!=facts['source']
                 or any(data.get(k)!=facts[k] for k in ('source','source_run','source_contract'))):
             raise ValueError('exact scoped submission proposal required')
+    if context['payload'].get('repair_kind')=='fixture':
+        data=context['payload']
+        facts=fixture_failure(project,store,data['incident'],data['reviewed_diagnosis'],data['tests'],data['implementation_snapshot'])
+        if (body.get('repair_protocol')!=FIXTURE_PROTOCOL or body.get('repair_of')!=facts['source']
+                or any(data.get(k)!=facts[k] for k in facts)):
+            raise ValueError('exact reviewed unpublished-fixture proposal required')
     return dict(review=key,proposal=proposal,context=context['payload'],context_id=body['repair_context'],task=scope['task'])
 
 
@@ -118,7 +142,9 @@ def repair_authority(project,store,board,run):
 def repair_document(value,context):
     if not isinstance(value,dict) or set(value)!={'classification','reason','test_paths'}:
         raise ValueError('repair classification, brief-grounded reason and explicit test paths required')
-    allowed=('submission','infrastructure','scope') if context.get('repair_kind')=='submission' else ('product','test_contract','infrastructure','scope')
+    allowed=(('submission','infrastructure','scope') if context.get('repair_kind')=='submission' else
+             ('test_contract','infrastructure','scope') if context.get('repair_kind')=='fixture' else
+             ('product','test_contract','infrastructure','scope'))
     if value['classification'] not in allowed:raise ValueError('permitted corrective classifications: '+', '.join(allowed))
     text(value['reason']);texts(value['test_paths'],maximum=20)
     paths=value['test_paths']
@@ -134,7 +160,7 @@ def context_view(store,value):
     result={k:value[k] for k in keys if k in value}
     if value.get('reviewed_diagnosis'):
         result['prior_diagnosis']=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')['payload']['verdict']
-    if value.get('repair_kind')=='submission':
+    if value.get('repair_kind') in ('submission','fixture'):
         frozen=store.receipt(value['tests'],kind='tests_frozen')['payload']
         result['protected_tests']=dict(receipt=value['tests'],snapshot=frozen['snapshot'],files=frozen['tests'],
             contract='Controller-recorded frozen paths and hashes; read-only evidence, not permission to change tests.')
@@ -199,6 +225,15 @@ class RepairTools(DraftTools):
                     'Infrastructure or scope holds require a separate actual impediment; never classify absent future completion evidence as a start impediment. '
                     'Approval of this plan never approves delivery or resets the original breaker.')
             result['repair_classifications']=['submission','infrastructure','scope']
+        if context['payload'].get('repair_kind')=='fixture':
+            result['contract']=('Classify the exact CTO diagnosis against the approved brief. '
+                'test_contract proposes only additive setup corrections in listed unpublished acceptance files. '
+                'No removal or modification of existing statements, assertions, selectors, timeouts, helpers or manifests. '
+                'Inspect setup, action and assertion; a failing Red alone does not establish a product defect. '
+                'Independent approval authorizes a new test candidate, fresh Red on the original base, and independent freeze; '
+                'it does not approve tests, implementation or delivery. Infrastructure/scope remain visible holds. '
+                'Do not change product, reset retries or ask the CEO to debug technical fixtures.')
+            result['repair_classifications']=['test_contract','infrastructure','scope']
         return result
 
     def submit(self,args):
@@ -226,6 +261,43 @@ class RepairTools(DraftTools):
 class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
+
+    def propose_fixture(self,conn,anchor,spec,item,incident,decision,graph):
+        """A reviewed technical proposal, never an implicit retry or test edit."""
+        kb,_,_=native()
+        if graph.get('fixture_depth',0)>=1:
+            raise EffectBlocked('fixture revision exhausted; require new technical diagnosis, no repeated proposal')
+        source=self.r.check_card(conn,item['cards']['implementation'])
+        tests=self.r.check_card(conn,item['cards']['tests']);latest=kb.latest_run(conn,source.id)
+        if source.status!='triage' or tests.status!='done' or not latest or not latest.ended_at:
+            raise ValueError('settled source triage and independently closed tests required')
+        frozen,_,_=self.r.closed(tests.id,'tests','tests_frozen')
+        facts=fixture_failure(self.project,self.store,incident,decision,frozen,self.store.capture(source.workspace_path))
+        if (facts['source']!=source.id or facts['source_run']!=latest.id
+                or facts['source_contract']!=digest(json.loads(source.body))
+                or json.loads(source.body).get('release_anchor')!=anchor.id):
+            raise ValueError('native fixture source changed since diagnosis')
+        if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
+            raise EffectBlocked('settle controller effects before fixture proposal')
+        if sum(i['cards']['implementation']['id']==source.id for i in graph['items'])!=1:
+            raise ValueError('unique fixture source in current graph required')
+        prior=self.store.record('release_graph',self.r.binding(anchor),graph)
+        context=self.store.record('repair_context',self.r.binding(anchor),dict(**facts,
+            project=self.project.fingerprint(),repair_kind='fixture',prior_graph=prior,
+            package=item['package'],architecture=spec['document']['architecture'],
+            observability=spec['document']['observability']))
+        body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
+            repair_of=source.id,repair_context=context,repair_protocol=FIXTURE_PROTOCOL,
+            inputs={'approved_brief':spec['approval']})
+        key=digest([self.project.fingerprint(),source.id,latest.id,FIXTURE_PROTOCOL,'proposal'])
+        existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+        if existing:
+            if json.loads(existing['body'])!=body:raise ValueError('existing fixture proposal changed; preserve it')
+            return existing['id']
+        if self.r.board.guard:self.r.board.guard()
+        return kb.create_task(conn,title='REVIEW FIXTURE '+item['package']['title'],body=json.dumps(body),
+            assignee=self.project.coordination_roles['lead'],workspace_kind='scratch',completion_contract='local-only',
+            parents=[spec['task']],max_retries=2,max_runtime_seconds=600,idempotency_key=key)
 
     def propose_submission(self,conn,anchor,spec,item,incident,decision,graph):
         """Document-only native handoff; activation of replacement work is separate."""
