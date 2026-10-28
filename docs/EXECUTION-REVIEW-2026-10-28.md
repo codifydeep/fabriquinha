@@ -389,6 +389,18 @@ sem contá-las como falha de produto. Separar encerramento de atividade e da rel
 
 ### Avaliação semântica antes da migração
 
+**Prova operacional posterior:** `scripts/qualify_native_red_review.py` preparou
+um board isolado, baseline real e Red real. O mesmo Claude Haiku usou o SDK e
+handlers de produção: três leituras, uma busca e `delivery_review`. A revisão
+nativa terminou em `done`, com `tests_frozen`, autor/revisor distintos, snapshot
+inalterado e controles obrigatórios preservados. Três chamadas, nenhuma entrega
+aprovada. Essa prova substitui o classificador como evidência da operação básica,
+mas não apaga suas falhas nem qualifica a recuperação do S6.
+
+O supervisor `4a908186` foi iniciado após essa prova. A reconciliação criou
+automaticamente o SPIKE do CTO para a revisão retida; nenhuma conclusão ou
+reabertura manual do card de produto. A recuperação real permanece em execução.
+
 Atualização: a repetição com contrato compartilhado consumiu cinco chamadas
 adicionais (até 7.257) e passou 3/5. A justificativa do Red propôs inspeção, mas
 selecionou espera. O HTTP também selecionou espera por evidência. Não houve

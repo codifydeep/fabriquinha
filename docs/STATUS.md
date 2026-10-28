@@ -8,8 +8,9 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Desenvolvimento retomado com plano aprovado; despacho em manutenção.** Pausa persistente, nenhum worker/claim
-pendente; supervisor descarregado, relay parado e política de provedor desabilitada.
+**Desenvolvimento e despacho retomados com plano aprovado.** Supervisor executando
+a fonte `4a908186`; relay habilitado, mesmo modelo e teto. A recuperação criou
+automaticamente um SPIKE do CTO para a revisão do segundo incremento.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
@@ -62,7 +63,16 @@ Fonte `4a908186` exportada, doctor aprovado nos nove perfis e definição do
 supervisor migrada com backup, ainda descarregado. Relay parado, política
 desabilitada, nenhuma retomada do despacho ou alteração dos cards.
 
-Consumo confirmado: **7.257/8.500 chamadas**, restando 1.243.
+Validação nativa complementar passou: Red verdadeiro em dois jobs Docker,
+autor/revisor diferentes, três leituras e uma busca via ferramentas reais, seguida
+de `delivery_review`. O Kanban concluiu a revisão e gravou `tests_frozen`, mantendo
+o snapshot do autor e os controles de regressão. Foram três chamadas; nenhuma
+aprovação de produto. O ensaio simples qualifica a operação de revisão de Red,
+não a recuperação do S6 nem autonomia ponta a ponta. Após essa prova, o supervisor
+foi iniciado e criou o SPIKE real sem reabertura manual dos cards.
+
+Último contador conferido antes da retomada: **7.260/8.500 chamadas**; a execução
+ativa pode consumir novas chamadas dentro do mesmo teto.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
 US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui
