@@ -8,11 +8,14 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Desenvolvimento retomado; despacho em manutenção após novo avanço.** A execução
-75 produziu evidência admissível e criou automaticamente a proposta do Tech Lead
-(76) e a revisão do CTO (77). As rodadas 78/79 repetiram uma confusão de fase.
-A execução 80 foi interrompida pela pausa operacional; drenagem completa, sem
-workers ou efeitos pendentes. Supervisor descarregado e relay parado.
+**Despacho em manutenção; refinamento de contrato aguarda aprovação.** A fonte
+`9688d88e` foi instalada e as rodadas 81–83 ainda exigiram implementação antes de
+revisar testes em Red, apesar do contexto corrigido. A execução 84 foi interrompida
+pela pausa operacional; drenagem completa, sem workers ou efeitos pendentes.
+Supervisor descarregado, provedor desabilitado e relay parado. A
+[simplificação proposta](REVIEW-RECOVERY-SIMPLIFICATION-2026-10-28.md) remove
+somente a revisão intermediária da permissão de revisar, mantendo revisão
+independente da entrega e todos os gates. Não foi implementada nem ativada.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
@@ -36,7 +39,7 @@ A [prova isolada de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstra que
 recebendo 409 gera. Isso invalida a equivalência presumida, mas não aprova produto,
 nem resolve por si só corrida entre clientes ou o lifecycle de saída da triagem.
 
-Fonte instalada: `c490c7d0`, com exportação verificada, backup preservado e
+Fonte instalada: `9688d88e`, com exportação verificada, backup preservado e
 `doctor` aprovado nos nove perfis. A suíte offline passou com 467 testes.
 Provas nativas programadas cobrem sucessão, dependências, interrupções,
 solicitação de mudanças e nova revisão. O acionamento CTO → proposta Lead passou
@@ -78,9 +81,10 @@ o handoff automaticamente. A proposta, porém, recebia o diagnóstico antigo e o
 relatório novo sem a decisão CTO associada a esse relatório. O reparo de contexto
 projeta a decisão da mesma execução/experimento e explicita que revisar testes em
 Red não exige Green. Foi conferido contra os recibos reais; não muda aprovação,
-testes nem estado dos cards. Instalação do reparo e continuação ainda pendentes.
+testes nem estado dos cards. O reparo foi instalado, mas não resolveu a etapa
+intermediária: Lead/CTO continuaram exigindo Green antes da revisão de Red.
 
-Último contador conferido: **7.278/8.500 chamadas**, restando 1.222.
+Último contador conferido: **7.281/8.500 chamadas**, restando 1.219.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
 US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui
