@@ -127,6 +127,11 @@ class Diagnostic:
                 'do not edit the source, demand Green before Red or transfer technical choices to the CEO. '
                 'Other implementation findings remain visible for the implementation phase and cannot waive any later gate. '
                 'The previous implementation snapshot is separate from this test-author baseline. '
+                'A failure on this pre-implementation baseline does not prove that a proposed implementation is impossible. '
+                'Trace each assertion to its actual client: an HTTP status observed by Python urllib/requests is not a browser console event. '
+                'Do not infer a required browser request or status from a separate API probe. '
+                'A conflict claim needs evidence that the same required execution cannot satisfy both assertions, not only that an earlier implementation failed. '
+                'At CTO level you own the technical ruling; requesting another CTO ruling is not a next action. '
                 'diagnostic_validate is read-only evidence; a fresh delivery_submit and independent test review remain required.')
         return ('Authorized QA expected-text correction, not a new feature Red. The independent corrective plan permits only its listed QA text paths. '
             'Diagnose all frozen-preview failures against the approved brief. Do not tell the author to edit product code or preserve a known incorrect QA expectation; '

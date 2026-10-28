@@ -8,6 +8,16 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
+A revisão aditiva produziu novo Red na execução 69: 16 casos, sete falhas
+comportamentais e nenhum erro de execução ou skip. O CTO manteve um bloqueio
+baseado na suposta incompatibilidade entre HTTP 409 e console vazio. Um
+[experimento isolado de clientes HTTP](S6-HTTP-CLIENT-DIAGNOSIS.md) demonstrou que
+409 no cliente Python não gera erro no navegador; 409 no próprio navegador gera.
+A orientação de diagnóstico foi corrigida no código, ainda não instalada.
+A reavaliação nativa do incidente em triagem permanece pendente; nenhuma aprovação,
+reset de contador ou alteração de teste foi feita para contornar o bloqueio.
+
+
 O primeiro incremento do lobby passou por revisão independente, PR
 [codifydeep/descartavel#13](https://github.com/codifydeep/descartavel/pull/13),
 CI local obrigatória, implantação, rollback/restauração e QA de navegador.
