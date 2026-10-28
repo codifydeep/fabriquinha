@@ -439,3 +439,51 @@ O teste novo falhou antes da implementação. Uma prova offline no registro real
 do Hermes confirmou chamada da operação sem callback terminal, e a superfície
 de revisão a excluiu. Zero chamadas ao modelo nessa prova. Isso ainda não
 comprova que o agente real usará o validador corretamente; instalação pendente.
+
+## Instalação do validador e impedimento técnico confirmado — 28/10
+
+A fonte `69583463` foi instalada sob manutenção drenada, sem workers ou efeitos
+pendentes. O supervisor foi recarregado e retomado. Doctor aprovou os nove
+perfis e GitHub; a janela de contexto e o bundle de validação foram preservados.
+O relay confirmou 7.201/8.500 chamadas; nenhuma chamada de inferência foi feita
+para instalar a alteração. `delivery_validate` está disponível à próxima
+implementação, mas seu uso pelo agente real ainda não foi qualificado.
+
+O SPIKE do CTO executou 16 testes: 14 passaram. Um cenário congelado procura uma
+sala cujo apelido aleatório acabou de ser gerado, sem criar essa sala. Isso é
+um defeito de preparação do teste, não uma razão para alterar o produto para
+satisfazer uma precondição impossível. A revisão anterior não identificou o
+problema; Red por si só não prova que a falha corresponde ao comportamento alvo.
+
+O outro cenário falha por erro de console durante rejeição HTTP 409. Ainda não
+há autorização técnica para remover essa verificação: a exigência de 409 está
+numa chamada HTTP separada e não determina a estratégia da interface. Cabe à
+equipe avaliar a implementação e preservar as verificações enquanto isso.
+
+### Próxima alteração, antes de outra tentativa
+
+1. Qualificar a revisão técnica de testes Python prevista em F3 do ADR 0006.
+   O suporte JSON legado não serve: atualmente exige baseline Green, condição
+   incompatível com o defeito encontrado. Não reutilizar essa evidência como
+   se fosse uma nova prova Red.
+2. Reutilizar cards nativos de proposta, autoria e revisão independente. Vincular
+   a proposta ao incidente, diagnóstico do CTO, freeze e snapshot exatos.
+   A proposta deve identificar o caminho e o defeito técnico; mudança de negócio
+   ou remoção de cobertura continua exigindo aprovação específica do CEO.
+3. Preservar as versões anteriores. A autoria gera novo candidato; a revisão
+   confere setup, ação e asserção de cada cenário alterado, mantém os casos e
+   publica outro freeze. Não permitir edição pelo revisor, alteração silenciosa
+   dos hashes nem reutilização da aprovação antiga.
+4. Reexecutar a suíte anterior integral e demonstrar Red comportamental para
+   a revisão, seguido de Green e controles negativos sobre a mesma nova entrega.
+   Preservar o produto já escrito como ponto de partida, nunca como Green aceito.
+5. Substituir somente a cauda não publicada do grafo depois da revisão, com
+   recuperação idempotente. Manter o limite/histórico de continuações anterior;
+   uma revisão técnica é nova precondição explícita, não reset desse limite.
+6. Testar offline negação de revisão obsoleta, mudança de produto na autoria,
+   remoção de cenário/assertion, retomada entre freeze e grafo e recusa de entrega
+   sem novos controles. Depois executar a correção pela equipe, sem escrever o
+   produto manualmente nem aprovar retroativamente a tentativa anterior.
+
+Até essa qualificação, o segundo incremento permanece impedido e visível. O
+primeiro incremento implantado continua preservado; a release não foi homologada.
