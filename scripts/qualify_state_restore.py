@@ -32,7 +32,7 @@ def manifest(root):
     return result
 
 
-def qualify(root,upstream):
+def qualify(root,upstream,*,source_cycle=None):
     root=Path(root).resolve()
     if root.exists():raise ValueError('fresh private root required')
     if root.is_relative_to(ROOT):
@@ -96,8 +96,19 @@ def qualify(root,upstream):
     env.update(PYTHONPATH=str(ROOT/'src'),PYTHONDONTWRITEBYTECODE='1',PYTHONNOUSERSITE='1')
     args=[sys.executable,'-B','-m','fabriquinha.runtime','serve','--root',str(restored),
           '--upstream',str(Path(upstream).resolve()),'--interval','0.1']
+    cycles=[None,None]
+    if source_cycle:
+        from fabriquinha.source import verify
+        if len(source_cycle)!=2:raise ValueError('explicit before/after source pair required')
+        for path,expected in source_cycle:verify(Path(path),expected)
+        cycles=[source_cycle[0],source_cycle[1],source_cycle[0]]
     pids=[]
-    for index in range(2):
+    for index,source_binding in enumerate(cycles):
+        if source_binding:
+            from run_hermes_runtime import command
+            args,env=command(Path(source_binding[0]),source_binding[1],Path(sys.executable),restored,
+                Path(upstream),'serve',interval=.1)
+
         with (root/('restored-service-'+str(index)+'.log')).open('xb') as log:
             service=subprocess.Popen(args,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT)
         try:
@@ -122,12 +133,17 @@ def qualify(root,upstream):
         assert conn.execute('SELECT COUNT(*) FROM task_runs').fetchone()[0]==0
     restored_notice=next(x for x in recovered.outbox.records() if x['key']==notice)
     assert restored_notice['state']=='queued' and restored_notice['attempts']==0
-    assert len(set(pids))==2
+    assert len(set(pids))==len(cycles)
+    assert recovered_meter.state()==meter_before
+    assert recovered.control.read()['episode']==pause['episode'] and recovered.control.read()['paused']
+    recovered.store.tree(snapshot);recovered.store.receipt(receipt)
+
     result=dict(sqlite_integrity=True,blocked_card_preserved=True,snapshot_verified=True,receipt_verified=True,
         queued_notification_preserved=True,pause_episode_preserved=True,files_verified=len(before),
         model_calls=0,workers_started=0,external_effects=0,production_restore_qualified=False,
         provider_counter_restore_qualified=False,synthetic_offline_restore=True,restored_dispatcher_restarted_paused=True,duplicate_owner_refused=True,
         synthetic_counter_preserved=True,uncertain_send_hold_preserved=True,reservation_while_held_refused=True)
+    if source_cycle:result.update(paused_source_upgrade_and_rollback=True,source_digests=[item[1] for item in cycles])
     write_json(root/'receipt.json',result)
     print(json.dumps(result,indent=2))
     return result
@@ -136,6 +152,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True)
     parser.add_argument('--upstream',type=Path,required=True)
+    parser.add_argument('--source-cycle',nargs=2,action='append',metavar=('PATH','DIGEST'))
     args=parser.parse_args()
     os.umask(0o077)
-    qualify(args.root,args.upstream)
+    qualify(args.root,args.upstream,source_cycle=args.source_cycle)

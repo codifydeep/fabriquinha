@@ -187,3 +187,16 @@ A restauração sintética também passou com o ledger real sobre dados fictíci
 contador 7, teto 10 e hold de envio incerto na chamada 7 sobreviveram à cópia.
 O ledger recusou nova reserva enquanto bloqueado, sem incrementar o contador.
 Não houve substituição do volume real nem afirmação de consumo reconciliado.
+
+## Upgrade e rollback pausados
+
+O mesmo ensaio agora aceita dois pares explícitos de fonte congelada/hash e usa
+a entrada pública `run_hermes_runtime.py` para a sequência anterior → atual →
+anterior. Passou com `6cc51421` → `0472c05d` → `6cc51421`: três processos distintos,
+mesmo episódio de pausa, segundo dono recusado, nenhum worker ou efeito externo,
+card/snapshot/recibo/contador/hold preservados. A prova vale para essas fontes
+compatíveis e o estado sintético, não para downgrade arbitrário de contratos.
+
+A próxima evidência necessária é a interação humana real e a versão útil P6;
+não substituir essa etapa por mais fixtures. Recuperação durante trabalho vivo
+será medida no ciclo de entrega, e não presumida a partir do restart pausado.
