@@ -39,6 +39,23 @@ class SubmissionRepairAdmission(unittest.TestCase):
             incident=key,experiment=experiment,action='hold',delivery_approval=False))
         return submission_failure(f.project,f.store,key,decision,freeze or self.freeze,current or self.snapshot)
 
+    def test_missing_terminal_protocol_allows_only_reviewed_future_attempt(self):
+        incident={k:v for k,v in self.incident.items() if k!='control_refusal'}
+        incident['failure']='activity ended without a controller-validated native handoff; SDK status '+json.dumps(
+            dict(code='missing_terminal_operation',output_limit=16384,failed=False,api_calls=13))
+        # A fresh attempt may begin before Green; it must still preserve the
+        # independently frozen tests and produce fresh Green/controls later.
+        self.snapshot=self.fixture.store.receipt(self.freeze)['payload']['snapshot']
+        incident['snapshot']=self.snapshot
+        result=self.evaluate(incident=incident)
+        self.assertEqual(result['protocol_failure']['code'],'missing_terminal_operation')
+        self.assertIsNone(result['control_refusal'])
+        self.assertTrue(result['requires_independent_plan_review'])
+        self.assertTrue(result['requires_fresh_green_and_controls'])
+        self.assertFalse(result['delivery_approval'])
+        for failure in ('missing_terminal_operation',incident['failure'].replace('missing_terminal_operation','sdk_failed')):
+            with self.assertRaises(ValueError):self.evaluate(incident={**incident,'failure':failure})
+
     def test_exact_facts_only_authorize_a_future_independent_proposal(self):
         value=self.evaluate()
         self.assertFalse(value['delivery_approval'])

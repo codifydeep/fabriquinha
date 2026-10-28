@@ -19,10 +19,22 @@ SUBMISSION_PROTOCOL='complete-control-set-3'
 SUBMISSION_PROTOCOLS=('complete-control-set-1','complete-control-set-2',SUBMISSION_PROTOCOL)
 
 
+def protocol_failure(data):
+    prefix='activity ended without a controller-validated native handoff; SDK status '
+    message=data.get('failure')
+    if not isinstance(message,str) or not message.startswith(prefix):return None
+    try:value=json.loads(message[len(prefix):])
+    except ValueError:return None
+    if (not isinstance(value,dict) or value.get('code')!='missing_terminal_operation'
+            or value.get('failed') is not False or type(value.get('api_calls')) is not int
+            or not 0<=value['api_calls']<=1000):return None
+    return {key:value[key] for key in ('code','failed','api_calls','output_limit','compressions','ineffective_compressions') if key in value}
+
+
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):
     """Read-only admission facts; never releases triage or creates a task.
 
-    Only a pre-review implementation with an exact negative-control refusal
+    Only a pre-review implementation with an exact control or missing-terminal refusal
     and completed CTO diagnosis can become a scoped continuation proposal.
     The native source/run/state and idle effects still need controller checks.
     """
@@ -45,21 +57,27 @@ def submission_failure(project,store,incident_key,decision_key,tests,current_sna
             or experiment['payload'].get('project')!=project.fingerprint()
             or experiment['payload'].get('snapshot')!=current_snapshot):
         raise ValueError('exact CTO experiment required; never a replacement for negative controls')
-    refusal=control_refusal_context(store,project,binding,data['control_refusal'],current_snapshot)
-    record=store.receipt(data['control_refusal'],kind='control_refusal')
-    green=store.receipt(record['payload']['green'],kind='green')['payload']
     quality=Quality(project,store,None,None)
     freeze=store.receipt(tests,kind='tests_frozen');frozen=quality.frozen_plan(freeze)
-    if (not refusal['matches_current_snapshot'] or not refusal['missing']
-            or green['freeze']!=tests or freeze['binding']['release']!=binding['release']
-            or set(green['cases'])!=set(frozen['cases'])
-            or not set(refusal['missing'])<=set(frozen['control_cases'])
-            or not set(refusal['coverage'])<=set(frozen['cases'])):
-        raise ValueError('unchanged snapshot and exact independently frozen control targets required')
+    if freeze['binding']['release']!=binding['release']:
+        raise ValueError('independently frozen tests must belong to this release')
+    refusal=None;protocol=None
+    if data.get('control_refusal'):
+        refusal=control_refusal_context(store,project,binding,data['control_refusal'],current_snapshot)
+        record=store.receipt(data['control_refusal'],kind='control_refusal')
+        green=store.receipt(record['payload']['green'],kind='green')['payload']
+        if (not refusal['matches_current_snapshot'] or not refusal['missing']
+                or green['freeze']!=tests or set(green['cases'])!=set(frozen['cases'])
+                or not set(refusal['missing'])<=set(frozen['control_cases'])
+                or not set(refusal['coverage'])<=set(frozen['cases'])):
+            raise ValueError('unchanged snapshot and exact independently frozen control targets required')
+    else:
+        protocol=protocol_failure(data)
+        if protocol is None:raise ValueError('exact control refusal or missing-terminal SDK failure required')
     quality.protect(frozen['snapshot'],current_snapshot,exact_tests=True)
     return dict(source=data['source'],source_run=data['source_run'],source_contract=binding['contract'],
         snapshot=current_snapshot,tests=tests,incident=incident_key,reviewed_diagnosis=decision_key,
-        control_refusal=refusal,delivery_approval=False,requires_independent_plan_review=True,
+        control_refusal=refusal,**({'protocol_failure':protocol} if protocol else {}),delivery_approval=False,requires_independent_plan_review=True,
         requires_fresh_green_and_controls=True)
 
 
@@ -112,7 +130,7 @@ def repair_document(value,context):
 def context_view(store,value):
     """Model context needs failure facts, not private graph/workspace copies."""
     keys=('source','source_run','snapshot','commit','tests','browser_job','failure','package','qa_paths','failed_stage','retry_rule','prior_authority',
-          'repair_kind','control_refusal','submission_contract')
+          'repair_kind','control_refusal','protocol_failure','submission_contract')
     result={k:value[k] for k in keys if k in value}
     if value.get('reviewed_diagnosis'):
         result['prior_diagnosis']=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')['payload']['verdict']
@@ -164,7 +182,7 @@ class RepairTools(DraftTools):
         if context['payload'].get('repair_kind')=='submission':
             from .quality import CONTROL_SUBMISSION_CONTRACT
             result['contract']=('Review a bounded continuation after native implementation triage. '
-                'Classify submission only when the recorded negative-control refusal can be addressed with a complete set; '
+                'Classify submission only when the recorded control refusal or missing-terminal SDK failure can be addressed by a concrete changed approach; '
                 'explain how the proposed continuation differs from the failed partial attempts. '
                 'Otherwise classify infrastructure or scope and hold. test_paths must be empty. '
                 'No new brief, test changes, breaker reset or approval of the previous Green. '
@@ -177,7 +195,7 @@ class RepairTools(DraftTools):
                 old_handoff_required=False,completion_evidence_required_before_start=False,
                 contract='The old missing_terminal_operation records an incomplete attempt; it does not by itself prove an infrastructure defect. '
                     'Do not require the replacement handoff, mutations, Green or delivery review before creating the task that produces them. '
-                    'When the recorded gaps can be addressed by completing the mutation set, propose submission. '
+                    'When the recorded gaps can be addressed by completing implementation and a full mutation set, propose submission. '
                     'Infrastructure or scope holds require a separate actual impediment; never classify absent future completion evidence as a start impediment. '
                     'Approval of this plan never approves delivery or resets the original breaker.')
             result['repair_classifications']=['submission','infrastructure','scope']
@@ -364,7 +382,7 @@ class Repairs:
                 if not key:continue
                 decision=self.store.receipt(key,kind='diagnostic_decision')
                 incident=self.store.receipt(decision['payload']['incident'],kind='incident')
-                if incident['payload'].get('control_refusal') and incident['binding'].get('reviewing') is False:
+                if (incident['payload'].get('control_refusal') or protocol_failure(incident['payload'])) and incident['binding'].get('reviewing') is False:
                     decisions.append((decision['payload']['incident'],key))
             if not decisions:continue
             if len(decisions)!=1:raise ValueError('one exact CTO disposition required for continuation')

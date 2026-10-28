@@ -374,3 +374,25 @@ pendentes ou efeitos Docker pendentes. O hold do CTO continua preservado.
 Telemetria e as duas projeções serão instaladas conjuntamente; não houve nova
 chamada ao modelo para qualificar essas alterações. Redução de aproximadamente
 7,7 mil caracteres no prompt observado não prova resolução da repetição.
+
+## Continuação após falha de protocolo — 28/10
+
+A instalação da fonte `3dfe073f` foi preparada sob pausa drenada; doctor verde,
+relay parado, política desabilitada, supervisor descarregado. Antes de ativar,
+foi identificada outra lacuna: o mecanismo de continuação revisada só admitia
+recusa de controles negativos. O hold por `missing_terminal_operation` não tinha
+caminho equivalente, mesmo após um reparo técnico no controlador.
+
+O mesmo mecanismo passou a admitir essa falha exata do SDK, sem liberar a
+triagem: implementação anterior à revisão, snapshot inalterado, testes
+independentemente congelados preservados, ausência de efeitos pendentes e
+hold/experimento exatos do CTO continuam obrigatórios. A equipe precisa propor
+uma abordagem diferente e obter revisão independente; infraestrutura ou escopo
+continuam sendo holds válidos. Não se exige Green antigo para começar a nova
+implementação; exige-se Green novo, controles e revisão para concluí-la.
+O limite existente de duas continuações permanece, sem reset de card ou breaker.
+
+A admissão somente leitura do incidente real da execução 51 passou e manteve
+`delivery_approval=false`; nenhum card foi criado por essa prova. O novo teste
+falhou antes do reparo e a suíte completa passou com 421 testes. Ainda falta
+instalar essa extensão e validar a proposta/execução real; manutenção continua.
