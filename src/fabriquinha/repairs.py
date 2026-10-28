@@ -169,6 +169,17 @@ class RepairTools(DraftTools):
                 'Otherwise classify infrastructure or scope and hold. test_paths must be empty. '
                 'No new brief, test changes, breaker reset or approval of the previous Green. '
                 'Independent approval authorizes only a replacement attempt with fresh Green, controls and review. '+CONTROL_SUBMISSION_CONTRACT)
+            result['continuation_stage']=dict(
+                reviewing='permission to create a replacement implementation task, not delivery acceptance',
+                controller_support='An independently approved submission plan creates the replacement task and preserves original triage.',
+                start_requires=['approved brief','unchanged source snapshot and frozen tests','independent approval of this continuation plan'],
+                completion_requires=['new Green','one complete negative-control set','validated delivery_submit handoff','independent delivery review'],
+                old_handoff_required=False,completion_evidence_required_before_start=False,
+                contract='The old missing_terminal_operation records an incomplete attempt; it does not by itself prove an infrastructure defect. '
+                    'Do not require the replacement handoff, mutations, Green or delivery review before creating the task that produces them. '
+                    'When the recorded gaps can be addressed by completing the mutation set, propose submission. '
+                    'Infrastructure or scope holds require a separate actual impediment; never classify absent future completion evidence as a start impediment. '
+                    'Approval of this plan never approves delivery or resets the original breaker.')
             result['repair_classifications']=['submission','infrastructure','scope']
         return result
 

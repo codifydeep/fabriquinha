@@ -1,7 +1,7 @@
 # S6 — submissão de controles e recuperação limitada
 
 Estado: orientação e continuação qualificadas offline no Hermes nativo.
-Fonte `a6f59bb8` instalada; a proposta real terminou em hold. Reparo de contexto em manutenção. Não é aprovação de entrega nem autorização para reset.
+Fonte `b3b7f6f6` instalada após qualificação offline; proposta sucessora terminou em novo hold. Execução drenada para separar pré-condições e resultados. Não é aprovação de entrega nem autorização para reset.
 
 ## Evidência e causa
 
@@ -135,6 +135,26 @@ classificação nem aprovação retroativa. 414 testes passaram, incluindo cria�
 idempotente da sucessora, preservação do hold, espera de revisão em curso e
 reutilização de uma aprovação já executável. A qualificação nativa desta revisão
 passou com dois incrementos, 17 atividades SDK e 32 chamadas HTTP locais
-programadas, sem chamadas pagas. Implantação e resultado com agentes reais
-ainda pendentes. O ensaio distingue 11 cards históricos de trabalho dos seis
+programadas, sem chamadas pagas. Fonte instalada e retomada real iniciada em
+7.033/7.064 chamadas, sem aumento de teto. A proposta sucessora foi submetida
+pelo Lead ao CTO; seu resultado e a entrega real ainda estão pendentes. O ensaio distingue 11 cards históricos de trabalho dos seis
 cards ativos da entrega; o ambiente foi retirado após registrar as evidências.
+
+
+## Resultado real da revisão 2
+
+A equipe reconheceu corretamente o recibo do CEO e o manifesto congelado. Após
+uma devolução, porém, aprovou hold de infraestrutura por exigir que a entrega
+substituta já tivesse handoff, controles e Green antes de começar. O próprio
+plano reconheceu que as lacunas eram de cobertura e podiam ser resolvidas com
+um conjunto completo. Não houve falha de ferramenta observada nessa revisão;
+o impedimento foi uma inferência circular sobre a ordem de execução.
+
+O ajuste de contexto separa: início = aceite de negócio, snapshot/freeze íntegros
+e revisão do plano; conclusão = Green novo, controles completos, handoff válido
+e revisão de entrega. A ausência do handoff antigo não prova defeito de
+infraestrutura. Infraestrutura/escopo continuam opções de hold para impedimentos
+reais distintos; nenhuma aprovação antiga é reinterpretada nem gate removido.
+A decisão da revisão 2 está preservada. O ajuste ainda precisa ser instalado e
+uma eventual nova revisão deve ter vínculo explícito com as decisões anteriores;
+não repetir chamadas idênticas nem desbloquear a implementação diretamente.

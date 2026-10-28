@@ -5,7 +5,7 @@ A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
 Multica e Temporal não participam desse caminho. A distribuição pública e a
 retomada do Truco ainda não estão qualificadas.
 
-**S6 em manutenção: a equipe confundiu texto histórico do brief com seu estado de aprovação.**
+**S6 em manutenção: autoridade do brief corrigida; resta separar início da tentativa de conclusão da entrega.**
 O teste Red foi aprovado independentemente e congelado; a implementação chegou
 a Green. Lead executou diagnóstico e retomou o autor; a repetição escalou ao
 CTO, que preservou a triagem. Nenhum controle foi dispensado e não houve PR ou
@@ -18,15 +18,21 @@ O reparo de orientação passou offline com 402 testes e está instalado.
 A admissão somente leitura reconheceu os vínculos reais preservados. A criação
 idempotente e a revisão independente da proposta passaram offline (409 testes
 no total). A continuação e sua reconciliação já estão implementadas em fonte,
-com testes de interrupção e remapeamento das dependências. O board real não foi
-alterado. A qualificação isolada no Hermes nativo passou: 17 atividades SDK, dois
+com testes de interrupção e remapeamento das dependências. O board foi preservado;
+novas propostas foram acrescentadas pelo controlador, sem reset dos cards. A qualificação isolada no Hermes nativo passou: 17 atividades SDK, dois
 incrementos integrados e QA, sem chamadas pagas. O núcleo passou com 411 testes.
 A proposta real passou por devolução e revisão, mas terminou em hold de
 infraestrutura porque Lead e CTO leram “NOT APPROVED” no documento histórico.
 O recibo exato do CEO está válido. A correção de contexto acrescenta autoridade
 estruturada. A proposta sucessora preserva o hold e exige nova revisão.
-414 testes e a cadeia nativa de dois incrementos passaram offline; ainda falta
-instalar esta revisão e comprovar a continuação com os agentes reais. O runtime foi novamente drenado.
+414 testes e a cadeia nativa de dois incrementos passaram offline. A fonte
+`b3b7f6f6` foi instalada com backup, sem alterar os validadores; admissão verde,
+retomada em 7.033/7.064 chamadas. O Lead submeteu a proposta sucessora ao CTO. Ambos reconheceram o aceite e
+os hashes, mas aprovaram outro hold exigindo handoff, controles e Green da nova
+entrega antes de criar sua implementação. Essa dependência circular permanece
+registrada; o runtime foi drenado. O contexto agora distingue pré-condições de
+início dos gates de conclusão, sem dispensar nenhum gate; esse ajuste ainda não
+está instalado. Falta comprovar a continuação real.
 Falta comprovar a continuação com a equipe real, preservando o card antigo,
 o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
 A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
