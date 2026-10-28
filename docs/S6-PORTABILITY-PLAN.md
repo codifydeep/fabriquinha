@@ -174,3 +174,21 @@ Só depois da evidência de S6, retomar o Truco por Produto a partir das informa
 já fornecidas pelo CEO. A stack Python/HTTP atual não qualifica automaticamente
 outros adaptadores, mobile, 3D, colaboração paralela ilimitada ou ausência universal
 de starvation diante de dependências externas.
+
+## Verificação do canal instalado — 28/10
+
+A instalação S6 ainda usa a CLI local de `fabriquinha.intake` como identidade
+confiável do CEO. O runtime possui outbox e transporte Telegram, mas o arquivo
+privado `notifications.json` não está configurado nesta instalação. Portanto,
+eventos enfileirados não comprovam comunicação recebida, e a existência do
+transporte de saída não comprova intake ou resposta pelo Telegram.
+
+Depois da entrega dos dois incrementos, S6.5 deve reutilizar as operações
+existentes de intake, sem criar um segundo grafo de execução. O adaptador do
+canal deve autenticar usuário e destino, vincular cada resposta ao identificador
+e à revisão da pergunta, persistir a deduplicação e rejeitar respostas antigas
+ou de outro fluxo. Aprovação de brief não autoriza orçamento, ferramentas ou
+exceções de qualidade. A qualificação precisa demonstrar entrada, pergunta,
+resposta e entrega no canal real, além de reinício e indisponibilidade sem
+interromper os workers nem duplicar ações. Não ativar gateways legados como
+atalho nem presumir autorização a partir de uma mensagem de outro bot.
