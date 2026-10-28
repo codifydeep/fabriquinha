@@ -87,3 +87,43 @@ def fixture_snapshot_diff(store,before,after,paths,tests_dir):
             raise ValueError('fixture file mode must remain unchanged')
         result[path]=fixture_diff((store.tree(before)/path).read_text(),(store.tree(after)/path).read_text())
     return result
+
+
+def revision_context(project,store,quality,authority,candidate):
+    """Read independently reviewed authority; return the original Red baseline.
+
+    Only unpublished fixture corrections with the unchanged product qualify.
+    This does not approve the candidate or the delivery.
+    """
+    context=authority['context']
+    if context.get('repair_kind')!='fixture' or authority['proposal']['classification']!='test_contract':
+        raise ValueError('independently reviewed fixture proposal required')
+    freeze=store.receipt(context['tests'],kind='tests_frozen')
+    previous=quality.frozen_plan(freeze)
+    review=store.receipt(authority['review'],kind='plan_review')
+    if (context['snapshot']!=previous['snapshot']
+            or freeze['binding']['release']!=review['binding']['release']):
+        raise ValueError('fixture source must be the exact old freeze')
+    fixture_snapshot_diff(store,previous['snapshot'],candidate,authority['proposal']['test_paths'],project.tests_dir)
+    quality.protect(previous['baseline'],candidate)
+    return previous
+
+
+def verify_red_revision(project,store,quality,record):
+    """Recheck new Red's provenance and preserve the old control target set."""
+    from .repairs import reviewed
+    value=record['payload'];revision=value['fixture_revision']
+    if not isinstance(revision,dict) or set(revision)!={'authority','tests'}:
+        raise ValueError('exact fixture provenance required')
+    authority=reviewed(project,store,revision['authority'])
+    previous=revision_context(project,store,quality,authority,value['snapshot'])
+    review=store.receipt(revision['authority'],kind='plan_review')
+    old=store.receipt(revision['tests'],kind='tests_frozen')
+    if (record['kind']!='red' or record['binding']['kind']!='tests' or record['binding']['reviewing']
+            or record['binding']['release']!=review['binding']['release']
+            or old['binding']['release']!=record['binding']['release']
+            or revision['tests']!=authority['context']['tests']
+            or value['project']!=project.fingerprint() or value['baseline']!=previous['baseline']
+            or set(value['cases'])!=set(previous['cases']) or set(value['new_cases'])!=set(previous['new_cases'])):
+        raise ValueError('new Red must preserve the exact reviewed fixture scope and inventory')
+    return set(previous['control_cases'])

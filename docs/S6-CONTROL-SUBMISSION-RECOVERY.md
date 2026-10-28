@@ -509,3 +509,28 @@ paths, descoberta, código alheio e preservação dos snapshots. A simulação d
 real foi somente em memória: identificou três instruções de preparação, sem
 escrever o candidato nem executar código do produto. A autoria real caberá ao
 agente de testes. Nenhuma chamada ao modelo nesta preparação.
+
+### Red novo sobre a base publicada — preparação offline
+
+A correção é anterior à publicação do segundo incremento: seus testes novos não
+existem na base Git do primeiro incremento. Por isso não é necessário estender o
+reparo legado pós-deploy nem criar um tipo adicional de evidência de qualidade.
+
+Foi preparado o caminho de autoria que recebe uma proposta independente do tipo
+`fixture`, confere o candidato contra o freeze anterior e executa a base original
+novamente. Essa base precisa passar. O candidato corrigido executa Red novo;
+precisa preservar integralmente os inventários de casos totais e novos. O recibo
+normal `red` registra `fixture_revision` com a proposta e o freeze históricos.
+Nenhum Red anterior, SPIKE ou Green incompleto é convertido em evidência nova.
+
+Antes de congelar, o controlador revalida a proveniência, a revisão técnica, os
+snapshots e a análise estrutural. Os controles obrigatórios são a união dos alvos
+do novo Red com todos os alvos previamente congelados, inclusive riscos extras
+que o revisor anterior acrescentou. A nova revisão exige autor, revisor permitido,
+release, contrato, inventário e baseline exatos. Green e controles continuam no
+fluxo normal posterior de implementação.
+
+A instalação ativa ainda não cria propostas `fixture`: a integração nativa de
+proposta, autoria e substituição da cauda do grafo permanece pendente. Os testes
+desta etapa isolam a autoridade da proposta para verificar o protocolo de
+qualidade; não constituem prova de revisão real por agentes nem de retomada S6.

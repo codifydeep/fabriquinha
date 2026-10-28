@@ -302,7 +302,15 @@ class Quality:
         self.check(run, 'tests')
         from .repairs import repair_authority
         authority=repair_authority(self.project,self.store,self.board,run)
-        if authority and authority['proposal']['classification']=='test_contract':
+        fixture=None
+        if authority and authority['context'].get('repair_kind')=='fixture':
+            from .test_revision import revision_context
+            previous=revision_context(self.project,self.store,self,authority,candidate)
+            if (baseline!=previous['snapshot'] or self.store.receipt(authority['review'])['binding']['release']!=run.release):
+                raise ValueError('exact frozen fixture workspace and release required')
+            baseline=previous['baseline']
+            fixture=dict(authority=authority['review'],tests=authority['context']['tests'])
+        elif authority and authority['proposal']['classification']=='test_contract':
             self.correction_diff(baseline,candidate,authority['proposal']['test_paths'])
             if baseline!=authority['context']['snapshot']:raise ValueError('test correction base changed')
             self.browser_tests(run,candidate)
@@ -324,6 +332,7 @@ class Quality:
         self.browser_tests(run,candidate)
         base_job, base = self.observe(run, baseline, 'baseline')
         if base['failures']:
+            if fixture:raise ValueError('fixture repair requires the original baseline to pass again')
             if candidate!=baseline:raise ValueError('regression baseline failed: submit unchanged existing tests, never duplicate or alter them')
             commit=self.board.input(run,'base_commit')
             if not re.fullmatch('[a-f0-9]{40}',commit):raise ValueError('controller baseline commit required for known regression')
@@ -336,6 +345,8 @@ class Quality:
         red_job, report = self.observe(run, candidate, 'red')
         old, all_cases = set(base['cases']), set(report['cases'])
         new, failing = all_cases-old, {f['case'] for f in report['failures']}
+        if fixture and (all_cases!=set(previous['cases']) or new!=set(previous['new_cases'])):
+            raise ValueError('fixture repair must preserve the entire frozen case inventory')
         if not old <= all_cases or not failing or not failing <= new:
             raise ValueError('Red must fail new behavior and preserve baseline membership')
         for failure in report['failures']:
@@ -343,7 +354,8 @@ class Quality:
                     f['function'].startswith('test') for f in failure['frames']):
                 raise ValueError('Red requires an assertion in a new test body')
         return self.record(run, 'red', dict(control_contract=CONTROL_CONTRACT,baseline=baseline, snapshot=candidate,
-            baseline_job=base_job, red_job=red_job, cases=sorted(all_cases), new_cases=sorted(new)))
+            baseline_job=base_job, red_job=red_job, cases=sorted(all_cases), new_cases=sorted(new),
+            **({'fixture_revision':fixture} if fixture else {})))
 
     def control_plan(self,red,risks):
         data=red['payload']
@@ -377,6 +389,9 @@ class Quality:
         if (not required or not required<=set(eligible) or set(report['cases'])!=set(data['cases'])
                 or not isinstance(risks,list) or len(risks)>32):
             raise ValueError('validated Red cases and bounded independently reviewed risks required')
+        if data.get('fixture_revision') is not None:
+            from .test_revision import verify_red_revision
+            required|=verify_red_revision(self.project,self.store,self,red)
         extra=set()
         for risk in risks:
             if (not isinstance(risk,dict) or set(risk)!={'case','reason'} or not isinstance(risk['case'],str)
@@ -434,14 +449,14 @@ class Quality:
         if data.get('control_contract')!=CONTROL_CONTRACT or data.get('project')!=self.project.fingerprint():
             raise ValueError('frozen tests use a historical control contract; new independent review required')
         red=self.test_evidence(data['red']);review=self.store.receipt(data['review'],kind='test_review')
-        if red['kind']=='regression_red':
+        if red['kind']=='regression_red' or red['payload'].get('fixture_revision') is not None:
             origin,scope=red['binding'],receipt['binding']
             if (scope['kind']!='tests' or scope['reviewing'] is not True or scope['task']!=origin['task']
                     or scope['release']!=origin['release'] or scope['contract']!=origin['contract']
                     or scope['author']!=origin['actor'] or scope['actor'] not in self.project.reviewers_for(origin['actor'])
                     or scope['number']<=origin['number'] or data['tests']!=self.tests(data['snapshot'])
                     or data['baseline']!=red['payload']['baseline']):
-                raise ValueError('independent exact regression freeze required')
+                raise ValueError('independent exact regression or fixture freeze required')
         if (review['binding']!=receipt['binding'] or review['payload']['project']!=self.project.fingerprint()
                 or review['payload']['red']!=data['red'] or review['payload']['snapshot']!=data['snapshot']
                 or review['payload']['verdict']['decision']!='approve' or red['payload']['snapshot']!=data['snapshot']
