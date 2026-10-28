@@ -389,6 +389,18 @@ sem contá-las como falha de produto. Separar encerramento de atividade e da rel
 
 ### Avaliação semântica antes da migração
 
+**Handoff real após feedback:** execução 75 criou uma cópia de produto admissível,
+demonstrou viabilidade do caso terceiro jogador e acionou automaticamente a
+proposta Lead 76 e revisão CTO 77. As rodadas 78/79 repetiram a exigência indevida
+de implementar antes de revisar Red. A projeção da proposta incluía diagnóstico
+antigo e relatório novo, mas omitia a decisão CTO vinculada ao relatório novo.
+O reparo passa a projetar somente a decisão com mesma execução, projeto,
+incidente e experimento (ambiguidade falha fechada), sem herdar aprovação, e
+explicita a fase da entrega original. Foi conferido no contexto real do card.
+Execução 80 pausada de forma controlada; zero workers/efeitos após drenagem.
+Consumo 7.278/8.500. O problema é informação incompleta no handoff, não falta de
+saldo nem justificativa para trocar o modelo ou aprovar automaticamente.
+
 **Resultado da retomada real:** SPIKE CTO execução 74 terminou em hold, com
 seis chamadas. Reconheceu o Red esperado e não reproduziu o conflito alegado,
 mas repetiu a mesma observação. A reconciliação recusou sucessão corretamente.

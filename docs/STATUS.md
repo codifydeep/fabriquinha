@@ -8,10 +8,11 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Desenvolvimento e despacho retomados.** Fonte `c490c7d0` instalada com backup
-e doctor aprovado. O controlador criou a retomada única do SPIKE do CTO,
-execução 75, preservando a execução 74 como concluída sem evidência admissível.
-Supervisor e relay ativos, mesmo modelo e teto; o resultado novo está pendente.
+**Desenvolvimento retomado; despacho em manutenção após novo avanço.** A execução
+75 produziu evidência admissível e criou automaticamente a proposta do Tech Lead
+(76) e a revisão do CTO (77). As rodadas 78/79 repetiram uma confusão de fase.
+A execução 80 foi interrompida pela pausa operacional; drenagem completa, sem
+workers ou efeitos pendentes. Supervisor descarregado e relay parado.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
 causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
 [ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
@@ -71,11 +72,15 @@ originais. Foi preparada uma migração única do protocolo antigo para o protoc
 com feedback, somente para um SPIKE CTO concluído com resultados normalizados
 idênticos. Execução antiga permanece intacta; worker ativo não é substituído,
 resultado já admissível é reutilizado e o protocolo novo não ganha retries.
-A prova nativa de criação, deduplicação, revisão e dependências passou. A alteração
-foi instalada e criou a execução 75 automaticamente; sua conclusão e os demais
-handoffs continuam pendentes.
+A prova nativa de criação, deduplicação, revisão e dependências passou. A execução
+75 demonstrou a viabilidade do terceiro jogador sem enfraquecer testes e iniciou
+o handoff automaticamente. A proposta, porém, recebia o diagnóstico antigo e o
+relatório novo sem a decisão CTO associada a esse relatório. O reparo de contexto
+projeta a decisão da mesma execução/experimento e explicita que revisar testes em
+Red não exige Green. Foi conferido contra os recibos reais; não muda aprovação,
+testes nem estado dos cards. Instalação do reparo e continuação ainda pendentes.
 
-Último contador conferido: **7.266/8.500 chamadas**, restando 1.234.
+Último contador conferido: **7.278/8.500 chamadas**, restando 1.222.
 Claude Haiku, saída máxima de 16.384 tokens, contexto 131.072 e nenhum fallback.
 A leitura do ledger parado conferiu a janela S6: 296 chamadas atribuídas,
 US$ 1,2739285 reportados pelo provedor. Não é custo histórico total nem inclui

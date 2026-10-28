@@ -103,6 +103,9 @@ def repair_phase(reviewing,kind):
         return (('Independently assess the reassessment proposal with plan_review. ' if reviewing else
                  'Use repair_submit to propose reassess, infrastructure or scope with empty test_paths. ')+
             'Compare the actual previous and current controller observations. A different hypothesis alone is not evidence. '
+            'Use review_phase and the current diagnosis, not the prior hold as an inherited order. '
+            'For tests, expected Red is not a reason to require implementation before independent test review/freezing. '
+            'For implementation, preserve Green and negative-control requirements. A disposable experiment never replaces the author handoff. '
             'Reassessment preserves the immutable author handoff and all delivery gates; no test edits, approval or breaker reset. '
             'If the observation does not address the impediment, state the remaining technical action rather than approving another identical retry.')
     if kind=='fixture':

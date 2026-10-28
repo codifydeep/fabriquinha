@@ -305,6 +305,26 @@ def context_view(store,value):
         current=store.receipt(value['new_evidence'],kind='diagnostic_experiment')
         result['observations']=dict(previous=prior['payload']['report'],current=current['payload']['report'],
             receipt=value['new_evidence'],snapshot=value['snapshot'],handoff=value['handoff'])
+        # Carry the ruling that produced this observation, not only the old
+        # hold. Match immutable execution identity, never the latest CTO text.
+        rulings=[]
+        for path in sorted((store.root/'receipts').glob('*.json')):
+            record=store.receipt(path.stem)
+            data=record['payload']
+            if (record['kind']=='diagnostic_decision' and record['binding']==current['binding']
+                    and data.get('experiment')==value['new_evidence']
+                    and data.get('project')==current['payload'].get('project')
+                    and data.get('incident')==current['payload'].get('incident')
+                    and data.get('delivery_approval') is False):
+                rulings.append(dict(receipt=path.stem,verdict=data['verdict'],action=data['action'],grants_approval=False))
+        if len(rulings)>1:raise ValueError('ambiguous ruling for current observation')
+        result['current_diagnosis']=rulings[0] if rulings else None
+        handoff=store.receipt(value['handoff'])
+        result['review_phase']=handoff['binding']['kind']
+        if result['review_phase']=='tests':
+            from .quality import CONTROL_REVIEW_CONTRACT
+            result['phase_contract']=CONTROL_REVIEW_CONTRACT
+            result['start_condition']='Evidence supports inspecting the original immutable tests. Product Green is not a prerequisite for review or freeze. The disposable experiment is not the author delivery.'
         result['authority']='Observed difference permits consideration, not approval. Preserve source triage and independently review the same author handoff.'
     if value.get('prior_proposal_review'):
         record=store.receipt(value['prior_proposal_review'],kind='plan_review')
