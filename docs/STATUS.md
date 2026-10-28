@@ -8,10 +8,12 @@ ainda não estão qualificadas.
 
 ## Estado atual do S6
 
-**Trabalho pausado pelo proprietário.** Pausa persistente, nenhum worker/claim
+**Desenvolvimento retomado com plano aprovado; despacho em manutenção.** Pausa persistente, nenhum worker/claim
 pendente; supervisor descarregado, relay parado e política de provedor desabilitada.
 A [auditoria de 28/10](EXECUTION-REVIEW-2026-10-28.md) apresenta percentuais,
-causas dos bloqueios e um plano proposto. Não autoriza retomada nem muda gates.
+causas dos bloqueios e o plano posteriormente aprovado pelo proprietário. O
+[ADR 0007](ADR-0007-EVIDENCE-BASED-SUCCESSION.md) registra a implementação offline
+e as qualificações delimitadas; o runtime instalado ainda não foi alterado.
 
 O primeiro incremento do lobby passou por revisão independente, PR
 [codifydeep/descartavel#13](https://github.com/codifydeep/descartavel/pull/13),

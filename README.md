@@ -12,11 +12,11 @@ desse caminho. A instalação legada está preservada e pausada.
 [Revisão crítica de 28/10/2026](docs/EXECUTION-REVIEW-2026-10-28.md) ·
 [Documentação](docs/README.md)
 
-**Execução pausada para balanço.** S4 técnico foi qualificado sem intervenção;
+**Desenvolvimento retomado; agentes sob manutenção.** S4 técnico foi qualificado sem intervenção;
 S5 foi homologado com assistência. O primeiro incremento S6 passou por PR/CI,
 implantação e QA, mas o segundo permanece em triagem na revisão dos testes.
 A [auditoria atual](docs/EXECUTION-REVIEW-2026-10-28.md) distingue esses resultados
-da autonomia geral e propõe simplificar a recuperação antes de ampliar a equipe.
+da autonomia geral e fundamentou o plano aprovado para simplificar a recuperação antes de ampliar a equipe.
 Canal real do CEO, restauração operacional e reprodução externa continuam pendentes.
 Os diagramas abaixo descrevem capacidades existentes, não serviços ativos nesta pausa.
 

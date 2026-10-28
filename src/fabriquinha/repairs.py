@@ -354,7 +354,7 @@ class Repairs:
     def __init__(self,releases):
         self.r=releases;self.project=releases.project;self.store=releases.store
 
-    def prepare_review_proposal(self,conn,anchor,card,incident,decision,handoff,evidence):
+    def prepare_review_proposal(self,conn,anchor,card,incident,decision,handoff,evidence,*,approved_brief):
         """Persist a blocked proposal; activation requires the qualified plan flow.
 
         No source transition or worker dispatch occurs here. The same observation
@@ -362,8 +362,12 @@ class Repairs:
         """
         kb,_,_=native();source=self.r.check_card(conn,card)
         facts=review_reassessment(self.project,self.store,incident,decision,handoff,evidence)
+        from .intake import Intake
+        business,_=Intake(self.project,self.store,self.r.board).approved(approved_brief)
         latest=kb.latest_run(conn,source.id)
         body=json.loads(source.body)
+        if business['binding']['release']!=body['release']:
+            raise ValueError('review succession requires the same approved business scope')
         if (source.status!='triage' or not latest or not latest.ended_at
                 or facts['source']!=source.id or facts['source_run']!=latest.id
                 or facts['source_contract']!=digest(body)
@@ -374,7 +378,7 @@ class Repairs:
         context=self.store.record('repair_context',self.r.binding(anchor),
             dict(**facts,project=self.project.fingerprint(),repair_kind='review',qa_paths=[]))
         proposal=dict(version=1,kind='plan',release=body['release'],anchor=anchor.id,
-            repair_of=source.id,repair_context=context,inputs={})
+            repair_of=source.id,repair_context=context,inputs={'approved_brief':approved_brief})
         key=digest([self.project.fingerprint(),source.id,latest.id,'review',facts['observation_identity']])
         existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
         if existing:

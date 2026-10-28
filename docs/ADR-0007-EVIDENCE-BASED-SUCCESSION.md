@@ -92,3 +92,10 @@ sempre sem caminhos de teste. A revisão independente revalida a origem e o job
 da observação, e o contexto apresenta os dois relatórios. O SDK distingue esta
 fase da correção de fixture e do reparo pós-deploy. Isso não habilita sucessora
 nem escrita; a cadeia nativa completa e sua ativação continuam pendentes.
+
+A prova nativa foi ampliada para o handoff Lead→CTO. A proposta exige o brief
+aprovado da mesma release e o inclui como input; a fixture simula essa autoridade
+sem reivindicar nova aprovação humana. Após a ativação explícita somente no
+ensaio isolado, Lead submeteu e CTO revisou pelo Kanban nativo. Autorrevisão foi
+recusada. A aprovação da proposta conservou `delivery_approval=false` e a origem
+em triagem. A materialização da sucessora ainda não foi implementada/qualificada.

@@ -16,7 +16,7 @@ from fabriquinha.config import Project
 from fabriquinha.effects import write_json
 from fabriquinha.kanban_lane import native
 from fabriquinha.releases import Releases
-from fabriquinha.repairs import Repairs
+from fabriquinha.repairs import Repairs,reviewed
 
 
 def qualify(root,upstream):
@@ -44,12 +44,12 @@ def qualify(root,upstream):
             observation_identity=digest('changed observation'),delivery_approval=False,requires_independent_plan_review=True)
         count=lambda:conn.execute('SELECT count(*) FROM tasks').fetchone()[0]
         before=count();create=kb.create_task
-        with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]):
+        with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
             def interrupted(*args,**kwargs):
                 create(*args,**kwargs)
                 raise OSError('simulated lost acknowledgement after native creation')
             with patch.object(kb,'create_task',side_effect=interrupted):
-                try:operation.prepare_review_proposal(conn,anchor,card,'incident','decision','handoff','evidence')
+                try:operation.prepare_review_proposal(conn,anchor,card,'incident','decision','handoff','evidence',approved_brief='programmed-brief')
                 except OSError:pass
                 else:raise AssertionError('missing injected failure')
             assert count()==before+1
@@ -57,15 +57,39 @@ def qualify(root,upstream):
     # New connection and operation instance represent reconstruction, not retained IDs.
     with kbc.connect_closing() as conn:
         operation=Repairs(Releases(project,store,board,None));anchor=kb.get_task(conn,anchor_id)
-        with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]):
-            proposal=operation.prepare_review_proposal(conn,anchor,card,'incident','decision','handoff','evidence')
-            assert operation.prepare_review_proposal(conn,anchor,card,'incident','decision','handoff','evidence')==proposal
+        with patch('fabriquinha.repairs.review_reassessment',return_value=facts),patch('fabriquinha.repairs.Recovery.expired_effects',return_value=[]),patch('fabriquinha.intake.Intake.approved',return_value=({'binding':{'release':release}},None)):
+            proposal=operation.prepare_review_proposal(conn,anchor,card,'incident','decision','handoff','evidence',approved_brief='programmed-brief')
+            assert operation.prepare_review_proposal(conn,anchor,card,'incident','decision','handoff','evidence',approved_brief='programmed-brief')==proposal
             assert conn.execute('SELECT count(*) FROM tasks').fetchone()[0]==before+1
             assert kb.get_task(conn,ident).status=='triage'
             assert kb.get_task(conn,proposal).status=='blocked'
             assert kb.claim_task(conn,proposal) is None
+            assert kb.unblock_task(conn,proposal)
+            claim=kb.claim_task(conn,proposal);assert claim
+            author=board.current(proposal,claim.current_run_id)
+            assert author.actor=='lead' and not author.reviewing
+            proposal_body=json.loads(kb.get_task(conn,proposal).body)
+            plan=store.record('work_plan',author.binding(),dict(project=project.fingerprint(),
+                approval='programmed-brief',repair_body=proposal_body,
+                document=dict(classification='reassess',reason='Programmed review of changed observation',test_paths=[])))
+            board.review(author,'Programmed technical proposal, not product approval',{'plan':plan})
+            claimed_review=kb.claim_review_task(conn,proposal);assert claimed_review
+            reviewer=board.current(proposal,claimed_review.current_run_id)
+            assert reviewer.actor=='cto' and reviewer.reviewing and reviewer.actor!=author.actor
+            decision=dict(project=project.fingerprint(),plan=plan,
+                verdict=dict(decision='approve',reason='Programmed independent proposal review',findings=[]))
+            forged=store.record('plan_review',{**reviewer.binding(),'actor':'lead'},decision)
+            try:reviewed(project,store,forged)
+            except ValueError:pass
+            else:raise AssertionError('self review accepted')
+            approval=store.record('plan_review',reviewer.binding(),decision)
+            board.finish_review(reviewer,'Programmed proposal approved, delivery remains unapproved',{'plan_review':approval})
+            authority=reviewed(project,store,approval)
+            assert authority['proposal']['classification']=='reassess'
+            assert authority['context']['delivery_approval'] is False
+            assert kb.get_task(conn,ident).status=='triage'
     result=dict(passed=True,native_creation=True,reconstructed_after_lost_ack=True,duplicate_cards=0,
-        original_triage_preserved=True,proposal_not_dispatchable=True,programmed_admission=True,
+        original_triage_preserved=True,proposal_initially_not_dispatchable=True,independent_native_review=True,self_review_denied=True,programmed_admission=True,
         model_calls=0,docker_calls=0,delivery_approval=False)
     write_json(root/'result.json',result);return result
 
