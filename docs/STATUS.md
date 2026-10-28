@@ -1,46 +1,57 @@
-# Status do projeto — 27 de outubro de 2026
+# Status do projeto — 28 de outubro de 2026
 
-**S4 técnico qualificado; S5 homologado com assistência. O objetivo geral continua aberto.**
-A execução usa Hermes SDK + Kanban nativos e operações determinísticas.
-Multica e Temporal não participam desse caminho. A distribuição pública e a
-retomada do Truco ainda não estão qualificadas.
+**S4 técnico qualificado; S5 homologado com assistência; primeiro incremento S6
+integrado e validado. O objetivo geral continua aberto.** A execução usa Hermes
+SDK + Kanban nativos e operações determinísticas. Multica e Temporal não
+participam desse caminho. A distribuição pública e a retomada do Truco completo
+ainda não estão qualificadas.
 
-**S6 em manutenção: autoridade do brief corrigida; resta separar início da tentativa de conclusão da entrega.**
-O teste Red foi aprovado independentemente e congelado; a implementação chegou
-a Green. Lead executou diagnóstico e retomou o autor; a repetição escalou ao
-CTO, que preservou a triagem. Nenhum controle foi dispensado e não houve PR ou
-homologação S6. O runtime foi drenado para manutenção e a fonte `a6f59bb8` foi instalada,
-sem troca dos validadores. Supervisor e relay foram conferidos; o despacho foi
-retomado dentro da cota existente, a partir de 7.029/7.064. A ampliação solicitada
-permanece pendente; nenhum aumento foi aplicado.
+## Estado atual do S6
 
-O reparo de orientação passou offline com 402 testes e está instalado.
-A admissão somente leitura reconheceu os vínculos reais preservados. A criação
-idempotente e a revisão independente da proposta passaram offline (409 testes
-no total). A continuação e sua reconciliação já estão implementadas em fonte,
-com testes de interrupção e remapeamento das dependências. O board foi preservado;
-novas propostas foram acrescentadas pelo controlador, sem reset dos cards. A qualificação isolada no Hermes nativo passou: 17 atividades SDK, dois
-incrementos integrados e QA, sem chamadas pagas. O núcleo passou com 411 testes.
-A proposta real passou por devolução e revisão, mas terminou em hold de
-infraestrutura porque Lead e CTO leram “NOT APPROVED” no documento histórico.
-O recibo exato do CEO está válido. A correção de contexto acrescenta autoridade
-estruturada. A proposta sucessora preserva o hold e exige nova revisão.
-414 testes e a cadeia nativa de dois incrementos passaram offline. A fonte
-`b3b7f6f6` foi instalada com backup, sem alterar os validadores; admissão verde,
-retomada em 7.033/7.064 chamadas. O Lead submeteu a proposta sucessora ao CTO. Ambos reconheceram o aceite e
-os hashes, mas aprovaram outro hold exigindo handoff, controles e Green da nova
-entrega antes de criar sua implementação. Essa dependência circular permanece
-registrada; o runtime foi drenado. O contexto agora distingue pré-condições de
-início dos gates de conclusão, sem dispensar nenhum gate; esse ajuste ainda não
-está instalado. Falta comprovar a continuação real.
-Falta comprovar a continuação com a equipe real, preservando o card antigo,
-o congelamento independente e os gates. Ver [análise do protocolo](S6-CONTROL-SUBMISSION-RECOVERY.md).
-A [auditoria de 27/10](EXECUTION-REVIEW-2026-10-27.md) recomenda corrigir a
-capacidade de QA entre sessões e a divergência de autoridade técnica antes do
-despacho. O proprietário aprovou os refinamentos e a retomada das correções;
-o [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md) passou na qualificação offline.
-Zero chamadas na auditoria e nas provas offline; o novo trabalho dos agentes
-usa a cota existente.
+O primeiro incremento do lobby passou por revisão independente, PR
+[codifydeep/descartavel#13](https://github.com/codifydeep/descartavel/pull/13),
+CI local obrigatória, implantação, rollback/restauração e QA de navegador.
+Commit integrado: `2d2b7fb3b987748713e6f691d9c10fde9afd4ad2`.
+O recibo `2d4e24b09859c0294accad2074a1d54ed305b99beda4671966d599094f93c947`
+conserva `delivery_approval=false`: comprova o incremento, não a release completa.
+
+O controlador liberou automaticamente o segundo incremento, de entrada na sala
+e limite de dois participantes. O QA acrescentou sete testes aos nove testes da
+base. O Tech Lead solicitou a verificação da mensagem visível de rejeição do
+terceiro jogador; o autor corrigiu e a revisão 48 aprovou o snapshot
+`c47bff7e4f48c262c76d441d687478c8ae578a5cd3cd4bf847d1d21303f259fe`.
+A implementação 49 terminou sem operação terminal. O Tech Lead diagnosticou a
+falha de protocolo na execução 50 e retomou o frontend na execução 51, cujo
+processo foi confirmado ativo. Isso comprova encaminhamento e retomada, não
+correção funcional nem entrega do segundo incremento.
+
+A fonte instalada é `21b14abd`; supervisor e relay estão ativos. O proprietário
+autorizou o teto de **8.500 chamadas**, aplicado sem reset do contador; a última
+consulta registrada antes desta atualização foi 7.123 chamadas. Esse número é
+um retrato, não um contador ao vivo. Modelo Claude Haiku, saída máxima de 16.384
+tokens, sem fallback. Nenhum gate de qualidade foi dispensado.
+
+## O que ainda falta
+
+- Segundo incremento: Green com regressões, controles negativos, revisão,
+  PR/CI, implantação, rollback e QA no mesmo commit; depois, aceite técnico S6.
+- Canal real: intake, pergunta/resposta do CEO e entrega, com autenticação,
+  vínculo de revisão e deduplicação. Nesta instalação, a entrada ainda é CLI e
+  a rota de notificações Telegram não está configurada.
+- Recuperação da instalação e upgrade/rollback operacional em isolamento;
+  rollback do produto não substitui essa prova.
+- Reprodução pública documentada e qualificação de entrega sem intervenções
+  técnicas do operador. O S6 atual teve reparos no controlador e não será
+  reclassificado como autônomo desde o briefing.
+
+Ver [plano S6](S6-PORTABILITY-PLAN.md),
+[histórico de recuperação](S6-CONTROL-SUBMISSION-RECOVERY.md) e
+[auditoria aprovada](EXECUTION-REVIEW-2026-10-27.md).
+
+## Evidências históricas de preparação
+
+Os registros abaixo descrevem momentos anteriores; cotas, pausas e fontes ali
+mencionadas não substituem o estado atual acima.
 
 **Correção R1 validada:** 396 testes do núcleo; sete jobs reais de navegador;
 dois incrementos dependentes pelo Hermes nativo com autores/revisores e GitHub
