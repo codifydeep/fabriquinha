@@ -302,3 +302,18 @@ Red real e freeze independente. O erro de limite de saída é uma pré-condiçã
 transporte separada da ausência de testes novos. Os 38 testes de recuperação
 passaram. A reavaliação técnica usará o vínculo de predecessor já existente,
 sem novo mecanismo de retry nem edição retroativa do hold.
+
+## Segundo incremento: correção após revisão — 28/10
+
+A execução 45 produziu Red para os sete comportamentos novos, preservando os
+nove testes verdes da base. Na execução 46, o Tech Lead pediu mudanças: a
+rejeição do terceiro participante estava verificada pela API, mas faltava
+comprovar a mensagem visível no navegador. A decisão está vinculada ao recibo
+`42d74a76aa57dd29a462a2b9fe85114d5069d08b5b534f157901fbfc2a024ae1`.
+
+O controlador devolveu a autoria ao Quality/Security, execução 47, que submeteu
+novo Red (`336be906cd42ea110831a45c99a634cf5b341006bcd453dccadd0d7362ee2203`)
+e preservou a suíte anterior verde. A execução 48 foi despachada ao Tech Lead
+para nova revisão. Esse retorno ocorreu sem edição manual dos testes ou
+aprovação pelo operador. Ainda não comprova aprovação da revisão, Green,
+integração ou homologação do segundo incremento.
