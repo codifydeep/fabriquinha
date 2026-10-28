@@ -342,7 +342,7 @@ class TechnicalRecovery(unittest.TestCase):
     def test_reassessment_spike_keeps_exact_tests_and_never_replaces_author_snapshot(self):
         from fabriquinha.repairs import review_reassessment
         scope=replace(self.run,actor='cto',author='cto').binding()
-        prior=self.store.record('diagnostic_experiment',scope,dict(incident=self.incident,snapshot=self.snapshot,report={'failures':['old']}))
+        prior=self.store.record('diagnostic_experiment',scope,dict(incident=self.incident,snapshot=self.snapshot,report={'cases':['case'],'failures':[dict(case='case',assertion=True,frames=[dict(file='tests/test_a.py',function='test_a',line=2)])]}))
         hold=self.store.record('diagnostic_decision',scope,dict(experiment=prior))
         facts=dict(snapshot=self.snapshot,delivery_approval=False)
         def candidate(changes):
@@ -351,7 +351,7 @@ class TechnicalRecovery(unittest.TestCase):
                 for path,value in changes.items():(work/path).write_text(value)
                 return self.store.capture(work)
         def evidence(snapshot,source=None):
-            report={'failures':[]}
+            report={'cases':['case'],'failures':[]}
             job=self.store.record('suite_job',scope,dict(report=report,identity=dict(snapshot=snapshot,project=self.project.fingerprint())))
             return self.store.record('diagnostic_experiment',scope,dict(project=self.project.fingerprint(),incident=self.incident,
                 snapshot=snapshot,source_snapshot=source or self.snapshot,report=report,job=job))

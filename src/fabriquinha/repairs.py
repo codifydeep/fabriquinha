@@ -88,6 +88,21 @@ def review_failure(project,store,incident_key,decision_key,handoff):
         delivery_approval=False,requires_independent_plan_review=True)
 
 
+def review_observation(report):
+    """Compare observed outcomes, not volatile exception wording or prose."""
+    cases=report.get('cases')
+    if not isinstance(cases,list) or not cases or len(cases)!=len(set(cases)):
+        raise ValueError('complete diagnostic case inventory required')
+    failures=[]
+    for failure in report.get('failures',[]):
+        frames=failure.get('frames',[])
+        if failure.get('case') not in cases or failure.get('assertion') is not True or not frames:
+            raise ValueError('observed assertion frames required')
+        failures.append((failure['case'],tuple((f['file'],f['function'],f['line']) for f in frames)))
+    return dict(cases=sorted(cases),failures=sorted(failures),
+        **{key:sorted(report.get(key,[])) for key in ('errors','skips','expected_failures','unexpected_successes')})
+
+
 def review_reassessment(project,store,incident,decision,handoff,evidence):
     """Require changed observed results, not another hypothesis or receipt ID."""
     facts=review_failure(project,store,incident,decision,handoff)
@@ -109,12 +124,19 @@ def review_reassessment(project,store,incident,decision,handoff,evidence):
             or observation['payload'].get('identity',{}).get('snapshot')!=data['snapshot']
             or observation['payload'].get('identity',{}).get('project')!=project.fingerprint()):
         raise ValueError('new observation requires its exact controller job')
+    previous_outcomes=review_observation(prior['payload']['report'])
+    current_outcomes=review_observation(data['report'])
+    if (current_outcomes['cases']!=previous_outcomes['cases']
+            or any(current_outcomes[key] for key in ('errors','skips','expected_failures','unexpected_successes'))):
+        raise ValueError('experiment must execute the same complete assertions; unreached behavior is not confirmation')
+    if current_outcomes==previous_outcomes:
+        raise ValueError('new observed outcome required; changed wording is insufficient')
     if data['snapshot']!=facts['snapshot']:
         # Reuse the same exact protection as disposable product mutations. A
         # diagnostic candidate is evidence only, never the successor delivery.
         Quality(project,store,None,None).protect(facts['snapshot'],data['snapshot'],exact_tests=True)
     return {**facts,'new_evidence':evidence,
-        'observation_identity':digest([facts['snapshot'],data['snapshot'],data['report']])}
+        'observation_identity':digest([facts['snapshot'],current_outcomes])}
 
 
 def submission_failure(project,store,incident_key,decision_key,tests,current_snapshot):

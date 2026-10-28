@@ -78,15 +78,25 @@ class SuccessionAdmission(unittest.TestCase):
         source.update(kind='implementation',actor='lead',author='developer',contract='contract')
         author={**source,'number':6,'actor':'developer','reviewing':False}
         self.records['green']=dict(kind='green',binding=author,payload=dict(project='project',snapshot='snapshot'))
-        old=self.records['experiment'];old['payload']['report']={'failures':['old']}
+        old=self.records['experiment'];old['payload']['report']={'cases':['case'],'failures':[dict(case='case',assertion=True,frames=[dict(file='tests/test_a.py',function='test_a',line=2)])]}
         new=copy.deepcopy(old);new['payload'].update(hypothesis='New prose',job='job')
         self.records['new']=new
         def assess():return review_reassessment(self.project,self.store,'incident','decision','green','new')
         with self.assertRaisesRegex(ValueError,'new wording'):assess()
-        new['payload']['report']={'failures':[]}
-        self.records['job']=dict(kind='suite_job',binding=new['binding'],payload=dict(report={'failures':[]},identity=dict(snapshot='snapshot',project='project')))
+        new['payload']['report']={'cases':['case'],'failures':[]}
+        self.records['job']=dict(kind='suite_job',binding=new['binding'],payload=dict(report={'cases':['case'],'failures':[]},identity=dict(snapshot='snapshot',project='project')))
         facts=assess();self.assertFalse(facts['delivery_approval'])
         self.assertEqual(facts['new_evidence'],'new')
+        valid=copy.deepcopy(new['payload']['report'])
+        for incomplete in ({'cases':['case'],'failures':[],'errors':['case']},
+                           {'cases':['case'],'failures':[],'skips':['case']},
+                           {'cases':['other'],'failures':[]}):
+            new['payload']['report']=incomplete;self.records['job']['payload']['report']=incomplete
+            with self.subTest(incomplete=incomplete),self.assertRaisesRegex(ValueError,'same complete assertions'):assess()
+        wording=copy.deepcopy(old['payload']['report']);wording['failures'][0]['detail']='Different ephemeral port in error'
+        new['payload']['report']=wording;self.records['job']['payload']['report']=wording
+        with self.assertRaisesRegex(ValueError,'changed wording'):assess()
+        new['payload']['report']=valid;self.records['job']['payload']['report']=valid
         self.records['job']['payload']['identity']['snapshot']='foreign'
         with self.assertRaisesRegex(ValueError,'exact controller job'):assess()
 

@@ -291,3 +291,24 @@ A suíte passou com 463 testes. A documentação/instruções do agente refletem
 novo escopo. Nenhuma entrega S6 recebeu aprovação, nenhum teste histórico foi
 reescrito e o runtime ainda não foi atualizado. P3 e a migração controlada
 continuam pendentes.
+
+### P3 — Comparar resultados, não texto volátil
+
+A admissão passou a comparar inventário e resultados por caso, incluindo
+localização das falhas de asserção. Alterar somente mensagem de exceção, porta
+efêmera ou hipótese não cria evidência nova. O identificador de deduplicação
+usa esses resultados normalizados, preservando todos os relatórios originais.
+
+Para propor reavaliação, o experimento precisa executar o mesmo inventário sem
+erros, skips ou resultados especiais. Falhas de asserção continuam permitidas;
+não se exige Green para rever Red. Um erro anterior às asserções permanece
+evidência diagnóstica, mas não confirma viabilidade nem autoriza uma sucessão.
+A relevância para a hipótese continua sendo responsabilidade do revisor técnico.
+
+A matriz offline cobre hipótese sem observação, texto volátil, erro antes da
+asserção, inventário parcial, evidência nova real, parecer antigo, interrupção,
+deduplicação, autorrevisão e tentativa de enfraquecimento. A suíte de 463 testes
+passou e os casos adicionais de admissão passaram. A prova de quatro jobs reais
+foi repetida com o novo comparador. A avaliação semântica com o modelo e a
+migração controlada permanecem pendentes; não se declara autonomia com essa
+matriz. Nenhuma chamada paga foi executada nesta etapa.
