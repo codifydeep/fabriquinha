@@ -418,3 +418,24 @@ sob manutenção drenada, com backup e atualização explícita do contrato inst
 Não instalar a configuração durante um worker ativo. Outros modelos só podem ser
 qualificados se sua capacidade comportar essa janela; não presumir capacidade
 por nome. O teste de rejeição do perfil antigo falhou antes da alteração.
+
+## Validação completa disponível ao implementador — 28/10
+
+Após migrar a janela, a execução 58 alterou `app.py` e terminou sem handoff,
+com 11 chamadas e zero compactações/ineficácia. O problema anterior não se
+repetiu nessa janela, mas o agente tentou executar a suíte no terminal: rodou
+somente dois testes de infraestrutura e procurou o módulo privado de aceitação.
+Esse resultado parcial nunca foi aceito como Green.
+
+Foi adicionada `delivery_validate`, somente para implementação, reutilizando
+`Quality.green` e o executor completo de snapshots. Não aceita comandos, paths,
+claims ou receipt IDs do agente. Não fecha sandbox, não faz handoff, não chama
+o callback terminal e não preenche a submissão. Depois de editar novamente,
+a validação captura outro snapshot. `delivery_submit` continua executando Green,
+controles completos e handoff para revisão independente; nenhuma aprovação vem
+da operação nova. Autoria de testes e revisão não recebem essa ferramenta.
+
+O teste novo falhou antes da implementação. Uma prova offline no registro real
+do Hermes confirmou chamada da operação sem callback terminal, e a superfície
+de revisão a excluiu. Zero chamadas ao modelo nessa prova. Isso ainda não
+comprova que o agente real usará o validador corretamente; instalação pendente.

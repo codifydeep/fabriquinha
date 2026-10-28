@@ -379,7 +379,7 @@ def restrict_handlers(sandbox,allowed):
         def guard(handler,entry_name):
             @wraps(handler)
             def guarded(*args,**kwargs):
-                if entry_name in {'delivery_submit','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
+                if entry_name in {'delivery_submit','delivery_validate','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
                 else:sandbox.ensure()
                 if entry_name=='terminal':
                     if len(args)!=1:raise ValueError('one terminal argument object required')
@@ -439,7 +439,17 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
         return json.dumps(result)
     registry.register(name=name,toolset='fabriquinha_delivery',
         schema=dict(name=name,description=description,parameters=schema),handler=handler)
-    return {name},operations
+    gates={name}
+    if sandbox.run.kind=='implementation' and not sandbox.run.reviewing:
+        registry.register(name='delivery_validate',toolset='fabriquinha_delivery',
+            schema=dict(name='delivery_validate',description=(
+                'Run the controller full frozen suite, including browser acceptance, on the current workspace. '
+                'Use after product edits; no need to locate or recreate the private browser harness. '
+                'Green alone does not submit or approve delivery; follow with delivery_submit and all negative controls.'),
+                parameters=dict(type='object',additionalProperties=False,properties={})),
+            handler=lambda args,**kwargs:json.dumps(operations.validate(args)))
+        gates.add('delivery_validate')
+    return gates,operations
 
 
 def activity_route(route,activity):
@@ -513,7 +523,7 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                if sandbox.run.kind=='diagnostic' else 'Review existing immutable delivery; never write or recreate Red. Submit findings using delivery_review.'
                if sandbox.run.reviewing else 'Implement the current phase with real tests and use delivery_submit. '
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
-        phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch. Exploratory terminal calls are limited to '+str(min(120,sandbox.project.timeout_seconds))+' seconds. The delivery_submit gate runs the full suite; partial exploratory runs never qualify delivery. Use its covered/missing control feedback rather than repeating unchanged mutation proposals.'
+        phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch. Exploratory terminal calls are limited to '+str(min(120,sandbox.project.timeout_seconds))+' seconds. For implementation, delivery_validate runs the complete frozen suite including browser acceptance without handoff; use it after edits instead of searching for the controller harness. delivery_submit still requires the complete negative-control set. Partial exploratory runs never qualify delivery. Use its covered/missing control feedback rather than repeating unchanged mutation proposals.'
         if corrective_phase is not None:phase=corrective_phase
         prompt=sandbox_context(prompt)
         if 'terminal' in allowed:terminal_schema(min(120,sandbox.project.timeout_seconds))

@@ -35,6 +35,27 @@ class ModelDeliveryOperations(unittest.TestCase):
             workspace=self.workspace,close=lambda:self.events.append(('close',)))
         self.tools=DeliveryTools(self.sandbox,self.quality)
 
+    def test_full_validation_does_not_handoff_or_cache_a_submission(self):
+        self.sandbox.run=replace(self.run,kind='implementation')
+        tools=DeliveryTools(self.sandbox,self.quality)
+        self.quality.green=Mock(return_value='green-receipt')
+        result=tools.validate({})
+        self.assertEqual(result['green'],'green-receipt')
+        self.assertFalse(result['delivery_approval'])
+        self.assertIsNone(tools.submission)
+        self.assertEqual(self.events,[])
+        first=self.quality.green.call_args.args[2]
+        (self.workspace/'app.py').write_text('VALUE = 2\n')
+        tools.validate({})
+        self.assertNotEqual(self.quality.green.call_args.args[2],first)
+        for args in ({'command':'true'},{'passed':True},{'snapshot':first}):
+            with self.assertRaises(ValueError):tools.validate(args)
+        self.assertEqual(self.quality.green.call_count,2)
+        for run in (self.run,replace(self.run,kind='implementation',reviewing=True)):
+            self.sandbox.run=run
+            with self.assertRaises(ValueError):DeliveryTools(self.sandbox,self.quality).validate({})
+        self.assertEqual(self.quality.green.call_count,2)
+
     def test_test_submission_uses_controller_baseline_and_closes_before_handoff(self):
         def red(run,baseline,snapshot):
             self.assertEqual((run,baseline),(self.run,self.baseline))

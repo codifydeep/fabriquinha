@@ -623,6 +623,17 @@ class DeliveryTools:
     def mutants(self,snapshot,proposals):
         return product_mutations(self.quality,snapshot,proposals)
 
+    def validate(self,args):
+        """Run the same full Green gate without requesting a delivery handoff."""
+        q,run=self.quality,self.run
+        q.check(run,'implementation',reviewing=False)
+        if not isinstance(args,dict) or args:raise ValueError('validation takes no commands, paths or evidence claims')
+        snapshot=self.store.capture(self.sandbox.workspace)
+        green=self.wait(lambda:q.green(run,self.board.input(run,'tests'),snapshot))
+        return dict(status='green_validated',snapshot=snapshot,green=green,
+            next_action='Submit the complete negative-control set with delivery_submit; independent review remains required.',
+            delivery_approval=False)
+
     def submit(self,args):
         q,run=self.quality,self.run
         q.check(run,run.kind)
