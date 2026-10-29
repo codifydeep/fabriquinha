@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from pathlib import Path
 import signal
 import subprocess
@@ -33,12 +34,32 @@ class Commands:
         source=event.source
         if (source is None or not self.authorized(source.user_id,source.chat_type,source.chat_id,
                 is_bot=source.is_bot,thread_id=source.thread_id)):return None
-        if event.get_command()!='fabrica':return None
+        # The pinned Telegram adapter strips @bot AND following whitespace:
+        # /fabrica@bot start becomes /fabricastart. Read the original command
+        # entity, never reconstruct authority from arbitrary attributed text.
+        raw=getattr(event,'raw_message',None)
+        if raw is not None:
+            text=getattr(raw,'text',None)
+            entities=getattr(raw,'entities',()) or ()
+            if (not isinstance(text,str) or not entities
+                    or str(getattr(entities[0],'type',''))!='bot_command'
+                    or getattr(entities[0],'offset',None)!=0):return None
+            first=text.split(maxsplit=1)[0]
+            if not re.fullmatch(r'/fabrica(?:@[A-Za-z0-9_]+)?',first,re.I):return None
+            if '@' in first:
+                try:own=raw.get_bot().username
+                except Exception:return None
+                if not isinstance(own,str) or first.split('@',1)[1].lower()!=own.lower():return None
+            parts=text.split(maxsplit=1);arguments=parts[1] if len(parts)>1 else ''
+        else:
+            if event.get_command()!='fabrica':return None
+            arguments=event.get_command_args()
+
         from gateway.session_context import set_session_vars,clear_session_vars
         tokens=set_session_vars(platform='telegram',chat_id=str(source.chat_id),chat_type=source.chat_type,
             user_id=str(source.user_id),thread_id=str(source.thread_id) if source.thread_id is not None else '',
             message_id=str(event.message_id or ''))
-        try:return await asyncio.to_thread(handle,event.get_command_args().strip())
+        try:return await asyncio.to_thread(handle,arguments.strip())
         finally:clear_session_vars(tokens)
 
 

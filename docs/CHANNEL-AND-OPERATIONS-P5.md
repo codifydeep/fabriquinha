@@ -200,3 +200,17 @@ compatíveis e o estado sintético, não para downgrade arbitrário de contratos
 A próxima evidência necessária é a interação humana real e a versão útil P6;
 não substituir essa etapa por mais fixtures. Recuperação durante trabalho vivo
 será medida no ciclo de entrega, e não presumida a partir do restart pausado.
+
+## Correção da entrada Telegram — 29/10/2026
+
+O primeiro envio humano não criou cards: o adaptador upstream remove o handle
+junto com o espaço seguinte, transformando `/fabrica@bot start` em
+`/fabricastart`. O teste anterior construía MessageEvent diretamente e não cobria
+essa transformação. A falha foi reproduzida com TelegramAdapter e Message reais.
+
+A integração agora usa o texto original apenas se houver entidade `bot_command`
+na posição zero, comando `fabrica` e destinatário igual ao bot associado à
+mensagem. A autorização de usuário/grupo/tópico continua anterior ao parsing.
+Texto livre e comandos dirigidos a outro bot são recusados. O upstream permanece
+intacto. A suíte passou em 491 testes. A nova recepção humana ainda deve ser
+confirmada após instalar a correção; recibo de update isolado não prova intake.
