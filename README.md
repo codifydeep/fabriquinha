@@ -275,3 +275,24 @@ A admissão permite revisar; não aprova testes, código ou release. A proposta
 intermediária de recuperação foi removida apenas desse caminho. A prova nativa
 isolada valida transferência e recuperação de crash com decisões programadas;
 a recuperação real com modelo e a homologação completa do S6 seguem pendentes.
+
+### Recuperação técnica de testes
+
+O contrato de reparo técnico preserva os testes anteriores e permite correções
+restritas a casos autorizados pelo CTO, com novo congelamento independente e
+controles negativos obrigatórios. A qualificação isolada inclui executor Docker
+e recuperação de cards no Kanban; ainda não comprova entrega autônoma.
+Veja [contrato e evidências](docs/TECHNICAL-TEST-REPAIR.md).
+
+```mermaid
+flowchart LR
+    B[Implementação bloqueada] --> C[CTO: experimento e escopo exato]
+    C --> A[Controlador: validar identidade e dependências]
+    A --> T[Autor: nova revisão dos testes]
+    T --> R[Revisor independente: novo congelamento]
+    R --> I[Implementação: Green e controles negativos]
+    I --> D[Revisão, PR, CI, deploy e QA]
+```
+
+A transição mantém o incidente e os snapshots antigos; um worker ativo ou um
+novo congelamento não equivale a homologação.

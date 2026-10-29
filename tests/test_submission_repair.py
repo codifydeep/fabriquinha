@@ -226,7 +226,10 @@ class SubmissionRepairAdmission(unittest.TestCase):
     def test_fixture_tail_replaces_tests_without_reset_and_recovers_after_graph_write(self):
         self.replacement_tail(fixture=True)
 
-    def replacement_tail(self,fixture=False):
+    def test_cto_admitted_blocked_fixture_recovers_without_submission_retries(self):
+        self.replacement_tail(fixture=True,direct=True)
+
+    def replacement_tail(self,fixture=False,direct=False):
         from fabriquinha.releases import Releases
         from fabriquinha.effects import write_json
         f=self.fixture;facts=self.evaluate()
@@ -252,7 +255,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
         tasks[plan]=SimpleNamespace(id=plan,status='done')
         items=[dict(package=dict(id='first',title='First'),cards=dict(tests=first_tests,implementation=first_impl,integration=first_integration)),
                dict(package=dict(id='second',title='Second'),cards=dict(tests=second_tests,implementation=second_impl,integration=second_integration))]
-        graph=dict(project=f.project.fingerprint(),items=items,validation_bundle='bundle',submission_depth=2 if fixture else 0)
+        graph=dict(project=f.project.fingerprint(),items=items,validation_bundle='bundle',submission_depth=2 if fixture and not direct else 0)
         releases=Releases(f.project,f.store,SimpleNamespace(guard=None),Mock());releases.closed=Mock(return_value=('approval',None,None))
         releases.folder=lambda a:f.store.root/'releases'/digest('v1')
         old=f.store.record('release_graph',releases.binding(anchor),graph)
@@ -261,6 +264,10 @@ class SubmissionRepairAdmission(unittest.TestCase):
             authority['proposal']['classification']='test_contract'
             authority['context'].update(repair_kind='fixture',implementation_snapshot=self.snapshot,
                 snapshot=f.store.receipt(self.freeze)['payload']['snapshot'])
+        if direct:
+            tasks['implementation'].status='blocked'
+            original['implementation']['status']='blocked'
+            authority['controller_admission']=True
         expected_count=6 if fixture else 5
         target=releases.folder(anchor)/('continuation-'+plan+'.json')
         def latest(connection,ident):
@@ -281,6 +288,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
         with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch('fabriquinha.releases.native',return_value=(kb,None,None)),\
              patch('fabriquinha.repairs.reviewed',return_value=authority),patch('fabriquinha.executor.validation_files',return_value=('bundle',{})):
             operation=Repairs(releases)
+            if direct:operation.succession_parent=Mock(return_value=tasks[plan])
             from fabriquinha.effects import EffectBlocked
             tasks['tests2'].status='running'
             with self.assertRaises(EffectBlocked):operation.materialize_submission(conn,anchor,graph,'approval')
@@ -299,7 +307,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
             self.assertEqual(len(created),expected_count);self.assertEqual(len(activated),expected_count)
             if not fixture:self.assertEqual(result['items'][0]['cards']['tests'],first_tests)
             else:
-                self.assertEqual(result['submission_depth'],2);self.assertEqual(result['fixture_depth'],1)
+                self.assertEqual(result['submission_depth'],0 if direct else 2);self.assertEqual(result['fixture_depth'],1)
                 self.assertNotEqual(result['items'][0]['cards']['tests']['id'],first_tests['id'])
             new_first=result['items'][0]['cards'];new_second=result['items'][1]['cards']
             self.assertEqual(new_second['tests']['body']['inputs']['baseline'],'parent:'+new_first['integration']['id']+':baseline')

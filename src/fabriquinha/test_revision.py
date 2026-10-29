@@ -103,6 +103,68 @@ def candidate_diff(before,after):
     return dict(diff=diff,structural=structural,semantic_review_required=True)
 
 
+def technical_repair_diff(before, after, *, cases=None):
+    """Evidence for the stricter technical-repair contract, never authority.
+
+    Preserve assertion expressions and their enclosing control flow. Setup and
+    action changes still require independent semantic review and negative tests.
+    Kept separate so historical candidate receipts retain their original rules.
+    """
+    findings = candidate_diff(before, after)
+    left, right = ast.parse(before), ast.parse(after)
+    def methods(tree):
+        return {cls.name+'.'+method.name:method for cls in tree.body if isinstance(cls,ast.ClassDef)
+                for method in cls.body if isinstance(method,(ast.FunctionDef,ast.AsyncFunctionDef))
+                and method.name.startswith('test')}
+    old, new = methods(left), methods(right)
+    allowed = set(old) if cases is None else set(cases)
+    if not allowed or not allowed <= set(old):raise ValueError('exact existing scoped test methods required')
+    for name in allowed:
+        prior,current=old[name],new[name]
+        before_exits=[shape(n) for n in ast.walk(prior) if isinstance(n,(ast.Return,ast.Raise,ast.Break,ast.Continue))]
+        after_exits=[shape(n) for n in ast.walk(current) if isinstance(n,(ast.Return,ast.Raise,ast.Break,ast.Continue))]
+        if before_exits!=after_exits:raise ValueError('technical repair cannot add or change early exits')
+        current.body=copy.deepcopy(prior.body)
+    if shape(left)!=shape(right):
+        raise ValueError('technical repair cannot change unscoped cases, helpers, imports or test definitions')
+
+    def protected(tree):
+        result = []
+
+        def control(node):
+            if isinstance(node,(ast.If,ast.While)):return shape(node.test)
+            if isinstance(node,(ast.For,ast.AsyncFor)):return shape(node.target)+shape(node.iter)
+            if isinstance(node,(ast.With,ast.AsyncWith)):return repr([shape(item) for item in node.items])
+            if isinstance(node,ast.ExceptHandler):return shape(node.type) if node.type else 'bare'
+            return ''
+
+        def visit(node, context):
+            assertion = isinstance(node, ast.Assert) or (
+                isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr.startswith('assert'))
+            if assertion:
+                result.append((context, shape(node)))
+                return
+            for field, value in ast.iter_fields(node):
+                if isinstance(value, list):
+                    for child in value:
+                        if isinstance(child, ast.AST):
+                            visit(child, context + ((type(node).__name__, field, control(node)),))
+                elif isinstance(value, ast.AST):
+                    visit(value, context + ((type(node).__name__, field, control(node)),))
+
+        for cls in tree.body:
+            if isinstance(cls, ast.ClassDef):
+                for method in cls.body:
+                    if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)) and method.name.startswith('test'):
+                        visit(method, ((cls.name, method.name),))
+        return result
+
+    if protected(ast.parse(before)) != protected(ast.parse(after)):
+        raise ValueError('technical repair must preserve assertion expressions and control nesting')
+    return findings
+
+
 def fixture_snapshot_diff(store,before,after,paths,tests_dir,*,candidate=False):
     """Bound structural findings to the exact proposed snapshot and paths.
 
@@ -131,6 +193,40 @@ def fixture_snapshot_diff(store,before,after,paths,tests_dir,*,candidate=False):
     return result
 
 
+def protect_repaired_baseline(project, store, baseline, candidate, paths):
+    """Only scoped existing test substitutions; never configuration exceptions."""
+    from .artifacts import protected_unchanged
+    from .quality import PROTECTED
+    left,right=store.manifest(baseline),store.manifest(candidate)
+    protected_unchanged(left,right,prefixes=PROTECTED)
+    protected_unchanged(right,left,prefixes=PROTECTED)
+    prefix=project.tests_dir+'/'
+    for path,value in left.items():
+        if path.startswith(prefix) and right.get(path)!=value:
+            if path not in paths or path not in right or right[path]['executable']!=value['executable']:
+                raise ValueError('unscoped baseline test changed or removed')
+
+
+def repaired_baseline(store, baseline, candidate, paths):
+    """Controller-owned baseline copy, retaining original product and inventory."""
+    import tempfile
+    from pathlib import Path
+    original=store.manifest(baseline)
+    eligible=[p for p in paths if p in original]
+    if not eligible:return baseline
+    with tempfile.TemporaryDirectory(prefix='.test-repair-baseline-',dir=store.root.parent) as folder:
+        work=Path(folder);store.checkout(baseline,work)
+        for path in eligible:(work/path).write_bytes((store.tree(candidate)/path).read_bytes())
+        return store.capture(work)
+
+
+def verify_repaired_baseline(store, baseline, candidate, paths, repaired):
+    expected=dict(store.manifest(baseline));right=store.manifest(candidate)
+    for path in paths:
+        if path in expected:expected[path]=right[path]
+    if store.manifest(repaired)!=expected:raise ValueError('exact scoped baseline projection required')
+
+
 def revision_context(project,store,quality,authority,candidate,*,contract=1):
     """Read independently reviewed authority; return the original Red baseline.
 
@@ -142,13 +238,27 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
         raise ValueError('independently reviewed fixture proposal required')
     freeze=store.receipt(context['tests'],kind='tests_frozen')
     previous=quality.frozen_plan(freeze)
-    review=store.receipt(authority['review'],kind='plan_review')
+    review=store.receipt(authority['review'])
+    if review['kind'] not in ('plan_review','test_repair_admission'):raise ValueError('test repair authority required')
     if (context['snapshot']!=previous['snapshot']
             or freeze['binding']['release']!=review['binding']['release']):
         raise ValueError('fixture source must be the exact old freeze')
-    if type(contract) is not int or contract not in (1,2):raise ValueError('unknown candidate revision contract')
-    fixture_snapshot_diff(store,previous['snapshot'],candidate,authority['proposal']['test_paths'],project.tests_dir,candidate=contract==2)
-    quality.protect(previous['baseline'],candidate)
+    if type(contract) is not int or contract not in (1,2,3):raise ValueError('unknown candidate revision contract')
+    if (review['kind']=='test_repair_admission')!=(contract==3):
+        raise ValueError('technical repair authority requires contract 3; historical contracts remain unchanged')
+    fixture_snapshot_diff(store,previous['snapshot'],candidate,authority['proposal']['test_paths'],project.tests_dir,candidate=contract in (2,3))
+    if contract==3:
+        if review['kind']!='test_repair_admission':raise ValueError('structured CTO authority required')
+        for path in authority['proposal']['test_paths']:
+            before=(store.tree(previous['snapshot'])/path).read_text()
+            after=(store.tree(candidate)/path).read_text()
+            if before!=after:
+                from pathlib import PurePosixPath
+                prefix=PurePosixPath(path).stem+'.'
+                technical_repair_diff(before,after,cases=[c[len(prefix):] for c in context['cases'] if c.startswith(prefix)])
+    if contract==3:
+        protect_repaired_baseline(project,store,previous['baseline'],candidate,authority['proposal']['test_paths'])
+    else:quality.protect(previous['baseline'],candidate)
     return previous
 
 
@@ -156,11 +266,14 @@ def verify_red_revision(project,store,quality,record):
     """Recheck new Red's provenance and preserve the old control target set."""
     from .repairs import reviewed
     value=record['payload'];revision=value['fixture_revision']
-    if not isinstance(revision,dict) or set(revision) not in ({'authority','tests'},{'authority','tests','contract'}):
+    shapes=({'authority','tests'},{'authority','tests','contract'})
+    if isinstance(revision,dict) and revision.get('contract')==3:
+        shapes=(*shapes,{'authority','tests','contract','repaired_baseline','original_baseline_job'})
+    if not isinstance(revision,dict) or set(revision) not in shapes:
         raise ValueError('exact fixture provenance required')
     authority=reviewed(project,store,revision['authority'])
     previous=revision_context(project,store,quality,authority,value['snapshot'],contract=revision.get('contract',1))
-    review=store.receipt(revision['authority'],kind='plan_review')
+    review=store.receipt(revision['authority'])
     old=store.receipt(revision['tests'],kind='tests_frozen')
     if (record['kind']!='red' or record['binding']['kind']!='tests' or record['binding']['reviewing']
             or record['binding']['release']!=review['binding']['release']
@@ -169,7 +282,29 @@ def verify_red_revision(project,store,quality,record):
             or value['project']!=project.fingerprint() or value['baseline']!=previous['baseline']
             or set(value['cases'])!=set(previous['cases']) or set(value['new_cases'])!=set(previous['new_cases'])):
         raise ValueError('new Red must preserve the exact reviewed fixture scope and inventory')
-    return set(previous['control_cases'])
+    if revision.get('contract')==3:
+        from .quality import suite_report, preview_evidence
+        corrected=revision.get('repaired_baseline',value['baseline'])
+        verify_repaired_baseline(store,value['baseline'],value['snapshot'],authority['proposal']['test_paths'],corrected)
+        if corrected!=value['baseline']:
+            reports=[]
+            for key,snapshot in ((revision['original_baseline_job'],value['baseline']),(value['baseline_job'],corrected)):
+                job=store.receipt(key,kind='suite_job');data=job['payload'];identity=data['identity']
+                if (job['binding']!=record['binding'] or identity['binding']!=record['binding']
+                        or identity['snapshot']!=snapshot or identity['phase']!='baseline'
+                        or identity['project']!=project.fingerprint() or identity['image']!=project.validation_image
+                        or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
+                    raise ValueError('exact isolated baseline repair observations required')
+                preview_evidence(project,store,data,snapshot,'baseline')
+                reports.append(suite_report(data))
+            original,current=reports
+            if (current['failures'] or set(current['cases'])!=set(original['cases'])
+                    or not {f['case'] for f in original['failures']}<=set(authority['context']['cases'])):
+                raise ValueError('baseline repair must preserve and pass all existing cases')
+    targets=set(previous['control_cases'])
+    if revision.get('contract')==3:
+        targets.update(authority['context']['cases'])
+    return targets
 
 
 def implementation_seed(project,store,quality,authority,frozen):
@@ -183,7 +318,7 @@ def implementation_seed(project,store,quality,authority,frozen):
     context=authority['context']
     red=store.receipt(frozen['red'],kind='red')
     revision=red['payload'].get('fixture_revision',{})
-    if ({k:v for k,v in revision.items() if k!='contract'}!=dict(authority=authority['review'],tests=context['tests'])
+    if ({k:revision.get(k) for k in ('authority','tests')}!=dict(authority=authority['review'],tests=context['tests'])
             or red['payload']['snapshot']!=frozen['snapshot']):
         raise ValueError('exact independently frozen fixture revision required for product seed')
     revision_context(project,store,quality,authority,frozen['snapshot'],contract=revision.get('contract',1))

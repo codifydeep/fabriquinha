@@ -233,6 +233,27 @@ def fixture_failure(project,store,incident,decision,tests,current_snapshot):
 
 def reviewed(project,store,key):
     record=store.receipt(key)
+    if record['kind']=='test_repair_admission':
+        from .technical_repair import validate_scope, PROTOCOL
+        data=record['payload']
+        diagnosis=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
+        choice=diagnosis['payload'];scope=choice.get('test_repair',{})
+        facts=validate_scope(project,store,data['incident'],diagnosis['binding'],choice['experiment'],
+            {k:scope[k] for k in ('tests','test_paths','cases')})
+        graph=store.receipt(data['prior_graph'],kind='release_graph')
+        incident=store.receipt(data['incident'],kind='incident')
+        if (choice.get('action')!='repair_tests' or choice.get('incident')!=data['incident']
+                or scope!=facts or data.get('protocol')!=PROTOCOL
+                or record['binding']!=graph['binding'] or record['binding'].get('actor')!='controller'
+                or record['binding'].get('release')!=diagnosis['binding']['release']
+                or data.get('project')!=project.fingerprint() or data.get('repair_kind')!='fixture'
+                or data.get('source')!=incident['binding']['task']
+                or data.get('source_run')!=incident['binding']['number']
+                or data.get('source_contract')!=incident['binding']['contract']
+                or any(data.get(k)!=v for k,v in facts.items())):
+            raise ValueError('exact CTO test-repair admission required')
+        return dict(review=key,proposal=dict(classification='test_contract',test_paths=scope['test_paths']),
+                    context=data,context_id=key,task=diagnosis['binding']['task'],controller_admission=True)
     if record['kind']=='review_admission':
         record=review_admission(project,store,key);data=record['payload']
         diagnosis=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
@@ -345,6 +366,9 @@ def context_view(store,value):
             raise ValueError('bounded exact frozen fixture sources required for proposal review')
         result['fixture_sources']={p:dict(sha256=manifest[p]['sha256'],text=(store.tree(value['snapshot'])/p).read_text()) for p in paths}
         result['fixture_syntax']='Add new local assignments and calls to methods or existing imported functions. New with blocks may manage setup resources, but may not wrap preserved statements. No new imports/helpers, rebinding, exits or changes to existing assertions.'
+        if value.get('protocol')=='technical-test-repair-1':
+            result['cases']=value['cases']
+            result['fixture_syntax']='Change setup or actions only inside the exact scoped cases. Preserve assertions, their conditions, neighboring cases, helpers, imports and test definitions. No early exits or observer suppression. A new independent freeze and fresh negative controls for every repaired case are mandatory.'
     if value.get('repair_kind')=='review':
         decision=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')
         prior=store.receipt(decision['payload']['experiment'],kind='diagnostic_experiment')
@@ -802,7 +826,7 @@ class Repairs:
                     if n<index or n==index and phase=='tests' and (fixture or not replace_tests):
                         if task.status!='done':raise ValueError('completed prefix and frozen tests required')
                     elif task.id==data['source']:
-                        if task.status!='triage' or not latest or latest.id!=data['source_run'] or not latest.ended_at:
+                        if task.status not in (('blocked','triage') if authority.get('controller_admission') and fixture else ('triage',)) or not latest or latest.id!=data['source_run'] or not latest.ended_at:
                             raise ValueError('source triage changed before replacement')
                         if self.store.capture(task.workspace_path)!=(data['implementation_snapshot'] if fixture else data['snapshot']):raise ValueError('source snapshot changed')
                     elif latest is not None or task.status not in ('todo','ready','blocked'):
@@ -978,7 +1002,7 @@ class Repairs:
         kb,_,_=native()
         for item in graph['items']:
             source=kb.get_task(conn,item['cards']['implementation']['id'])
-            if not source or source.status!='triage':continue
+            if not source or source.status not in ('blocked','triage'):continue
             latest=kb.latest_run(conn,source.id)
             if not latest or not latest.ended_at:continue
             decisions=[]
@@ -990,6 +1014,49 @@ class Repairs:
                 if not key:continue
                 decision=self.store.receipt(key,kind='diagnostic_decision')
                 incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                if decision['payload'].get('action')=='repair_tests':
+                    if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
+                        raise EffectBlocked('settle controller effects before test repair')
+                    from .technical_repair import validate_scope, PROTOCOL
+                    scope=decision['payload']['test_repair']
+                    facts=validate_scope(self.project,self.store,decision['payload']['incident'],decision['binding'],
+                        decision['payload']['experiment'],{k:scope[k] for k in ('tests','test_paths','cases')})
+                    if self.store.capture(source.workspace_path)!=facts['implementation_snapshot']:
+                        raise ValueError('implementation changed after CTO test-repair decision')
+                    frozen,_,_=self.r.closed(item['cards']['tests']['id'],'tests','tests_frozen')
+                    if frozen!=facts['tests']:raise ValueError('CTO scope must bind current graph freeze')
+                    prior=self.store.record('release_graph',self.r.binding(anchor),graph)
+                    context=dict(**facts,project=self.project.fingerprint(),repair_kind='fixture',
+                        prior_graph=prior,current_diagnosis=key,reviewed_diagnosis=key,
+                        incident=decision['payload']['incident'],source=source.id,source_run=latest.id,
+                        source_contract=digest(json.loads(source.body)),qa_paths=scope['test_paths'])
+                    admission=self.store.record('test_repair_admission',self.r.binding(anchor),context)
+                    replacement=self.materialize_submission(conn,anchor,graph,admission)
+                    return self.continue_submission(conn,anchor,spec,replacement)
+                if (source.status=='blocked' and decision['payload'].get('action')=='hold' and decision['payload'].get('experiment')
+                        and not body.get('test_repair_scope') and incident['binding'].get('reviewing') is False):
+                    frozen,_,_=self.r.closed(item['cards']['tests']['id'],'tests','tests_frozen')
+                    probe=dict(version=1,kind='diagnostic',release=json.loads(source.body)['release'],stage='cto',
+                        source=source.id,source_run=latest.id,block_event=incident['payload']['block_event'],
+                        cause=incident['payload']['cause'],inputs={'incident':decision['payload']['incident']},
+                        escalated_from=task.id,test_repair_scope=dict(protocol='technical-test-repair-1',
+                            tests=frozen,previous_diagnosis=key))
+                    identity=digest([self.project.fingerprint(),source.id,latest.id,frozen,key,'technical-test-repair-1'])
+                    existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(identity,)).fetchone()
+                    if existing:
+                        if json.loads(existing['body'])!=probe:raise ValueError('test repair probe drift')
+                    else:
+                        if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
+                            raise EffectBlocked('settle controller effects before scoped CTO probe')
+                        if self.store.capture(source.workspace_path)!=incident['payload']['snapshot']:
+                            raise ValueError('held implementation changed before scoped CTO probe')
+                        if self.r.board.guard:self.r.board.guard()
+                        kb.create_task(conn,title='SCOPE TEST REPAIR '+source.title,body=json.dumps(probe),
+                            assignee=self.project.technical_roles['cto'],parents=[task.id],priority=100,
+                            workspace_kind='dir',workspace_path=str(self.store.tree(incident['payload']['snapshot'])),
+                            completion_contract='local-only',max_retries=0,max_runtime_seconds=600,idempotency_key=identity)
+                    continue
+                if source.status!='triage':continue
                 if (incident['payload'].get('control_refusal') or protocol_failure(incident['payload'])) and incident['binding'].get('reviewing') is False:
                     decisions.append((decision['payload']['incident'],key))
             if not decisions:continue

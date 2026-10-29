@@ -211,6 +211,16 @@ class Quality:
         if allow_revision and any(new_tests.get(path)!=value for path,value in old_tests.items()):
             for path in (self.store.root/'receipts').glob('*.json'):
                 record=self.store.receipt(path.stem)
+                if record['kind']=='tests_frozen' and record['payload'].get('baseline')==before and record['payload'].get('tests')==new_tests:
+                    red=self.test_evidence(record['payload']['red'])
+                    revision=red['payload'].get('fixture_revision',{})
+                    if revision.get('contract')==3:
+                        self.frozen_plan(record)
+                        from .repairs import reviewed
+                        from .test_revision import protect_repaired_baseline
+                        authority=reviewed(self.project,self.store,revision['authority'])
+                        protect_repaired_baseline(self.project,self.store,before,after,authority['proposal']['test_paths'])
+                        return
                 if record['kind']!='tests_frozen' or not record['payload'].get('revision'):continue
                 data=record['payload']
                 if data['baseline']==before and data['tests']==self.tests(after):
@@ -308,11 +318,12 @@ class Quality:
         fixture=None
         if authority and authority['context'].get('repair_kind')=='fixture':
             from .test_revision import revision_context
-            previous=revision_context(self.project,self.store,self,authority,candidate,contract=2)
+            contract=3 if authority.get('controller_admission') else 2
+            previous=revision_context(self.project,self.store,self,authority,candidate,contract=contract)
             if (baseline!=previous['snapshot'] or self.store.receipt(authority['review'])['binding']['release']!=run.release):
                 raise ValueError('exact frozen fixture workspace and release required')
             baseline=previous['baseline']
-            fixture=dict(authority=authority['review'],tests=authority['context']['tests'],contract=2)
+            fixture=dict(authority=authority['review'],tests=authority['context']['tests'],contract=contract)
         elif authority and authority['proposal']['classification']=='test_contract':
             self.correction_diff(baseline,candidate,authority['proposal']['test_paths'])
             if baseline!=authority['context']['snapshot']:raise ValueError('test correction base changed')
@@ -327,13 +338,27 @@ class Quality:
                 historical_tests=authority['context']['tests'],historical_red=prior['red'],baseline=baseline,snapshot=candidate,
                 baseline_job=base_job,validation_job=job,red_job=historical['payload']['red_job'],
                 cases=report['cases'],new_cases=prior['new_cases'],control_cases=prior['control_cases']))
-        self.protect(baseline, candidate)
+        if fixture and fixture['contract']==3:
+            from .test_revision import protect_repaired_baseline
+            protect_repaired_baseline(self.project,self.store,baseline,candidate,authority['proposal']['test_paths'])
+        else:self.protect(baseline, candidate)
         left, right = self.store.manifest(baseline), self.store.manifest(candidate)
         prefix = self.project.tests_dir+'/'
         if any(not p.startswith(prefix) and left.get(p) != right.get(p) for p in set(left) | set(right)):
             raise ValueError('tests-only phase changed product')
         self.browser_tests(run,candidate)
         base_job, base = self.observe(run, baseline, 'baseline')
+        if fixture and fixture['contract']==3:
+            from .test_revision import repaired_baseline
+            corrected=repaired_baseline(self.store,baseline,candidate,authority['proposal']['test_paths'])
+            if corrected!=baseline:
+                if not {f['case'] for f in base['failures']}<=set(authority['context']['cases']):
+                    raise ValueError('baseline has unrelated failing regressions')
+                original_job,original_cases=base_job,set(base['cases'])
+                base_job,base=self.observe(run,corrected,'baseline')
+                if base['failures'] or set(base['cases'])!=original_cases:
+                    raise ValueError('corrected baseline must preserve and pass all existing cases')
+                fixture.update(repaired_baseline=corrected,original_baseline_job=original_job)
         if base['failures']:
             if fixture:raise ValueError('fixture repair requires the original baseline to pass again')
             if candidate!=baseline:raise ValueError('regression baseline failed: submit unchanged existing tests, never duplicate or alter them')
@@ -791,7 +816,7 @@ class DeliveryTools:
                 instructions='Review this new expected-text correction against the approved brief and repair authority. Historical Red remains historical; no new failing test is claimed. Preserve every unit test, action and control target.')
         elif evidence['kind']=='regression_red':
             context.update(regression_red=red,instructions='Known regression at the controller base SHA: independently confirm the existing expectation and every exact assertion failure. No new test is claimed. Preserve all tests and require a product-only fix, full Green and negative controls before independent delivery approval.')
-        if red.get('fixture_revision',{}).get('contract')==2:
+        if red.get('fixture_revision',{}).get('contract') in (2,3):
             from .repairs import reviewed
             from .test_revision import fixture_snapshot_diff
             authority=reviewed(q.project,self.store,red['fixture_revision']['authority'])

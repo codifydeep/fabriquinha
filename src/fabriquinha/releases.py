@@ -310,6 +310,11 @@ class Releases:
                         'It cannot reuse old Red or approve the new fixture. Independent test review freezes a new version, '
                         'preserving the complete old inventory and negative-control targets. No product changes.')
                     result['browser']='Use only the existing browser protocol and helpers; fix the reviewed missing setup without changing business coverage.'
+                    if continuation['context'].get('protocol')=='technical-test-repair-1':
+                        result['tdd']=('Correct setup/actions only in the CTO-authorized paths and cases. Preserve exact assertion expressions, conditions, helpers and other cases. No product changes. '
+                            'delivery_submit validates the original baseline, any scoped corrected baseline and fresh feature Red. Independent review must freeze the corrected tests; '
+                            'every repaired case requires a fresh product negative control. No old Red, Green or approval is inherited.')
+                        result['browser']='Preserve browser error observers. For deliberate negative API probes, the same browser context request client preserves cookies without injecting an expected HTTP failure into the UI console.'
                 elif run.kind=='implementation' and authority:
                     result['tdd']=('Continue preserved product work using the newly reviewed frozen tests. Use delivery_validate for the full suite, '
                         'then submit fresh Green and the complete negative-control set for this exact revision. '

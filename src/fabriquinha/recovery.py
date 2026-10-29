@@ -109,7 +109,11 @@ class Diagnostic:
             if self.store.receipt(key)['binding']['release']!=self.run.release:raise ValueError('foreign corrective diagnosis')
 
     def actions(self):
-        return (['resume'] if self.incident.get('resume_allowed',True) else [])+(['escalate'] if self.level=='lead' else [])+['hold']
+        repair = (self.level=='cto' and self.original.get('kind')=='implementation'
+                  and self.original.get('reviewing') is False
+                  and self.incident.get('source_state') in ('blocked','triage')
+                  and self.incident.get('controller_effects')==[])
+        return (['resume'] if self.incident.get('resume_allowed',True) else [])+(['escalate'] if self.level=='lead' else [])+['hold']+(['repair_tests'] if repair else [])
 
     def qa_correction(self):
         return self.original['kind']=='tests' and self.repair and self.repair['proposal']['classification']=='test_contract'
@@ -156,6 +160,23 @@ class Diagnostic:
         result=dict(incident={**self.incident,'workspace':'/workspace','recorded_failure_is_historical':True},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
+        if 'repair_tests' in self.actions():
+            kb,kbc,_=native()
+            with kbc.connect_closing() as conn:
+                task=kb.get_task(conn,self.run.task)
+                requested=json.loads(task.body or '{}').get('test_repair_scope') if task else None
+            if requested:
+                frozen=self.q.frozen_plan(self.store.receipt(requested['tests'],kind='tests_frozen'))
+                previous=self.store.receipt(requested['previous_diagnosis'],kind='diagnostic_decision')
+                result['technical_test_repair']=dict(tests=requested['tests'],cases=frozen['cases'],
+                    files=sorted(frozen['tests']),previous=previous['payload'],
+                    contract='Use a current diagnostic_validate experiment. If a technical test defect is demonstrated, '
+                    'end with repair_tests and repair_scope containing the exact tests receipt, test_paths and cases. '
+                    'Preserve accepted product behavior, assertion expressions and browser error observers. '
+                    'A deliberate negative HTTP API probe may use the same browser context request client to preserve cookies '
+                    'without injecting an expected network error into the UI console. Never ignore console errors globally. '
+                    'This authorizes only scoped author correction and fresh independent freeze, not delivery. '
+                    'If evidence does not support a technical test repair, hold with concrete findings.')
         result['phase_expectation']=(
             'Tests author: add new acceptance tests for the current increment before its product implementation. '
             'Existing baseline tests may all pass; this is expected regression protection, not an impediment to resuming test authorship. '
@@ -326,7 +347,9 @@ class Diagnostic:
 
     def decide(self,args):
         self.board.ensure(self.run)
-        if (not isinstance(args,dict) or set(args)!={'action','reason','findings'}
+        expected={'action','reason','findings'}
+        if isinstance(args,dict) and args.get('action')=='repair_tests':expected.add('repair_scope')
+        if (not isinstance(args,dict) or set(args)!=expected
                 or args['action'] not in self.actions()):
             raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; preserve native triage and never send technical decisions to CEO')
         if args['action']=='resume' and self.experiment is None:
@@ -348,8 +371,15 @@ class Diagnostic:
             raise ValueError('resume guidance cannot require writes outside the independently authorized QA paths; cite other observations as incident/experiment evidence')
         if files:review_decision(dict(decision='changes',reason=args['reason'],findings=files),self.store.manifest(snapshot),self.store.tree(snapshot))
         verdict=dict(decision='changes',reason=args['reason'],findings=args['findings'])
+        repair=None
+        if args['action']=='repair_tests':
+            from .technical_repair import validate_scope
+            if self.experiment is None:raise ValueError('test repair requires a current CTO experiment')
+            repair=validate_scope(self.q.project,self.store,self.board.input(self.run,'incident'),
+                                  self.run.binding(),self.experiment,args['repair_scope'])
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),
-            action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False))
+            action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False,
+            **({'test_repair':repair} if repair else {})))
         self.sandbox.close()
         kb,kbc,_=native()
         with kbc.connect_closing() as conn:
@@ -587,9 +617,10 @@ class Recovery:
         if data['action']=='escalate':
             if body['stage']!='lead':raise ValueError('only lead escalates to CTO')
             self.create(conn,data['incident'],'cto',previous=task.id);return
-        if data['action']=='hold':
+        if data['action'] in ('hold','repair_tests'):
             # Keep the hold receipt/source block, but do not strand a technical
             # impediment at Lead. CTO is the final technical decision owner.
+            if data['action']=='repair_tests' and body['stage']!='cto':raise ValueError('only CTO may authorize technical test repair')
             if body['stage']=='lead':self.create(conn,data['incident'],'cto',previous=task.id)
             return
         if source.get('resume_allowed') is False:raise EffectBlocked('native triage/controller effect needs scoped repair; preserve source')
@@ -743,6 +774,11 @@ def register_diagnostic(sandbox,quality,on_terminal):
         diagnostic_decide=dict(type='object',additionalProperties=False,required=['action','reason','findings'],properties=dict(
             action={'type':'string','enum':operations.actions()},reason={'type':'string','minLength':1,'maxLength':2000},
             findings=dict(type='array',minItems=1,maxItems=8,items={'oneOf':[finding,reference]}))))
+    if 'repair_tests' in operations.actions():
+        schemas['diagnostic_decide']['properties']['repair_scope']=dict(
+            type='object',additionalProperties=False,required=['tests','test_paths','cases'],
+            properties=dict(tests=dict(type='string'),test_paths=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
+                            cases=dict(type='array',minItems=1,maxItems=20,items=dict(type='string'))))
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')
