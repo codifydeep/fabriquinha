@@ -71,3 +71,14 @@ class PendingInstructions(unittest.TestCase):
         self.assertNotIn('/fabrica answer',brief)
         self.assertIn('Keep existing tests',brief)
         with self.assertRaises(ValueError):format_pending({**value,'kind':'product_brief','scope':'technical'})
+
+class RefusalDiagnostics(unittest.TestCase):
+    def test_diagnostic_does_not_log_exception_value_or_command(self):
+        from fabriquinha.channel_plugin import handle
+        with patch.dict(os.environ,{'FABRIQUINHA_CHANNEL_CONFIG':'/private-config'}), \
+             patch('fabriquinha.channel_plugin.private_json',side_effect=ValueError('private-secret-value')), \
+             self.assertLogs('fabriquinha.channel_plugin',level='WARNING') as logs:
+            self.assertIn('refused',handle('start v1 private-objective'))
+        text=' '.join(logs.output)
+        self.assertIn('stage=configuration',text);self.assertIn('error_type=ValueError',text)
+        self.assertNotIn('private-secret-value',text);self.assertNotIn('private-objective',text)

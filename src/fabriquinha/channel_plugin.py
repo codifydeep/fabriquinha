@@ -1,5 +1,6 @@
 """Hermes slash-command seam: no shell, model turn, dispatcher or token access."""
 import json
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -17,26 +18,33 @@ def private_json(path):
 def handle(raw):
     # Return failures as handled text. Raising here would let the upstream
     # plugin exception path fall through to a conversational model turn.
+    stage="configuration"
     try:
         config=private_json(os.environ['FABRIQUINHA_CHANNEL_CONFIG'])
         if set(config)!={'source','digest','python','root','upstream','policy'}:
             raise ValueError('fixed channel installation binding required')
+        stage="identity"
         identity=session_identity();policy=private_json(config['policy'])
+        stage="command"
         operation=command(raw,policy,identity)  # Reject before spawning a subprocess.
+        stage='source'
         verify(Path(config['source']),config['digest'])
         env={k:v for k,v in os.environ.items() if k in ('PATH','HOME','TMPDIR','LANG')}
         env.update(PYTHONPATH=str(Path(config['source'])/'src'),PYTHONNOUSERSITE='1',
             PYTHONDONTWRITEBYTECODE='1',PYTHONSAFEPATH='1',FABRIQUINHA_SOURCE_DIGEST=config['digest'])
+        stage="subprocess"
         result=subprocess.run([config['python'],'-B','-m','fabriquinha.channel',
             '--root',config['root'],'--upstream',config['upstream'],'--policy',config['policy']],
             input=json.dumps(dict(raw=raw,identity=identity)),capture_output=True,text=True,
             timeout=30,env=env,check=False)
         if result.returncode:return 'Command not completed. Check the exact card/request and operator status; no delivery approval is implied.'
+        stage='response'
         if operation['operation']=='show':return format_pending(json.loads(result.stdout))
         return result.stdout.strip() or 'No pending product question for this card.'
     except subprocess.TimeoutExpired:
         return 'Outcome not confirmed. Check status before resending; do not assume approval or failure.'
-    except Exception:
+    except Exception as error:
+        logging.getLogger(__name__).warning('Channel command refused: stage=%s error_type=%s',stage,type(error).__name__)
         return 'Command refused. Use an authorized Telegram account/group and an exact card/request. No action was approved.'
 
 
