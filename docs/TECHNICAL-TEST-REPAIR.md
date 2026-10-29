@@ -1,6 +1,6 @@
 # Technical test repair
 
-Implementation status: **offline only; not installed or delivery-qualified**.
+Implementation status: **installed after isolated qualification; live agent recovery started, delivery qualification pending**.
 
 A technical test defect must not require artificial implementation failures to
 reach the CTO. The new `repair_tests` diagnostic disposition binds the incident,
@@ -57,8 +57,9 @@ agent judgment, PR/CI integration, deployment, or homologation.
 
 ## Rollout and remaining qualification
 
-Drain dispatch and verify an installation backup before replacing the frozen
-runtime source. Retain provider counters, previous deployment and original
+Dispatch was drained and the installation backup verified before replacing the frozen
+runtime source. The real CTO scope-diagnosis card was created and claimed automatically.
+For subsequent updates, repeat the same drain/backup procedure. Retain provider counters, previous deployment and original
 cards. The CTO must emit a new structured authorization; the historical hold
 must not be converted into one. Agents then author/review the actual correction.
 

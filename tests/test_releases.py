@@ -14,7 +14,7 @@ from fabriquinha.artifacts import Store, digest
 from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.effects import EffectBlocked
-from fabriquinha.releases import Releases, ordered, continuation_context
+from fabriquinha.releases import Releases, ordered, continuation_context, technical_document
 from test_delivery_core import configuration
 from test_intake import document, work
 
@@ -27,6 +27,13 @@ def configured():
 
 
 class ReleaseContracts(unittest.TestCase):
+    def test_controller_repair_keeps_original_reviewed_architecture(self):
+        original=dict(architecture='approved stack',observability='approved metrics')
+        scoped=dict(controller_admission=True,context={'repair_kind':'fixture'})
+        self.assertIs(technical_document(scoped,original),original)
+        legacy=dict(context=dict(architecture='reviewed corrective architecture'))
+        self.assertIs(technical_document(legacy,original),legacy['context'])
+
     def test_reviewed_continuation_context_keeps_authority_not_old_plan_prose(self):
         full=dict(review='a'*64,context_id='b'*64,task='t_12345678',
             proposal={'plan':'old plan '*10000},context=dict(source='t_abcdef01',

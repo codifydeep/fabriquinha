@@ -76,11 +76,21 @@ def qualify(root,upstream):
             idempotency_key=digest([project.fingerprint(),data['source'],data['source_run'],data['block_event'],'diagnostic','cto']))
         assert legacy==fresh.create(conn,legacy_incident,'cto',previous=prior)
         complete(conn,legacy,legacy_incident,'hold')
+        failed_key=incident(conn,'failed-lead-context')
+        failed_lead=fresh.create(conn,failed_key,'lead')
+        claim=kb.claim_task(conn,failed_lead);assert claim
+        assert kb.block_task(conn,failed_lead,reason='Programmed controller context failure',expected_run_id=claim.current_run_id)
+        fresh.discover(conn,kb.get_task(conn,failed_lead),lambda *args,**kwargs:None)
+        escalated=[t for t in fresh.cards(conn) if json.loads(t.body).get('escalated_from')==failed_lead]
+        assert len(escalated)==1 and escalated[0].assignee=='succ-cto'
+        fresh.discover(conn,kb.get_task(conn,failed_lead),lambda *args,**kwargs:None)
+        assert len([t for t in fresh.cards(conn) if json.loads(t.body).get('escalated_from')==failed_lead])==1
+        complete(conn,escalated[0].id,failed_key,'hold')
         assert fresh.reconcile(conn,lambda *args,**kwargs:None)=={}
         assert len([t for t in fresh.cards(conn) if json.loads(t.body).get('escalated_from')==lead])==1
         assert not conn.execute('SELECT 1 FROM task_runs WHERE ended_at IS NULL').fetchone()
     result=dict(native_kanban=True,held_cto_receipt_preserved=True,new_predecessor_created_new_cto=True,
-        lead_hold_automatically_escalated=True,lead_hold_preserved=True,source_never_unblocked=True,
+        failed_lead_automatically_escalated=True,lead_hold_automatically_escalated=True,lead_hold_preserved=True,source_never_unblocked=True,
         restart_reused_same_successor=True,legacy_same_predecessor_reused=True,status_selects_current_successor=True,open_claims=0,model_calls=0,docker_jobs=0,
         programmed_decisions=True,delivery_approval=False,autonomous_delivery=False)
     write_json(root/'receipt.json',result);print(json.dumps(result,indent=2))

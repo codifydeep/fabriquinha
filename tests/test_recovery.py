@@ -155,6 +155,24 @@ class TechnicalRecovery(unittest.TestCase):
             diagnostic.decide(dict(action='resume',reason='Change product wording',findings=[dict(path='app.py',line=1,detail='Edit the app')]))
         self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
 
+    def test_controller_test_repair_diagnosis_reads_original_plan_for_brief(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        proposed=self.store.record('work_plan',self.run.binding(),{'approval':'business-approval'})
+        plan=self.store.record('plan_review',self.run.binding(),{'plan':proposed})
+        admission=self.store.record('test_repair_admission',self.run.binding(),{})
+        body=dict(release=self.run.release,release_plan=plan)
+        diagnostic.original={**diagnostic.original,'contract':digest(body)}
+        diagnostic.repair=dict(review=admission,context=dict(repair_kind='fixture'),
+                              proposal=dict(classification='test_contract',test_paths=['tests/acceptance_sample.py']))
+        kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body=json.dumps(body)))
+        api=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)
+        with patch('fabriquinha.recovery.native',return_value=api),patch('fabriquinha.repairs.context_view',return_value={}),\
+             patch('fabriquinha.intake.Intake.approved',return_value=({},dict(payload=dict(document={'goal':'same brief'})))):
+            self.assertEqual(diagnostic.evidence()['approved_brief'],{'goal':'same brief'})
+            diagnostic.original['contract']='changed'
+            with self.assertRaisesRegex(ValueError,'exact corrective source'):
+                diagnostic.evidence()
+
     def test_fixture_diagnosis_uses_diagnostic_phase_and_never_rewrites_candidate(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.repair=dict(context=dict(repair_kind='fixture'),

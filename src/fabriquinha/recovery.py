@@ -194,7 +194,16 @@ class Diagnostic:
         if self.qa_correction():
             from .repairs import context_view
             result['repair_authority']={**self.repair,'context':context_view(self.store,self.repair['context'])}
-            reviewed=self.store.receipt(self.repair['review'],kind='plan_review')
+            reviewed=self.store.receipt(self.repair['review'])
+            if reviewed['kind']=='test_repair_admission':
+                kb,api,_=native()
+                with api.connect_closing() as conn:
+                    source=kb.get_task(conn,self.incident['source'])
+                    body=json.loads(source.body) if source else {}
+                if digest(body)!=self.original['contract'] or body.get('release')!=self.run.release:
+                    raise ValueError('exact corrective source contract required for brief context')
+                reviewed=self.store.receipt(body['release_plan'],kind='plan_review')
+            elif reviewed['kind']!='plan_review':raise ValueError('scoped corrective authority required')
             approval=self.store.receipt(reviewed['payload']['plan'],kind='work_plan')['payload'].get('approval')
             if isinstance(approval,str):
                 from .intake import Intake
@@ -510,7 +519,10 @@ class Recovery:
             cause=data['cause'],inputs={'incident':incident},escalated_from=previous)
         if previous:
             parent=kb.get_task(conn,previous);prior=json.loads(parent.body) if parent else {}
-            if (not parent or parent.status!='done' or prior.get('kind')!='diagnostic' or prior.get('version')!=1
+            failed=kb.latest_run(conn,previous) if parent and parent.status in ('blocked','triage') else None
+            failed_lead=(stage=='cto' and prior.get('stage')=='lead' and failed is not None
+                         and failed.ended_at is not None and failed.outcome in ('blocked','failed','timed_out'))
+            if (not parent or (parent.status!='done' and not failed_lead) or prior.get('kind')!='diagnostic' or prior.get('version')!=1
                     or prior.get('inputs',{}).get('incident')!=incident or prior.get('release')!=body['release']
                     or prior.get('stage') not in self.project.technical_roles or prior['stage']==stage
                     or parent.assignee!=self.project.technical_roles[prior['stage']]):

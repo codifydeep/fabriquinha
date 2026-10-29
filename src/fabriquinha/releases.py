@@ -42,6 +42,11 @@ def continuation_context(continuation):
             else continuation['context']['submission_contract']),delivery_approval=False)
 
 
+def technical_document(authority, original):
+    # A controller admission scopes a repair; it is not another architecture plan.
+    return authority['context'] if authority and not authority.get('controller_admission') else original
+
+
 class Releases:
     def __init__(self,project,store,board,intake):
         self.project,self.store,self.board,self.intake=project,store,board,intake
@@ -269,7 +274,7 @@ class Releases:
         controls=(quality.freeze(run,self.board.input(run,'tests'))['control_cases'] if run.kind=='implementation' else None)
         from .repairs import repair_authority,context_view
         authority=repair_authority(self.project,self.store,self.board,run)
-        technical=authority['context'] if authority else proposed['payload']['document']
+        technical=technical_document(authority,proposed['payload']['document'])
         result=dict(approved_brief=brief['payload']['document'],
             brief_authority=self.intake.authority(proposed['payload']['approval'],run.release),package=body['package'],criteria=body['criteria'],
             repair=({**authority,'context':context_view(self.store,authority['context'])} if authority else None),
