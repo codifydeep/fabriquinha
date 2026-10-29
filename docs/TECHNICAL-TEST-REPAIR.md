@@ -1,6 +1,6 @@
 # Technical test repair
 
-Implementation status: **installed after isolated qualification; live agent recovery started, delivery qualification pending**.
+Implementation status: **installed; live assisted release completed with independent review, CI, rollback and post-deploy QA**.
 
 A technical test defect must not require artificial implementation failures to
 reach the CTO. The new `repair_tests` diagnostic disposition binds the incident,
@@ -24,7 +24,7 @@ resume implementation directly, or declare delivery.
 
 ## Qualification completed
 
-511 offline unit tests pass. Coverage includes blocked-source succession without
+513 offline unit tests pass. Coverage includes blocked-source succession without
 synthetic retry consumption, unchanged historical cards, downstream dependency
 rewriting, crash before/after graph persistence, and idempotent activation.
 The installed cancellation incident also passed read-only scope eligibility
@@ -68,3 +68,18 @@ context request client so creator cookies remain present. Observe independent
 review, PR, exact-SHA local CI, deployment and post-deploy QA before declaring
 homologation. This cycle remains assisted; a subsequent useful delivery with two
 dependent increments must demonstrate unassisted flow.
+
+## Live result
+
+The cancellation release completed the repair through real agent executions:
+CTO scope authorization, QA correction, independent test freeze, full Green
+(21 cases), seven negative-control jobs, independent implementation review,
+PR integration, exact-commit CI, rollback/restoration and 19 post-deploy browser
+cases. The controller recorded `HOMOLOGADA`. The correction preserved the
+browser error observer and the full-room HTTP 409 assertions.
+
+The installation required a context repair during this cycle. Consequently,
+this is an assisted delivery, not proof of complete autonomy. After that repair,
+a reviewer requested a product correction and a later non-terminal review was
+recovered through CTO diagnosis without manual product or card changes.
+A useful subsequent delivery with two dependent increments remains required.

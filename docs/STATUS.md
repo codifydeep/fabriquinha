@@ -1,4 +1,30 @@
-# Status do projeto — 28 de outubro de 2026
+# Status do projeto — 29 de outubro de 2026
+
+**v0.2 homologada, ciclo assistido.** Cancelamento de salas entregue com
+reparo técnico dos testes pelo fluxo CTO → QA → revisão independente.
+
+- URL vigente: http://127.0.0.1:52936 (verificada ao concluir o ciclo).
+- Commit: `97a880d7975915267bd53a6f8a71905efd5d7639`.
+- [PR 15](https://github.com/codifydeep/descartavel/pull/15) integrado.
+- 21 testes da suíte completa; sete jobs de controles negativos; 19 casos
+  de navegador aprovados no ambiente implantado.
+- CI obrigatória no commit integrado, rollback e restauração comprovados.
+- Estado controlador `HOMOLOGADA`; evidências privadas preservadas fora do Git.
+- Automação validada por 513 testes offline e qualificações delimitadas em
+  Docker e no Kanban nativo. Ver [contrato de reparo](TECHNICAL-TEST-REPAIR.md).
+
+Houve correção da plataforma durante a execução: não é uma prova de autonomia
+completa. Após essa correção, a equipe tratou solicitação de mudanças e recuperação
+de revisão, integrou, implantou e validou sem edição manual de cards ou produto.
+Próximo marco: entrega útil com dois incrementos dependentes, do brief aprovado
+à homologação sem intervenção operacional. Manter o modelo e os gates atuais.
+O canal Telegram recebeu o objetivo e o aceite desta versão; a validação completa
+de recuperação operacional e entregas repetidas continua pendente.
+
+## Registro anterior — S6 e P5
+
+As URLs e estados intermediários abaixo são históricos; a implantação vigente
+é a v0.2 indicada acima.
 
 **S6 homologado com assistência anterior na automação.** Os dois incrementos
 foram integrados e o QA final passou em 28/10/2026. Isso não qualifica autonomia
