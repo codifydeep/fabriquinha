@@ -133,6 +133,11 @@ def execution_context(project,*,browser_mode=1):
     result=dict(stack='python-http',repository=project.repository,branch=project.branch,
         workers=project.max_workers,tests_dir=project.tests_dir,iterations=40,
         reviewers={role:list(project.reviewers_for(role)) for role in project.reviewers},
+        review_contract=('The reviewers mapping lists eligible alternative reviewers, not cumulative sign-offs. '
+            'The controller selects one independent reviewer for each handoff. '
+            'Plan review, test freeze, implementation review and deployed QA are distinct gates. '
+            'Describe only the installed gates; do not promise additional frontend/backend/CTO signatures '
+            'that are not represented by the workflow. Technical consultation does not create another approval gate.'),
         coordination_roles=dict(project.coordination_roles or {}),delivery_roles=dict(project.delivery_roles or {}),
         test_tooling=dict(command='python -B /opt/fabriquinha/suite.py',browser_tdd=bool(project.browser_tdd),
             available=['unittest','playwright.sync_api','Chromium'] if project.browser_tdd else ['unittest'],
