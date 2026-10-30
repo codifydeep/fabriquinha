@@ -48,9 +48,26 @@ class DeploymentContinuation(unittest.TestCase):
         self.images={};self.builds=[];self.deploys=[];self.live=None
         self.lose_build=False;self.lose_deploy=None
         self.addCleanup(patch.stopall)
+        patch('fabriquinha.qa_recovery.native',return_value=(SimpleNamespace(get_task=lambda *a:SimpleNamespace(body='{}')),SimpleNamespace(connect_closing=lambda:contextlib.nullcontext(None)),None)).start()
         patch('fabriquinha.deployment.docker',side_effect=self.docker).start()
         patch.object(Deployment,'_command',side_effect=self.command).start()
         patch.object(Deployment,'service',side_effect=self.service).start()
+
+    def test_clean_qa_is_fresh_per_run_and_idempotent_within_run(self):
+        payload=dict(project=self.project.fingerprint(),image='sha256:'+'b'*64,commit=self.commit,snapshot=self.snapshot,role='candidate')
+        key=self.store.record('artifact',self.run.binding(),payload)
+        artifact=self.delivery.read_artifact(key)
+        self.delivery._up(self.run,artifact,'candidate')
+        first=self.live['container']
+        self.active=replace(self.run,number=4,actor='cto',reviewing=True)
+        receipt=self.delivery.clean_qa(self.active,artifact)
+        second=self.live['container'];self.assertNotEqual(first,second)
+        self.assertEqual(self.delivery.clean_qa(self.active,artifact),receipt)
+        self.assertEqual(self.live['container'],second)
+        self.active=replace(self.active,number=5)
+        self.delivery.clean_qa(self.active,artifact)
+        self.assertNotEqual(self.live['container'],second)
+        self.assertEqual(self.live['image'],payload['image'])
 
     def docker(self,*args,**kwargs):
         if args[:2]==('image','inspect'):

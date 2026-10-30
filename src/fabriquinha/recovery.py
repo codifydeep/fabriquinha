@@ -508,7 +508,9 @@ class Recovery:
         if source.kind=='integration':
             if source.reviewing:
                 rollout=self.store.receipt(handoff['rollout'],kind='rollout')
-                expected={**source.binding(),'actor':source.author,'reviewing':False}
+                from .qa_recovery import origin
+                prior=origin(self.project,self.store,source)
+                expected={**prior.binding(),'actor':source.author,'reviewing':False}
                 if (not Run(**expected).same_subject(rollout['binding'])
                         or rollout['payload']['project']!=self.project.fingerprint()):raise ValueError('foreign deployed QA handoff')
                 record=self.store.receipt(rollout['payload']['candidate'],kind='artifact')

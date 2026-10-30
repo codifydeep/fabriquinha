@@ -171,6 +171,7 @@ class Releases:
         return graph_id,graph
 
     def graph_path(self,anchor,body):
+        if body.get('qa_recovery_graph') is True:return self.folder(anchor)/'qa-recovery.json'
         generation=body.get('maintenance_generation')
         if generation is not None:
             if not re.fullmatch(r'[a-f0-9]{64}',generation) or not body.get('maintenance_plan'):
@@ -432,7 +433,8 @@ class Releases:
         accepted=self.store.receipt(previous['acceptance'],kind='release_acceptance')
         data=accepted['payload'];qa=self.store.receipt(data['final_qa'],kind='release_evidence')
         artifact_id=qa['payload']['artifact'];artifact=self.store.receipt(artifact_id,kind='artifact')
-        proof,image=qa['payload'],artifact['payload'];owner,reviewer=artifact['binding'],qa['binding']
+        from .qa_recovery import receipt_origin
+        proof,image=qa['payload'],artifact['payload'];owner,reviewer=artifact['binding'],receipt_origin(self.project,self.store,qa)
         if (data['project']!=self.project.fingerprint() or proof['project']!=data['project'] or image['project']!=data['project']
                 or seed['project']!=data['project'] or data['state']!='HOMOLOGADA' or image['role']!='candidate'
                 or data['qualification'] is not self.project.qualification or data['delivery_approval'] is not (not self.project.qualification)
@@ -509,6 +511,8 @@ class Releases:
                     spec=self.specification(conn,anchor)
                     if spec is None:continue
                     graph_id,graph=self.materialize(conn,anchor,spec,services)
+                    from .qa_recovery import reconcile as recover_qa
+                    graph=recover_qa(self,conn,anchor,graph)
                     from .repairs import Repairs
                     repairs=Repairs(self)
                     effective=repairs.continue_submission(conn,anchor,spec,graph)
@@ -517,6 +521,7 @@ class Releases:
                     effective=repairs.reconcile(conn,anchor,spec,effective,services)
                     if effective!=graph:
                         graph=effective;graph_id=self.store.record('release_graph',self.binding(anchor),graph)
+                    graph_id=self.store.record('release_graph',self.binding(anchor),graph)
                     self.accept(conn,anchor,spec,graph_id,graph,services)
                 except (ValueError,KeyError,TypeError,OSError,subprocess.SubprocessError,EffectBlocked,Pending) as error:
                     issues[anchor.id]=dict(category=type(error).__name__,detail=str(error)[:500],owner=self.project.coordination_roles['lead'])

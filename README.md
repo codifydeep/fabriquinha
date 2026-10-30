@@ -117,9 +117,12 @@ flowchart TD
     N --> PR[PR e CI no SHA exato]
     PR --> M[Integração: suíte e mesmo QA congelado]
     M --> D[DevOps: deploy e rollback]
-    D --> Q[QA independente do ambiente]
+    D --> QC[Instância limpa do mesmo artefato aprovado]
+    QC --> Q[QA independente do ambiente]
     Q -->|aprovado| H[HOMOLOGADA com URL e evidências]
-    Q -->|falha| X[Lead: classificar erro contra o brief]
+    Q -->|estado residual qualificado e hold CTO| QR[Sucessor de QA; entrega preservada, uma retomada]
+    QR --> QC
+    Q -->|outra falha| X[Lead: classificar erro contra o brief]
     X --> R[Proposta corretiva e revisão independente]
     R -->|produto| T
     R -->|expectativa textual no contrato legado| RT[Correção restrita; Red histórico preservado]

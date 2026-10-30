@@ -59,7 +59,7 @@ repaired fixture. It does not modify product workspaces or snapshots and consume
 no model calls. These proofs qualify the narrow mechanism, which is installed in the reference
 environment. The actual agent repair has been admitted; its freeze, PR and new
 homologation must still supply their own evidence. The complete offline suite
-passed 532 tests; this is not a count of autonomous deliveries.
+passed 535 tests; this is not a count of autonomous deliveries.
 
 ## Operator interface
 
@@ -127,3 +127,24 @@ The native isolated proof checks idempotence, crash recovery, unchanged history
 and reuse of the independent plan. The real Docker mount proof verifies readable
 bytes and an EROFS refusal on attempted writes. These proofs do not qualify the
 actual fixture repair, which still requires every delivery gate.
+
+## Independent deployed QA and clean state
+
+Deployed QA validates the exact independent freeze and its scoped baseline
+exception before running browser tests. It then prepares the same approved
+artifact in a fresh owned Compose instance. The preparation is keyed by QA run:
+observing the same run is idempotent; a new run cannot reuse in-memory test data.
+The whole operation holds the deployment lock, archives previous logs, validates
+health/commit identity and records the preparation receipt in the final evidence.
+No network credentials, volume deletion or test waiver is introduced.
+
+For the qualified single `EMPTY_LIST` precondition failure, a settled CTO hold can
+admit one QA-only successor. It retains the existing tests, delivery review,
+rollout and commit, and transfers the native handoff to an independent reviewer.
+Multiple failures, other assertions, active workers, pending effects, stale
+identities and competing live corrective plans do not qualify. Old cards and
+plans remain unchanged; another QA failure cannot create a second such successor.
+The real Docker proof demonstrates dirty-to-clean state with the same image.
+The isolated native proof checks crash recovery, independent handoff, unchanged
+predecessors and rejection of unauthorized test edits. These are mechanism proofs,
+not a replacement for the actual deployed QA result.

@@ -293,11 +293,13 @@ class Deployment:
             policy='The exact previous same-project homologation may be replaced by the fixed candidate/rollback/restore sequence. Preserve every unmatched deployment. The incident error describes a historical attempt; classify current identity by these receipts, not that error wording. Resume still requires actual integration and independent deployed QA.',
             delivery_approval=False)
 
-    def _up(self,run,artifact,operation):
-        self.current(run)
+    def _up(self,run,artifact,operation,*,qa=False):
+        self.current(run,review=qa)
+        if qa and operation!='qa-clean':raise ValueError('fixed independent QA preparation only')
         if self.project.delivery_roles and not self.project.qualification:deployment_networks(self.project)
         scope=dict(subject=run.subject(),artifact=artifact['receipt'],operation=operation,
                       policy=digest(web_spec(self.project,artifact,'pending')))
+        if qa:scope['qa_run']=run.number
         key=digest(scope);folder=self.store.root/'deployments'/key
         folder.mkdir(mode=0o700,parents=True,exist_ok=True)
         inputs=folder/'inputs.json'
@@ -354,14 +356,29 @@ class Deployment:
                 qualification=self.project.qualification,candidate=candidate_id,previous=previous_id,
                 steps=steps,final=final,delivery_approval=False))
 
+    def clean_qa(self,run,artifact):
+        deadline=time.monotonic()+self.project.timeout_seconds+15
+        while True:
+            self.current(run,review=True)
+            try:return self._up(run,artifact,'qa-clean',qa=True)
+            except Pending:
+                if time.monotonic()>=deadline:raise EffectBlocked('clean QA candidate health observation expired')
+                time.sleep(.1)
+
     def qa(self,run,rollout_id,repository):
+        with self.journal.lock('rollout:'+self.group):
+            return self._qa(run,rollout_id,repository)
+
+    def _qa(self,run,rollout_id,repository):
         self.current(run,review=True)
         if self.board.input(run,'rollout',review_handoff=True)!=rollout_id:
             raise ValueError('exact current QA handoff required')
+        from .qa_recovery import origin
+        original=origin(self.project,self.store,run)
         rollout=self.store.receipt(rollout_id,kind='rollout')
         data=rollout['payload']
         if (data['project']!=self.project.fingerprint() or rollout['binding']['actor']!=run.author
-                or rollout['binding']['task']!=run.task or rollout['binding']['contract']!=run.contract):
+                or rollout['binding']['task']!=original.task or rollout['binding']['contract']!=original.contract):
             raise ValueError('independent QA of this rollout required')
         artifact=self.read_artifact(data['candidate'])
         if self.board.input(run,'delivery')!=artifact['review']:
@@ -377,9 +394,36 @@ class Deployment:
                 or steps[-2]['payload']['artifact']!=data['previous']
                 or steps[-1]['payload']['artifact']!=data['candidate']):
             raise ValueError('actual rollback and restoration evidence required')
+        from .executor import browser_contract
+        from .browser import acceptance_manifest
+        mode=browser_contract(self.project,self.store)
+        folder=self.store.tree(artifact['snapshot'])/self.project.tests_dir
+        if mode==2:
+            from .quality import Quality,preview_evidence,suite_report
+            manifest=acceptance_manifest(folder)
+            integrated=self.store.receipt(artifact['integrated'],kind='integrated')
+            suite=self.store.receipt(integrated['payload']['suite_job'],kind='suite_job')
+            identity=suite['payload']['identity']
+            if (suite['binding']!=integrated['binding'] or identity['binding']!=integrated['binding']
+                    or identity['project']!=self.project.fingerprint() or identity['snapshot']!=artifact['snapshot']
+                    or identity['phase']!='integrated' or integrated['payload']['commit']!=artifact['commit']):
+                raise ValueError('exact integrated suite required for acceptance gates')
+            preview_evidence(self.project,self.store,suite['payload'],artifact['snapshot'],'integrated')
+            facts=suite_report(suite['payload'])
+            review=self.store.receipt(artifact['review'],kind='delivery_review')['payload']
+            green=self.store.receipt(review['green'],kind='green')['payload']
+            quality=Quality(self.project,self.store,None,self.board)
+            frozen=quality.frozen_plan(self.store.receipt(green['freeze'],kind='tests_frozen'))
+            if facts['failures'] or set(facts['cases'])!=set(frozen['cases']):raise ValueError('complete independently frozen suite required')
+            quality.protect(frozen['baseline'],artifact['snapshot'],allow_revision=True)
+            if quality.tests(artifact['snapshot'])!=frozen['tests']:raise ValueError('deployed tests differ from independent freeze')
         before=self.service(artifact)
-        if not before or not before['healthy'] or before['container']!=data['final']['container']:
+        if not before:
             raise EffectBlocked('deployment changed before QA')
+        clean=self.clean_qa(run,artifact)
+        before=self.service(artifact)
+        if not before or not before['healthy'] or before['container']!=self.store.receipt(clean,kind='deployment')['payload']['container']:
+            raise EffectBlocked('clean candidate identity changed before QA')
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self,*args,**kwargs):return None
         opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
@@ -403,34 +447,19 @@ class Deployment:
             raise BrowserValidationFailed(job,report)
         checks=report['checks']
         if mode==2:
-            from .quality import Quality,preview_evidence,suite_report
-            manifest=acceptance_manifest(folder)
             if value['identity'].get('browser_contract')!=2 or report.get('cases')!=manifest['cases']:
                 raise ValueError('exact deployed acceptance inventory required')
-            integrated=self.store.receipt(artifact['integrated'],kind='integrated')
-            suite=self.store.receipt(integrated['payload']['suite_job'],kind='suite_job')
-            identity=suite['payload']['identity']
-            if (suite['binding']!=integrated['binding'] or identity['binding']!=integrated['binding']
-                    or identity['project']!=self.project.fingerprint() or identity['snapshot']!=artifact['snapshot']
-                    or identity['phase']!='integrated' or integrated['payload']['commit']!=artifact['commit']):
-                raise ValueError('exact integrated suite required for acceptance gates')
-            preview_evidence(self.project,self.store,suite['payload'],artifact['snapshot'],'integrated')
-            facts=suite_report(suite['payload'])
-            review=self.store.receipt(artifact['review'],kind='delivery_review')['payload']
-            green=self.store.receipt(review['green'],kind='green')['payload']
-            quality=Quality(self.project,self.store,None,self.board)
-            frozen=quality.frozen_plan(self.store.receipt(green['freeze'],kind='tests_frozen'))
-            if facts['failures'] or set(facts['cases'])!=set(frozen['cases']):raise ValueError('complete independently frozen suite required')
-            quality.protect(frozen['baseline'],artifact['snapshot'])
-            if quality.tests(artifact['snapshot'])!=frozen['tests']:raise ValueError('deployed tests differ from independent freeze')
             checks=list(manifest['criteria'])
         after=self.service(artifact)
         if after!=before:raise EffectBlocked('deployment changed during QA')
         if repository.remote_head(self.project.branch)!=artifact['commit']:
             raise EffectBlocked('integration branch advanced during deployed QA')
         self.board.ensure(run)
-        return self.store.record('release_evidence',run.binding(),dict(project=self.project.fingerprint(),
+        recovery={}
+        if original.task!=run.task:
+            recovery={'qa_recovery':self.board.input(run,'qa_recovery')}
+        return self.store.record('release_evidence',run.binding(),dict(**recovery,project=self.project.fingerprint(),
             qualification=self.project.qualification,rollout=rollout_id,artifact=data['candidate'],
             integrated=artifact['integrated'],commit=artifact['commit'],image=artifact['image'],
-            url=after['url'],container=after['container'],qa_job=job,checks=checks,
+            url=after['url'],container=after['container'],qa_preparation=clean,qa_job=job,checks=checks,
             rollback_verified=True,delivery_approval=False))
