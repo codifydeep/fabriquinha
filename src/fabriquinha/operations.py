@@ -93,7 +93,7 @@ def doctor(project,root,store):
     try:
         mode=browser_contract(project,store)
         acceptance=dict(version=mode,multiple_contexts=mode==2,timing_assertions=mode==2,
-            frozen_python_test_revision=False,scope='qualified Python HTTP only')
+            frozen_python_test_revision=False,shared_browser_observer_maintenance=mode==2,scope='qualified Python HTTP only')
     except (ValueError,OSError,TypeError):errors.append('AcceptanceContractInvalid')
     profiles=profile_report(project,root);errors+=profiles['errors']
     from .github_auth import report as github_report

@@ -222,6 +222,17 @@ class Quality:
                         protect_repaired_baseline(self.project,self.store,before,after,authority['proposal']['test_paths'])
                         return
                 if record['kind']!='tests_frozen' or not record['payload'].get('revision'):continue
+                revision=self.test_evidence(record['payload']['revision'])
+                if revision['payload'].get('maintenance'):
+                    data=record['payload']
+                    if data['baseline']==before and data['tests']==self.tests(after):
+                        self.frozen_plan(record)
+                        from .maintenance import validate_revision
+                        from .test_revision import protect_repaired_baseline
+                        facts=validate_revision(self.project,self.store,self,revision)
+                        protect_repaired_baseline(self.project,self.store,before,after,facts['paths'])
+                        return
+                    continue
                 data=record['payload']
                 if data['baseline']==before and data['tests']==self.tests(after):
                     self.frozen_plan(record)
@@ -313,6 +324,24 @@ class Quality:
 
     def red(self, run, baseline, candidate):
         self.check(run, 'tests')
+        from .maintenance import run_authority
+        maintenance=run_authority(self.project,self.store,self.board,run)
+        if maintenance:
+            key,facts=maintenance
+            if baseline!=facts['snapshot']:raise ValueError('exact accepted maintenance baseline required')
+            from .observer_maintenance import snapshot_diff
+            snapshot_diff(self.store,baseline,candidate,facts['paths'],self.project.tests_dir)
+            self.browser_tests(run,candidate)
+            base_job,base=self.observe(run,baseline,'baseline')
+            job,report=self.observe(run,candidate,'green')
+            prior=self.frozen_plan(self.store.receipt(facts['tests'],kind='tests_frozen'))
+            if base['failures'] or report['failures'] or set(base['cases'])!=set(prior['cases']) or set(report['cases'])!=set(prior['cases']):
+                raise ValueError('maintenance preserves and passes the entire inventory')
+            historical=self.test_evidence(prior['red'])
+            return self.record(run,'test_revision',dict(control_contract=CONTROL_CONTRACT,maintenance=key,
+                historical_tests=facts['tests'],historical_red=prior['red'],baseline=baseline,snapshot=candidate,
+                baseline_job=base_job,validation_job=job,red_job=historical['payload']['red_job'],
+                cases=prior['cases'],new_cases=[],control_cases=prior['control_cases']))
         from .repairs import repair_authority
         authority=repair_authority(self.project,self.store,self.board,run)
         fixture=None
@@ -504,7 +533,7 @@ class Quality:
             scope={**scope,'task':origin['task'],'contract':origin['contract']}
         elif review['payload'].get('reassessment'):
             raise ValueError('freeze omitted reassessment authority')
-        if red['kind']=='regression_red' or red['payload'].get('fixture_revision') is not None or data.get('reassessment'):
+        if red['kind']=='regression_red' or red['payload'].get('fixture_revision') is not None or red['payload'].get('maintenance') or data.get('reassessment'):
 
             if (scope['kind']!='tests' or scope['reviewing'] is not True or scope['task']!=origin['task']
                     or scope['release']!=origin['release'] or scope['contract']!=origin['contract']
@@ -550,6 +579,8 @@ class Quality:
         self.check(run, 'implementation')
         frozen = self.freeze(run, freeze_id)
         self.protect(frozen['snapshot'], snapshot, exact_tests=True)
+        if self.test_evidence(frozen['red'])['payload'].get('maintenance') and snapshot!=frozen['snapshot']:
+            raise ValueError('observer maintenance cannot change delivered product')
         job, report = self.observe(run, snapshot, 'green')
         if report['failures'] or set(report['cases']) != set(frozen['cases']):
             raise ValueError('Green requires complete frozen membership passing')
@@ -564,6 +595,11 @@ class Quality:
         if preview_drivers(self.project,'green'):
             value=self.store.receipt(data['job'],kind='suite_job')['payload']
             preview_evidence(self.project,self.store,value,data['snapshot'],'green');suite_report(value)
+        maintenance=self.test_evidence(frozen['red'])['payload'].get('maintenance')
+        observer_paths=set();observer_covered=set()
+        if maintenance:
+            from .maintenance import reviewed
+            observer_paths=set(reviewed(self.project,self.store,maintenance)['paths'])
         coverage, jobs = set(), []
         for mutant in mutants:
             if mutant == data['snapshot']:
@@ -576,7 +612,12 @@ class Quality:
                 if failure['assertion'] and any(f['file'].startswith(self.project.tests_dir+'/') and
                         f['function'].startswith('test') for f in failure['frames']):
                     coverage.add(failure['case'])
+            if maintenance:
+                from .maintenance import observer_failures
+                observer_covered.update(observer_failures(self.store,data['snapshot'],observer_paths,report))
             jobs.append(job)
+        if observer_paths-observer_covered:
+            raise ValueError('maintenance negative control must fail the preserved pair errors assertion in each repaired fixture: '+str(sorted(observer_paths-observer_covered)))
         missing=sorted(set(frozen['control_cases'])-coverage)
         if missing:
             feedback=dict(missing=missing[:32],missing_count=len(missing),covered=sorted(coverage)[:32],
@@ -823,6 +864,12 @@ class DeliveryTools:
             context['candidate_revision']=fixture_snapshot_diff(self.store,authority['context']['snapshot'],red['snapshot'],authority['proposal']['test_paths'],q.project.tests_dir,candidate=True)
             context['candidate_scope']=dict(authority=red['fixture_revision']['authority'],proposal=authority['proposal'])
             context['candidate_review_contract']='Review the complete diff against the approved scope. Structural findings are advisory. Preserve behavior coverage and baseline, explain setup/action/assertion and why Red is expected; do not approve weaker assertions or accept a passing case as sufficient evidence.'
+        if red.get('maintenance'):
+            from .maintenance import validate_revision
+            from .observer_maintenance import snapshot_diff
+            facts=validate_revision(q.project,self.store,q,evidence)
+            context['candidate_revision']=snapshot_diff(self.store,red['baseline'],red['snapshot'],facts['paths'],q.project.tests_dir)
+            context['instructions']='Independently review exact shared-observer helper maintenance. No new functionality Red is claimed. Historical Red remains historical. Verify setup, live list identity, preserved test methods and assertions, full fresh suites and late-error negative control. Never approve your own work.'
         context['mandatory_red_targets']=sorted({failure['case'] for failure in context['red']['failures']})
         context['passing_cases']=sorted(set(context['red']['cases'])-set(context['mandatory_red_targets']))
         return context

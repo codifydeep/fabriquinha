@@ -146,6 +146,12 @@ class Board:
         with kbc.connect_closing() as conn:
             return json.loads(kb.get_task(conn,run.task).body).get('inputs',{}).get('reassessment_review')
 
+    def maintenance_input(self,run):
+        self.ensure(run)
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            return json.loads(kb.get_task(conn,run.task).body).get('inputs',{}).get('maintenance_review')
+
     def repair_input(self,run):
         self.ensure(run)
         return self.repair_for_task(run.task)

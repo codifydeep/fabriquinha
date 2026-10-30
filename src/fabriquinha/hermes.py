@@ -226,6 +226,11 @@ class Sandbox:
                 authority=repair_authority(project,store,board,run)
                 if authority and authority['proposal']['classification']=='test_contract':
                     baseline=[p for p in baseline if p not in authority['proposal']['test_paths']]
+                from .maintenance import run_authority
+                maintenance=run_authority(project,store,board,run)
+                if maintenance:
+                    if board.input(run,'baseline')!=maintenance[1]['snapshot']:raise ValueError('maintenance mount baseline drift')
+                    baseline=[p for p in baseline if p not in maintenance[1]['paths']]
         if ',' in str(self.workspace):raise ValueError('Docker bind source cannot contain a comma')
         self.expected=dict(binding=run.binding(),project=project.fingerprint(),
             workspace=str(self.workspace),phase=self.phase,baseline_tests=baseline,image=project.validation_image)

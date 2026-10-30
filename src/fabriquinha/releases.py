@@ -86,6 +86,9 @@ class Releases:
                 or proposed['payload']['project']!=self.project.fingerprint() or proposed['payload']['approval']!=approval
                 or business['binding']['release']!=release):raise ValueError('exact approved plan and business scope required')
         document=plan(proposed['payload']['document'],brief['payload']['document'],self.project)
+        if business['kind']=='maintenance_authorization':
+            from .maintenance import reviewed
+            reviewed(self.project,self.store,review_id)
         return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document)
 
     def seed(self,anchor,specification,services):
@@ -94,6 +97,11 @@ class Releases:
         if not path.exists():
             repository,_=services(self.project.delivery_roles['integration'])
             base=repository.base();snapshot=repository.snapshot(base)
+            approval=self.store.receipt(specification['approval'])
+            if approval['kind']=='maintenance_authorization':
+                from .maintenance import reviewed
+                facts=reviewed(self.project,self.store,specification['review'])
+                if base!=facts['commit'] or snapshot!=facts['snapshot']:raise ValueError('maintenance requires unchanged accepted remote base')
             write_json(path,{**expected,'commit':base,'snapshot':snapshot})
         value=json.loads(path.read_bytes())
         if any(value.get(key)!=item for key,item in expected.items()):raise ValueError('release seed scope drift')
@@ -123,6 +131,8 @@ class Releases:
                     owner=(package['owner'] if phase=='implementation' else self.project.delivery_roles[phase])
                     inputs=(test_inputs if phase=='tests' else {'tests':'parent:'+cards['tests']['id']+':tests'}
                             if phase=='implementation' else {'delivery':'parent:'+cards['implementation']['id']+':delivery'})
+                    if json.loads(anchor.body).get('maintenance'):
+                        inputs={**inputs,'maintenance_review':specification['review']}
                     if specification.get('repair'):inputs={**inputs,'repair_review':specification['repair']['review']}
                     deps=parents if phase=='tests' else [cards['tests' if phase=='implementation' else 'implementation']['id']]
                     body=self.body(phase,binding['release'],anchor.id,specification['review'],package,inputs)
@@ -253,7 +263,14 @@ class Releases:
                     left,right=self.store.manifest(source),self.store.manifest(self.store.capture(workspace))
                     if any(p not in authority['proposal']['test_paths'] and left.get(p)!=right.get(p) for p in set(left)|set(right)):
                         raise ValueError('correction workspace changed an unauthorized file')
-                else:quality.protect(source,self.store.capture(workspace))
+                else:
+                    from .maintenance import run_authority
+                    maintenance=run_authority(self.project,self.store,self.board,run)
+                    if maintenance:
+                        left,right=self.store.manifest(source),self.store.manifest(self.store.capture(workspace))
+                        if any(p not in maintenance[1]['paths'] and left.get(p)!=right.get(p) for p in set(left)|set(right)):
+                            raise ValueError('maintenance workspace changed an unauthorized file')
+                    else:quality.protect(source,self.store.capture(workspace))
         review=self.store.receipt(body['release_plan'],kind='plan_review')
         proposed=self.store.receipt(review['payload']['plan'],kind='work_plan')
         _,brief=self.intake.approved(proposed['payload']['approval'])
@@ -325,6 +342,12 @@ class Releases:
                         'then submit fresh Green and the complete negative-control set for this exact revision. '
                         'Do not change tests, reuse old Green or infer approval from the fixture repair proposal.')
             else:result['submission_continuation']=continuation_context(continuation)
+        from .maintenance import run_authority
+        maintenance=run_authority(self.project,self.store,self.board,run)
+        if maintenance:
+            result['maintenance']=maintenance[1]
+            result['tdd']='Scoped technical observer maintenance only. Replace errors = [] in open_home with errors = self._browser_errors; remove only its two duplicate page.on handlers; replace creator_errors + joiner_errors in full_room_pair with self._browser_errors. All test methods, assertions, other helpers, imports, manifests and product remain unchanged. Submit new test_revision with full original and revised suites; historical Red is provenance, not a new Red. Independent review freezes exact candidate; implementation is unchanged product with fresh Green and every required negative control. Include a product mutation causing a late browser error and prove an existing errors assertion fails.'
+            result['browser']='The controller observer is mandatory. Preserve shared live list identity and all frozen test cases. No new criterion IDs or manifests.'
         return result
 
     def baseline(self,run,body):

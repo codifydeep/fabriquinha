@@ -97,9 +97,12 @@ sob demanda; não exige nove passagens para toda atividade.
 ```mermaid
 flowchart TD
     B[Produto: brief aprovado pelo proprietário] --> P[Tech Lead: plano]
+    MA[Operador: manutenção delimitada da entrega aceita] --> P
     P --> C[CTO: revisão técnica]
     C -->|mudanças| P
     C --> T[QA: Red novo ou regressão existente no SHA exato]
+    C -->|manutenção de observador| MT[QA: nova revisão técnica e suítes completas]
+    MT --> F
     T --> F[Revisão independente e freeze]
     F -->|mudanças| T
     F --> I[Desenvolvedor: suíte Green e QA congelado local]
@@ -130,6 +133,9 @@ Não é replanejamento geral nem permissão para remover cobertura.
 O [contrato novo](docs/ADR-0006-SHARED-ACCEPTANCE.md) executa a mesma aceitação
 Python/Playwright em prévia e deploy. Revisão de teste Python já congelado ainda
 é impedimento técnico ao CTO, sem autorização implícita para editar a entrega.
+A exceção delimitada de [manutenção do observador](docs/OBSERVER-MAINTENANCE.md)
+reutiliza os gates existentes, com autorização explícita e novos recibos. A prova
+isolada passou; a entrega do reparo pelos agentes continua pendente.
 O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) completou a primeira
 entrega técnica sem intervenção externa: nove testes, controles, revisão,
 PR/CI, deploy, rollback e QA. O ensaio reutilizou explicitamente um brief já

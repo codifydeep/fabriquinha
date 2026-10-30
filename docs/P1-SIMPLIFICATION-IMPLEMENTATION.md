@@ -111,3 +111,25 @@ consumidas chamadas ao modelo nem despachados cards de reparo nesta etapa.
 
 Esses itens permanecem pendentes. Não declarar o caminho instalado, o reparo
 executado pelos agentes ou P1 concluído apenas pela existência do comparador.
+
+
+## Integração e provas de manutenção
+
+A integração agora reutiliza o fluxo normal de plano, revisão CTO, autoria QA,
+freeze independente e entrega. O comando exclusivo do operador registra escopo
+sem fabricar incidente nem aprovação de brief novo. As suítes novas são
+`test_revision`, preservando Red histórico e exigindo novos controles negativos.
+A permissão é específica ao observador, não uma liberação geral de testes Python.
+
+A prova nativa isolada passou com uma cópia privada do board: admissão repetida,
+revisão CTO separada e um único grafo depois da reconstrução dos objetos do
+controlador. A prova Chromium passou em quatro jobs Docker sem chamadas ao
+modelo. Erros depois do setup de dois contextos foram detectados pela assertion
+corrigida; o gate central continuou recusando o erro com a fixture antiga.
+A primeira tentativa da prova de navegador falhou por health/identity incompletos
+na aplicação sintética; essa fixture foi corrigida antes da nova prova. Nenhuma
+evidência dessa tentativa foi reutilizada como aprovação.
+
+Instalação e despacho reais serão registrados após a publicação. O reparo pelos
+agentes ainda precisa de revisão, PR, CI e nova homologação. Ver
+[contrato de manutenção](OBSERVER-MAINTENANCE.md).

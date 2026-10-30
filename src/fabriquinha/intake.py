@@ -126,6 +126,40 @@ class Intake:
             self._reconcile(conn)
             return dict(release=old.id,execution=key,delivery_approval=False)
 
+    def start_maintenance(self,value):
+        """Operator-only admission for unchanged delivered behavior, not approval."""
+        from .maintenance import source
+        if not isinstance(value,dict) or set(value)!={'request','label','acceptance','paths'}:
+            raise ValueError('exact maintenance request, label, acceptance and paths required')
+        text(value['label'],80)
+        if not isinstance(value['request'],str) or not re.fullmatch('[a-zA-Z0-9_-]{1,80}',value['request']):
+            raise ValueError('stable request key required')
+        facts=source(self.project,self.store,value['acceptance'],value['paths'])
+        original=self.store.receipt(facts['brief'],kind='brief_approval')
+        kb,kbc,_=native()
+        with self.lock(),kbc.connect_closing() as conn:
+            roots=self.roots(conn);key=digest([self.project.fingerprint(),'maintenance',value['request']])
+            old=next((a for a in roots if json.loads(a.body)['release']==key),None)
+            if old:
+                if json.loads(old.body)['request']!=value:raise ValueError('maintenance request changed')
+            else:
+                if any(not self.terminal(a) for a in roots):raise ValueError('one active release required')
+                if conn.execute('SELECT count(*) FROM task_runs WHERE ended_at IS NULL').fetchone()[0]:
+                    raise ValueError('settle active workers before maintenance admission')
+                origin=self.store.receipt(value['acceptance'],kind='release_acceptance')
+                parent=kb.get_task(conn,origin['binding']['task'])
+                if not parent or not self.terminal(parent):raise ValueError('native accepted source required')
+                if self.previous(key)['acceptance']!=value['acceptance']:raise ValueError('latest accepted release required')
+                permission=self.store.record('maintenance_authorization',
+                    dict(actor='operator',release=key,request=value['request'],task=original['binding']['task']),
+                    dict(**facts,project=self.project.fingerprint(),business_change=False))
+                ident=kb.create_task(conn,title='MAINTENANCE '+value['label'],assignee=self.project.coordination_roles['lead'],
+                    body=json.dumps(dict(version=1,kind='release',release=key,project=self.project.fingerprint(),
+                        request=value,maintenance=permission)),initial_status='blocked',completion_contract='local-only',idempotency_key=key)
+                old=kb.get_task(conn,ident)
+            self._reconcile(conn)
+            return dict(release=old.id,execution=key,delivery_approval=False)
+
     def _card(self,conn,anchor,kind,*,approval=None):
         kb,_,_=native();body=json.loads(anchor.body);roles=self.project.coordination_roles
         values=dict(version=1,kind=kind,release=body['release'],anchor=anchor.id,inputs={})
@@ -142,7 +176,14 @@ class Intake:
         return task_id
 
     def approved(self,approval):
-        record=self.store.receipt(approval,kind='brief_approval');data=record['payload'];binding=record['binding']
+        record=self.store.receipt(approval)
+        if record.get('kind')=='maintenance_authorization':
+            from .maintenance import authorization
+            record=authorization(self.project,self.store,approval)
+            _,proposal=self.approved(record['payload']['brief'])
+            return record,proposal
+        if record['kind']!='brief_approval':raise ValueError('business or scoped maintenance authorization required')
+        data=record['payload'];binding=record['binding']
         proposal=self.store.receipt(binding['brief'],kind='product_brief')
         if (binding.get('actor')!='ceo' or data.get('decision')!='approve' or data.get('project')!=self.project.fingerprint()
                 or proposal['payload']['project']!=self.project.fingerprint()
@@ -155,6 +196,10 @@ class Intake:
         """Expose verified approval separately from immutable proposal prose."""
         record,proposal=self.approved(approval)
         if record['binding']['release']!=release:raise ValueError('foreign approved brief')
+        if record.get('kind')=='maintenance_authorization':
+            return dict(status='maintenance_authorized',actor='operator',receipt=approval,release=release,
+                historical_brief=record['payload']['brief'],business_change=False,
+                contract='Explicit scoped maintenance only. Reuse unchanged delivered behavior; no new business approval is claimed. CTO review, independent freeze, full validation, PR, CI and deployed QA remain required.')
         return dict(status='approved',decision='approve',actor='ceo',receipt=approval,
             brief=record['binding']['brief'],release=release,document_unchanged=True,
             contract='This controller-verified receipt approves the exact document and its criteria. '
@@ -212,6 +257,10 @@ class Intake:
         for anchor in self.roots(conn):
             if self.terminal(anchor):continue
             if anchor.status!='blocked':raise ValueError('release anchor changed without qualified terminal evidence')
+            maintenance=json.loads(anchor.body).get('maintenance')
+            if maintenance:
+                self._card(conn,anchor,'plan',approval=maintenance)
+                continue
             task_id=self._card(conn,anchor,'brief');task=kb.get_task(conn,task_id)
             if task.status!='done':continue
             row=kb.latest_run(conn,task_id)
@@ -319,6 +368,9 @@ class DraftTools:
         if record['binding']['release']!=self.run.release:raise ValueError('foreign approved brief')
         result=dict(approved_brief=proposal['payload']['document'],brief_authority=self.intake.authority(approval,self.run.release),available_owners=list(self.a.project.reviewers),
                     execution=execution,work_unit_contract=PACKAGE_CONTRACT,**memory)
+        if record.get('kind')=='maintenance_authorization':
+            result['maintenance']=record['payload']
+            result['work_unit_contract']='Exactly one maintenance package. Preserve all delivered behavior and criterion IDs. Scope: only the authorized observer helpers, no product or manifest edits. CTO independently reviews the plan; QA authors the candidate and an independent reviewer freezes it. No new feature Red is claimed: historical Red stays historical; fresh full suites and negative controls are mandatory.'
         result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
         if result['previous_reviews']:
             previous=self.a.store.receipt(result['previous_reviews'][-1]['plan'],kind='work_plan')
@@ -432,7 +484,7 @@ def register_draft(activity,on_terminal):
 def main():
     from .runtime import Runtime
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('start','respond','show'))
+    parser.add_argument('operation',choices=('start','start-maintenance','respond','show'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--file',type=Path);parser.add_argument('--task');parser.add_argument('--expect')
     parser.add_argument('--decision',choices=('approve','changes','answer'));parser.add_argument('--text')
@@ -441,7 +493,7 @@ def main():
         _,kbc,_=native()
         with kbc.connect_closing() as conn:value=runtime.intake.pending(conn,args.task)
     else:
-        value=(runtime.intake.start(json.loads(args.file.read_bytes())) if args.operation=='start'
+        value=(runtime.intake.start_maintenance(json.loads(args.file.read_bytes())) if args.operation=='start-maintenance' else runtime.intake.start(json.loads(args.file.read_bytes())) if args.operation=='start'
                else runtime.intake.respond(args.task,args.expect,args.decision,args.text))
     print(json.dumps(value,indent=2))
 

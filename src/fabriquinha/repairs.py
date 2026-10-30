@@ -404,7 +404,11 @@ def context_view(store,value):
 
 
 def validate_revision(project,store,quality,record):
-    data=record['payload'];authority=reviewed(project,store,data['authority']);context=authority['context']
+    data=record['payload']
+    if data.get('maintenance'):
+        from .maintenance import validate_revision as validate_maintenance
+        return validate_maintenance(project,store,quality,record)
+    authority=reviewed(project,store,data['authority']);context=authority['context']
     if (record['kind']!='test_revision' or data['project']!=project.fingerprint()
             or record['binding']['kind']!='tests' or record['binding']['reviewing']
             or record['binding']['release']!=store.receipt(data['authority'])['binding']['release']
