@@ -71,7 +71,14 @@ class MaintenanceAuthorityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);(root/'tests').mkdir();(root/'tests/acceptance_demo.py').write_text(BEFORE)
             self.store.tree.return_value=root
-            result=context(self.project,self.store,'authorization')
+            from unittest.mock import patch
+            validator=Path(__file__).resolve().parents[1]/'src/fabriquinha/browser.py'
+            with patch('fabriquinha.executor.validation_files',return_value=('pinned-bundle',{'browser.py':validator})):
+                result=context(self.project,self.store,'authorization')
+            self.assertEqual(result['observer_harness']['validation_bundle'],'pinned-bundle')
+            self.assertIn("page.on('pageerror'",result['observer_harness']['symbols']['AcceptanceTest'])
+            self.assertIn('AcceptanceTest._browser_errors=browser_errors',result['observer_harness']['symbols']['acceptance_evaluate'])
+            self.assertEqual(len(result['observer_harness']['browser_sha256']),64)
             self.assertEqual(set(result['helpers']),{'tests/acceptance_demo.py'})
             self.assertEqual(len(result['helpers']['tests/acceptance_demo.py']),2)
             self.assertIn('ARE the authorized edit targets',result['edit_contract'])

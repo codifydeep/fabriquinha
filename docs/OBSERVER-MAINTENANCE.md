@@ -83,7 +83,10 @@ independently reviewed maintenance authority. They receive the same bounded edit
 scope as the author. A passing historical suite is expected, not a reason to add
 new assertions or manufacture feature Red. The browser harness is injected by
 the fixed validator; its absence in the exploratory shell does not authorize
-framework edits.
+framework edits. Plan and diagnostic evidence includes read-only `AcceptanceTest`
+and `acceptance_evaluate` source excerpts from the installed validation bundle,
+with its bundle identity and browser file hash. These excerpts explain the
+interface; they never replace executing the required negative controls.
 
 This context does not reset exhausted retries. The operator may use
 `intake replan-maintenance` with a private JSON containing `release` (the root

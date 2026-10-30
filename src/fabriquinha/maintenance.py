@@ -137,6 +137,17 @@ def context(project,store,key):
         tree=ast.parse(text)
         helpers[path]=[ast.get_source_segment(text,node) for cls in tree.body if isinstance(cls,ast.ClassDef)
                        for node in cls.body if isinstance(node,ast.FunctionDef) and node.name in ('open_home','full_room_pair')]
+    from .executor import validation_files
+    bundle,files=validation_files(project,store)
+    browser=files['browser.py'].read_text()
+    symbols={node.name:ast.get_source_segment(browser,node) for node in ast.parse(browser).body
+             if isinstance(node,(ast.ClassDef,ast.FunctionDef)) and node.name in ('AcceptanceTest','acceptance_evaluate')}
+    if set(symbols)!={'AcceptanceTest','acceptance_evaluate'}:
+        raise ValueError('qualified observer harness evidence required')
+    import hashlib
+    data['observer_harness']=dict(validation_bundle=bundle,
+        browser_sha256=hashlib.sha256(browser.encode()).hexdigest(),symbols=symbols,
+        contract='Read-only controller validator evidence, not a product edit target. delivery_submit runs the pinned full suite plus browser acceptance; the exploratory shell does not provide this injected module. Inspect initialization and page listener setup here; preserve independent review and actual negative-control evidence.')
     data.update(helpers=helpers,edit_contract=(
         'The exact files in paths ARE the authorized edit targets, even though they are delivered baseline tests. '
         'This explicit operator-authorized exception replaces only their open_home and full_room_pair observer setup. '
