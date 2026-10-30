@@ -102,6 +102,8 @@ flowchart TD
     C -->|mudanças| P
     C --> T[QA: Red novo ou regressão existente no SHA exato]
     C -->|manutenção de observador| MT[QA: nova revisão técnica e suítes completas]
+    MT -->|plano contraditório: triagem e hold CTO| MR[Operador: retomada delimitada, histórico preservado]
+    MR --> P
     MT --> F
     T --> F[Revisão independente e freeze]
     F -->|mudanças| T

@@ -59,7 +59,7 @@ repaired fixture. It does not modify product workspaces or snapshots and consume
 no model calls. These proofs qualify the narrow mechanism, which is installed in the reference
 environment. The actual agent repair has been admitted; its freeze, PR and new
 homologation must still supply their own evidence. The complete offline suite
-passed 528 tests; this is not a count of autonomous deliveries.
+passed 531 tests; this is not a count of autonomous deliveries.
 
 ## Operator interface
 
@@ -76,7 +76,7 @@ This operation is not an agent tool or a general Telegram approval command. The
 ordinary native board, durable outbox and `/fabrica status` expose subsequent work.
 No token, installation state or source receipt contents belong in the repository.
 
-## Diagnostic context and remaining recovery boundary
+## Diagnostic context and bounded replanning
 
 Diagnostics must read and validate the exact inactive source contract and its
 independently reviewed maintenance authority. They receive the same bounded edit
@@ -85,7 +85,22 @@ new assertions or manufacture feature Red. The browser harness is injected by
 the fixed validator; its absence in the exploratory shell does not authorize
 framework edits.
 
-This context does not reset exhausted retries. A held maintenance incident still
-requires a qualified continuation before another author attempt. The current
-end-to-end maintenance path is not yet qualified: protocol handoff failures and
-an earlier generic CTO diagnosis remain preserved, not converted into approval.
+This context does not reset exhausted retries. The operator may use
+`intake replan-maintenance` with a private JSON containing `release` (the root
+card) and `diagnosis` (the exact completed CTO hold receipt). Admission requires
+an unchanged single-package graph, a settled tests author in triage, no active
+workers or unresolved source effects, and no downstream execution.
+
+One successor plan is keyed to the predecessor graph. The Tech Lead must name
+both authorized test paths; the CTO reviews the proposed scope independently.
+Mentioning paths is only a structural gate, never semantic approval. Until that
+review completes, no successor delivery graph is released. New cards and
+workspaces preserve the original graph, incident, attempts and decisions. A
+crash between native plan creation and pointer persistence reuses the same plan.
+A different diagnosis cannot silently create repeated replans for that graph.
+
+The isolated native proof covers interrupted admission, active-worker refusal,
+independent review, repeated graph materialization, separate workspaces and
+unchanged predecessors. It uses programmed roles and does not qualify autonomous
+agent performance. The live repair still requires fresh freeze, controls, PR,
+CI, deployment and QA. This administrative replan is assisted recovery.

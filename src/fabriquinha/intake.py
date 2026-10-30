@@ -372,6 +372,13 @@ class DraftTools:
             from .maintenance import context as maintenance_context
             result['maintenance']=maintenance_context(self.a.project,self.a.store,approval)
             result['work_unit_contract']='Exactly one maintenance package. Preserve all delivered behavior and criterion IDs. Scope: only the authorized observer helpers, no product or manifest edits. CTO independently reviews the plan; QA authors the candidate and an independent reviewer freezes it. No new feature Red is claimed: historical Red stays historical; fresh full suites and negative controls are mandatory.'
+        if body.get('maintenance_replan'):
+            correction=self.a.store.receipt(body['maintenance_replan'],kind='maintenance_replan_authorization')
+            if correction['binding']['release']!=self.run.release or correction['payload']['authority']!=approval:
+                raise ValueError('exact maintenance replan authority required')
+            result['replan']=dict(prior_review=correction['payload']['prior_review'],
+                diagnosis=correction['payload']['diagnosis'],
+                instruction='Replace the contradictory plan. Name BOTH exact authorized test paths as edit targets in task acceptance. Do not target the framework or require whole-file hash preservation for those paths. Preserve all other code, assertions, manifests and behavior. Independent review must assess this exact scope. No new feature Red; fresh original/revised suites, freeze, Green and negative controls remain mandatory.')
         result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
         if result['previous_reviews']:
             previous=self.a.store.receipt(result['previous_reviews'][-1]['plan'],kind='work_plan')
@@ -389,6 +396,11 @@ class DraftTools:
         self.a.ensure()
         if self.run.reviewing:raise ValueError('review cannot replace the plan')
         document=brief(args) if self.run.kind=='brief' else plan(args,self.evidence()['approved_brief'],self.a.project)
+        if self.run.kind=='plan':
+            evidence=self.evidence()
+            if evidence.get('replan'):
+                from .maintenance_replan import plan_scope
+                plan_scope(document,evidence['maintenance']['paths'])
         if self.run.kind=='brief' and self.a.project.delivery_roles and len(document['criteria'])>20:
             raise ValueError('the qualified browser contract supports at most 20 acceptance criteria')
         payload=dict(project=self.a.project.fingerprint(),document=document)
@@ -425,6 +437,9 @@ class DraftTools:
         text(args['reason']);texts(args['findings'],maximum=8)
         if (args['decision']=='approve')!= (not args['findings']):raise ValueError(REVIEW_FINDINGS_CONTRACT)
         plan(evidence['plan'],evidence['approved_brief'],self.a.project)
+        if args['decision']=='approve' and evidence.get('replan'):
+            from .maintenance_replan import plan_scope
+            plan_scope(evidence['plan'],evidence['maintenance']['paths'])
         receipt=self.a.store.record('plan_review',self.run.binding(),dict(project=self.a.project.fingerprint(),verdict=args,
             plan=self.a.board.input(self.run,'plan',review_handoff=True)))
         self.a.board.finish_review(self.run,args['reason'],{'plan_review':receipt},changes=args['decision']=='changes')
@@ -485,7 +500,7 @@ def register_draft(activity,on_terminal):
 def main():
     from .runtime import Runtime
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('start','start-maintenance','respond','show'))
+    parser.add_argument('operation',choices=('start','start-maintenance','replan-maintenance','respond','show'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--file',type=Path);parser.add_argument('--task');parser.add_argument('--expect')
     parser.add_argument('--decision',choices=('approve','changes','answer'));parser.add_argument('--text')
@@ -494,7 +509,8 @@ def main():
         _,kbc,_=native()
         with kbc.connect_closing() as conn:value=runtime.intake.pending(conn,args.task)
     else:
-        value=(runtime.intake.start_maintenance(json.loads(args.file.read_bytes())) if args.operation=='start-maintenance' else runtime.intake.start(json.loads(args.file.read_bytes())) if args.operation=='start'
+        from .maintenance_replan import admit as maintenance_replan
+        value=(maintenance_replan(runtime,json.loads(args.file.read_bytes())) if args.operation=='replan-maintenance' else runtime.intake.start_maintenance(json.loads(args.file.read_bytes())) if args.operation=='start-maintenance' else runtime.intake.start(json.loads(args.file.read_bytes())) if args.operation=='start'
                else runtime.intake.respond(args.task,args.expect,args.decision,args.text))
     print(json.dumps(value,indent=2))
 

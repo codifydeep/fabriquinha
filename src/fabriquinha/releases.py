@@ -73,7 +73,9 @@ class Releases:
     def specification(self,conn,anchor):
         kb,_,_=native();release=json.loads(anchor.body)['release']
         row=conn.execute('SELECT id FROM tasks WHERE idempotency_key=? AND status!=?',(digest([release,'plan']),'archived')).fetchone()
-        task=kb.get_task(conn,row['id']) if row else None
+        from .maintenance_replan import selection
+        replan=selection(self,conn,anchor)
+        task=kb.get_task(conn,replan['plan']) if replan else kb.get_task(conn,row['id']) if row else None
         if not task or task.status!='done':return None
         review_id,review,handoff=self.closed(task.id,'plan_review','plan_review')
         body=json.loads(task.body);approval=body['inputs']['approved_brief']
@@ -89,10 +91,10 @@ class Releases:
         if business['kind']=='maintenance_authorization':
             from .maintenance import reviewed
             reviewed(self.project,self.store,review_id)
-        return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document)
+        return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document,**({'maintenance_replan':replan} if replan else {}))
 
     def seed(self,anchor,specification,services):
-        path=self.folder(anchor)/'seed.json'
+        path=self.folder(anchor)/(('maintenance-seed-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'seed.json')
         expected=dict(project=self.project.fingerprint(),plan_review=specification['review'])
         if not path.exists():
             repository,_=services(self.project.delivery_roles['integration'])
@@ -109,7 +111,7 @@ class Releases:
         return self.store.record('release_seed',self.binding(anchor),value)
 
     def materialize(self,conn,anchor,specification,services,*,path=None,seed=None):
-        kb,_,_=native();path=path or self.folder(anchor)/'graph.json';binding=self.binding(anchor)
+        kb,_,_=native();path=path or self.folder(anchor)/(('maintenance-graph-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'graph.json');binding=self.binding(anchor)
         bundle=validation_files(self.project,self.store)[0]
         if path.exists():
             graph_id=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(graph_id,kind='release_graph')
@@ -137,7 +139,8 @@ class Releases:
                     deps=parents if phase=='tests' else [cards['tests' if phase=='implementation' else 'implementation']['id']]
                     body=self.body(phase,binding['release'],anchor.id,specification['review'],package,inputs)
                     if specification.get('repair'):body['repair_plan']=specification['repair']['plan']
-                    workspace=self.store.root.parent/'work'/binding['release']/package['id']/phase
+                    if specification.get('maintenance_replan'):body['maintenance_plan']=specification['task']
+                    workspace=self.store.root.parent/'work'/binding['release']/(specification['task'] if specification.get('maintenance_replan') else '')/package['id']/phase
                     workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
                     contract=self.project.repository.removeprefix('https://github.com/') if phase=='integration' else 'local-only'
                     task=kb.create_task(conn,title=phase.upper()+' '+package['title'],body=json.dumps(body),assignee=owner,
@@ -163,6 +166,11 @@ class Releases:
         return graph_id,graph
 
     def graph_path(self,anchor,body):
+        maintenance=body.get('maintenance_plan')
+        if maintenance is not None:
+            if not re.fullmatch(r't_[a-f0-9]{8}',maintenance) or body.get('repair_plan') or body.get('continuation_plan'):
+                raise ValueError('one exact maintenance successor required')
+            return self.folder(anchor)/('maintenance-graph-'+maintenance+'.json')
         repair=body.get('repair_plan')
         continuation=body.get('continuation_plan')
         if continuation is not None:
