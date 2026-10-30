@@ -1,135 +1,64 @@
-# P1 — implementação aprovada em 30/10/2026
+# P1 — simplificação aprovada em 30/10/2026
 
-Decisão do proprietário: manter Hermes + Kanban. O plano da auditoria de 30/10
-foi aprovado; pequenas correções não dispensam revisão ou proteção das regressões.
+A arquitetura permanece Hermes + Kanban. Pequenas correções continuam sujeitas à
+revisão independente e à proteção das regressões.
 
-## Matriz
+## Matriz — instalada
 
-A configuração já fornece `execution.reviewers` ao planejamento. Seus valores
-são alternativas elegíveis, não uma lista de assinaturas cumulativas. O primeiro
-ajuste explicita essa semântica no contexto compartilhado, sem alterar identidade,
-seleção ou quantidade de revisores. Consulta técnica não cria um gate adicional.
+`config.execution_context` esclarece que os valores de `execution.reviewers` são
+alternativas elegíveis, não assinaturas cumulativas. O controlador seleciona um
+revisor independente por handoff; consulta técnica não cria outro gate.
+Identidades, seleção e quantidade de revisores foram preservadas.
 
-Estado: instalado em 30/10 a partir de `03b5fea`, após pausa controlada, ausência
-de workers ativos, backup SQLite com integridade verificada e exportação congelada.
-Dispatcher retomado; doctor confirmou ready sem erros. A seleção de revisores
-não mudou. A instrução se aplica às próximas execuções.
+## Manutenção das fixtures — mecanismo instalado; entrega em andamento
 
-## Fixtures
+Nos dois arquivos de aceitação novos, a concatenação de listas de erros no setup
+produz uma cópia. Os observadores centrais de `AcceptanceTest.new_context` e o gate
+final de `acceptance_evaluate` já protegiam a execução; a correção elimina a
+redundância enganosa, sem invalidar a homologação anterior.
 
-Os observadores centrais de `AcceptanceTest.new_context` e o gate final de
-`acceptance_evaluate` já detectam erros de console/pageerror. Nos dois novos
-arquivos de aceitação, a concatenação das listas no setup captura apenas uma
-cópia. Encaminhar à equipe uma correção técnica delimitada: eliminar a duplicação
-ou preservar referências vivas, demonstrar que erro após setup reprova e executar
-a suíte integral. Não editar snapshots da v0.3 nem converter resultados antigos
-em validação da correção.
+O [contrato delimitado](OBSERVER-MAINTENANCE.md) permite somente a substituição dos
+helpers por referências à lista viva do observador central. Casos, assertions,
+imports, outros helpers, manifests e produto permanecem iguais. Não foi habilitada
+revisão geral de testes Python congelados.
 
-Antes do despacho, verificar o caminho de admissão para manutenção de teste de
-release concluída. Se ele exigir incidente ativo, não fabricar falha/retries:
-usar um novo objetivo de manutenção com escopo e evidências explícitos, sob o
-contrato existente. Uma alteração necessária de contrato deve ser apresentada
-como tal, não escondida na manutenção da fixture.
+O operador identifica a aceitação entregue e os caminhos exatos. A equipe reutiliza
+o brief original como escopo histórico, sem fabricar novo aceite do CEO ou um
+incidente de falha. Lead e CTO planejam/revisam; QA produz a revisão; outro perfil
+congela o candidato exato. Green, controles, revisão, PR, CI, implantação e QA
+continuam obrigatórios. O histórico e os snapshots anteriores são preservados.
 
-## Kanban
+O objetivo real foi admitido e o Tech Lead iniciou o planejamento pelo dispatcher.
+As fixtures do produto não foram editadas manualmente. A entrega do reparo ainda
+precisa fornecer evidências próprias; não declarar P1 concluído.
 
-Próxima alteração: visão de consulta que explique a release vigente e seus
-predecessores, mantendo o board nativo acessível. Derivar estado do grafo e do
-recibo de aceitação. Não marcar predecessores como concluídos nem arquivar por
-heurística de nome. Identificar claramente o dispatcher Fabriquinha e evitar
-interpretar `Gateway: Off` como parada da equipe. Validar leitura sem escrita e
-estado indisponível/antigo como desconhecido, nunca como saudável.
+### Validação do mecanismo
 
-Nenhum novo serviço, banco ou orquestrador. Publicação do código não equivale à
-instalação no runtime congelado. Registrar implantação e validação separadamente.
+- Suíte offline: 527 testes aprovados, incluindo escopo, snapshots completos,
+  revisão obsoleta, autoria, jobs de outra execução e produto imutável.
+- Kanban nativo isolado: admissão repetida e reconstrução do controlador preservam
+  um plano e um grafo, com revisão separada do CTO. Papéis programados, sem modelo.
+- Chromium real: quatro jobs isolados demonstram comportamento normal e erro
+  tardio após setup de dois contextos. O observador central bloqueia o erro na
+  fixture antiga; a assertion preservada também falha na fixture corrigida.
+- A primeira prova de navegador falhou por health/identity incompletos na aplicação
+  sintética. A fixture foi corrigida e a prova completa repetida. Isso não alterou
+  testes ou implementação do produto.
 
-## Resultado da verificação de manutenção
+Instalação executada com pausa, ausência de workers ativos, backup SQLite com
+integridade conferida e fonte congelada. Dispatcher e canal retomados; doctor
+confirmou a capacidade restrita sem erros. Modelos e limites não foram alterados.
 
-A admissão instalada declara `frozen_python_test_revision=false` e
-`Quality.correction_diff` rejeita revisão técnica Python congelada. Além disso,
-a admissão de reparo exige incidente de implementação bloqueada/triage, ausente
-na release concluída. Portanto, não foi despachado um objetivo destinado a falhar,
-nem fabricado incidente. As fixtures permanecem inalteradas; P1 não está concluído.
+## Kanban — orientação instalada; resumo ainda pendente
 
-Próximo passo técnico: qualificar uma autorização de manutenção com referência à
-entrega concluída e escopo exato, reutilizando revisão independente e novo freeze.
-Validar rejeição de arquivo fora de escopo, revisão obsoleta, autor igual ao revisor,
-remoção de casos e bypass do observador central. Demonstrar erro tardio capturado
-pelo harness, suíte completa e controle negativo antes do despacho real. Não
-habilitar globalmente revisão Python apenas mudando o indicador de capacidade.
-Não há necessidade de novo serviço ou de uma nova autorização geral do proprietário.
+O painel nativo mostra uma orientação dispensável que distingue o dispatcher
+Fabriquinha do gateway nativo e explica que cards históricos não significam
+trabalho ativo. Autenticação, consulta somente leitura e bloqueio de chat/terminal
+foram preservados. A orientação foi confirmada no navegador e tem cinco testes.
 
-## Visualização instalada
+Ela não é um indicador de saúde nem um resumo da release. A visão resumida derivada
+do grafo e dos recibos permanece pendente. Não alterar cards históricos para
+melhorar aparência; estado ausente ou antigo deve aparecer como desconhecido.
 
-O launcher acrescenta orientação dispensável à página nativa do Kanban, explicando
-quem despacha, o significado dos cards históricos e o canal de comandos. Não
-transforma estados nem declara saúde a partir de uma mensagem estática. Cinco testes
-passaram, incluindo preservação de respostas 401, APIs, bloqueio de mutações e
-WebSockets. Painel reiniciado isoladamente e orientação confirmada no navegador.
-A visão resumida derivada de grafo/recibos continua pendente; esta etapa é apenas
-orientação visual, não um novo painel de estado.
-
-
-## Qualificação offline da manutenção — etapa estrutural
-
-Implementado `observer_maintenance.observer_diff` e o comparador de snapshots.
-Eles aceitam somente a substituição dos observadores locais duplicados pela lista
-viva do observador central nos dois helpers existentes. Todas as outras árvores
-sintáticas, casos, assertions, imports e condições permanecem idênticas. O snapshot
-inteiro é comparado: mudanças no produto, descoberta, manifests, modos ou arquivos
-fora dos dois caminhos são rejeitadas. Este comparador não concede autoridade e
-não é um protocolo paralelo de execução.
-
-Validação: seis testes novos passaram e a suíte completa teve 519 testes aprovados.
-O teste de eventos simula duas páginas e comprova que erros tardios chegam à lista
-central enquanto uma concatenação antiga permanece vazia. Isso é um teste unitário
-do harness, não evidência de execução real em Chromium. Uma comparação em memória
-com as duas fixtures entregues confirmou compatibilidade, sem gravar candidato,
-workspace, snapshot ou recibo de produto.
-
-A instalação continua sem permissão geral de revisão de testes Python. Não foram
-consumidas chamadas ao modelo nem despachados cards de reparo nesta etapa.
-
-### Integração ainda necessária antes do despacho
-
-1. Vincular a manutenção à aceitação exata da release entregue, commit, snapshot e
-   arquivos autorizados; recusar divergência da base ou outra release ativa.
-2. Reutilizar o card de plano/revisão para o CTO validar o escopo, sem inventar
-   incidente de falha nem reabrir a release homologada. A admissão não aprova testes.
-3. Permitir o candidato somente no card de testes atribuído ao autor; produzir um
-   recibo novo de revisão técnica. Preservar a referência ao Red histórico, sem
-   apresentar Green de manutenção como novo Red de funcionalidade.
-4. Vincular o freeze à revisão independente do candidato exato; verificar autoria,
-   SHA, escopo e inventário novamente no caminho de CI. Não reinterpretar recibos
-   antigos com a nova exceção.
-5. Executar suíte completa e controle negativo de erro tardio em navegador real,
-   inclusive depois do setup dos dois contextos. O reparo só será qualificado após
-   essa prova e o ciclo de revisão; os testes unitários acima não o substituem.
-6. Reutilizar implementação/Green, revisão, PR, CI local, implantação e QA existentes;
-   publicar o novo recibo. Registrar reinícios com a mesma chave idempotente e
-   nenhuma aprovação duplicada.
-
-Esses itens permanecem pendentes. Não declarar o caminho instalado, o reparo
-executado pelos agentes ou P1 concluído apenas pela existência do comparador.
-
-
-## Integração e provas de manutenção
-
-A integração agora reutiliza o fluxo normal de plano, revisão CTO, autoria QA,
-freeze independente e entrega. O comando exclusivo do operador registra escopo
-sem fabricar incidente nem aprovação de brief novo. As suítes novas são
-`test_revision`, preservando Red histórico e exigindo novos controles negativos.
-A permissão é específica ao observador, não uma liberação geral de testes Python.
-
-A prova nativa isolada passou com uma cópia privada do board: admissão repetida,
-revisão CTO separada e um único grafo depois da reconstrução dos objetos do
-controlador. A prova Chromium passou em quatro jobs Docker sem chamadas ao
-modelo. Erros depois do setup de dois contextos foram detectados pela assertion
-corrigida; o gate central continuou recusando o erro com a fixture antiga.
-A primeira tentativa da prova de navegador falhou por health/identity incompletos
-na aplicação sintética; essa fixture foi corrigida antes da nova prova. Nenhuma
-evidência dessa tentativa foi reutilizada como aprovação.
-
-Instalação e despacho reais serão registrados após a publicação. O reparo pelos
-agentes ainda precisa de revisão, PR, CI e nova homologação. Ver
-[contrato de manutenção](OBSERVER-MAINTENANCE.md).
+Nenhum novo serviço, banco ou orquestrador foi introduzido. A próxima comprovação
+é a entrega real da manutenção pela equipe, seguida da melhoria de visualização.

@@ -56,8 +56,10 @@ The Chromium proof uses a disposable synthetic HTTP app and four isolated Docker
 jobs: old/new normal behavior passes; late errors after setup are blocked by the
 central observer with the old fixture and by the preserved assertion with the
 repaired fixture. It does not modify product workspaces or snapshots and consumes
-no model calls. These proofs qualify the narrow mechanism; the actual agent
-repair, PR and new homologation must still supply their own evidence.
+no model calls. These proofs qualify the narrow mechanism, which is installed in the reference
+environment. The actual agent repair has been admitted; its freeze, PR and new
+homologation must still supply their own evidence. The complete offline suite
+passed 527 tests; this is not a count of autonomous deliveries.
 
 ## Operator interface
 
