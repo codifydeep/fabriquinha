@@ -36,6 +36,7 @@ pausa humana ou dependência externa também não significa cancelamento.
 
 ```mermaid
 flowchart LR
+    DASH[Hermes dashboard: consulta local] --> K
     CEO[Proprietário: brief e decisões de negócio] --> TG[Telegram: comando explícito e identidade humana]
     TG --> IN[Intake: card e revisão exatos]
     IN --> K[Hermes Kanban]
@@ -296,3 +297,5 @@ flowchart LR
 
 A transição mantém o incidente e os snapshots antigos; um worker ativo ou um
 novo congelamento não equivale a homologação.
+
+Local board access and observation limits: [Local Hermes Kanban](docs/LOCAL-KANBAN.md).

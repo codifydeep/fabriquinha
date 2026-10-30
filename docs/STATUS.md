@@ -1,4 +1,8 @@
-# Status do projeto — 29 de outubro de 2026
+# Status do projeto — 30 de outubro de 2026
+
+Painel local em modo consulta: [Hermes Kanban](http://127.0.0.1:9119/kanban).
+[Instruções e limites](LOCAL-KANBAN.md). As instalações antigas do Multica
+foram retiradas de execução; volumes e arquivos de recuperação preservados.
 
 **v0.2 homologada, ciclo assistido.** Cancelamento de salas entregue com
 reparo técnico dos testes pelo fluxo CTO → QA → revisão independente.
