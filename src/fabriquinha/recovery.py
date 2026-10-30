@@ -190,6 +190,33 @@ class Diagnostic:
             'Review the existing immutable handoff; do not reproduce Red or edit the author.'
             if self.original['reviewing'] else
             'Diagnose the current implementation/integration phase; preserve frozen tests and its existing delivery gates.')
+        # The source execution is no longer claimed. Read its immutable contract,
+        # not diagnostic-card inputs, and revalidate the maintenance authority.
+        kb,api,_=native()
+        with api.connect_closing() as conn:
+            source=kb.get_task(conn,self.incident['source'])
+            source_body=json.loads(source.body or '{}') if source else {}
+        maintenance_key=source_body.get('inputs',{}).get('maintenance_review')
+        if maintenance_key:
+            from .maintenance import reviewed,context
+            if digest(source_body)!=self.original['contract'] or source_body.get('release')!=self.run.release:
+                raise ValueError('exact maintenance source contract required')
+            reviewed(self.q.project,self.store,maintenance_key)
+            review=self.store.receipt(maintenance_key,kind='plan_review')
+            if review['binding']['release']!=self.run.release:
+                raise ValueError('foreign maintenance diagnosis')
+            plan=self.store.receipt(review['payload']['plan'],kind='work_plan')
+            result['maintenance']=context(self.q.project,self.store,plan['payload']['approval'])
+            result['phase_expectation']=(
+                'Scoped maintenance of existing tests, not new feature authorship. '
+                'The operator edit_contract and exact paths override conflicting historical plan prose. '
+                'Do not require new assertions or a new Red against correct delivered behavior. '
+                'Historical Red remains provenance; fresh full original and revised suites, independent freeze, '
+                'Green and negative controls remain mandatory. The author must edit only the authorized fixture '
+                'helpers and call delivery_submit, which runs the controller browser harness. '
+                'fabriquinha_acceptance is injected by that harness; its absence in the exploratory shell '
+                'does not justify editing or creating the framework. A passing diagnostic is not delivery approval. '
+                'Preserve allowed_actions; do not reset exhausted retries or grant a new retry from this context.')
         result['experiment_semantics']='A complete diagnostic report may contain failures, errors or skips. These are evidence for guidance, not a delivery approval. Resume permits a fresh attempt in the same phase; it does not certify success.'
         if self.qa_correction():
             from .repairs import context_view

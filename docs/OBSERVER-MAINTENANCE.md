@@ -75,3 +75,17 @@ python -m fabriquinha.intake start-maintenance \
 This operation is not an agent tool or a general Telegram approval command. The
 ordinary native board, durable outbox and `/fabrica status` expose subsequent work.
 No token, installation state or source receipt contents belong in the repository.
+
+## Diagnostic context and remaining recovery boundary
+
+Diagnostics must read and validate the exact inactive source contract and its
+independently reviewed maintenance authority. They receive the same bounded edit
+scope as the author. A passing historical suite is expected, not a reason to add
+new assertions or manufacture feature Red. The browser harness is injected by
+the fixed validator; its absence in the exploratory shell does not authorize
+framework edits.
+
+This context does not reset exhausted retries. A held maintenance incident still
+requires a qualified continuation before another author attempt. The current
+end-to-end maintenance path is not yet qualified: protocol handoff failures and
+an earlier generic CTO diagnosis remain preserved, not converted into approval.

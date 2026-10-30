@@ -62,6 +62,37 @@ class TechnicalRecovery(unittest.TestCase):
         view[0]['experiment']['report']['failures'][0]['detail']='changed'
         self.assertEqual(json.dumps(guide,sort_keys=True),before)
 
+    def test_maintenance_diagnosis_preserves_scope_without_fabricating_red_or_retry(self):
+        body=dict(release='v1',inputs=dict(maintenance_review='review'))
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.original={**diagnostic.original,'contract':digest(body)}
+        diagnostic.incident['resume_allowed']=False
+        kb=SimpleNamespace(get_task=lambda *args:SimpleNamespace(body=json.dumps(body)))
+        api=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)
+        original_receipt=self.store.receipt
+        records={'review':dict(binding=dict(release='v1'),payload=dict(plan='plan')),
+                 'plan':dict(payload=dict(approval='authority'))}
+        def receipt(key,**kwargs):
+            return records[key] if key in records else original_receipt(key,**kwargs)
+        with patch('fabriquinha.recovery.native',return_value=api), \
+             patch('fabriquinha.maintenance.reviewed') as reviewed, \
+             patch('fabriquinha.maintenance.context',return_value={'paths':['tests/exact.py']}) as context, \
+             patch.object(self.store,'receipt',side_effect=receipt):
+            result=diagnostic.evidence()
+            self.assertEqual(result['maintenance']['paths'],['tests/exact.py'])
+            self.assertIn('not new feature',result['phase_expectation'])
+            self.assertIn('delivery_submit',result['phase_expectation'])
+            self.assertNotIn('resume',result['allowed_actions'])
+            reviewed.assert_called_once_with(self.project,self.store,'review')
+            context.assert_called_once_with(self.project,self.store,'authority')
+            diagnostic.original['contract']='stale'
+            with self.assertRaisesRegex(ValueError,'exact maintenance source'):
+                diagnostic.evidence()
+            diagnostic.original['contract']=digest(body)
+            records['review']['binding']['release']='foreign'
+            with self.assertRaisesRegex(ValueError,'foreign maintenance'):
+                diagnostic.evidence()
+
     def test_previous_diagnosis_is_evidence_history_not_inherited_instructions(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         prior=Run('old-cto',9,'cto','diagnostic',False,'cto','v1','old-contract')
