@@ -49,3 +49,6 @@ LaunchAgents were disabled and archived, databases dumped and verified, and
 container metadata/logs archived privately before exact-ID removal. Volumes and
 historical evidence remain available for recovery. Shared images and unrelated
 projects must not be removed as part of retirement.
+
+The Kanban page includes a dismissible explanation of these ownership and history
+limitations. This static notice is not a health indicator or release summary.

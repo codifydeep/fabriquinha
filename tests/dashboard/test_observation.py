@@ -9,6 +9,18 @@ spec.loader.exec_module(module)
 
 
 class ObservationTests(unittest.TestCase):
+    def test_guidance_preserves_auth_errors_and_api_payloads(self):
+        for path, status, content in [('/kanban', 401, b'text/html'), ('/api/status', 200, b'application/json'), ('/kanban', 200, b'text/html')]:
+            output = []
+            async def inner(scope, receive, send):
+                await send({'type':'http.response.start', 'status':status, 'headers':[(b'content-type',content)]})
+                await send({'type':'http.response.body', 'body':b'<body>native</body>'})
+            async def send(message):
+                output.append(message)
+            asyncio.run(module.KanbanGuidance(inner)({'type':'http','method':'GET','path':path}, None, send))
+            self.assertEqual(output[0]['status'], status)
+            self.assertEqual(module.KANBAN_NOTICE in output[1]['body'], path == '/kanban' and status == 200)
+
     def invoke(self, scope):
         messages, reached = [], []
         async def inner(scope, receive, send):
