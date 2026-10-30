@@ -240,7 +240,18 @@ class Releases:
         artifact=self.store.receipt(rollout['candidate'],kind='artifact')['payload']
         integrated=self.store.receipt(artifact['integrated'],kind='integrated')['payload']
         publication=self.store.receipt(integrated['publication'],kind='publication')
-        return (publication['binding']['task']==task.id and publication['binding']['contract']==digest(body)
+        expected_task,expected_contract=task.id,digest(body)
+        key=body.get('inputs',{}).get('qa_recovery')
+        if key:
+            from .board import Run
+            from .qa_recovery import origin
+            admission=self.store.receipt(key,kind='qa_recovery')['payload']
+            if handoff.get('qa_recovery')!=key or handoff['rollout']!=admission['rollout'] or rollout['candidate']!=admission['artifact']:
+                return False
+            source=origin(self.project,self.store,Run(**{**admission['source_binding'],
+                'task':task.id,'contract':digest(body)}))
+            expected_task,expected_contract=source.task,source.contract
+        return (publication['binding']['task']==expected_task and publication['binding']['contract']==expected_contract
                 and publication['binding']['release']==body['release'] and publication['payload']['pr']==task.completion_contract)
 
     def admit(self,task):

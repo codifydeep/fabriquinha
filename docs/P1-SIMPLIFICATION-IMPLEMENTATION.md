@@ -38,7 +38,7 @@ precisa fornecer evidências próprias; não declarar P1 concluído.
 
 ### Validação do mecanismo
 
-- Suíte offline: 535 testes aprovados, incluindo escopo, snapshots completos,
+- Suíte offline: 536 testes aprovados, incluindo escopo, snapshots completos,
   revisão obsoleta, autoria, jobs de outra execução e produto imutável.
 - Kanban nativo isolado: admissão repetida e reconstrução do controlador preservam
   um plano e um grafo, com revisão separada do CTO. Papéis programados, sem modelo.

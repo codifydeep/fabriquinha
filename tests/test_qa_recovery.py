@@ -27,3 +27,25 @@ class CleanQARouting(TestCase):
         self.assertEqual(receipt_origin(project,store,record)['task'],'old')
         for scope,payload in (({'actor':'devops'},{}),({}, {'artifact':'foreign'}),({'release':'foreign'},{})):
             with self.assertRaises(ValueError):receipt_origin(project,store,{'binding':{**record['binding'],**scope},'payload':{**record['payload'],**payload}})
+
+    def test_recovered_card_binds_only_original_exact_pr(self):
+        import json
+        from types import SimpleNamespace as NS
+        from unittest.mock import patch
+        from fabriquinha.releases import Releases
+        body={'kind':'integration','release':'r','inputs':{'qa_recovery':'a'}}
+        task=NS(id='new',body=json.dumps(body),completion_contract='https://github.com/o/r/pull/18')
+        handoff=dict(published_pr=task.completion_contract,rollout='rollout',qa_recovery='a')
+        records={'rollout':dict(candidate='artifact'),'artifact':dict(integrated='i'),'i':dict(publication='pub'),
+            'a':dict(rollout='rollout',artifact='artifact',source_binding=dict(task='old'))}
+        publication=dict(binding=dict(task='old',contract='old-contract',release='r'),payload=dict(pr=task.completion_contract))
+        store=NS(receipt=lambda key,**kw:publication if key=='pub' else dict(payload=records[key]))
+        obj=NS(project=NS(repository='https://github.com/o/r'),store=store)
+        conn=NS(execute=lambda *a:NS(fetchone=lambda:{'metadata':json.dumps(handoff)}))
+        with patch('fabriquinha.board.Run',side_effect=lambda **kw:NS(**kw)),patch('fabriquinha.qa_recovery.origin',return_value=NS(task='old',contract='old-contract')):
+            self.assertTrue(Releases.bound_contract(obj,conn,task))
+            publication['binding']['task']='foreign'
+            self.assertFalse(Releases.bound_contract(obj,conn,task))
+            publication['binding']['task']='old';handoff['rollout']='other'
+            records['other']=dict(candidate='artifact')
+            self.assertFalse(Releases.bound_contract(obj,conn,task))
