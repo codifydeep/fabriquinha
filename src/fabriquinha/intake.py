@@ -369,7 +369,8 @@ class DraftTools:
         result=dict(approved_brief=proposal['payload']['document'],brief_authority=self.intake.authority(approval,self.run.release),available_owners=list(self.a.project.reviewers),
                     execution=execution,work_unit_contract=PACKAGE_CONTRACT,**memory)
         if record.get('kind')=='maintenance_authorization':
-            result['maintenance']=record['payload']
+            from .maintenance import context as maintenance_context
+            result['maintenance']=maintenance_context(self.a.project,self.a.store,approval)
             result['work_unit_contract']='Exactly one maintenance package. Preserve all delivered behavior and criterion IDs. Scope: only the authorized observer helpers, no product or manifest edits. CTO independently reviews the plan; QA authors the candidate and an independent reviewer freezes it. No new feature Red is claimed: historical Red stays historical; fresh full suites and negative controls are mandatory.'
         result['previous_reviews']=self.a.board.review_feedback(self.run,self.a.store)
         if result['previous_reviews']:

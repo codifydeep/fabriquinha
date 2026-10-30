@@ -125,3 +125,28 @@ def observer_failures(store, snapshot, paths, report):
     return {frame['file'] for failure in report['failures'] if failure.get('assertion') is True
             for frame in failure.get('frames',[]) if frame.get('file') in lines
             and frame.get('line') in lines[frame['file']] and frame.get('function','').startswith('test')}
+
+
+def context(project,store,key):
+    """Show the precise authorized byte exception, not an ambiguous helper name."""
+    record=authorization(project,store,key);data=dict(record['payload']);helpers={}
+    import ast
+    for path in data['paths']:
+        text=(store.tree(data['snapshot'])/path).read_text()
+        if len(text.encode())>131072:raise ValueError('bounded maintenance fixture context required')
+        tree=ast.parse(text)
+        helpers[path]=[ast.get_source_segment(text,node) for cls in tree.body if isinstance(cls,ast.ClassDef)
+                       for node in cls.body if isinstance(node,ast.FunctionDef) and node.name in ('open_home','full_room_pair')]
+    data.update(helpers=helpers,edit_contract=(
+        'The exact files in paths ARE the authorized edit targets, even though they are delivered baseline tests. '
+        'This explicit operator-authorized exception replaces only their open_home and full_room_pair observer setup. '
+        'Inside each listed file: change errors = [] to errors = self._browser_errors; remove only the two duplicate '
+        'page.on(pageerror/console) handlers in open_home; replace creator_errors + joiner_errors with self._browser_errors '
+        'in full_room_pair. Do not preserve the whole-file hashes of these two files: they must change and receive a new independent freeze. '
+        'Preserve every test method/assertion, other helper, import, manifest and product byte. '
+        'Never edit fabriquinha_acceptance, AcceptanceTest, the controller harness, or an invented helper module. '
+        'Old brief wording about unchanged baseline bytes is overridden ONLY for this explicit helper substitution; '
+        'all business behavior remains unchanged. Use the existing complete suite command and installed delivery gates; '
+        'do not invent a separate coverage command. Negative controls must include a late console/page error that fails '
+        'the preserved pair errors assertion in EACH edited fixture, plus every existing mandatory control target.'))
+    return data

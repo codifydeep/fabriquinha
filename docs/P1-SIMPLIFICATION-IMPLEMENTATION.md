@@ -29,12 +29,16 @@ congela o candidato exato. Green, controles, revisão, PR, CI, implantação e Q
 continuam obrigatórios. O histórico e os snapshots anteriores são preservados.
 
 O objetivo real foi admitido e o Tech Lead iniciou o planejamento pelo dispatcher.
-As fixtures do produto não foram editadas manualmente. A entrega do reparo ainda
+As fixtures do produto não foram editadas manualmente. A primeira revisão real
+interpretou incorretamente o alvo como helper do framework. O contexto foi então
+explicitado com os helpers originais dos dois arquivos autorizados e a exceção
+exata; cards, plano e revisão foram preservados. Este ciclo de manutenção é
+assistido por essa correção da plataforma após o início. A entrega do reparo ainda
 precisa fornecer evidências próprias; não declarar P1 concluído.
 
 ### Validação do mecanismo
 
-- Suíte offline: 527 testes aprovados, incluindo escopo, snapshots completos,
+- Suíte offline: 528 testes aprovados, incluindo escopo, snapshots completos,
   revisão obsoleta, autoria, jobs de outra execução e produto imutável.
 - Kanban nativo isolado: admissão repetida e reconstrução do controlador preservam
   um plano e um grafo, com revisão separada do CTO. Papéis programados, sem modelo.

@@ -59,7 +59,7 @@ repaired fixture. It does not modify product workspaces or snapshots and consume
 no model calls. These proofs qualify the narrow mechanism, which is installed in the reference
 environment. The actual agent repair has been admitted; its freeze, PR and new
 homologation must still supply their own evidence. The complete offline suite
-passed 527 tests; this is not a count of autonomous deliveries.
+passed 528 tests; this is not a count of autonomous deliveries.
 
 ## Operator interface
 

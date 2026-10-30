@@ -62,3 +62,19 @@ class MaintenanceAuthorityTests(unittest.TestCase):
             self.assertEqual(observer_failures(self.store,'snapshot',[p],report(3)),{p})
             self.assertEqual(observer_failures(self.store,'snapshot',[p],report(4)),set())
             self.assertEqual(observer_failures(self.store,'snapshot',[p],report(3,False)),set())
+
+    def test_context_names_actual_baseline_files_and_exact_exception(self):
+        import tempfile
+        from pathlib import Path
+        from fabriquinha.maintenance import context
+        from test_observer_maintenance import BEFORE
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'tests').mkdir();(root/'tests/acceptance_demo.py').write_text(BEFORE)
+            self.store.tree.return_value=root
+            result=context(self.project,self.store,'authorization')
+            self.assertEqual(set(result['helpers']),{'tests/acceptance_demo.py'})
+            self.assertEqual(len(result['helpers']['tests/acceptance_demo.py']),2)
+            self.assertIn('ARE the authorized edit targets',result['edit_contract'])
+            self.assertIn('Never edit fabriquinha_acceptance',result['edit_contract'])
+            self.assertIn('Do not preserve the whole-file hashes',result['edit_contract'])
+            self.assertNotIn('edit_contract',self.records['authorization']['payload'])

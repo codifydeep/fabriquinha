@@ -345,7 +345,10 @@ class Releases:
         from .maintenance import run_authority
         maintenance=run_authority(self.project,self.store,self.board,run)
         if maintenance:
-            result['maintenance']=maintenance[1]
+            from .maintenance import context as maintenance_context
+            maintenance_plan=self.store.receipt(self.store.receipt(maintenance[0],kind='plan_review')['payload']['plan'],kind='work_plan')
+            result['maintenance']=maintenance_context(self.project,self.store,maintenance_plan['payload']['approval'])
+            result['maintenance']['scope_precedence']='The explicit operator scope is authoritative. Plan prose cannot authorize editing the framework or require preserving bytes that this scope explicitly allows to change. Preserve any discrepant plan prose as history; review the actual candidate against the exact authorized substitution.'
             result['tdd']='Scoped technical observer maintenance only. Replace errors = [] in open_home with errors = self._browser_errors; remove only its two duplicate page.on handlers; replace creator_errors + joiner_errors in full_room_pair with self._browser_errors. All test methods, assertions, other helpers, imports, manifests and product remain unchanged. Submit new test_revision with full original and revised suites; historical Red is provenance, not a new Red. Independent review freezes exact candidate; implementation is unchanged product with fresh Green and every required negative control. Include a product mutation causing a late browser error and prove an existing errors assertion fails.'
             result['browser']='The controller observer is mandatory. Preserve shared live list identity and all frozen test cases. No new criterion IDs or manifests.'
         return result
