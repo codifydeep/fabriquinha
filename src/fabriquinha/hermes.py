@@ -189,6 +189,7 @@ def command(project, expected):
         '--log-opt','max-size=1m','--log-opt','max-file=2','--workdir','/workspace',
         '--env','HOME=/tmp',*phase_mounts(expected['workspace'],project.tests_dir,expected['phase'],
                                       baseline_tests=expected['baseline_tests']),
+        *(['--mount','type=bind,src='+expected['validation_browser']+',dst=/opt/fabriquinha/browser.py,readonly'] if expected.get('validation_browser') else []),
         '--entrypoint','/bin/sh',project.validation_image,'-c','exec sleep infinity']
 
 
@@ -234,6 +235,12 @@ class Sandbox:
         if ',' in str(self.workspace):raise ValueError('Docker bind source cannot contain a comma')
         self.expected=dict(binding=run.binding(),project=project.fingerprint(),
             workspace=str(self.workspace),phase=self.phase,baseline_tests=baseline,image=project.validation_image)
+        from .executor import validation_files
+        bundle,files=validation_files(project,store)
+        if bundle:
+            path=str(files['browser.py'].resolve())
+            if ',' in path:raise ValueError('validator bind source cannot contain a comma')
+            self.expected['validation_browser']=path
         self.key=digest(self.expected)
         self.folder=store.root/'agents'/self.key
         self.journal=Journal(store.root/'effects')
@@ -247,9 +254,14 @@ class Sandbox:
         authority is granted by reconstructing an old lease.
         """
         from .board import Run
-        if (not isinstance(expected,dict) or set(expected)!={'binding','project','workspace','phase','baseline_tests','image'}
+        if (not isinstance(expected,dict) or set(expected) not in ({'binding','project','workspace','phase','baseline_tests','image'}, {'binding','project','workspace','phase','baseline_tests','image','validation_browser'})
                 or expected['project']!=project.fingerprint() or expected['image']!=project.validation_image):
             raise ValueError('exact controller-owned sandbox intent required')
+        if 'validation_browser' in expected:
+            from .executor import validation_files
+            _,files=validation_files(project,store)
+            if expected['validation_browser']!=str(files['browser.py'].resolve()):
+                raise ValueError('exact pinned validator mount required')
         run=Run(**expected['binding'])
         phase='review' if run.reviewing or run.kind=='diagnostic' else run.kind
         if (run.kind not in ('tests','implementation','diagnostic') or expected['phase']!=phase

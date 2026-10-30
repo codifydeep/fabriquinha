@@ -141,6 +141,18 @@ class NativeBackendPolicy(unittest.TestCase):
         self.board=SimpleNamespace(ensure=lambda run:None,workspace=lambda run:self.workspace,
                                    input=lambda *args,**kwargs:self.snapshot)
 
+    def test_pinned_browser_source_is_readonly_and_retirement_rejects_foreign_mount(self):
+        from unittest.mock import patch
+        browser=self.root/'browser.py';browser.write_text('# immutable validator')
+        with patch('fabriquinha.executor.validation_files',return_value=('bundle',{'browser.py':browser})):
+            sandbox=Sandbox(self.project,self.store,self.board,self.run)
+            args=command(self.project,sandbox.expected)
+            self.assertIn('type=bind,src='+str(browser)+',dst=/opt/fabriquinha/browser.py,readonly',args)
+            restored=Sandbox.recover(self.project,self.store,sandbox.expected)
+            self.assertEqual(restored.key,sandbox.key)
+            wrong={**sandbox.expected,'validation_browser':'/arbitrary/private/file'}
+            with self.assertRaisesRegex(ValueError,'exact pinned'):Sandbox.recover(self.project,self.store,wrong)
+
     def test_only_new_tests_are_writable_in_tests_phase(self):
         sandbox=Sandbox(self.project,self.store,self.board,self.run)
         args=command(self.project,sandbox.expected)

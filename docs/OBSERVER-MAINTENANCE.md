@@ -59,7 +59,7 @@ repaired fixture. It does not modify product workspaces or snapshots and consume
 no model calls. These proofs qualify the narrow mechanism, which is installed in the reference
 environment. The actual agent repair has been admitted; its freeze, PR and new
 homologation must still supply their own evidence. The complete offline suite
-passed 531 tests; this is not a count of autonomous deliveries.
+passed 532 tests; this is not a count of autonomous deliveries.
 
 ## Operator interface
 
@@ -107,3 +107,23 @@ independent review, repeated graph materialization, separate workspaces and
 unchanged predecessors. It uses programmed roles and does not qualify autonomous
 agent performance. The live repair still requires fresh freeze, controls, PR,
 CI, deployment and QA. This administrative replan is assisted recovery.
+
+## Corrected environment, unchanged reviewed plan
+
+`intake resume-maintenance-environment` accepts an exact root card and completed
+CTO hold receipt. It is a bounded operator admission, not an agent retry tool.
+It requires the corrected independently reviewed plan, settled tests triage,
+unchanged workspace, no downstream execution or unresolved effects, and the
+actual old sandbox identity proving the pinned browser source was absent.
+The installed sandbox command must now mount that exact validator read-only at
+`/opt/fabriquinha/browser.py`. No framework import or product change is required
+for file/line inspection. Network, credentials and Docker remain unavailable.
+
+Admission preserves the existing plan approval and all predecessor cards. It
+records the changed environment and creates fresh graph-owned cards/workspaces,
+without resetting a breaker or granting test, review or delivery approval. One
+such succession is allowed per root; another diagnosis cannot silently repeat it.
+The native isolated proof checks idempotence, crash recovery, unchanged history
+and reuse of the independent plan. The real Docker mount proof verifies readable
+bytes and an EROFS refusal on attempted writes. These proofs do not qualify the
+actual fixture repair, which still requires every delivery gate.

@@ -91,7 +91,11 @@ class Releases:
         if business['kind']=='maintenance_authorization':
             from .maintenance import reviewed
             reviewed(self.project,self.store,review_id)
-        return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document,**({'maintenance_replan':replan} if replan else {}))
+        from .maintenance_environment import selection as environment_selection
+        environment=environment_selection(self,anchor)
+        if environment and environment[1]['review']!=review_id:raise ValueError('environment belongs to another reviewed plan')
+        return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document,
+            **({'maintenance_replan':replan} if replan else {}),**({'maintenance_generation':environment[0]} if environment else {}))
 
     def seed(self,anchor,specification,services):
         path=self.folder(anchor)/(('maintenance-seed-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'seed.json')
@@ -111,7 +115,7 @@ class Releases:
         return self.store.record('release_seed',self.binding(anchor),value)
 
     def materialize(self,conn,anchor,specification,services,*,path=None,seed=None):
-        kb,_,_=native();path=path or self.folder(anchor)/(('maintenance-graph-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'graph.json');binding=self.binding(anchor)
+        kb,_,_=native();path=path or (self.folder(anchor)/('maintenance-environment-'+specification['maintenance_generation']+'.json') if specification.get('maintenance_generation') else None) or self.folder(anchor)/(('maintenance-graph-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'graph.json');binding=self.binding(anchor)
         bundle=validation_files(self.project,self.store)[0]
         if path.exists():
             graph_id=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(graph_id,kind='release_graph')
@@ -140,13 +144,14 @@ class Releases:
                     body=self.body(phase,binding['release'],anchor.id,specification['review'],package,inputs)
                     if specification.get('repair'):body['repair_plan']=specification['repair']['plan']
                     if specification.get('maintenance_replan'):body['maintenance_plan']=specification['task']
-                    workspace=self.store.root.parent/'work'/binding['release']/(specification['task'] if specification.get('maintenance_replan') else '')/package['id']/phase
+                    if specification.get('maintenance_generation'):body['maintenance_generation']=specification['maintenance_generation']
+                    workspace=self.store.root.parent/'work'/binding['release']/(specification.get('maintenance_generation') or (specification['task'] if specification.get('maintenance_replan') else ''))/package['id']/phase
                     workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
                     contract=self.project.repository.removeprefix('https://github.com/') if phase=='integration' else 'local-only'
                     task=kb.create_task(conn,title=phase.upper()+' '+package['title'],body=json.dumps(body),assignee=owner,
                         parents=deps,workspace_kind='dir',workspace_path=str(workspace),completion_contract=contract,
                         initial_status='blocked',max_retries=2,max_runtime_seconds=600,
-                        idempotency_key=digest([binding['release'],specification['review'],package['id'],phase]))
+                        idempotency_key=digest([binding['release'],specification['review'],package['id'],phase]+([specification['maintenance_generation']] if specification.get('maintenance_generation') else [])))
                     cards[phase]=dict(id=task,body=body,parents=deps,workspace=str(workspace),owner=owner,completion_contract=contract)
                 previous=cards['integration']['id'];by_package[package['id']]=previous
                 items.append(dict(package=package,cards=cards))
@@ -166,6 +171,11 @@ class Releases:
         return graph_id,graph
 
     def graph_path(self,anchor,body):
+        generation=body.get('maintenance_generation')
+        if generation is not None:
+            if not re.fullmatch(r'[a-f0-9]{64}',generation) or not body.get('maintenance_plan'):
+                raise ValueError('exact maintenance environment generation required')
+            return self.folder(anchor)/('maintenance-environment-'+generation+'.json')
         maintenance=body.get('maintenance_plan')
         if maintenance is not None:
             if not re.fullmatch(r't_[a-f0-9]{8}',maintenance) or body.get('repair_plan') or body.get('continuation_plan'):

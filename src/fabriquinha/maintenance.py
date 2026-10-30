@@ -147,7 +147,7 @@ def context(project,store,key):
     import hashlib
     data['observer_harness']=dict(validation_bundle=bundle,
         browser_sha256=hashlib.sha256(browser.encode()).hexdigest(),symbols=symbols,
-        contract='Read-only controller validator evidence, not a product edit target. delivery_submit runs the pinned full suite plus browser acceptance; the exploratory shell does not provide this injected module. Inspect initialization and page listener setup here; preserve independent review and actual negative-control evidence.')
+        contract='Read-only controller validator evidence, not a product edit target. The same pinned browser.py is mounted at /opt/fabriquinha/browser.py for read-only file/line inspection. delivery_submit runs the pinned full suite plus browser acceptance; the exploratory shell does not provide this injected module. Inspect initialization and page listener setup here; preserve independent review and actual negative-control evidence.')
     data.update(helpers=helpers,edit_contract=(
         'The exact files in paths ARE the authorized edit targets, even though they are delivered baseline tests. '
         'This explicit operator-authorized exception replaces only their open_home and full_room_pair observer setup. '
