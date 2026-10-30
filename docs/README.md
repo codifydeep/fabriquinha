@@ -8,8 +8,8 @@ snapshots e recibos operacionais completos permanecem privados.
 ## Ordem de leitura
 
 1. [Status atual](STATUS.md): o que foi comprovado e o que falta.
-2. [Balanço de 28/10](EXECUTION-REVIEW-2026-10-28.md): percentuais com régua explícita,
-   bloqueio atual, custos conferidos e plano proposto, sem retomada.
+2. [Balanço de 30/10](EXECUTION-REVIEW-2026-10-30.md): v0.3, autonomia observada, custos e plano.
+   [Balanço histórico de 28/10](EXECUTION-REVIEW-2026-10-28.md): régua anterior e bloqueios daquela data.
    [Revisão antes do S6, 27/10](EXECUTION-REVIEW-2026-10-27.md): capacidade de
    aceitação entre sessões, autoridade técnica, operação, memória e custos;
    refinamentos aprovados e em qualificação no [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md).

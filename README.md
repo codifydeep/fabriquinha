@@ -3,23 +3,19 @@
 Uma equipe de agentes para transformar um brief em software revisado, testado e
 entregue em homologação, com GitHub e infraestrutura própria.
 
-**Experimental. Primeiro ciclo técnico completo sem intervenção externa qualificado.**
-O caminho em validação usa **Hermes + Kanban nativos**, com operações determinísticas para
-qualidade, publicação e implantação. Multica e Temporal não são dependências
-desse caminho. A instalação legada está preservada e pausada.
+**Experimental. v0.3 homologada em ciclo autônomo observado após o aceite.**
+Dois incrementos dependentes passaram por TDD, revisão, PR/CI, implantação,
+rollback e QA; um impedimento foi diagnosticado e retomado pela própria equipe.
+O escopo comprovado é Python/HTTP web local, um host e uma release ativa.
+Autonomia geral, operação recuperável e instalação por terceiros ainda exigem provas.
+
+O caminho atual usa **Hermes + Kanban nativos** e operações determinísticas de
+qualidade/publicação/implantação. Multica foi retirado de execução; Temporal não
+é dependência. Evidências históricas e backups permanecem privados.
 
 [Status atual](docs/STATUS.md) · [Próximos passos](docs/ROADMAP.md) ·
-[Revisão crítica de 28/10/2026](docs/EXECUTION-REVIEW-2026-10-28.md) ·
+[Balanço de 30/10/2026](docs/EXECUTION-REVIEW-2026-10-30.md) ·
 [Documentação](docs/README.md)
-
-**S6 homologado com assistência; P5 em validação.** Os dois incrementos do
-lobby passaram por revisão, PR/CI, implantação, rollback e QA. O ciclo permanece
-assistido pelas correções anteriores da automação. Canal Telegram instalado com
-um único bot e comandos explícitos; saída confirmada, entrada humana ainda pendente.
-A cópia sintética foi restaurada e reiniciada sob pausa; o backup real passou na
-inspeção de dados. Recuperação operacional completa e duas entregas comparáveis
-sem intervenção técnica continuam pendentes. Veja [evidências P5](docs/CHANNEL-AND-OPERATIONS-P5.md).
-Os diagramas descrevem a arquitetura instalada, sem prometer autonomia geral.
 
 ## O que queremos construir
 
@@ -233,7 +229,7 @@ controlador ou dos artefatos após o aceite do brief. Foram 31 chamadas e
 US$ 0,074938 reportados. Os PRs 57/58 permanecem assistidos. O [S5](docs/HERMES-S5-QUALIFICATION.md) entregou Reset/Undo com 29 testes,
 memória entre perfis e recuperação real, preservando sete intervenções externas.
 Ainda faltam ciclo limpo nessa fronteira, atribuição auxiliar completa e uma
-instalação reproduzível em outro repositório. O canal Telegram está instalado, mas sua interação humana completa ainda não foi qualificada.
+instalação reproduzível em outro repositório. O canal Telegram já recebeu objetivo e aceite; recuperação operacional completa continua pendente.
 Veja o [roadmap](docs/ROADMAP.md).
 
 ## Retirada de recursos de teste
