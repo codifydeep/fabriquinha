@@ -60,8 +60,10 @@ def acceptance_manifest(folder, *, allow_empty=False):
                     or len(set(methods))!=len(methods)):
                 raise ValueError('explicit AcceptanceTest classes and unique test methods required')
             cases.extend(path.stem+'.'+node.name+'.'+method for method in methods)
-    if not 1<=len(cases)<=128 or len(set(cases))!=len(cases) or not 1<=len(criteria)<=20:
-        raise ValueError('bounded nonempty acceptance inventory required')
+    if not 1<=len(criteria)<=256:
+        raise ValueError(f'cumulative acceptance criteria count {len(criteria)} outside 1..256; preserve regressions, escalate capacity instead of removing coverage')
+    if not 1<=len(cases)<=1024 or len(set(cases))!=len(cases):
+        raise ValueError(f'cumulative acceptance cases count {len(cases)} outside 1..1024 or duplicate cases; preserve regressions')
     referenced={case for proof in criteria.values() for case in proof['cases']}
     if referenced!=set(cases):raise ValueError('coverage must reference every real acceptance case, with no invented cases')
     return dict(version=2,criteria=criteria,cases=sorted(cases))
@@ -177,7 +179,7 @@ def author_protocol(mode=1):
                 'Declare every real acceptance case in criterion coverage. All cases are discovered and run; no case filters, load_tests overrides, skips, test inheritance or hidden discovery.',
                 'A criterion may reference several cases and a case may cover several criteria. Coverage is semantic and must be independently reviewed.',
                 'Only full_suite and regression are controller gates. Use gates only for corresponding delivery-quality criteria, never to replace a user-visible behavior test.',
-                'At most 20 distinct criteria and 128 cases. Append a new manifest and test file per increment; preserve all baseline tests and manifests byte-for-byte.',
+                'The cumulative regression inventory supports 256 distinct criteria and 1024 cases; this is separate from the bounded current brief. Append a new manifest and test file per increment; preserve all baseline tests and manifests byte-for-byte.',
                 'To extend an existing criterion in a later increment, repeat its ID in the new manifest with only additional case IDs. Coverage is the union of all immutable manifests; never replace earlier cases or edit their manifest. Exact duplicate coverage is rejected.',
                 'Server data is shared. Use explicit repeatable fixtures through supported product behavior; new browser contexts isolate cookies/storage, not server data. Do not add privileged test-only application endpoints.',
                 'Same-origin HTTP only, no WebSockets/CDNs/downloads. Register cleanup for any extra resources. No browser console/page errors.',

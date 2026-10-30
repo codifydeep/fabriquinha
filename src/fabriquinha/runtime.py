@@ -674,6 +674,15 @@ class Runtime:
             if self.project.delivery_roles and run.kind in ('tests','implementation','integration'):
                 context=self.releases.prepare(run,quality)
                 prompt+='\nController-approved package context:\n'+json.dumps(context)
+                with kbc.connect_closing() as context_conn:
+                    task_body=json.loads(kb.get_task(context_conn,run.task).body)
+                if task_body.get('capacity_generation'):
+                    repair=self.store.receipt(task_body['capacity_generation'],kind='capacity_repair')['payload']
+                    prompt+='\nAssisted platform recovery (not approval): '+json.dumps({
+                        'historical_rejected_snapshot':repair['rejected_snapshot'],
+                        'historical_error':repair['reproduced_error'],'candidate_criteria':repair['criteria'],
+                        'candidate_cases':repair['cases'],
+                        'guidance':'The old cumulative 20-criterion limit rejected an additive test candidate before Red. The installed limit is now 256 criteria / 1024 cases. The old passing baseline did not diagnose that candidate. Preserve baseline bytes; add current-increment acceptance tests, use small tool writes, and submit for real Red and independent freeze. No historical candidate or diagnostic is an approval.'})
             if run.kind=='integration':
                 try:result=self.integrate(run,quality)
                 except Pending:
@@ -727,11 +736,13 @@ class Runtime:
         except BaseException as error:
             control_refusal=getattr(quality,'control_refusal',None)
             suite_refusal=getattr(quality,'suite_refusal',None)
+            submission_refusal=getattr(quality,'submission_refusal',None)
             browser_refusal=getattr(error,'browser_job',None)
             failure=self.store.record('worker_failure',run.binding(),dict(project=self.project.fingerprint(),
                 category=type(error).__name__,message=str(error)[:2000],
                 **({'control_refusal':control_refusal} if control_refusal else {}),
                 **({'suite_refusal':suite_refusal} if suite_refusal else {}),
+                **({'submission_refusal':submission_refusal} if submission_refusal else {}),
                 **({'browser_refusal':browser_refusal} if browser_refusal else {})))
             with kbc.connect_closing() as conn:
                 kb.block_task(conn,task,reason=json.dumps(dict(category=type(error).__name__,failure=failure)),

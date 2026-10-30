@@ -156,7 +156,7 @@ def execution_context(project,*,browser_mode=1):
                 source_sha='Exact runtime value of FABRIQUINHA_SOURCE_SHA environment variable; do not hardcode a commit.'),
             assets='Same-origin HTTP only; no CDN/downloads or WebSockets in this qualified stack.'),
         quality='Red -> independent test freeze -> Green -> mutations -> independent delivery review -> integrated suite -> deployed browser QA.',
-        browser_checks=dict(maximum=20,required_count='Not a target of 20. Use proportionate scenarios covering the approved criterion IDs.'),
+        browser_checks=dict(maximum=20,scope='Legacy declarative scenarios only; Python cumulative regression inventory follows the installed acceptance author protocol, not this limit.',required_count='Not a target of 20. Use proportionate scenarios covering the approved criterion IDs.'),
         frozen_qa_preview=('The exact frozen browser contract also runs after the full suite in Green, delivery review and integrated CI. '
             'text is the exact normalized full locator text, never a substring. Unit Green alone cannot satisfy this check. '
             'It does not replace post-deploy QA or historical Red.' if project.browser_tdd and project.delivery_roles else None),

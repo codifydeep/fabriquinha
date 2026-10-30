@@ -57,6 +57,16 @@ def browser_refusal_context(store,project,binding,key):
         delivery_approval=False,requires_fresh_validation=True)
 
 
+def submission_refusal_context(store,project,binding,key,current_snapshot):
+    record=store.receipt(key,kind='submission_refusal');data=record['payload']
+    if (record['binding']!=binding or data['project']!=project.fingerprint()
+            or data['phase']!='tests' or data['operation']!='delivery_submit' or data['delivery_approval'] is not False):
+        raise ValueError('submission refusal requires exact tests execution')
+    store.tree(data['snapshot']);store.tree(data['baseline'])
+    return dict(receipt=key,**data,current_workspace_matches=data['snapshot']==current_snapshot,
+        semantics='Rejected candidate is preserved evidence, not approved tests. A passing current baseline does not diagnose this rejection. Inspect the rejected snapshot and error; preserve all gates.')
+
+
 def suite_refusal_context(store,project,binding,key,current_snapshot):
     record=store.receipt(key,kind='suite_job');data=record['payload'];identity=data['identity']
     if (record['binding']!=binding or identity['binding']!=binding or identity['project']!=project.fingerprint()
@@ -242,6 +252,19 @@ class Diagnostic:
                 self.incident['control_refusal'],self.incident['snapshot'])
             result['control_submission_contract']=CONTROL_SUBMISSION_CONTRACT
             result['experiment_semantics']+=' For a control refusal, a passing unmodified suite only reconfirms Green; it does not resolve missing mutation targets. Address the recorded negative-control coverage in the technical guidance.'
+        historical=[]
+        for f in (self.store.root/'receipts').glob('*.json'):
+            record=self.store.receipt(f.stem)
+            scope=record['binding']
+            if (record['kind']=='submission_refusal' and scope.get('task')==self.original['task']
+                    and scope.get('contract')==self.original['contract'] and scope.get('release')==self.original['release']
+                    and scope.get('number',0)<self.original['number']):
+                historical.append((scope['number'],f.stem,scope))
+        if historical:
+            result['historical_submission_refusals']=[dict(source_run=n,**submission_refusal_context(
+                self.store,self.q.project,scope,key,self.incident['snapshot'])) for n,key,scope in sorted(historical)[-3:]]
+        if self.incident.get('submission_refusal'):
+            result['last_submission_refusal']=submission_refusal_context(self.store,self.q.project,self.original,self.incident['submission_refusal'],self.incident['snapshot'])
         if self.incident.get('suite_refusal'):
             result['last_suite_refusal']=suite_refusal_context(self.store,self.q.project,self.original,
                 self.incident['suite_refusal'],self.incident['snapshot'])
@@ -601,7 +624,7 @@ class Recovery:
         snapshot=self.snapshot(conn,task,source,handoff)
         failure=row['summary'] or row['error'] or task.result or 'Native worker could not complete'
         payload=json.loads(event['payload'] or '{}')
-        reason=payload.get('reason');escalation_id=None;control_refusal=None;suite_refusal=None;browser_refusal=None
+        reason=payload.get('reason');escalation_id=None;control_refusal=None;suite_refusal=None;browser_refusal=None;submission_refusal=None
         if isinstance(reason,str):
             try:data=json.loads(reason)
             except (ValueError,TypeError):data=None
@@ -610,6 +633,8 @@ class Recovery:
                     failure_record=self.store.receipt(data['failure'],kind='worker_failure')
                     if failure_record['binding']==source.binding():
                         failure=failure_record['payload']['message']
+                        submission_refusal=failure_record['payload'].get('submission_refusal')
+                        if submission_refusal:submission_refusal_context(self.store,self.project,source.binding(),submission_refusal,snapshot)
                         control_refusal=failure_record['payload'].get('control_refusal')
                         if control_refusal:control_refusal_context(self.store,self.project,source.binding(),control_refusal,snapshot)
                         suite_refusal=failure_record['payload'].get('suite_refusal')
@@ -641,6 +666,7 @@ class Recovery:
             **({'document_kind':source.kind} if source.kind in ('brief','plan') else {}),
             **({'control_refusal':control_refusal} if control_refusal else {}),
             **({'suite_refusal':suite_refusal} if suite_refusal else {}),
+            **({'submission_refusal':submission_refusal} if submission_refusal else {}),
             **({'browser_refusal':browser_refusal} if browser_refusal else {}),
             workspace=task.workspace_path,**({'review_escalation':escalation_id} if escalation_id else {})))
         # A native idempotent anchor survives restart before stage materialization.

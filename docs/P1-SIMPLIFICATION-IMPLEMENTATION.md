@@ -10,7 +10,7 @@ alternativas elegíveis, não assinaturas cumulativas. O controlador seleciona u
 revisor independente por handoff; consulta técnica não cria outro gate.
 Identidades, seleção e quantidade de revisores foram preservadas.
 
-## Manutenção das fixtures — mecanismo instalado; entrega em andamento
+## Manutenção das fixtures — entrega homologada em ciclo assistido
 
 Nos dois arquivos de aceitação novos, a concatenação de listas de erros no setup
 produz uma cópia. Os observadores centrais de `AcceptanceTest.new_context` e o gate
@@ -33,8 +33,8 @@ As fixtures do produto não foram editadas manualmente. A primeira revisão real
 interpretou incorretamente o alvo como helper do framework. O contexto foi então
 explicitado com os helpers originais dos dois arquivos autorizados e a exceção
 exata; cards, plano e revisão foram preservados. Este ciclo de manutenção é
-assistido por essa correção da plataforma após o início. A entrega do reparo ainda
-precisa fornecer evidências próprias; não declarar P1 concluído.
+assistido por essa correção da plataforma após o início. O reparo posteriormente passou por revisão independente, PR, CI e QA pós-implantação,
+com 30 testes e recibo de homologação. Isso conclui a manutenção, sem comprovar autonomia.
 
 ### Validação do mecanismo
 
@@ -65,4 +65,6 @@ do grafo e dos recibos permanece pendente. Não alterar cards históricos para
 melhorar aparência; estado ausente ou antigo deve aparecer como desconhecido.
 
 Nenhum novo serviço, banco ou orquestrador foi introduzido. A próxima comprovação
-é a entrega real da manutenção pela equipe, seguida da melhoria de visualização.
+é uma entrega útil sem intervenção operacional após o brief. A melhoria de visualização
+continua pendente. A entrega seguinte encontrou o limite cumulativo descrito em
+[CUMULATIVE-ACCEPTANCE-RECOVERY.md](CUMULATIVE-ACCEPTANCE-RECOVERY.md) e passou a ser assistida.

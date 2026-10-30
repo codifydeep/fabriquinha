@@ -441,3 +441,36 @@ class TechnicalRecovery(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class SubmissionEvidenceTest(__import__("unittest").TestCase):
+    def test_rejected_snapshot_is_not_replaced_by_current_baseline(self):
+        from types import SimpleNamespace
+        from fabriquinha.recovery import submission_refusal_context
+        binding={'task':'tests','number':2}
+        record=dict(binding=binding,payload=dict(project='p',phase='tests',operation='delivery_submit',
+            snapshot='candidate',baseline='baseline',error='capacity',delivery_approval=False))
+        store=SimpleNamespace(receipt=lambda *a,**kw:record,tree=lambda key:key)
+        project=SimpleNamespace(fingerprint=lambda:'p')
+        result=submission_refusal_context(store,project,binding,'receipt','baseline')
+        self.assertFalse(result['current_workspace_matches'])
+        self.assertEqual(result['snapshot'],'candidate')
+        with self.assertRaises(ValueError):submission_refusal_context(store,project,{'task':'foreign'},'receipt','baseline')
+
+
+class RejectedSubmissionCapture(__import__('unittest').TestCase):
+    def test_submit_failure_keeps_candidate_before_workspace_changes(self):
+        from types import SimpleNamespace as NS
+        from fabriquinha.quality import DeliveryTools
+        records=[]
+        def reject(*a):raise ValueError('cumulative acceptance criteria count 257 outside 1..256')
+        def record(run,kind,payload):records.append((kind,payload));return 'refusal-id'
+        q=NS(check=lambda *a:None,red=reject,record=record)
+        obj=NS(quality=q,run=NS(kind='tests'),submission=None,
+            store=NS(capture=lambda path:'rejected-snapshot'),sandbox=NS(workspace='work'),
+            board=NS(input=lambda *a:'baseline'),wait=lambda f,**kw:f())
+        with self.assertRaisesRegex(ValueError,'rejected submission receipt refusal-id'):DeliveryTools.submit(obj,{})
+        self.assertEqual(q.submission_refusal,'refusal-id')
+        self.assertEqual(records[0][1]['snapshot'],'rejected-snapshot')
+        self.assertFalse(records[0][1]['delivery_approval'])
+        self.assertIsNone(obj.submission)

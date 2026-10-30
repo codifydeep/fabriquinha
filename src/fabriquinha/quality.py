@@ -135,6 +135,7 @@ class Quality:
         self.observed_jobs=set()
         self.control_refusal=None
         self.suite_refusal=None
+        self.submission_refusal=None
         self.review_after=0  # Last applied diagnostic run, not a reset of history/retries.
 
     def check(self, run, kind, *, reviewing=False):
@@ -757,7 +758,13 @@ class DeliveryTools:
             exclude=()
             if run.kind=='tests':
                 baseline=self.board.input(run,'baseline')
-                evidence={'red':self.wait(lambda:q.red(run,baseline,snapshot),jobs=2)}
+                try:
+                    evidence={'red':self.wait(lambda:q.red(run,baseline,snapshot),jobs=2)}
+                except ValueError as error:
+                    q.submission_refusal=q.record(run,'submission_refusal',dict(
+                        snapshot=snapshot,baseline=baseline,phase='tests',operation='delivery_submit',
+                        error=str(error)[:2000],delivery_approval=False))
+                    raise ValueError(str(error)+'; rejected submission receipt '+q.submission_refusal) from error
             else:
                 frozen_id=self.board.input(run,'tests')
                 green=self.wait(lambda:q.green(run,frozen_id,snapshot))

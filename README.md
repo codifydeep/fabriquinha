@@ -306,3 +306,7 @@ A transição mantém o incidente e os snapshots antigos; um worker ativo ou um
 novo congelamento não equivale a homologação.
 
 Local board access and observation limits: [Local Hermes Kanban](docs/LOCAL-KANBAN.md).
+
+Python acceptance regressions accumulate independently of the current brief.
+See [cumulative capacity and rejected-submission recovery](docs/CUMULATIVE-ACCEPTANCE-RECOVERY.md)
+for the bounded inventory, preserved rejection evidence and explicitly assisted recovery.

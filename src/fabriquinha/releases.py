@@ -94,7 +94,11 @@ class Releases:
         from .maintenance_environment import selection as environment_selection
         environment=environment_selection(self,anchor)
         if environment and environment[1]['review']!=review_id:raise ValueError('environment belongs to another reviewed plan')
+        from .capacity_repair import selection as capacity_selection
+        capacity=capacity_selection(self,anchor)
+        if capacity and capacity[1]['review']!=review_id:raise ValueError('capacity repair plan drift')
         return dict(task=task.id,review=review_id,approval=approval,brief=brief['payload']['document'],document=document,
+            **({'capacity_generation':capacity[0]} if capacity else {}),
             **({'maintenance_replan':replan} if replan else {}),**({'maintenance_generation':environment[0]} if environment else {}))
 
     def seed(self,anchor,specification,services):
@@ -115,7 +119,7 @@ class Releases:
         return self.store.record('release_seed',self.binding(anchor),value)
 
     def materialize(self,conn,anchor,specification,services,*,path=None,seed=None):
-        kb,_,_=native();path=path or (self.folder(anchor)/('maintenance-environment-'+specification['maintenance_generation']+'.json') if specification.get('maintenance_generation') else None) or self.folder(anchor)/(('maintenance-graph-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'graph.json');binding=self.binding(anchor)
+        kb,_,_=native();path=path or (self.folder(anchor)/('capacity-'+specification['capacity_generation']+'.json') if specification.get('capacity_generation') else None) or (self.folder(anchor)/('maintenance-environment-'+specification['maintenance_generation']+'.json') if specification.get('maintenance_generation') else None) or self.folder(anchor)/(('maintenance-graph-'+specification['task']+'.json') if specification.get('maintenance_replan') else 'graph.json');binding=self.binding(anchor)
         bundle=validation_files(self.project,self.store)[0]
         if path.exists():
             graph_id=json.loads(path.read_bytes())['receipt'];record=self.store.receipt(graph_id,kind='release_graph')
@@ -145,18 +149,20 @@ class Releases:
                     if specification.get('repair'):body['repair_plan']=specification['repair']['plan']
                     if specification.get('maintenance_replan'):body['maintenance_plan']=specification['task']
                     if specification.get('maintenance_generation'):body['maintenance_generation']=specification['maintenance_generation']
-                    workspace=self.store.root.parent/'work'/binding['release']/(specification.get('maintenance_generation') or (specification['task'] if specification.get('maintenance_replan') else ''))/package['id']/phase
+                    if specification.get('capacity_generation'):body['capacity_generation']=specification['capacity_generation']
+                    workspace=self.store.root.parent/'work'/binding['release']/(specification.get('capacity_generation') or specification.get('maintenance_generation') or (specification['task'] if specification.get('maintenance_replan') else ''))/package['id']/phase
                     workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
                     contract=self.project.repository.removeprefix('https://github.com/') if phase=='integration' else 'local-only'
                     task=kb.create_task(conn,title=phase.upper()+' '+package['title'],body=json.dumps(body),assignee=owner,
                         parents=deps,workspace_kind='dir',workspace_path=str(workspace),completion_contract=contract,
                         initial_status='blocked',max_retries=2,max_runtime_seconds=600,
-                        idempotency_key=digest([binding['release'],specification['review'],package['id'],phase]+([specification['maintenance_generation']] if specification.get('maintenance_generation') else [])))
+                        idempotency_key=digest([binding['release'],specification['review'],package['id'],phase]+([specification['maintenance_generation']] if specification.get('maintenance_generation') else [])+([specification['capacity_generation']] if specification.get('capacity_generation') else [])))
                     cards[phase]=dict(id=task,body=body,parents=deps,workspace=str(workspace),owner=owner,completion_contract=contract)
                 previous=cards['integration']['id'];by_package[package['id']]=previous
                 items.append(dict(package=package,cards=cards))
             graph=dict(project=self.project.fingerprint(),plan_review=specification['review'],seed=seed,items=items,
                 serialized_integrations=True,qualification=self.project.qualification,
+                **({'assisted':True,'platform_repair':specification['capacity_generation']} if specification.get('capacity_generation') else {}),
                 **({'validation_bundle':bundle} if bundle else {}))
             graph_id=self.store.record('release_graph',binding,graph);write_json(path,{'receipt':graph_id})
         # Every card starts parked. Publish the whole immutable graph before
@@ -172,6 +178,10 @@ class Releases:
 
     def graph_path(self,anchor,body):
         if body.get('qa_recovery_graph') is True:return self.folder(anchor)/'qa-recovery.json'
+        if body.get('capacity_generation'):
+            key=body['capacity_generation']
+            if not re.fullmatch(r'[a-f0-9]{64}',key):raise ValueError('capacity generation required')
+            return self.folder(anchor)/('capacity-'+key+'.json')
         generation=body.get('maintenance_generation')
         if generation is not None:
             if not re.fullmatch(r'[a-f0-9]{64}',generation) or not body.get('maintenance_plan'):
@@ -504,6 +514,7 @@ class Releases:
         if self.board.guard:self.board.guard()
         acceptance=self.store.record('release_acceptance',self.binding(anchor),dict(project=self.project.fingerprint(),
             state='HOMOLOGADA',qualification=self.project.qualification,delivery_approval=not self.project.qualification,
+            **({'assisted':True,'platform_repair':graph['platform_repair']} if graph.get('assisted') and graph.get('platform_repair') else {}),
             **({'validation_bundle':graph['validation_bundle']} if graph.get('validation_bundle') else {}),
             brief=specification['approval'],plan_review=specification['review'],graph=graph_id,packages=evidence,
             criteria=sorted(criteria),final_qa=final['qa'],commit=final['commit'],image=qa['image'],url=qa['url'],ci=ci))

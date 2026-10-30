@@ -38,6 +38,16 @@ class AcceptanceInventory(unittest.TestCase):
         (self.root/'acceptance_rooms.py').write_text(SOURCE)
         (self.root/'acceptance.rooms.json').write_text(json.dumps(coverage()))
 
+    def test_cumulative_regressions_exceed_a_single_brief_without_weakening_coverage(self):
+        original=(self.root/'acceptance.rooms.json').read_bytes()
+        value=dict(version=2,criteria={f'REGRESSION_{n}':dict(cases=[],gates=['regression']) for n in range(254)})
+        (self.root/'acceptance.next.json').write_text(json.dumps(value))
+        self.assertEqual(len(acceptance_manifest(self.root)['criteria']),256)
+        self.assertEqual((self.root/'acceptance.rooms.json').read_bytes(),original)
+        value['criteria']['OVERFLOW']=dict(cases=[],gates=['regression'])
+        (self.root/'acceptance.next.json').write_text(json.dumps(value))
+        with self.assertRaisesRegex(ValueError,'criteria count 257 outside 1..256'):acceptance_manifest(self.root)
+
     def test_coverage_reads_source_without_executing_product_code_on_host(self):
         (self.root/'acceptance_rooms.py').write_text('raise RuntimeError("must not execute")\n'+SOURCE)
         value=acceptance_manifest(self.root)
