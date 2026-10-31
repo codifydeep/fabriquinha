@@ -79,3 +79,17 @@ and retirement succeed. It does not exercise production backup restoration, real
 GitHub outages or model judgment. It requires a fresh private root and the same
 image/upstream arguments as the original integration qualifier. Never enable
 its fault marker in an installed product project.
+
+## Qualification result — 31 October 2026
+
+The corrected cross-release attempt completed both releases and all three work
+packages. Its final receipts confirm unchanged historical receipts and baseline
+tests, QA bound to the new bundle, exact prior-artifact rollback, interrupted
+pre-quality upgrade reconciliation and scoped retirement. Paid calls: zero.
+The first attempt failed because the fixture redeclared an inherited regression
+gate; it remains failed. The corrected generator has an offline preflight using
+the same manifests. No product gate was relaxed.
+
+This closes the consolidated deterministic compatibility scenario, not production
+migration qualification or repeatability with model-driven agents. The proposed
+product delivery and the pending-effect operational proof remain separate work.

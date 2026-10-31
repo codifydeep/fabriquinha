@@ -13,7 +13,8 @@ aprovado por este documento.
 | E | Evoluir produto e qualificar capacidades separadamente | Persistência, frontend/3D/mobile com evidências próprias |
 
 A/P1: matriz alinhada, fixtures homologadas e resumo visual instalado. Aviso
-incerto classificado como histórico, sem presumir entrega. B continua parcial.
+incerto classificado como histórico, sem presumir entrega. B: cenário determinístico
+consolidado aprovado; não equivale a migração de produção nem autonomia de agentes.
 Detalhamento: [checkpoint e próximos passos](PLAN-CHECKPOINT-2026-10-31.md).
 P2: saída/reposição entregue, mas assistida. Preservar a comprovação autônoma
 anterior da v0.3; não declarar repetibilidade com base no trecho final isolado.

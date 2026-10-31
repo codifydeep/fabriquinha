@@ -262,11 +262,12 @@ if __name__=='__main__':
     parser.add_argument('--mode',choices=('qualify','serve','worker'),default='qualify')
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image');parser.add_argument('--browser-image')
+    parser.add_argument('--namespace',default='delivery-kit-hermes-integrate')
     parser.add_argument('--compose-ack-loss',action='store_true',help='Restart supervisor after an actual Compose send loses its acknowledgement')
     parser.add_argument('--task');parser.add_argument('--run',type=int)
     args=parser.parse_args();root=args.root.resolve();upstream=args.upstream.resolve()
     if args.mode=='qualify':
-        qualify(root,upstream,args.image,browser_image=args.browser_image,namespace='delivery-kit-hermes-integrate',
+        qualify(root,upstream,args.image,browser_image=args.browser_image,namespace=args.namespace,
             after_review=lambda *values:integrate(*values,upstream=upstream,compose_ack_loss=args.compose_ack_loss))
     elif args.mode=='worker':
         signal.signal(signal.SIGTERM,lambda *_:sys.exit(143))
