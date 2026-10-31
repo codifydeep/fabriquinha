@@ -60,3 +60,22 @@ The journal unit checks also terminate a real subprocess immediately after a
 filesystem stand-in records an external effect, before acknowledgement. Recovery
 must observe the existing effect, preserve its deadline and never resend. This
 check does not substitute for the planned interruption during a real deployment.
+
+## Pending-effect supervisor qualification
+
+`scripts/qualify_hermes_integration.py --compose-ack-loss` extends the existing
+isolated integration fixture. Its fault injector is refused outside a
+qualification project. After the real Compose command returns, the first
+acknowledgement is lost and the existing journal retains an uncertain intent.
+The driver waits for the native scheduled handoff and settled workers, stops
+the supervisor, verifies the unresolved effect and starts the supervisor again.
+The resumed worker must reconcile that effect, then finish rollback and browser
+QA. Every Compose operation is counted by its durable operation directory; any
+resend of that operation fails the proof. PR creation and merge must still occur
+only once through the existing simulated GitHub transport.
+
+This mode is prepared but is not qualified until its complete integration receipt
+and retirement succeed. It does not exercise production backup restoration, real
+GitHub outages or model judgment. It requires a fresh private root and the same
+image/upstream arguments as the original integration qualifier. Never enable
+its fault marker in an installed product project.

@@ -19,7 +19,8 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'));sys.path.insert(0,str(ROOT/'tests'))
 from fixtures.github_transport import FakeGitHub
 from fabriquinha.deployment import Deployment
-from fabriquinha.effects import write_json
+from fabriquinha.effects import write_json, Pending
+from fabriquinha.artifacts import digest
 from fabriquinha.executor import docker
 from fabriquinha.kanban_lane import native
 from fabriquinha.publication import Repository
@@ -55,6 +56,27 @@ class FileGitHub(FakeGitHub):
 
 
 class FixtureRuntime(Runtime):
+    def worker(self,task,number):
+        marker=self.root/'compose-ack-loss-enabled.json'
+        if not marker.exists():return super().worker(task,number)
+        if not self.project.qualification:raise ValueError('fault injection requires a qualification project')
+        original=Deployment._command
+        root=self.root
+        def command(deployment,folder,label,*args,**kwargs):
+            result=original(deployment,folder,label,*args,**kwargs)
+            if args and args[0]=='compose' and 'up' in args:
+                attempts=root/'compose-attempts';attempts.mkdir(mode=0o700,exist_ok=True)
+                path=attempts/(Path(folder).name+'.json')
+                old=json.loads(path.read_bytes()) if path.exists() else {'calls':0}
+                write_json(path,{'calls':old['calls']+1})
+                fault=root/'compose-ack-lost.json'
+                if not fault.exists():
+                    write_json(fault,dict(folder=str(folder),run=number,
+                        observed=deployment.service(),qualification=True))
+                    raise Pending('fixture lost Compose acknowledgement after actual send')
+            return result
+        with patch.object(Deployment,'_command',command):return super().worker(task,number)
+
     def integration_services(self,run):
         if not self.project.qualification:raise ValueError('fixture cannot be used in production')
         repo=Repository(self.project,self.store,remote=self.root/'github-fixture/remote.git')
@@ -119,7 +141,7 @@ def retire_fixture(root,upstream):
             images_preserved=True,volumes_deleted=0,snapshots_preserved=True))
 
 
-def integrate(project,store,board,quality,implementation,review,frozen,*,upstream):
+def integrate(project,store,board,quality,implementation,review,frozen,*,upstream,compose_ack_loss=False):
     root=store.root.parent;folder=root/'github-fixture';folder.mkdir(mode=0o700)
     remote,seed=folder/'remote.git',folder/'seed';remote.mkdir()
     baseline=store.receipt(frozen,kind='tests_frozen')['payload']['baseline'];store.checkout(baseline,seed)
@@ -143,6 +165,7 @@ def integrate(project,store,board,quality,implementation,review,frozen,*,upstrea
                 inputs={'delivery':'parent:'+implementation+':delivery'})),parents=[implementation],
             workspace_kind='dir',workspace_path=str(work),max_retries=2,max_runtime_seconds=600,
             completion_contract=project.repository.removeprefix('https://github.com/'))
+    if compose_ack_loss:write_json(root/'compose-ack-loss-enabled.json',dict(qualification=True))
     services=[]
     def start():
         with os.fdopen(os.open(root/('integration-service-'+str(len(services)+1)+'.log'),
@@ -183,10 +206,20 @@ def integrate(project,store,board,quality,implementation,review,frozen,*,upstrea
         stop(service)
         write_json(folder/'ci-ready.json',{'synthetic_checks_green':True})
         service=start()
+        if compose_ack_loss:
+            card,runs=until(lambda card,runs:(root/'compose-ack-lost.json').exists()
+                and card.status=='scheduled' and all(run['ended_at'] is not None
+                and not worker_alive(run) for run in runs),service)
+            stop(service)
+            fault=json.loads((root/'compose-ack-lost.json').read_bytes())
+            unresolved=[json.loads(p.read_bytes()) for p in (store.root/'effects').glob('*.json')]
+            assert any(x.get('state')=='intent' and x.get('last_error')=='Pending' for x in unresolved)
+            # Restart the actual supervisor with the uncertain effect retained.
+            service=start()
         card,runs=until(lambda card,runs:card.status=='done' and all(
             run['ended_at'] is not None and not worker_alive(run) for run in runs),service)
         stop(service)
-        assert len(services)==2 and all(process.returncode==0 for process in services)
+        assert len(services)==(3 if compose_ack_loss else 2) and all(process.returncode==0 for process in services)
         latest=kb.latest_run
         with kbc.connect_closing() as conn:
             done=latest(conn,task);key=done.metadata['release_evidence']
@@ -206,6 +239,16 @@ def integrate(project,store,board,quality,implementation,review,frozen,*,upstrea
             deployment=dict(release_evidence=key,commit=data['commit'],image=data['image'],
                 container=data['container'],url=data['url'],checks=data['checks']),
             model_calls=0,real_github_ci=False,delivery_approval=False,migration=False)
+        if compose_ack_loss:
+            attempts=[json.loads(p.read_bytes()) for p in (root/'compose-attempts').glob('*.json')]
+            assert attempts and all(x['calls']==1 for x in attempts)
+            effect_key=Path(fault['folder']).name+':compose'
+            effect=json.loads((store.root/'effects'/(digest(effect_key)+'.json')).read_bytes())
+            assert effect['state']=='done' and fault['observed']
+            assert effect['result']['container']==fault['observed']['container']
+            result.update(real_compose_ack_loss=True,supervisor_restarted_with_pending_effect=True,
+                compose_operations=len(attempts),no_compose_resend=True,same_container_reconciled=True,
+                production_restore_qualified=False)
         write_json(root/'integration-receipt.json',result)
         retire_fixture(root,upstream)
         result['deployment']['retired_after_evidence']=True
@@ -219,11 +262,12 @@ if __name__=='__main__':
     parser.add_argument('--mode',choices=('qualify','serve','worker'),default='qualify')
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image');parser.add_argument('--browser-image')
+    parser.add_argument('--compose-ack-loss',action='store_true',help='Restart supervisor after an actual Compose send loses its acknowledgement')
     parser.add_argument('--task');parser.add_argument('--run',type=int)
     args=parser.parse_args();root=args.root.resolve();upstream=args.upstream.resolve()
     if args.mode=='qualify':
         qualify(root,upstream,args.image,browser_image=args.browser_image,namespace='delivery-kit-hermes-integrate',
-            after_review=lambda *values:integrate(*values,upstream=upstream))
+            after_review=lambda *values:integrate(*values,upstream=upstream,compose_ack_loss=args.compose_ack_loss))
     elif args.mode=='worker':
         signal.signal(signal.SIGTERM,lambda *_:sys.exit(143))
         FixtureRuntime(root,upstream).worker(args.task,args.run)
