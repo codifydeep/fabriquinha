@@ -22,7 +22,7 @@ from fabriquinha.effects import write_json
 from fabriquinha.executor import docker
 from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
-from fabriquinha.profile_policy import contract as profile_contract
+from fabriquinha.profile_policy import contract as profile_contract, configuration as profile_configuration
 
 
 def qualify(root,upstream,image,*,managed_profiles=False):
@@ -34,6 +34,8 @@ def qualify(root,upstream,image,*,managed_profiles=False):
     if managed_profiles:
         # New, synthetic fixture before any claim or approval; never promote an
         # old installation by adding this field in an operational migration.
+        for actor in ('flow-author','flow-reviewer'):
+            write_json(root/'home/profiles'/actor/'config.yaml',profile_configuration())
         path=root/'installation.json'
         write_json(path,{**json.loads(path.read_bytes()),'profile_contract':profile_contract()})
         runtime=Runtime(root,upstream)

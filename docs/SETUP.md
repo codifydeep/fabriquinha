@@ -135,6 +135,25 @@ zero chamadas ao modelo, zero jobs Docker e zero mutações GitHub. A raiz cont�
 cards de qualificação e não deve ser reaproveitada para uma equipe de produto.
 O preparo normal de um projeto usa `prepare_hermes_project.py` em outra raiz nova.
 
+### Operação no SDK provisionado do zero
+
+Em 31/10/2026, `qualify_hermes_operations.py --managed-profiles` passou com o
+venv e checkout esparso novos, reutilizando a imagem validadora local por ID.
+Foram oito execuções nativas e 19 requisições HTTP programadas: pausa durante
+autoria e revisão, preservação de arquivos/sessões, reinício sem rota enquanto
+pausado, recusa de retomada obsoleta e TDD concluído após correção. Zero chamadas
+ao modelo e nenhuma aprovação de entrega ou migração de produção.
+
+A primeira tentativa foi recusada antes da execução: a fixture declarava o
+contrato de perfis gerenciados mas criava configuração legada. A correção usa a
+configuração canônica somente ao preparar uma fixture nova, antes do despacho;
+não migra instalações existentes nem flexibiliza a admissão. A tentativa falha
+permanece preservada e o resultado aprovado veio de outra raiz.
+
+Essa prova reutiliza uma imagem local já qualificada. Não substitui build das
+imagens a partir de um clone público, instalação por outro operador, integração
+GitHub real ou entrega autônoma com modelo real.
+
 ### Validação fixada e consulta de consumo
 
 A preparação de uma instalação nova grava `validation_bundle` e `control_contract`
