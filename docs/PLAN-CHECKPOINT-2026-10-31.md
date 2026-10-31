@@ -152,3 +152,64 @@ Nenhum novo teste pago, mudança de modelo, reinício ou alteração de produto.
 consultas HTTP locais desta análise foram impedidas pelo sandbox; a URL indicada
 é a do recibo, não uma nova afirmação de disponibilidade. Os testes anteriores
 citados permanecem evidências anteriores, não uma execução nova nesta auditoria.
+
+
+## Atualização de execução posterior ao balanço
+
+Esta seção registra execução posterior; a tabela acima preserva o diagnóstico
+que originou o plano. O status corrente detalhado continua em `STATUS.md`.
+
+- **B concluída no âmbito determinístico:** duas releases, mudança real de bundle,
+  leitura histórica preservada, QA atual, rollback e retomada foram exercitados.
+  Autores e GitHub são programados; não é prova nova de autonomia do modelo.
+- **C preparada, não autorizada:** Produto revisou o brief antes do aceite. O
+  escopo proposto tem mão única e pedido de Truco em dois incrementos; as regras
+  simplificadas de empate dependem de decisão explícita. Não iniciar por uma
+  autorização genérica de continuar a manutenção da plataforma.
+- **D avançou:** reconciliação de Compose após perda de confirmação e restauração
+  isolada preservaram o efeito sem duplicar criação. Exportação pública passou
+  nos 548 testes do núcleo sem site-packages. SDK provisionado em venv novo e
+  checkout Hermes esparso novo passaram em preparo de perfis e operação real
+  com respostas locais (oito execuções, 19 requisições, zero chamadas pagas).
+  Uma fixture legada precisou usar a configuração canônica de perfis; a tentativa
+  falha foi preservada e a segunda terminou. Não houve mudança do runtime ativo.
+- **D ainda não concluída:** falta reprodução das imagens e cadeia completa em
+  ambiente independente, além de recuperação com contabilidade e pausas do
+  provedor e exclusão de um segundo escritor. A inspeção de backup existente
+  apenas verifica integridade e lê um contador fornecido; não instala esse
+  contador, não restaura o relay e não prova reconciliação de consumo.
+- **E permanece posterior**, orientada por requisitos aprovados do produto.
+
+Próxima ação operacional: obter o aceite exato de C e observar a execução sem
+intervenções. Enquanto isso, D pode avançar somente com hipóteses delimitadas e
+raízes descartáveis; não repetir ensaios verdes nem construir outro controlador.
+Para contabilidade, a prova deve usar o ledger real com chamadas locais simuladas,
+conservar marcadores de bloqueio, rejeitar rollback do contador e provar exclusão
+de escritores. Não restaurar uma cópia antiga sobre o provedor em uso.
+
+
+### Diagnóstico isolado do ledger de recuperação
+
+Uma prova temporária com `Ledger` real, sem rede ou credenciais, reservou a
+chamada 8 e marcou 402 na raiz original após copiar o estado com contador 7.
+A cópia aceitou outro owner e reservou sua própria chamada 8, sem conhecer o
+bloqueio posterior. Isso é consistente com locks locais por diretório; não
+constitui prova de segurança contra cópias da raiz. Nenhum ledger real foi tocado.
+
+Consequência: a futura restauração não pode ativar o ledger copiado do backup.
+Deve reusar a autoridade atual de consumo e seus marcadores, adquirindo o mesmo
+lock de owner antes de admitir o relay restaurado. Se essa autoridade foi perdida,
+a retomada deve permanecer recusada até reconciliação explícita; nunca assumir
+zero ou confiar no contador antigo. Não adicionar sincronização distribuída:
+qualificar primeiro a recuperação local com um único ledger preservado fora da
+raiz restaurável. O procedimento ainda precisa ser implementado e testado.
+
+
+A extensão de `qualify_state_restore.py` passou usando o ledger real em raiz
+sintética externa à árvore restaurada: contador 8 e bloqueio 402 posteriores ao
+backup permaneceram, nova reserva foi recusada e um segundo owner da mesma raiz
+não foi admitido. O dispatcher restaurado reiniciou pausado, sem workers ou
+chamadas ao modelo. Isso testa a preservação da autoridade explicitamente
+selecionada, não sua descoberta automática nem migração/restore de produção.
+O recibo mantém `production_restore_qualified=false` e
+`provider_counter_restore_qualified=false`. A cópia antiga jamais foi ativada.

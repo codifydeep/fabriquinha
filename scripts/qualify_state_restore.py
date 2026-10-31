@@ -122,6 +122,15 @@ def qualify(root,upstream,*,source_cycle=None):
         before=manifest(source)
         backup=root/'backup';shutil.copytree(source,backup)
         assert manifest(source)==before==manifest(backup)
+    # Current accounting authority is deliberately outside the restored tree.
+    # Model a charge and financial block occurring after the application backup.
+    authority=root/'preserved-meter';authority.mkdir(mode=0o700)
+    write_json(authority/'calls.json',{'calls':7})
+    current_meter=Ledger(authority,10)
+    assert current_meter.reserve()==8
+    current_meter.pause(8,402)
+    with current_meter.owner():pass
+    authority_before=manifest(authority)
     restored=root/'restored';shutil.copytree(backup,restored)
     assert manifest(restored)==before
     recovered=Runtime(restored,upstream)
@@ -141,6 +150,18 @@ def qualify(root,upstream,*,source_cycle=None):
     except Held as error:assert error.code=='transport_unknown'
     else:raise AssertionError('restored uncertain send allowed a new reservation')
     assert recovered_meter.state()==meter_before
+    retained_meter=Ledger(authority,10)
+    assert retained_meter.state()['calls']==8
+    assert retained_meter.state()['provider_pause']['upstream_status']==402
+    try:retained_meter.reserve()
+    except Held as error:assert error.code=='provider_paused'
+    else:raise AssertionError('restoration lost current financial block')
+    with current_meter.owner():
+        try:
+            with retained_meter.owner():pass
+        except BlockingIOError:pass
+        else:raise AssertionError('second owner acquired preserved authority')
+    assert manifest(authority)==authority_before
     for target in (source,restored):
         assert not (target/'route.json').exists() and not (target/'notifications.json').exists()
     # Start the real restored dispatcher while fenced, then restart it. The
@@ -195,7 +216,8 @@ def qualify(root,upstream,*,source_cycle=None):
         queued_notification_preserved=True,pause_episode_preserved=True,files_verified=len(before),
         model_calls=0,workers_started=0,external_effects=0,production_restore_qualified=False,
         provider_counter_restore_qualified=False,synthetic_offline_restore=True,restored_dispatcher_restarted_paused=True,duplicate_owner_refused=True,
-        synthetic_counter_preserved=True,uncertain_send_hold_preserved=True,reservation_while_held_refused=True)
+        external_current_ledger_preserved=True,post_backup_financial_block_preserved=True,
+        same_ledger_second_owner_refused=True,synthetic_counter_preserved=True,uncertain_send_hold_preserved=True,reservation_while_held_refused=True)
     if source_cycle:result.update(paused_source_upgrade_and_rollback=True,source_digests=[item[1] for item in cycles])
     write_json(root/'receipt.json',result)
     print(json.dumps(result,indent=2))
