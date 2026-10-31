@@ -318,6 +318,27 @@ class NativeRuntime(unittest.TestCase):
             self.runtime.settle('task',conn=conn)
         recover.return_value.close.assert_called_once()
 
+    def test_pinned_browser_sandbox_retirement_preserves_live_workers(self):
+        run=Run('task',2,'backend','tests',False,'backend','v1','contract')
+        expected=dict(binding=run.binding(),project=self.runtime.project.fingerprint(),workspace=str(self.root/'work'),
+                      phase='tests',baseline_tests=[],image=self.runtime.project.validation_image)
+        expected['validation_browser']='/pinned/browser.py'
+        from fabriquinha.artifacts import digest
+        key=digest(expected)
+        write_json(self.runtime.store.root/'effects'/(digest(key+':agent-create')+'.json'),
+                   dict(identity=expected,state='intent'))
+        row=dict(id=2,task_id='task',profile='backend',worker_pid=123,worker_started_at='verified',
+                 claim_lock='local',ended_at=100)
+        conn=Mock();conn.execute.return_value.fetchone.return_value=row
+        with patch('fabriquinha.runtime.worker_alive',return_value=True), \
+             patch.object(Sandbox,'recover') as recover:
+            with self.assertRaises(EffectBlocked):self.runtime.settle('task',conn=conn)
+        recover.assert_not_called()
+        with patch('fabriquinha.runtime.worker_alive',return_value=False), \
+             patch.object(Sandbox,'recover') as recover:
+            self.runtime.settle('task',conn=conn)
+        recover.return_value.close.assert_called_once()
+
     def test_pause_fences_even_direct_delivery_handlers_before_native_state_access(self):
         self.runtime.control.pause()
         with patch.object(self.runtime.board,'current',side_effect=AssertionError('gate crossed pause')):

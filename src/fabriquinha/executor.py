@@ -35,7 +35,8 @@ def validation_files(project,store=None):
         if path.is_symlink():raise ValueError('unsafe validation bundle authority')
         if path.exists():
             if path.stat().st_size>4096:raise ValueError('bounded installation contract required')
-            installation=json.loads(path.read_bytes());bundle=installation.get('validation_bundle')
+            from .historical import AcceptedHistory
+            installation=store.installation if isinstance(store,AcceptedHistory) else json.loads(path.read_bytes());bundle=installation.get('validation_bundle')
             if bundle is not None:
                 from .quality import CONTROL_CONTRACT
                 if installation.get('project')!=project.fingerprint() or installation.get('control_contract')!=CONTROL_CONTRACT:
@@ -52,10 +53,12 @@ def browser_contract(project,store=None):
     path=store.root.parent/'installation.json'
     if not path.exists():return 1
     validation_files(project,store)
-    value=json.loads(path.read_bytes()).get('browser_contract',1)
+    from .historical import AcceptedHistory
+    installation=store.installation if isinstance(store,AcceptedHistory) else json.loads(path.read_bytes())
+    value=installation.get('browser_contract',1)
     if type(value) is not int or value not in (1,2):raise ValueError('known installed browser contract required')
     if value==2 and (not project.browser_tdd or not project.delivery_roles
-            or not json.loads(path.read_bytes()).get('validation_bundle')):
+            or not installation.get('validation_bundle')):
         raise ValueError('acceptance suite requires pinned validation and browser TDD')
     if value==2:
         _,files=validation_files(project,store)

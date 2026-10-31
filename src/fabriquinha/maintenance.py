@@ -25,7 +25,9 @@ def source(project, store, acceptance, paths):
             or artifact['payload']['project'] != project.fingerprint()):
         raise ValueError('maintenance source must match deployed acceptance')
     from .quality import Quality
-    frozen = Quality(project,store,None,None).frozen_plan(store.receipt(final['tests'],kind='tests_frozen'))
+    from .historical import AcceptedHistory
+    historical=AcceptedHistory(project,store,acceptance)
+    frozen = Quality(project,historical,None,None).frozen_plan(store.receipt(final['tests'],kind='tests_frozen'))
     if (not isinstance(paths,list) or not 1 <= len(paths) <= 2
             or any(not isinstance(p,str) for p in paths) or len(set(paths)) != len(paths)):
         raise ValueError('one or two exact observer paths required')

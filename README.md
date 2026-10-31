@@ -310,3 +310,6 @@ Local board access and observation limits: [Local Hermes Kanban](docs/LOCAL-KANB
 Python acceptance regressions accumulate independently of the current brief.
 See [cumulative capacity and rejected-submission recovery](docs/CUMULATIVE-ACCEPTANCE-RECOVERY.md)
 for the bounded inventory, preserved rejection evidence and explicitly assisted recovery.
+
+[Historical validator provenance](docs/HISTORICAL-VALIDATOR-RECOVERY.md) keeps accepted
+evidence readable across validator upgrades without qualifying it for new delivery.

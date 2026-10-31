@@ -500,7 +500,7 @@ def register_draft(activity,on_terminal):
 def main():
     from .runtime import Runtime
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('repair-capacity','start','start-maintenance','replan-maintenance','resume-maintenance-environment','respond','show'))
+    parser.add_argument('operation',choices=('repair-history','repair-capacity','start','start-maintenance','replan-maintenance','resume-maintenance-environment','respond','show'))
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--file',type=Path);parser.add_argument('--task');parser.add_argument('--expect')
     parser.add_argument('--decision',choices=('approve','changes','answer'));parser.add_argument('--text')
@@ -509,10 +509,11 @@ def main():
         _,kbc,_=native()
         with kbc.connect_closing() as conn:value=runtime.intake.pending(conn,args.task)
     else:
+        from .historical import recover as history_repair
         from .capacity_repair import admit as capacity_repair
         from .maintenance_replan import admit as maintenance_replan
         from .maintenance_environment import admit as maintenance_environment
-        value=(capacity_repair(runtime,json.loads(args.file.read_bytes())) if args.operation=='repair-capacity' else maintenance_environment(runtime,json.loads(args.file.read_bytes())) if args.operation=='resume-maintenance-environment' else maintenance_replan(runtime,json.loads(args.file.read_bytes())) if args.operation=='replan-maintenance' else runtime.intake.start_maintenance(json.loads(args.file.read_bytes())) if args.operation=='start-maintenance' else runtime.intake.start(json.loads(args.file.read_bytes())) if args.operation=='start'
+        value=(history_repair(runtime,json.loads(args.file.read_bytes())) if args.operation=='repair-history' else capacity_repair(runtime,json.loads(args.file.read_bytes())) if args.operation=='repair-capacity' else maintenance_environment(runtime,json.loads(args.file.read_bytes())) if args.operation=='resume-maintenance-environment' else maintenance_replan(runtime,json.loads(args.file.read_bytes())) if args.operation=='replan-maintenance' else runtime.intake.start_maintenance(json.loads(args.file.read_bytes())) if args.operation=='start-maintenance' else runtime.intake.start(json.loads(args.file.read_bytes())) if args.operation=='start'
                else runtime.intake.respond(args.task,args.expect,args.decision,args.text))
     print(json.dumps(value,indent=2))
 

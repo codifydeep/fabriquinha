@@ -274,7 +274,7 @@ class Runtime:
         else:self.settlement.pop(task,None)
         for path in (self.store.root/'effects').glob('*.json'):
             state=json.loads(path.read_bytes());identity=state.get('identity',{})
-            if not isinstance(identity,dict) or set(identity)!={'binding','project','workspace','phase','baseline_tests','image'}:continue
+            if not isinstance(identity,dict) or set(identity)-{'validation_browser'}!={'binding','project','workspace','phase','baseline_tests','image'}:continue
             key=digest(identity);binding=identity['binding']
             if path.name!=digest(key+':agent-create')+'.json' or task and binding['task']!=task:continue
             if (self.store.root/'agents'/key/'retirement.json').exists():continue
