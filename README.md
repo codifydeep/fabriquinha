@@ -313,3 +313,6 @@ for the bounded inventory, preserved rejection evidence and explicitly assisted 
 
 [Historical validator provenance](docs/HISTORICAL-VALIDATOR-RECOVERY.md) keeps accepted
 evidence readable across validator upgrades without qualifying it for new delivery.
+
+Current assessment and next milestones: [31 October review](docs/EXECUTION-REVIEW-2026-10-31.md).
+The earlier v0.3 autonomous observation remains valid; the latest delivery is assisted.

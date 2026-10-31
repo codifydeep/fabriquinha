@@ -1,26 +1,24 @@
-# Roadmap corrente — 30/10/2026
+# Roadmap corrente — 31/10/2026
 
-A v0.3 completou dois incrementos dependentes após aceite, com recuperação pela
-própria equipe. O [balanço de 30/10](EXECUTION-REVIEW-2026-10-30.md) substitui
-as pendências correntes descritas nas revisões anteriores. Proposta para próxima
-execução; nenhuma alteração de contrato ou novo brief está aprovada por este texto.
+Fonte corrente: [balanço e plano detalhado](EXECUTION-REVIEW-2026-10-31.md).
+Manter Hermes + Kanban, modelo e contratos de qualidade. Nenhum novo brief está
+aprovado por este documento.
 
 | Ordem | Trabalho | Critério de saída |
 |---|---|---|
-| P0 | Consolidar marco e documentação | Status e limites coerentes — concluído nesta auditoria |
-| P1 | Remover duplicação de observadores; alinhar matriz; melhorar visão de cards | Falha JS após setup detectada; leitura não altera histórico; nenhuma revisão dispensada |
-| P2 | Segunda entrega útil, proposta: motor de regras do Truco Paulista | Brief aprovado; dois incrementos definidos pelo time; entrega sem intervenção operacional |
-| P3 | Interrupção e restore operacional isolados | Efeitos reconciliados sem duplicação, consumo e evidências preservados |
-| P4 | Instalação por outra pessoa | Entrega num ambiente/repositório limpos seguindo somente documentação |
-| P5 | 3D, persistência e mobile progressivos | Validadores e evidências por capacidade; sem extrapolar a prova Python/HTTP |
+| A | Resumo somente leitura no Kanban; classificar aviso incerto | Saúde, progresso, dono e próxima ação compreensíveis; histórico preservado |
+| B | Consolidar prova de compatibilidade entre bundles/releases | Consumidores do histórico e novos gates validados juntos; retomada sem duplicação |
+| C | Primeira fatia útil do motor do Truco, proposta pelo time | Brief aprovado; dois incrementos; nova entrega integral sem intervenção |
+| D | Interrupção/restore isolados e instalação por outro operador | Reconciliação comprovada e entrega seguindo somente documentação pública |
+| E | Evoluir produto e qualificar capacidades separadamente | Persistência, frontend/3D/mobile com evidências próprias |
 
-Manter Hermes, modelo e gates atuais. Medir intervenções, custo, duração e
-repetibilidade. Consultar o plano detalhado para responsáveis, restrições e
-sequência; não iniciar outra reestruturação geral.
+P1: matriz alinhada e fixtures homologadas; resumo visual ainda pendente.
+P2: saída/reposição entregue, mas assistida. Preservar a comprovação autônoma
+anterior da v0.3; não declarar repetibilidade com base no trecho final isolado.
+P3/P4: provas parciais não substituem recuperação operacional e distribuição.
+Não condicionar todo trabalho útil à conclusão da publicação para terceiros.
 
-## Histórico
-
-O [plano de 28/10](EXECUTION-REVIEW-2026-10-28.md), o
-[contrato de reparo](TECHNICAL-TEST-REPAIR.md) e os ADRs preservam as decisões
-anteriores. Versões antigas deste roadmap estão no Git; resultados assistidos
-não são reclassificados retroativamente.
+Evitar nova rodada genérica de ensaios sem hipótese e critério de saída.
+A proposta de repetibilidade inicial é duas entregas consecutivas sem intervenção,
+não uma promessa de confiabilidade universal. Decisões de produto continuam com
+CEO/Produto; decisões técnicas com Lead/CTO; reparos da plataforma com mantenedor.

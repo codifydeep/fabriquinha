@@ -1,40 +1,35 @@
-# Status do projeto — 30 de outubro de 2026
+# Status do projeto — 31 de outubro de 2026
 
-**v0.3 homologada: ciclo autônomo observado após o aceite do brief**, com dois
-incrementos dependentes e uma recuperação técnica executada pela equipe.
-A proposta inicial foi orientada pelo operador; descoberta aberta e autonomia
-geral não foram comprovadas. S6 e v0.2 permanecem entregas assistidas históricas.
+**Saída e reposição de jogadores homologadas em ciclo assistido**, com dois
+incrementos dependentes. A v0.3 anterior permanece um ciclo autônomo observado;
+ainda falta demonstrar repetibilidade sob evolução da plataforma.
 
-- URL vigente conferida: http://127.0.0.1:61323.
-- Commit: `26ee2774a689bfd5b21888d42ec41375c5db6d10`.
-- PRs [16](https://github.com/codifydeep/descartavel/pull/16) e
-  [17](https://github.com/codifydeep/descartavel/pull/17) integrados.
-- Suíte final: 30 casos; QA implantado: 28 casos de navegador.
-- Testes da v0.2 preservados byte a byte; dez jobs de controles negativos
-  distribuídos pelos dois incrementos; revisão independente, CI no commit
-  integrado e rollback/restauração comprovados.
-- Aproximadamente 65 minutos do aceite ao fechamento; 82 chamadas atribuídas
-  à release e US$ 0,3758524 reportados pelo provedor, incluindo o brief.
-- Prontidão estimada: 80–85% para Python/HTTP local, GitHub, um host e uma release
-  ativa. Não mede o Truco completo, mobile, 3D ou reutilização por terceiros.
+- Ambiente vigente na última verificação: http://127.0.0.1:62413.
+- Commit: `a731d2d6588d5c52121584d5cf8056c7074aea2d`.
+- PRs [19](https://github.com/codifydeep/descartavel/pull/19) e
+  [20](https://github.com/codifydeep/descartavel/pull/20).
+- 43 testes na suíte final, 41 casos de navegador; CI, revisão, rollback e QA.
+- Todos os 15 arquivos de testes/manifestos do baseline preservados byte a byte.
+- Fixtures anteriores reparadas e homologadas. Matriz de revisão alinhada.
+- Compatibilidade histórica corrigida; 541 testes da automação no último check.
+- Resumo operacional do Kanban, recuperação operacional isolada e instalação
+  independente por terceiros continuam pendentes.
+- Prontidão estimada: 80–85% no escopo Python/HTTP local. Não é esforço restante
+  nem prontidão para qualquer SaaS, Truco completo, mobile ou 3D.
 
-O caminho instalado usa Hermes + Kanban; Multica foi retirado de execução.
+Hermes + Kanban permanecem como arquitetura; Multica fora do caminho ativo.
 [Kanban local](http://127.0.0.1:9119/kanban), somente consulta.
-[Instruções e limites](LOCAL-KANBAN.md). Telegram recebeu objetivo e aceite e
-entrega avisos. O painel nativo ainda mostra predecessores históricos e rótulos
-de gateway/orquestração que não representam o controlador atual.
+A orientação nativa não substitui resumo de saúde/progresso. Há um envio incerto
+na outbox a classificar; não presumir recebimento de todos os avisos.
 
-Próximos passos: higiene pequena de fixtures/documentação/visibilidade; segunda
-entrega útil comparável; recuperação operacional; instalação independente.
-Não trocar modelo nem plataforma. Ver [balanço e plano detalhado](EXECUTION-REVIEW-2026-10-30.md)
-e [roadmap](ROADMAP.md). A auditoria propõe ações; não as executa nem aprova novo brief.
+Ver [balanço detalhado e plano](EXECUTION-REVIEW-2026-10-31.md) e
+[roadmap](ROADMAP.md). Não iniciar nova reestruturação ou trocar modelo.
 
 ## Referências históricas
 
-- [Balanço de 28/10](EXECUTION-REVIEW-2026-10-28.md): régua anterior e causas de bloqueios.
-- [Reparo técnico de testes](TECHNICAL-TEST-REPAIR.md): contrato instalado e v0.2 assistida.
-- [Canal e operação P5](CHANNEL-AND-OPERATIONS-P5.md): qualificações delimitadas de restauração.
-- [S1](HERMES-S1-QUALIFICATION.md): integração inicial do Kanban, não qualificação do produto completo.
+- [30/10: v0.3 autônoma observada](EXECUTION-REVIEW-2026-10-30.md).
+- [P1: fixtures, revisão e painel](P1-SIMPLIFICATION-IMPLEMENTATION.md).
+- [Capacidade cumulativa](CUMULATIVE-ACCEPTANCE-RECOVERY.md).
+- [Compatibilidade histórica](HISTORICAL-VALIDATOR-RECOVERY.md).
 
-Estados, URLs e pendências em auditorias anteriores descrevem suas respectivas
-datas. Para o retrato corrente, usar este documento.
+URLs e pendências em auditorias antigas descrevem suas respectivas datas.
