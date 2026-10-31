@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import sqlite3
+import shutil
 import sys
 import tempfile
 from types import SimpleNamespace as NS
@@ -38,7 +39,14 @@ class PendingRestoreFixture(unittest.TestCase):
             root=Path(folder)/'fixture';self.prepare(root)
             runtime=NS(pause=lambda:dict(agents_stopped=True,pending_effects=['b','a'],control={'episode':'exact'}),
                 control=NS(read=lambda:{'episode':'exact'}),resume=lambda episode:{'pending_effects':['a','b']})
-            with patch.object(fixture,'ROOT',Path(folder).resolve()),patch.object(fixture.subprocess,'run',return_value=NS(returncode=0)),patch.object(fixture,'Runtime',return_value=runtime):
+            connections=[];connect=sqlite3.connect;copytree=shutil.copytree
+            def opened(*args,**kwargs):
+                conn=connect(*args,**kwargs);connections.append(conn);return conn
+            def copied(*args,**kwargs):
+                for conn in connections:
+                    with self.assertRaises(sqlite3.ProgrammingError):conn.execute('select 1')
+                return copytree(*args,**kwargs)
+            with patch.object(fixture,'ROOT',Path(folder).resolve()),patch.object(fixture.subprocess,'run',return_value=NS(returncode=0)),patch.object(fixture,'Runtime',return_value=runtime),patch.object(fixture.sqlite3,'connect',side_effect=opened),patch.object(fixture.shutil,'copytree',side_effect=copied):
                 result=fixture.restore_pending_integration_fixture(root,Path(folder))
             self.assertTrue(result['pending_effects_preserved'])
             self.assertFalse(result['production_restore_qualified'])

@@ -4,6 +4,7 @@ Not a production backup command: the fixture has no credentials, external
 routes, active leases, or running gateway. Keep this boundary explicit.
 """
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -58,7 +59,7 @@ def restore_pending_integration_fixture(root,upstream):
         if not paused['agents_stopped'] or not paused['pending_effects']:
             raise ValueError('settled workers and a retained pending effect required')
         for database in (root/'home').rglob('*.db'):
-            with sqlite3.connect(database) as conn:
+            with closing(sqlite3.connect(database)) as conn:
                 if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
                     raise ValueError('fixture database integrity failed')
                 if conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0]!=0:

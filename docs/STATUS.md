@@ -19,7 +19,9 @@ ainda falta demonstrar repetibilidade sob evolução da plataforma.
   com brief ainda sujeito ao aceite do CEO.
 - Reinício do supervisor com efeito Compose pendente passou em isolamento,
   reconciliando o mesmo container sem reenvio; rollback e QA concluídos.
-- Restauração operacional de backup e instalação independente por terceiros
+- Restauração da instalação descartável com efeito Compose pendente passou,
+  seguida de reconciliação, rollback e QA.
+- Restauração de produção/contador pago e instalação independente por terceiros
   continuam pendentes.
 - Prontidão estimada: 80–85% no escopo Python/HTTP local. Não é esforço restante
   nem prontidão para qualquer SaaS, Truco completo, mobile ou 3D.

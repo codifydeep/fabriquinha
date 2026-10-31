@@ -98,9 +98,14 @@ restores at the same absolute path and uses the normal pause/resume contract.
 The effect identity and deadline are retained; subsequent integration must still
 prove that the original container was observed without a second Compose send.
 
-This restore extension is prepared and unit-tested, but its integrated execution
-is still pending. It does not qualify restoring a paid-provider counter or a
-production installation. Never point it at an active product root.
+The integrated restore attempt passed on 31 October 2026: 370 installation files
+were verified, the pending effect survived restoration, the original container
+was reconciled without resending Compose, and rollback plus independent browser
+QA completed before scoped retirement. Backup and pre-restore trees remain
+private. A subsequent focused regression verifies that SQLite inspection
+connections close before copying; the helper now closes them explicitly.
+This does not qualify restoring a paid-provider counter or a production
+installation. Never point it at an active product root.
 
 ## Qualification result — 31 October 2026
 
