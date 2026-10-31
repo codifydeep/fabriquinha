@@ -12,18 +12,22 @@ ainda falta demonstrar repetibilidade sob evolução da plataforma.
 - Todos os 15 arquivos de testes/manifestos do baseline preservados byte a byte.
 - Fixtures anteriores reparadas e homologadas. Matriz de revisão alinhada.
 - Compatibilidade histórica corrigida; 541 testes da automação no último check.
-- Resumo operacional do Kanban, recuperação operacional isolada e instalação
-  independente por terceiros continuam pendentes.
+- Resumo operacional somente leitura instalado no Kanban (08e01954).
+- Compatibilidade consolidada entre releases, recuperação operacional isolada e
+  instalação independente por terceiros continuam pendentes.
 - Prontidão estimada: 80–85% no escopo Python/HTTP local. Não é esforço restante
   nem prontidão para qualquer SaaS, Truco completo, mobile ou 3D.
 
 Hermes + Kanban permanecem como arquitetura; Multica fora do caminho ativo.
 [Kanban local](http://127.0.0.1:9119/kanban), somente consulta.
-A orientação nativa não substitui resumo de saúde/progresso. Há um envio incerto
-na outbox a classificar; não presumir recebimento de todos os avisos.
+O resumo distingue saúde do dispatcher e estado da entrega. O envio incerto foi
+classificado como aviso histórico de uma integração já concluída; seu recebimento
+continua desconhecido, sem reenvio nem confirmação fictícia.
 
 Ver [balanço detalhado e plano](EXECUTION-REVIEW-2026-10-31.md) e
 [roadmap](ROADMAP.md). Não iniciar nova reestruturação ou trocar modelo.
+
+Ver também o [fechamento do balanço e sequência executável](PLAN-CHECKPOINT-2026-10-31.md).
 
 ## Referências históricas
 

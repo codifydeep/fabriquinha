@@ -12,7 +12,9 @@ aprovado por este documento.
 | D | Interrupção/restore isolados e instalação por outro operador | Reconciliação comprovada e entrega seguindo somente documentação pública |
 | E | Evoluir produto e qualificar capacidades separadamente | Persistência, frontend/3D/mobile com evidências próprias |
 
-P1: matriz alinhada e fixtures homologadas; resumo visual ainda pendente.
+A/P1: matriz alinhada, fixtures homologadas e resumo visual instalado. Aviso
+incerto classificado como histórico, sem presumir entrega. B continua parcial.
+Detalhamento: [checkpoint e próximos passos](PLAN-CHECKPOINT-2026-10-31.md).
 P2: saída/reposição entregue, mas assistida. Preservar a comprovação autônoma
 anterior da v0.3; não declarar repetibilidade com base no trecho final isolado.
 P3/P4: provas parciais não substituem recuperação operacional e distribuição.
