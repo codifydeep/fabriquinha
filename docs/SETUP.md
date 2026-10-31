@@ -48,6 +48,15 @@ instalação independente por terceiros. Para distribuir o kit, ainda é necess�
 reproduzir o preparo em uma raiz limpa, sem copiar estado privado, e documentar
 cada dependência e intervenção exigida. Multica não faz parte desse caminho.
 
+### Verificação da distribuição do código
+
+Em 31/10/2026, uma exportação limpa (`git archive`) do commit `a7e840fa`
+executou os 548 testes de `tests/` com sucesso em Python 3.14, usando `-S`
+(sem carregar site-packages) e apenas `src` no `PYTHONPATH`. Nenhum estado privado
+do checkout foi copiado. Isso comprova a reprodução da suíte do núcleo a partir
+dos arquivos versionados na mesma máquina; não comprova provisionamento do SDK,
+imagens Docker, credenciais, instalação em outro sistema ou entrega por agentes.
+
 ## Caminho atual e referência histórica
 
 O caminho novo é `src/fabriquinha`, com preparação parcial por
