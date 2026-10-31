@@ -1,4 +1,5 @@
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import shutil
@@ -18,7 +19,7 @@ class PendingRestoreFixture(unittest.TestCase):
         (root/'project.json').write_text(json.dumps({'qualification':qualification}))
         (root/'route.json').write_text(json.dumps({'base_url':'http://127.0.0.1:9/v1','api_key':'unused-fixture'}))
         (root/'evidence.txt').write_text('preserve exact evidence')
-        with sqlite3.connect(root/'home/kanban.db') as conn:
+        with closing(sqlite3.connect(root/'home/kanban.db')) as conn, conn:
             conn.execute('create table evidence(value text)')
             conn.execute("insert into evidence values('original')")
 
@@ -52,5 +53,5 @@ class PendingRestoreFixture(unittest.TestCase):
             self.assertFalse(result['production_restore_qualified'])
             for path in [root,root.with_name('fixture-restore-backup'),root.with_name('fixture-pre-restore')]:
                 self.assertEqual((path/'evidence.txt').read_text(),'preserve exact evidence')
-                with sqlite3.connect(path/'home/kanban.db') as conn:
+                with closing(sqlite3.connect(path/'home/kanban.db')) as conn:
                     self.assertEqual(conn.execute('select value from evidence').fetchone()[0],'original')
