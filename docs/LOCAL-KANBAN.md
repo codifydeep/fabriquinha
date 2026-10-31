@@ -52,3 +52,14 @@ projects must not be removed as part of retirement.
 
 The Kanban page includes a dismissible explanation of these ownership and history
 limitations. This static notice is not a health indicator or release summary.
+
+## Resumo operacional
+
+A página Kanban inclui uma projeção somente leitura da última release, do
+estado observado do dispatcher, workers, progresso validado e avisos incertos.
+Homologação exige recibo controlador íntegro; `done` sozinho não é aprovação.
+Ausência da marca assistida não permite inferir autonomia automaticamente.
+Observações com mais de 90 segundos aparecem como desconhecidas. Use Atualizar
+para obter uma nova observação. Incidentes históricos ficam recolhidos e os cards
+originais não são alterados. O resumo é mostrado somente após uma resposta HTML
+bem-sucedida da rota nativa; erros de autenticação e APIs permanecem intactos.

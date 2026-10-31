@@ -49,3 +49,41 @@ class ObservationTests(unittest.TestCase):
 
     def test_kanban_event_stream_allowed(self):
         self.assertTrue(self.invoke({'type': 'websocket', 'path': '/api/plugins/kanban/events'})[1])
+
+
+class SummaryTests(unittest.TestCase):
+    def test_stale_or_missing_state_never_reports_success(self):
+        import tempfile,json
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name)
+            self.assertIn('indisponível',module.operational_summary(root,now=100))
+            (root/'status.json').write_text(json.dumps({'observed_at':0}))
+            self.assertIn('desatualizada',module.operational_summary(root,now=100))
+
+    def test_raw_done_is_not_acceptance_and_titles_are_escaped(self):
+        import tempfile,json
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name)
+            status=dict(observed_at=99,dispatcher_state='running',board=dict(cards=[dict(
+                id='t_one',kind='release',created_at=1,status='done',title='<script>bad</script>')]))
+            (root/'status.json').write_text(json.dumps(status))
+            view=module.operational_summary(root,now=100)
+            self.assertIn('sem recibo',view)
+            self.assertNotIn('<script>',view)
+            self.assertNotIn('HOMOLOGADA',view)
+
+    def test_exact_acceptance_is_shown_without_promoting_autonomy(self):
+        import tempfile,json,hashlib
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);folder=root/'private/receipts';folder.mkdir(parents=True)
+            status=dict(observed_at=99,dispatcher_state='running',board=dict(cards=[dict(
+                id='t_one',kind='release',created_at=1,status='done',title='Release')]))
+            (root/'status.json').write_text(json.dumps(status))
+            receipt=dict(kind='release_acceptance',binding=dict(task='t_one',actor='controller'),
+                payload=dict(state='HOMOLOGADA',assisted=True,commit='sha',url='http://localhost'))
+            raw=json.dumps(receipt,sort_keys=True,separators=(',',':')).encode()
+            path=folder/(hashlib.sha256(raw).hexdigest()+'.json');path.write_bytes(raw)
+            view=module.operational_summary(root,now=100)
+            self.assertIn('HOMOLOGADA',view);self.assertIn('assistido',view)
+            path.write_text('{}')
+            self.assertNotIn('HOMOLOGADA',module.operational_summary(root,now=100))
