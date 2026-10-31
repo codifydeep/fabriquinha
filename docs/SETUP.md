@@ -1,6 +1,6 @@
 # Instalação segura e limites
 
-Estado de referência revisto: **27 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
+Estado de referência revisto: **31 de outubro de 2026**. Leia [STATUS.md](STATUS.md)
 antes de ativar agentes. O kit continua experimental; não há instalação completa
 e autônoma qualificada para terceiros. Os passos abaixo não reproduzem por si
 sós a instalação privada de referência.
@@ -34,20 +34,34 @@ da instalação, nunca ao Git; não copie tokens para SOULs, cards ou testes. O 
 de qualificação recusa Telegram real. A futura ativação depende do destino
 explicitamente configurado, sem reativar os gateways antigos por consequência.
 
+## O que já foi qualificado e o que falta
+
+A continuidade entre versões com validadores distintos e a retomada de um efeito
+Compose pendente passaram em ensaios isolados. Também foi comprovada a restauração
+de um backup isolado com esse efeito pendente, sem repetir a criação do contêiner.
+As evidências e limites estão em
+[recuperação e compatibilidade](HISTORICAL-VALIDATOR-RECOVERY.md).
+
+Esses ensaios usam infraestrutura de teste e autores programados: não comprovam
+a restauração de credenciais e contadores pagos da instalação real, nem uma
+instalação independente por terceiros. Para distribuir o kit, ainda é necessário
+reproduzir o preparo em uma raiz limpa, sem copiar estado privado, e documentar
+cada dependência e intervenção exigida. Multica não faz parte desse caminho.
+
 ## Caminho atual e referência histórica
 
 O caminho novo é `src/fabriquinha`, com preparação parcial por
 `scripts/prepare_hermes_project.py`. Esse script não instala imagens, provisiona
-GitHub ou inicia relay/serviço. A [revisão atual](EXECUTION-REVIEW-2026-10-26.md)
-documenta os achados, as mudanças propostas e as lacunas de S6; não autoriza retomada.
+GitHub ou inicia relay/serviço. A [revisão atual](EXECUTION-REVIEW-2026-10-31.md) e o
+[checkpoint](PLAN-CHECKPOINT-2026-10-31.md) distinguem entrega, recuperação
+e instalação independente. A documentação não autoriza ativação.
 A CLI de preparação exige `--max-output-tokens` explícito: 2048, 4096, 8192 ou 16384,
 conforme política autorizada. O valor é preservado no preparo e consumido pelo
 relay/SDK; escolhê-lo não habilita o provedor nem aumenta o teto de chamadas.
-O suporte a 16384 foi autorizado e usado no ensaio real. A política de referência
-tem saída máxima 16384 e teto específico de 7.000 chamadas; sua ativação segue a
-pausa/retomada explícita do proprietário, consultável no status local. Esses
-valores privados não são uma autorização de consumo para novas
-instalações. Limite de chamadas e saída por resposta são controles distintos.
+O suporte a 16384 foi autorizado e usado no ensaio real. Consulte a política privada da instalação para o teto vigente e a saída
+autorizada; não copie limites históricos deste documento. A ativação segue a
+pausa/retomada explícita do proprietário, consultável no status local. Valores
+de uma instalação não são autorização de consumo para outra. Limite de chamadas e saída por resposta são controles distintos.
 
 Para consultar uma instalação existente, use o Python do SDK já provisionado,
 com `PYTHONPATH=src`, e `python -m fabriquinha.runtime status --root
