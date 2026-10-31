@@ -1,11 +1,36 @@
 import sys
 from pathlib import Path
 import unittest
+from copy import deepcopy
 from types import SimpleNamespace as NS
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.historical import AcceptedHistory
 
 class HistoricalScope(unittest.TestCase):
+    def test_historical_authority_rejects_cross_release_and_stale_evidence(self):
+        mutations=[
+            ('accepted',('binding','actor'),'worker'),
+            ('accepted',('payload','delivery_approval'),False),
+            ('accepted',('payload','project'),'foreign'),
+            ('graph',('binding','release'),'different-release'),
+            ('qa',('binding','release'),'different-release'),
+            ('job',('payload','identity','binding','task'),'other-review'),
+            ('job',('payload','report','source_sha'),'stale-sha'),
+            ('job',('payload','report','status'),'failed'),
+            ('job',('payload','exit_code'),1),
+        ]
+        for record,keys,value in mutations:
+            with self.subTest(record=record,keys=keys):
+                records=deepcopy(self.records())
+                # Receipts are separately deserialized in the real store.
+                records[record]=deepcopy(records[record]);target=records[record]
+                for key in keys[:-1]:target=target[key]
+                target[keys[-1]]=value
+                project=NS(fingerprint=lambda:'p',qualification=False)
+                store=NS(root=Path('/private/evidence'),receipt=lambda key,**kw:records[key],
+                    manifest=lambda key:{'suite.py':{},'browser.py':{}},tree=lambda key:key)
+                with self.assertRaises(ValueError):AcceptedHistory(project,store,'accepted')
+
     def records(self):
         binding=dict(actor='controller',task='release',release='old')
         qa_binding=dict(actor='qa',release='old',task='integration')

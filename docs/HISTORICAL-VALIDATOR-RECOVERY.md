@@ -31,3 +31,32 @@ The same change fixes stale-sandbox recognition for the optional pinned-browser
 mount. Retirement still verifies the original journal identity, native run,
 process liveness, container ownership and pinned mount before scoped cleanup.
 Unknown shapes and active workers are preserved.
+
+## Cross-release qualification
+
+The existing release qualifier accepts `--acceptance-suite --continuity
+--validator-continuity`. It delivers two dependent packages, then a subsequent
+release retaining their tests. Between completed releases, and only with a
+drained qualification installation, it selects a second validator generation
+with a stricter diagnostic-output bound. Historical receipts must remain byte
+identical; the old acceptance selects its original read-only bundle while new
+QA must use the newly installed bundle. The second rollout must exercise the
+exact previous homologated artifact as rollback before restoring its candidate.
+
+This is an isolated compatibility fixture, not a production migration API.
+Authors and GitHub transport are programmed; Docker, browser and native lifecycle
+are real. No paid model call is made. A passing result does not qualify agent
+autonomy, real GitHub CI, or a general production installer. The existing
+pre-quality interruption scenario separately tests a half-committed graph/pin
+upgrade and idempotent reconciliation without duplicating cards.
+
+Inspect `receipt.json`, `continuity-receipt.json` and
+`validator-continuity-receipt.json` in the private qualification root. A receipt
+from an intermediate stage alone is insufficient: final chain completion and
+scoped retirement must also succeed. Failed or still-running attempts must not
+be reported as qualified.
+
+The journal unit checks also terminate a real subprocess immediately after a
+filesystem stand-in records an external effect, before acknowledgement. Recovery
+must observe the existing effect, preserve its deadline and never resend. This
+check does not substitute for the planned interruption during a real deployment.

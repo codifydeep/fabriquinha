@@ -30,6 +30,15 @@ from fabriquinha.publication import Repository
 from fabriquinha.runtime import Runtime,Owner,worker_alive,recorded_worker
 
 
+
+def fixture_coverage(package,criterion):
+    case='acceptance_'+package+'.Browser.test_behavior'
+    coverage={criterion:dict(cases=[case],gates=[]),'NAMED':dict(cases=[case],gates=[])}
+    # Subsequent releases inherit this gate from the immutable baseline.
+    if package=='farewell':coverage['REGRESSION']=dict(cases=[],gates=['regression'])
+    return dict(version=2,criteria=coverage)
+
+
 def reserve_fixture_networks(project,pool):
     """Optional explicit /27 for two disposable /28s on crowded Docker hosts.
 
@@ -128,8 +137,9 @@ class FixtureRuntime(Runtime):
         with patch('fabriquinha.runtime.subprocess.Popen',spawn):return super().spawn(*args,**kwargs)
 
 
-def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None,acceptance_suite=False,submission_recovery=False):
+def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release',recovery='none',continuity=False,network_pool=None,acceptance_suite=False,submission_recovery=False,validator_continuity=False):
     if submission_recovery and (not acceptance_suite or recovery!='none' or continuity):raise ValueError('submission recovery requires isolated shared-acceptance scenario')
+    if validator_continuity and not (continuity and acceptance_suite):raise ValueError('validator continuity requires two releases and browser acceptance')
     if root.exists():raise ValueError('fresh private root required')
     root.mkdir(mode=0o700,parents=True);check_dependencies();home=prepare(root,upstream)
     os.environ['HERMES_DISABLE_LAZY_INSTALLS']='1';kb,kbc,_=native()
@@ -202,6 +212,7 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
         'criteria':[*brief['criteria'],dict(id='THANK',statement='Thank Ada by name.') ]}
     document2={**document,'tasks':[dict(id='thanks',title='Named thanks in a subsequent release',owner='release-author',depends_on=[],
         criteria=['GREET','BYE','THANK'],acceptance='Thank Ada; preserve greeting and farewell')]}
+    if acceptance_suite:document2['tasks'][0]['criteria']+=['REGRESSION','NAMED']
     app3=app2.replace('<p id="result" role="status"></p>',
         '<button id="thanks">Thanks</button><p id="thanks-result" role="status"></p><p id="result" role="status"></p>')
     app3=app3.replace('</script>',"document.querySelector('#thanks').onclick=async()=>{const r=await fetch('/thanks?name='+encodeURIComponent(document.querySelector('#name').value));document.querySelector('#thanks-result').textContent=(await r.json()).message;};</script>")
@@ -255,11 +266,9 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                                 '  expect(page.locator('+repr(check['actions'][1]['selector'])+')).to_be_visible(timeout=1000)\n'
                                 '  page.locator("#name").fill("Ada")\n  page.locator('+repr(check['actions'][1]['selector'])+').click()\n'
                                 '  expect(page.locator('+repr(check['selector'])+')).to_have_text('+repr(check['text'])+')\n')
-                            coverage={check['id']:dict(cases=['acceptance_'+package+'.Browser.test_behavior'],gates=[])}
-                            coverage['NAMED']=dict(cases=['acceptance_'+package+'.Browser.test_behavior'],gates=[])
-                            if package=='farewell':coverage['REGRESSION']=dict(cases=[],gates=['regression'])
+                            coverage=fixture_coverage(package,check['id'])
                             sequence=[sequence[0],('write_file',dict(path='/workspace/tests/acceptance_'+package+'.py',content=browser_test)),
-                                ('write_file',dict(path='/workspace/tests/acceptance.'+package+'.json',content=json.dumps(dict(version=2,criteria=coverage)))),sequence[-1]]
+                                ('write_file',dict(path='/workspace/tests/acceptance.'+package+'.json',content=json.dumps(coverage))),sequence[-1]]
                     else:sequence=[('write_file',dict(path='/workspace/app.py',content=app)),
                         ('delivery_submit',{'mutations':[{'app.py':app.replace('Thanks, ','Wrong, ') if third else app.replace('Hello, ','Wrong, ') if first else app.replace('Goodbye, ','Wrong, ')}]})]
                 if submission_recovery and run.kind=='implementation' and not run.reviewing and not native_body(run).get('continuation_plan'):
@@ -428,6 +437,29 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
             from fabriquinha.deployment import Deployment
             old_live=Deployment(runtime.project,runtime.store,runtime.board,None).service()
             assert old_live['artifact']==previous_qa['artifact'] and old_live['healthy']
+            if validator_continuity:
+                # Qualification-only installed-generation fixture. This is not
+                # a production migration API or permission to rewrite history.
+                assert runtime.project.qualification and service.poll()==0
+                pause=runtime.pause()
+                with kbc.connect_closing() as conn:assert runtime.pause_status(conn)['drained']
+                installation=root/'installation.json';pin=json.loads(installation.read_bytes())
+                old_bundle=pin['validation_bundle']
+                candidate=root/'next-validator';shutil.copytree(runtime.store.tree(old_bundle),candidate)
+                reporter=candidate/'suite.py';reporter.chmod(0o600)
+                text=reporter.read_text();assert text.count('1024 * 1024')==1
+                # A real, stricter diagnostic output bound, not merely a hash comment.
+                reporter.write_text(text.replace('1024 * 1024','512 * 1024'))
+                new_bundle=runtime.store.capture(candidate);assert new_bundle!=old_bundle
+                historical_bytes={p:p.read_bytes() for p in (runtime.store.root/'receipts').glob('*.json')}
+                write_json(installation,{**pin,'validation_bundle':new_bundle})
+                from fabriquinha.historical import AcceptedHistory
+                from fabriquinha.executor import validation_files
+                from fabriquinha.artifacts import digest
+                history=AcceptedHistory(runtime.project,runtime.store,digest(prior_acceptance))
+                assert validation_files(runtime.project,history)[0]==old_bundle
+                assert validation_files(runtime.project,runtime.store)[0]==new_bundle
+                with runtime.control.lock():runtime.control.resume(pause['control']['episode'])
             started=runtime.intake.start(dict(request='next-release',label='v0.2',objective='Add thanks while retaining greeting and farewell.'))
             second_release[0]=started['execution'];pending[0]=None
             service=start();until(question)
@@ -437,12 +469,22 @@ def qualify(root,upstream,image,browser,*,namespace='delivery-kit-hermes-release
                 row=kb.latest_run(conn,started['release']);acceptance=runtime.store.receipt(row.metadata['release_acceptance'],kind='release_acceptance')
             data=acceptance['payload'];qa=runtime.store.receipt(data['final_qa'],kind='release_evidence')['payload']
             rollout=runtime.store.receipt(qa['rollout'],kind='rollout')['payload']
+            if validator_continuity:
+                assert data['validation_bundle']==new_bundle
+                assert prior_data['validation_bundle']==old_bundle
+                assert all(path.read_bytes()==content for path,content in historical_bytes.items())
+                job=runtime.store.receipt(qa['qa_job'],kind='browser_job')['payload']
+                assert job['identity']['validation_bundle']==new_bundle
+                write_json(root/'validator-continuity-receipt.json',dict(passed=True,
+                    old_bundle=old_bundle,new_bundle=new_bundle,historical_receipts_unchanged=True,
+                    current_qa_uses_new_bundle=True,synthetic_installation_transition=True,
+                    production_migration_qualified=False,paid_calls=0,delivery_approval=False))
             assert rollout['previous']==previous_qa['artifact']
             assert len(rollout['steps'])==3
             steps=[runtime.store.receipt(key,kind='deployment')['payload'] for key in rollout['steps']]
             assert [step['operation'] for step in steps]==['candidate','rollback','restore']
             assert steps[1]['artifact']==old_live['artifact'] and steps[1]['image']==old_live['image']
-            assert set(data['criteria'])=={'GREET','BYE','THANK'} and len(data['packages'])==1
+            assert set(data['criteria'])==({'GREET','BYE','THANK','REGRESSION','NAMED'} if acceptance_suite else {'GREET','BYE','THANK'}) and len(data['packages'])==1
             old_tests=runtime.store.manifest(prior_data['packages'][-1]['snapshot'])
             new_tests=runtime.store.manifest(data['packages'][0]['snapshot'])
             assert all(new_tests.get(path)==value for path,value in old_tests.items() if path.startswith('tests/'))
@@ -482,6 +524,7 @@ if __name__=='__main__':
     parser.add_argument('--namespace',default='delivery-kit-hermes-release')
     parser.add_argument('--recovery',choices=('none','recover','triage'),default='none')
     parser.add_argument('--continuity',action='store_true',help='Also deliver a subsequent release using the prior homologated rollback')
+    parser.add_argument('--validator-continuity',action='store_true',help='Exercise historical rollback after a qualification-only validator generation change between releases')
     parser.add_argument('--network-pool',help='Explicit nonoverlapping private /27, split into two owned /28 test networks')
     parser.add_argument('--acceptance-suite',action='store_true',help='Qualify version 2 shared Python acceptance and controller gate coverage')
     parser.add_argument('--submission-recovery',action='store_true',help='Qualify reviewed pre-merge continuation after two incomplete control submissions')
@@ -494,6 +537,6 @@ if __name__=='__main__':
             FixtureRuntime(root,upstream).serve(stop,interval=0.25)
     elif args.mode=='retire':retire_fixture(root,upstream)
     else:
-        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool,acceptance_suite=args.acceptance_suite,submission_recovery=args.submission_recovery),indent=2))
+        try:print(json.dumps(qualify(root,upstream,args.image,args.browser_image,namespace=args.namespace,recovery=args.recovery,continuity=args.continuity,network_pool=args.network_pool,acceptance_suite=args.acceptance_suite,submission_recovery=args.submission_recovery,validator_continuity=args.validator_continuity),indent=2))
         except BaseException as error:
             write_json(root/'failure.json',dict(category=type(error).__name__,message=str(error)[:2000],delivery_approval=False));raise
