@@ -78,6 +78,63 @@ com `PYTHONPATH=src`, e `python -m fabriquinha.runtime status --root
 dispatch. Os caminhos são inputs privados do operador; não copie instalações
 ou credenciais de outra máquina.
 
+### Ambiente Python dos agentes
+
+O arquivo `scripts/requirements-hermes-agent.txt` contém os 47 pins do ambiente
+leve dos agentes. Em 31/10/2026, todos coincidiram com o SDK da instalação de
+referência. Não substituir esse arquivo pelos requisitos S1: estes pertencem
+à prova inicial do Kanban/API e usam versões diferentes. O dashboard tem seu
+próprio ambiente; não misturar suas dependências ao SDK.
+
+Para provisionar um ambiente novo (download de pacotes, sem chamadas ao modelo):
+
+```sh
+python3.14 -m venv <venv-novo>
+<venv-novo>/bin/python -m pip install -r scripts/requirements-hermes-agent.txt
+```
+
+A receita também foi executada em um venv novo em macOS ARM64/Python 3.14:
+os 47 pins instalaram, e o preparador exportado do Git passou na admissão nativa
+dos nove perfis, rejeição de configuração divergente e reinício pausado. Sem
+chamadas ao modelo, jobs Docker ou alterações no GitHub. A prova foi repetida com um checkout esparso novo do Hermes público e uma
+segunda raiz privada nova, também com sucesso. Ainda faltam ferramentas/imagens
+e ciclo de entrega em ambiente independente. O checkout
+Hermes deve estar limpo no commit
+`e06df9c2eae6901f4c88f464e0ae6e753c0428b8`; o preparador recusa outro commit
+ou alterações locais. Não copiar o home de uma instalação anterior.
+
+### Checkout Hermes e prova de preparo sem inferência
+
+A receita abaixo reproduziu o preparo em macOS ARM64 com o venv novo. Use caminhos
+novos; o preparador recusa sobrescrever uma instalação. O checkout é esparso para
+reduzir uso de disco e permanece separado de qualquer home de agentes.
+
+```sh
+git clone --depth 1 --filter=blob:none --sparse --branch v0.22.0 \
+  https://github.com/NousResearch/hermes-agent.git <upstream-novo>
+git -C <upstream-novo> sparse-checkout set \
+  hermes_cli agent tools gateway cron pm hermes_plugins hermes_platform \
+  plugins/kanban providers acp_adapter locales plugins/browser plugins/web \
+  plugins/video_gen plugins/model-providers plugins/context_engine plugins/memory
+git -C <upstream-novo> rev-parse HEAD
+```
+
+O último comando deve retornar o commit fixado acima. Para exercitar a preparação
+pública, admissão de perfis, recusa de fallback/configuração divergente e reinício:
+
+```sh
+<venv-novo>/bin/python scripts/qualify_profile_admission.py \
+  --upstream <upstream-novo> --root <raiz-privada-nova> \
+  --image sha256:ID_DO_VALIDADOR --browser-image sha256:ID_DO_NAVEGADOR
+```
+
+Essa prova usa os IDs como configuração: **não constrói nem executa as imagens**.
+Seu callback de despacho é simulado, não um worker real. O recibo deve registrar
+nove perfis, provedor desabilitado, pausa preservada, nenhuma execução aberta,
+zero chamadas ao modelo, zero jobs Docker e zero mutações GitHub. A raiz contém
+cards de qualificação e não deve ser reaproveitada para uma equipe de produto.
+O preparo normal de um projeto usa `prepare_hermes_project.py` em outra raiz nova.
+
 ### Validação fixada e consulta de consumo
 
 A preparação de uma instalação nova grava `validation_bundle` e `control_contract`
