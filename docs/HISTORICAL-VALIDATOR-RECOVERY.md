@@ -74,11 +74,33 @@ QA. Every Compose operation is counted by its durable operation directory; any
 resend of that operation fails the proof. PR creation and merge must still occur
 only once through the existing simulated GitHub transport.
 
-This mode is prepared but is not qualified until its complete integration receipt
-and retirement succeed. It does not exercise production backup restoration, real
+The corrected isolated attempt completed its integration receipt and retirement
+on 31 October 2026. Five Compose operations were each sent once; the uncertain
+operation reconciled the exact original container after supervisor restart.
+Rollback and independent browser QA completed; simulated PR creation and merge
+each occurred once. Paid calls: zero. It does not exercise production backup restoration, real
 GitHub outages or model judgment. It requires a fresh private root and the same
 image/upstream arguments as the original integration qualifier. Never enable
 its fault marker in an installed product project.
+
+The first operational attempt stopped before deployment: the older integration
+fixture produced TDD evidence before Runtime pinned the validator. Preparation
+now opens the installation before Red and verifies that every TDD job has that
+pin before handoff. The failed evidence was not reinterpreted or approved.
+
+The optional `--restore-pending-effect` extends that same scenario with a cold
+backup/restore after stopping the supervisor and settling workers, while the
+external Docker effect remains pending. It requires `--compose-ack-loss`, a
+Git-ignored qualification root, the fixed unused local provider route and no
+paid-provider policy or notification transport. The existing restore qualifier
+copies and verifies the entire installation, preserves the pre-restore tree,
+restores at the same absolute path and uses the normal pause/resume contract.
+The effect identity and deadline are retained; subsequent integration must still
+prove that the original container was observed without a second Compose send.
+
+This restore extension is prepared and unit-tested, but its integrated execution
+is still pending. It does not qualify restoring a paid-provider counter or a
+production installation. Never point it at an active product root.
 
 ## Qualification result — 31 October 2026
 

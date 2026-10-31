@@ -141,7 +141,7 @@ def retire_fixture(root,upstream):
             images_preserved=True,volumes_deleted=0,snapshots_preserved=True))
 
 
-def integrate(project,store,board,quality,implementation,review,frozen,*,upstream,compose_ack_loss=False):
+def integrate(project,store,board,quality,implementation,review,frozen,*,upstream,compose_ack_loss=False,restore_pending=False):
     root=store.root.parent;folder=root/'github-fixture';folder.mkdir(mode=0o700)
     remote,seed=folder/'remote.git',folder/'seed';remote.mkdir()
     baseline=store.receipt(frozen,kind='tests_frozen')['payload']['baseline'];store.checkout(baseline,seed)
@@ -214,6 +214,9 @@ def integrate(project,store,board,quality,implementation,review,frozen,*,upstrea
             fault=json.loads((root/'compose-ack-lost.json').read_bytes())
             unresolved=[json.loads(p.read_bytes()) for p in (store.root/'effects').glob('*.json')]
             assert any(x.get('state')=='intent' and x.get('last_error')=='Pending' for x in unresolved)
+            if restore_pending:
+                from qualify_state_restore import restore_pending_integration_fixture
+                restoration=restore_pending_integration_fixture(root,upstream)
             # Restart the actual supervisor with the uncertain effect retained.
             service=start()
         card,runs=until(lambda card,runs:card.status=='done' and all(
@@ -249,6 +252,7 @@ def integrate(project,store,board,quality,implementation,review,frozen,*,upstrea
             result.update(real_compose_ack_loss=True,supervisor_restarted_with_pending_effect=True,
                 compose_operations=len(attempts),no_compose_resend=True,same_container_reconciled=True,
                 production_restore_qualified=False)
+        if restore_pending:result['restoration']=restoration
         write_json(root/'integration-receipt.json',result)
         retire_fixture(root,upstream)
         result['deployment']['retired_after_evidence']=True
@@ -262,13 +266,15 @@ if __name__=='__main__':
     parser.add_argument('--mode',choices=('qualify','serve','worker'),default='qualify')
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
     parser.add_argument('--image');parser.add_argument('--browser-image')
+    parser.add_argument('--restore-pending-effect',action='store_true',help='Cold restore the isolated fixture before reconciling its pending Compose effect')
     parser.add_argument('--namespace',default='delivery-kit-hermes-integrate')
     parser.add_argument('--compose-ack-loss',action='store_true',help='Restart supervisor after an actual Compose send loses its acknowledgement')
     parser.add_argument('--task');parser.add_argument('--run',type=int)
     args=parser.parse_args();root=args.root.resolve();upstream=args.upstream.resolve()
+    if args.restore_pending_effect and not args.compose_ack_loss:parser.error('restore requires compose acknowledgement loss')
     if args.mode=='qualify':
         qualify(root,upstream,args.image,browser_image=args.browser_image,namespace=args.namespace,
-            after_review=lambda *values:integrate(*values,upstream=upstream,compose_ack_loss=args.compose_ack_loss))
+            after_review=lambda *values:integrate(*values,upstream=upstream,compose_ack_loss=args.compose_ack_loss,restore_pending=args.restore_pending_effect))
     elif args.mode=='worker':
         signal.signal(signal.SIGTERM,lambda *_:sys.exit(143))
         FixtureRuntime(root,upstream).worker(args.task,args.run)

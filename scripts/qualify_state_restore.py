@@ -32,6 +32,58 @@ def manifest(root):
     return result
 
 
+def restore_pending_integration_fixture(root,upstream):
+    """Cold restore at the same path, only for the credential-free CI fixture.
+
+    The external Docker effect survives. Both the backup and pre-restore tree
+    remain private. This is not a production restoration command.
+    """
+    root=Path(root).resolve()
+    if not root.is_relative_to(ROOT) or subprocess.run(
+            ['git','-C',str(ROOT),'check-ignore','--quiet',str(root)]).returncode:
+        raise ValueError('private ignored fixture root required')
+    project=json.loads((root/'project.json').read_bytes())
+    route=json.loads((root/'route.json').read_bytes())
+    if (project.get('qualification') is not True
+            or route.get('base_url')!='http://127.0.0.1:9/v1'
+            or route.get('api_key')!='unused-fixture'
+            or (root/'provider-policy.json').exists() or (root/'notifications.json').exists()):
+        raise ValueError('credential-free integration fixture required')
+    backup=root.with_name(root.name+'-restore-backup')
+    preserved=root.with_name(root.name+'-pre-restore')
+    if backup.exists() or preserved.exists():raise ValueError('fresh restoration destinations required')
+    runtime=Runtime(root,upstream)
+    with Owner(root):
+        paused=runtime.pause()
+        if not paused['agents_stopped'] or not paused['pending_effects']:
+            raise ValueError('settled workers and a retained pending effect required')
+        for database in (root/'home').rglob('*.db'):
+            with sqlite3.connect(database) as conn:
+                if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
+                    raise ValueError('fixture database integrity failed')
+                if conn.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0]!=0:
+                    raise ValueError('fixture database still busy')
+        before=manifest(root)
+        shutil.copytree(root,backup)
+        if manifest(root)!=before or manifest(backup)!=before:
+            raise ValueError('fixture changed during backup')
+        root.rename(preserved)
+        shutil.copytree(backup,root)
+        if manifest(root)!=before:raise ValueError('restored fixture differs from verified backup')
+    restored=Runtime(root,upstream)
+    if restored.control.read()['episode']!=paused['control']['episode']:
+        raise ValueError('restored pause identity changed')
+    resumed=restored.resume(paused['control']['episode'])
+    if sorted(resumed['pending_effects'])!=sorted(paused['pending_effects']):
+        raise ValueError('pending effects changed before restored dispatch')
+    result=dict(files_verified=len(before),sqlite_integrity=True,same_path_restore=True,
+        pending_effects_preserved=True,backup_preserved=True,pre_restore_tree_preserved=True,
+        production_restore_qualified=False,provider_counter_restore_qualified=False,
+        delivery_approval=False,model_calls=0)
+    write_json(root/'restoration-receipt.json',result)
+    return result
+
+
 def qualify(root,upstream,*,source_cycle=None):
     root=Path(root).resolve()
     if root.exists():raise ValueError('fresh private root required')

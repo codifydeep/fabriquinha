@@ -47,6 +47,15 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
         validation_image=image, tests_dir='tests', reviewers={'s2-tests':'s2-lead',
             's2-author':['s2-tests','s2-lead'], 's2-devops':'s2-qa'}, qualification=True,
         browser_image=browser_image))
+    if after_review is not None:
+        # Native integration will open this installation. Pin its validators
+        # before producing any Red/Green evidence, not after the handoff.
+        from fabriquinha.runtime import Runtime
+        write_json(root/'project.json',dict(version=1,**{
+            name:dict(value) if name=='reviewers' else value
+            for name in project.__dataclass_fields__
+            for value in (getattr(project,name),) if value is not None}))
+        Runtime(root,upstream)
     store = Store(root/'private')
     board = Board(project)
     runner = Runner(project, store)
@@ -187,6 +196,12 @@ def qualify(root, upstream, image, *, after_review=None, browser_image=None, nam
     board.finish_review(reviewer, 'S2 fixture delivery reviewed; not homologated', {'delivery':receipt})
     checks['independent_readonly_review_revalidates_exact_delivery'] = True
     assert store.receipt(receipt)['payload']['delivery_approval'] is False
+    if after_review is not None:
+        pin=json.loads((root/'installation.json').read_bytes())['validation_bundle']
+        jobs=[store.receipt(path.stem) for path in (store.root/'receipts').glob('*.json')]
+        jobs=[record for record in jobs if record['kind']=='suite_job']
+        assert jobs and all(record['payload']['identity'].get('validation_bundle')==pin for record in jobs)
+        checks['all_tdd_jobs_use_preinstalled_validator']=True
     assert all(checks.values())
     assert not docker('ps', '-aq', '--filter', 'label=com.docker.compose.project='+project.namespace+'-tests').strip()
     result = dict(version=1, checks=checks, synthetic_workers=True, native_manual_claim_fixture=True,

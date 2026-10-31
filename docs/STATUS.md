@@ -11,11 +11,15 @@ ainda falta demonstrar repetibilidade sob evolução da plataforma.
 - 43 testes na suíte final, 41 casos de navegador; CI, revisão, rollback e QA.
 - Todos os 15 arquivos de testes/manifestos do baseline preservados byte a byte.
 - Fixtures anteriores reparadas e homologadas. Matriz de revisão alinhada.
-- Compatibilidade histórica corrigida; 541 testes da automação no último check.
+- Compatibilidade histórica corrigida; 548 testes da automação no último check.
 - Resumo operacional somente leitura instalado no Kanban (08e01954).
 - Prova determinística consolidada de compatibilidade entre duas releases e
   dois validadores passou; autores/GitHub simulados, Docker/navegador reais.
-- Recuperação operacional isolada e instalação independente por terceiros
+- Próximo objetivo encaminhado ao Produto: primeira fatia jogável do Truco,
+  com brief ainda sujeito ao aceite do CEO.
+- Reinício do supervisor com efeito Compose pendente passou em isolamento,
+  reconciliando o mesmo container sem reenvio; rollback e QA concluídos.
+- Restauração operacional de backup e instalação independente por terceiros
   continuam pendentes.
 - Prontidão estimada: 80–85% no escopo Python/HTTP local. Não é esforço restante
   nem prontidão para qualquer SaaS, Truco completo, mobile ou 3D.
