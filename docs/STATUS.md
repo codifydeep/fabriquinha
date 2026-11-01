@@ -16,7 +16,7 @@ ainda falta demonstrar repetibilidade sob evolução da plataforma.
 - Prova determinística consolidada de compatibilidade entre duas releases e
   dois validadores passou; autores/GitHub simulados, Docker/navegador reais.
 - Brief da primeira mão jogável e pedido de Truco aprovado pelo CEO. Primeiro pacote integrado; autoria dos testes do pacote seguinte em triage após encerramento sem handoff. Ainda não há homologação dessa release.
-- Recuperação de autoria vazia qualificada offline; instalação e execução pelos agentes são etapas distintas. Ver [contrato delimitado](EMPTY-AUTHORING-RECOVERY.md).
+- Recuperação de autoria vazia qualificada offline e instalada. A equipe retomou a autoria dos testes em card sucessor; origem e prefixo concluído preservados. Ciclo assistido, ainda sem homologação. Ver [contrato delimitado](EMPTY-AUTHORING-RECOVERY.md).
 - Reinício do supervisor com efeito Compose pendente passou em isolamento,
   reconciliando o mesmo container sem reenvio; rollback e QA concluídos.
 - Restauração da instalação descartável com efeito Compose pendente passou,

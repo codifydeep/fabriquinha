@@ -33,3 +33,8 @@ workspace e contrato alterados; ensaio nativo em cópia isolada com interrupçã
 entre publicação do recibo e do grafo, retomada idempotente e seis sucessores
 únicos. Prefixo concluído, fonte em triage, plano, validador e contagem de runs
 preservados. Nenhum worker, chamada ao modelo ou operação Docker nesse ensaio.
+
+Instalação realizada após backup conferido e pausa drenada. O dispatcher retomou
+a autoria em card sucessor; seis cards pendentes foram encadeados e o primeiro
+pacote concluído permaneceu intacto. Suite do núcleo: 560 testes aprovados.
+Execução iniciada não significa Red aceito, entrega concluída ou homologação.
