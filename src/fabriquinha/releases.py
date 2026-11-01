@@ -358,6 +358,13 @@ class Releases:
             result['browser']='Change only expected text in the explicitly authorized existing QA files; preserve all IDs, actions, selectors, paths and unit tests. Match the brief and deterministic UI wording; do not add requirements or weaken business coverage.'
         if mode==2:
             result['browser']='Add acceptance_*.py tests subclassing AcceptanceTest and acceptance.*.json criterion coverage. The same frozen suite runs in preview and deployment; use self.target and self.new_context(). Preserve every existing test/manifest. Review behavior coverage independently, including timing and independent sessions where required.'
+        if body.get('authoring_repair'):
+            recovery=self.store.receipt(body['authoring_repair'],kind='authoring_recovery')
+            if recovery['binding']!=self.binding(anchor) or recovery['payload']['project']!=self.project.fingerprint():
+                raise ValueError('exact assisted authoring recovery required')
+            result['authoring_recovery']=dict(source=recovery['payload']['request']['source'],
+                source_run=recovery['payload']['source_run'],assisted=True,delivery_approval=False,
+                instruction='The old empty test-authoring attempt remains triaged. Author tests for THIS package and its criteria. Baseline Green proves regressions only. Produce fresh behavioral Red and independent freeze; no historical hold or text promise replaces the required tool handoff.')
         if body.get('continuation_plan'):
             from .repairs import reviewed
             graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')['payload']

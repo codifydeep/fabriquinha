@@ -213,3 +213,20 @@ chamadas ao modelo. Isso testa a preservação da autoridade explicitamente
 selecionada, não sua descoberta automática nem migração/restore de produção.
 O recibo mantém `production_restore_qualified=false` e
 `provider_counter_restore_qualified=false`. A cópia antiga jamais foi ativada.
+
+## Situação que substitui as pendências antigas — 01/11/2026
+
+O brief de C foi aprovado; não pedir novamente o mesmo aceite. O primeiro pacote
+foi integrado, mas a autoria dos testes seguintes encerrou sem handoff e chegou
+a triage. Correções de contexto e continuação após limite de saída foram instaladas
+com o Hermes v0.22.5. A próxima ação é recuperação delimitada da autoria vazia,
+preservando prefixo, origem e testes. O ciclo é assistido. O mecanismo qualificado
+[está documentado aqui](EMPTY-AUTHORING-RECOVERY.md); não se aplica a entregas
+parciais ou testes já submetidos.
+
+B permanece concluída no âmbito determinístico. A atualização também concluiu
+um ensaio de dois incrementos com SDK, Docker e QA, com autores/GitHub programados.
+D avançou em backup real e migração preservadora, mas instalação independente por
+terceiros e recuperação integral de produção/contabilidade ainda não estão
+qualificadas. Conversação livre, memória automática e novas skills não foram
+reintroduzidas por esta manutenção. Evitar outra arquitetura antes de concluir C.

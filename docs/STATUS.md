@@ -1,22 +1,22 @@
-# Status do projeto — 31 de outubro de 2026
+# Status do projeto — 1 de novembro de 2026
 
 **Saída e reposição de jogadores homologadas em ciclo assistido**, com dois
 incrementos dependentes. A v0.3 anterior permanece um ciclo autônomo observado;
 ainda falta demonstrar repetibilidade sob evolução da plataforma.
 
-- Ambiente vigente na última verificação: http://127.0.0.1:62413.
+- A URL histórica da entrega anterior não deve ser confundida com o deployment parcial da release em andamento; consultar os recibos vigentes.
 - Commit: `a731d2d6588d5c52121584d5cf8056c7074aea2d`.
 - PRs [19](https://github.com/codifydeep/descartavel/pull/19) e
   [20](https://github.com/codifydeep/descartavel/pull/20).
 - 43 testes na suíte final, 41 casos de navegador; CI, revisão, rollback e QA.
 - Todos os 15 arquivos de testes/manifestos do baseline preservados byte a byte.
 - Fixtures anteriores reparadas e homologadas. Matriz de revisão alinhada.
-- Compatibilidade histórica corrigida; 548 testes da automação no último check.
+- Compatibilidade histórica corrigida; atualização do Hermes v0.22.5 qualificada e instalada.
 - Resumo operacional somente leitura instalado no Kanban (08e01954).
 - Prova determinística consolidada de compatibilidade entre duas releases e
   dois validadores passou; autores/GitHub simulados, Docker/navegador reais.
-- Próximo objetivo encaminhado ao Produto: primeira fatia jogável do Truco,
-  com brief ainda sujeito ao aceite do CEO.
+- Brief da primeira mão jogável e pedido de Truco aprovado pelo CEO. Primeiro pacote integrado; autoria dos testes do pacote seguinte em triage após encerramento sem handoff. Ainda não há homologação dessa release.
+- Recuperação de autoria vazia qualificada offline; instalação e execução pelos agentes são etapas distintas. Ver [contrato delimitado](EMPTY-AUTHORING-RECOVERY.md).
 - Reinício do supervisor com efeito Compose pendente passou em isolamento,
   reconciliando o mesmo container sem reenvio; rollback e QA concluídos.
 - Restauração da instalação descartável com efeito Compose pendente passou,
