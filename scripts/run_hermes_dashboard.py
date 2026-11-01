@@ -13,7 +13,7 @@ KANBAN_NOTICE = '''<aside role="note" style="position:fixed;bottom:8px;left:max(
 <strong>Fabriquinha · Hermes + Kanban · consulta</strong><br>
 O dispatcher Fabriquinha executa a equipe. “Gateway: Off” refere-se ao gateway nativo.
 Cards históricos não indicam trabalho ativo: confira o recibo da release e seus sucessores.
-Comandos e aprovações: Telegram /fabrica.
+Comandos e aprovações: Telegram /fabrica. Atualizações são instaladas sob manutenção; este painel não pode atualizar o Hermes.
 <button onclick="this.parentElement.remove()" aria-label="Fechar orientação">Fechar</button></aside>'''.encode()
 
 
@@ -78,7 +78,7 @@ class KanbanGuidance:
         self.root = root
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or scope.get('method') != 'GET' or scope.get('path') != '/kanban':
+        if scope['type'] != 'http' or scope.get('method') != 'GET' or scope.get('path') not in ('/', '/kanban', '/system'):
             return await self.app(scope, receive, send)
         pending = []
         async def capture(message):
@@ -114,6 +114,23 @@ class ObservationOnly:
             from starlette.responses import JSONResponse
             await JSONResponse({'detail': 'Observation-only dashboard. Use the authorized /fabrica channel.'},
                                status_code=403)(scope, receive, send)
+            return
+        if scope['type']=='http' and scope['method']=='GET' and scope['path']=='/api/status':
+            import json
+            pending=[]
+            async def capture(message):pending.append(message)
+            await self.app(scope,receive,capture)
+            start=next((m for m in pending if m['type']=='http.response.start'),None)
+            headers=dict(start.get('headers',[])) if start else {}
+            if start and start['status']==200 and b'application/json' in headers.get(b'content-type',b'') and b'content-encoding' not in headers:
+                body=b''.join(m.get('body',b'') for m in pending if m['type']=='http.response.body')
+                value=json.loads(body)
+                value['can_update_hermes']=False
+                value['fabriquinha_observation_only']=True
+                body=json.dumps(value).encode()
+                await send(dict(start,headers=[(k,v) for k,v in start['headers'] if k.lower()!=b'content-length']+[(b'content-length',str(len(body)).encode())]))
+                await send({'type':'http.response.body','body':body});return
+            for message in pending:await send(message)
             return
         await self.app(scope, receive, send)
 

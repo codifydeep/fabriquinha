@@ -316,3 +316,8 @@ evidence readable across validator upgrades without qualifying it for new delive
 
 Current assessment and next milestones: [31 October review](docs/EXECUTION-REVIEW-2026-10-31.md).
 The earlier v0.3 autonomous observation remains valid; the latest delivery is assisted.
+
+Hermes upgrade compatibility and operational limits are recorded in
+[the v0.22.5 qualification](docs/HERMES-0225-UPGRADE.md). Existing installations
+require a drained maintenance window and verified backup; changing the source pin
+alone does not migrate an installation or authorize new delivery evidence.

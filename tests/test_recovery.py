@@ -15,11 +15,22 @@ from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.quality import Quality, suite_report
 from fabriquinha.effects import EffectBlocked
-from fabriquinha.recovery import Diagnostic, Recovery, guidance_context
+from fabriquinha.recovery import Diagnostic, Recovery, guidance_context, source_package_context
 from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_failed_package_context_is_exact_and_not_baseline_inventory(self):
+        body={'package':'hand-play','release':'r','criteria':['PLAY'],'acceptance':'Play a card'}
+        binding={'contract':digest(body),'release':'r'}
+        result=source_package_context(body,binding)
+        self.assertEqual(result['package'],'hand-play')
+        self.assertEqual(result['criteria'],['PLAY'])
+        with self.assertRaises(ValueError):
+            source_package_context({**body,'package':'hand-start'},binding)
+        with self.assertRaises(ValueError):
+            source_package_context(body,{**binding,'release':'other'})
+
     def test_review_probe_feedback_uses_same_admission_before_terminal_decision(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.experiment='new-observation'

@@ -97,6 +97,16 @@ def control_refusal_context(store,project,binding,key,current_snapshot):
         delivery_approval=False,requires_fresh_validation=True)
 
 
+def source_package_context(body,binding):
+    """Exact failed work scope; baseline inventory is not its unfinished work."""
+    if not body.get('package'):return None
+    if digest(body)!=binding['contract'] or body.get('release')!=binding['release']:
+        raise ValueError('exact failed package contract required')
+    return dict(package=body['package'],criteria=body.get('criteria',[]),
+        acceptance=body.get('acceptance',''),release_plan=body.get('release_plan'),
+        semantics='Diagnose this package only. Passing baseline tests are prior regressions, not evidence that new criteria exist or that old behavior needs a new Red.')
+
+
 class Diagnostic:
     def __init__(self,sandbox,quality):
         self.sandbox,self.q,self.run=sandbox,quality,sandbox.run
@@ -206,6 +216,8 @@ class Diagnostic:
         with api.connect_closing() as conn:
             source=kb.get_task(conn,self.incident['source'])
             source_body=json.loads(source.body or '{}') if source else {}
+        package=source_package_context(source_body,self.original)
+        if package:result['failed_work_package']=package
         maintenance_key=source_body.get('inputs',{}).get('maintenance_review')
         if maintenance_key:
             from .maintenance import reviewed,context

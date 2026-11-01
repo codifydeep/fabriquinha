@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-UPSTREAM_COMMIT = 'e06df9c2eae6901f4c88f464e0ae6e753c0428b8'
+UPSTREAM_COMMIT = 'bf0203a794a07aac3ff764972ab9087baa4e4f4e'
 
 
 def save(path, value):

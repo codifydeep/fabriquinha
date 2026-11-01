@@ -100,7 +100,7 @@ chamadas ao modelo, jobs Docker ou alterações no GitHub. A prova foi repetida 
 segunda raiz privada nova, também com sucesso. Ainda faltam ferramentas/imagens
 e ciclo de entrega em ambiente independente. O checkout
 Hermes deve estar limpo no commit
-`e06df9c2eae6901f4c88f464e0ae6e753c0428b8`; o preparador recusa outro commit
+`bf0203a794a07aac3ff764972ab9087baa4e4f4e`; o preparador recusa outro commit
 ou alterações locais. Não copiar o home de uma instalação anterior.
 
 ### Checkout Hermes e prova de preparo sem inferência
@@ -110,7 +110,7 @@ novos; o preparador recusa sobrescrever uma instalação. O checkout é esparso 
 reduzir uso de disco e permanece separado de qualquer home de agentes.
 
 ```sh
-git clone --depth 1 --filter=blob:none --sparse --branch v0.22.0 \
+git clone --depth 1 --filter=blob:none --sparse --branch v0.22.5 \
   https://github.com/NousResearch/hermes-agent.git <upstream-novo>
 git -C <upstream-novo> sparse-checkout set \
   hermes_cli agent tools gateway cron pm hermes_plugins hermes_platform \
@@ -790,3 +790,5 @@ preservando a pergunta anterior; CTO, Tech Lead e execução recebem a mesma
 clarificação. Replay não duplica retomadas. Outra pergunta não é respondida
 implicitamente. O registro não autoriza ferramentas, merge, exceções de testes
 ou aprovação completa do brief. Workers não devem poder escrever nessa área.
+
+A atualização de instalações existentes exige manutenção e backup; não basta trocar o checkout. Consulte [qualificação v0.22.5](HERMES-0225-UPGRADE.md). O dashboard também requer `tui_gateway` e assets compilados; o canal existente usa `plugins/platforms/telegram`.

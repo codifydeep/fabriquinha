@@ -167,6 +167,13 @@ def incomplete_activity(result, output_limit, *, compressor=None):
     code=('output_budget_exceeds_policy' if isinstance(error,str) and 'output_budget_exceeds_policy' in error else
           'sdk_failed' if result.get('failed') is True else 'missing_terminal_operation')
     state=dict(code=code,output_limit=output_limit,failed=result.get('failed') is True)
+    # Diagnostic evidence only: never grants retries or terminal success.
+    messages=result.get('messages')
+    if isinstance(messages,list):
+        marker='[System: Your previous response was truncated by the output length limit. Continue exactly where you left off. Do not restart or repeat prior text. Finish the answer directly.]'
+        count=sum(1 for message in messages if isinstance(message,dict)
+                  and message.get('role')=='user' and message.get('content')==marker)
+        if count:state['output_limit_continuations']=min(count,1000)
     calls=result.get('api_calls')
     if type(calls) is int and 0<=calls<=1000:state['api_calls']=calls
     # Read numeric telemetry from the pinned native compressor only. Never copy
@@ -559,6 +566,10 @@ def run_activity(sandbox,quality,route,prompt,*,run_seconds=600,stop_requested=N
                'Validation errors require correction, not weakening tests. Do not claim completion in prose.')
         phase+=' File tools see only /workspace; controller host paths are unavailable. Use small complete tool calls within the fixed output budget, not one oversized command or file batch. Exploratory terminal calls are limited to '+str(min(120,sandbox.project.timeout_seconds))+' seconds. For implementation, delivery_validate runs the complete frozen suite including browser acceptance without handoff; use it after edits instead of searching for the controller harness. delivery_submit still requires the complete negative-control set. Partial exploratory runs never qualify delivery. Use its covered/missing control feedback rather than repeating unchanged mutation proposals.'
         if corrective_phase is not None:phase=corrective_phase
+        phase+=(' An SDK output-limit continuation does not end the activity or remove tools. '
+                'Resume the assigned work with small complete authorized tool calls; do not continue a long explanation. '
+                'A final prose promise is not a handoff. Use the terminal operation authorized for this phase only after its gates pass. '
+                'Do not repeat a mutation whose result is uncertain, and do not bypass a failed gate to finish.')
         prompt=sandbox_context(prompt)
         if 'terminal' in allowed:terminal_schema(min(120,sandbox.project.timeout_seconds))
         bundle=validation_files(sandbox.project,sandbox.store)[0]

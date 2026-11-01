@@ -87,3 +87,16 @@ class SummaryTests(unittest.TestCase):
             self.assertIn('HOMOLOGADA',view);self.assertIn('assistido',view)
             path.write_text('{}')
             self.assertNotIn('HOMOLOGADA',module.operational_summary(root,now=100))
+
+class UpdateCapabilityTests(unittest.TestCase):
+    def test_readonly_capability_preserves_native_gateway_status(self):
+        import json
+        messages=[]
+        async def native(scope,receive,send):
+            await send({'type':'http.response.start','status':200,'headers':[(b'content-type',b'application/json')]})
+            await send({'type':'http.response.body','body':b'{"gateway_running":false,"can_update_hermes":true}'})
+        async def send(m):messages.append(m)
+        asyncio.run(module.ObservationOnly(native)({'type':'http','method':'GET','path':'/api/status'},None,send))
+        result=json.loads(messages[1]['body'])
+        self.assertFalse(result['can_update_hermes']);self.assertFalse(result['gateway_running'])
+        self.assertTrue(result['fabriquinha_observation_only'])

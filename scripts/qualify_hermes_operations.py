@@ -25,7 +25,7 @@ from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 from fabriquinha.profile_policy import contract as profile_contract, configuration as profile_configuration
 
 
-def qualify(root,upstream,image,*,managed_profiles=False):
+def qualify(root,upstream,image,*,managed_profiles=False,output_continuation=False):
     tests,impl=create_trial(root,upstream,image,namespace='delivery-kit-hermes-operations')
     project=json.loads((root/'project.json').read_bytes())
     project['reviewers']['mobile']='flow-reviewer'  # Absent and unused must not stop web work.
@@ -41,6 +41,8 @@ def qualify(root,upstream,image,*,managed_profiles=False):
         runtime=Runtime(root,upstream)
     held={kind:threading.Event() for kind in ('author','review')}
     release={kind:threading.Event() for kind in held};paused={};sequences={};requests={};services=[]
+    truncated_run=[]
+    continuation_observed=[]
     class Response(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def do_POST(self):
@@ -59,6 +61,21 @@ def qualify(root,upstream,image,*,managed_profiles=False):
                     sequence=[('read_file',{'path':'/workspace/tests/test_new.py'}),('delivery_submit',{})]
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
+            if output_continuation and not truncated_run:
+                truncated_run.append(run.number)
+                data=json.dumps(dict(id='local-truncated',object='chat.completion',created=int(time.time()),
+                    model=body['model'],choices=[dict(index=0,finish_reason='length',
+                        message=dict(role='assistant',content='Preparing the next tool call'))],
+                    usage=dict(prompt_tokens=100,completion_tokens=50,total_tokens=150))).encode()
+                self.send_response(200);self.send_header('Content-Type','application/json')
+                self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+                return
+            if truncated_run==[run.number]:
+                index-=1
+                if index==0:
+                    assert any('previous response was truncated by the output length limit' in str(m.get('content','')) for m in body['messages'])
+                    assert any('An SDK output-limit continuation does not end the activity' in str(m.get('content','')) for m in body['messages'])
+                    continuation_observed.append(run.number)
             if index>=len(sequences[run.number]):self.send_error(400);return
             kind=('author' if run.task==tests and not run.reviewing and index==3 and not held['author'].is_set()
                   else 'review' if run.task==tests and run.reviewing and index==0 and not held['review'].is_set() else None)
@@ -165,6 +182,9 @@ def qualify(root,upstream,image,*,managed_profiles=False):
             native_runs=len(runs),local_http_requests=sum(requests.values()),model_calls=0,
             delivery_approval=False,migration=False,managed_profiles=managed_profiles,
             profile_contract=profile_contract() if managed_profiles else None)
+        if output_continuation:
+            assert continuation_observed==truncated_run and len(truncated_run)==1
+            result.update(native_output_continuation=True,continuation_tools_and_handoff=True)
         write_json(root/'receipt.json',result);print(json.dumps(result,indent=2))
     finally:
         for event in release.values():event.set()
@@ -182,5 +202,5 @@ def qualify(root,upstream,image,*,managed_profiles=False):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--upstream',type=Path,required=True)
-    parser.add_argument('--image',required=True);parser.add_argument('--managed-profiles',action='store_true');args=parser.parse_args()
-    qualify(args.root.resolve(),args.upstream.resolve(),args.image,managed_profiles=args.managed_profiles)
+    parser.add_argument('--image',required=True);parser.add_argument('--managed-profiles',action='store_true');parser.add_argument('--output-continuation',action='store_true');args=parser.parse_args()
+    qualify(args.root.resolve(),args.upstream.resolve(),args.image,managed_profiles=args.managed_profiles,output_continuation=args.output_continuation)

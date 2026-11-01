@@ -19,6 +19,14 @@ from test_delivery_core import configuration
 
 
 class NativeBackendPolicy(unittest.TestCase):
+    def test_incomplete_activity_reports_output_continuation_without_transcript(self):
+        text='[System: Your previous response was truncated by the output length limit. Continue exactly where you left off. Do not restart or repeat prior text. Finish the answer directly.]'
+        result={'messages':[{'role':'user','content':text},{'role':'assistant','content':'private response'}]}
+        message=str(incomplete_activity(result,16384))
+        self.assertIn('"output_limit_continuations": 1',message)
+        self.assertNotIn('private response',message)
+        self.assertIn('missing_terminal_operation',message)
+
     def test_request_policy_pins_output_and_keeps_activity_accounting(self):
         for limit in adapter.OUTPUT_LIMITS:
             value=adapter.request_policy('a'*64,limit)

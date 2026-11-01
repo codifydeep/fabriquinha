@@ -65,7 +65,12 @@ def reserve_fixture_networks(project,pool):
 
 
 def wal_probe(root):
-    """Deterministically reproduce native preflight TOCTOU, then retain WAL."""
+    """Exercise sidecar disappearance and retained-WAL integrity on pinned upstream."""
+    from fabriquinha.kanban_lane import UPSTREAM_COMMIT
+    expected_race={
+        "e06df9c2eae6901f4c88f464e0ae6e753c0428b8":True,
+        "bf0203a794a07aac3ff764972ab9087baa4e4f4e":False,
+    }[UPSTREAM_COMMIT]
     from hermes_state_repair import preflight_db_writability
     path=root/'wal-lifetime-probe.db';wal=Path(str(path)+'-wal');access=os.access
     connection=sqlite3.connect(path);connection.execute('PRAGMA journal_mode=WAL')
@@ -74,10 +79,12 @@ def wal_probe(root):
     def losing(file,mode):
         if Path(file)==wal and not closed[0]:connection.close();closed[0]=True;assert not wal.exists()
         return access(file,mode)
+    reproduced=False
     with patch('hermes_state_repair.os.access',losing):
         try:preflight_db_writability(path)
-        except sqlite3.OperationalError as error:assert str(wal) in str(error)
-        else:raise AssertionError('native disappearing-sidecar race was not reproduced')
+        except sqlite3.OperationalError as error:
+            assert str(wal) in str(error);reproduced=True
+    assert closed[0] and reproduced==expected_race, 'unexpected pinned upstream sidecar behavior'
     keeper=sqlite3.connect(path);keeper.execute('SELECT value FROM probe').fetchone()
     short=sqlite3.connect(path);short.execute('SELECT value FROM probe').fetchone();closed[0]=False
     def retained(file,mode):
@@ -85,7 +92,7 @@ def wal_probe(root):
         return access(file,mode)
     with patch('hermes_state_repair.os.access',retained):preflight_db_writability(path)
     assert keeper.execute('SELECT value FROM probe').fetchone()==(1,);keeper.close()
-    value=dict(native_race_reproduced=True,connection_lifetime_retains_wal=True,data_preserved=True,upstream_patches=0)
+    value=dict(native_race_reproduced=reproduced,native_disappearance_handled=not reproduced,connection_lifetime_retains_wal=True,data_preserved=True,upstream_patches=0)
     write_json(root/'wal-lifetime-probe.json',value);return value
 
 
