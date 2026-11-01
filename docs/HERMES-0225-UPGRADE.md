@@ -1,6 +1,6 @@
-# Atualização Hermes v0.22.5 — compatibilidade qualificada
+# Hermes v0.22.5 — atualização concluída e limites de qualificação
 
-Solicitada pelo proprietário em 31/10/2026; qualificação integrada concluída em 01/11/2026. Instalação sob manutenção, com verificação pós-troca ainda necessária.
+Solicitada pelo proprietário em 31/10/2026. Qualificação, instalação e verificação pós-troca concluídas em 01/11/2026.
 
 Origem: v0.22.0, `e06df9c2eae6901f4c88f464e0ae6e753c0428b8`.
 Destino: v0.22.5, `bf0203a794a07aac3ff764972ab9087baa4e4f4e`.
@@ -17,7 +17,7 @@ A prova de admissão nativa passou: nove perfis, recusa de configuração diverg
 recusa de fallback silencioso, reinício com divergência preservada, restauração da
 admissão e pausa mantida. Zero chamadas ao modelo, workers ou mutações GitHub.
 
-## Sequência restante
+## Sequência de instalação validada
 
 1. Qualificar execução real do SDK e continuação após truncagem na versão nova.
 2. Qualificar a cadeia de entrega e revisão com os validadores fixados.
@@ -39,7 +39,7 @@ não criar outro dispatcher nem substituir os contratos de revisão e entrega.
 Correções de Claude DirectSDK não demonstram solução para truncagem via OpenRouter.
 Recursos de planos/limites não substituem a contabilidade local já autorizada.
 
-A v0.22.0 continua sendo a versão ativa até a conclusão dessas validações.
+A v0.22.5 é a versão instalada. Checkout, SDK e backup da versão anterior foram preservados para recuperação.
 
 ## Qualificações adicionais
 
@@ -115,3 +115,18 @@ procedimento frio; a reversão simples dos vínculos deliberadamente recusa drif
 ## Qualificação integrada concluída
 
 Dois incrementos dependentes concluídos, onze atividades SDK e dezenove requisições locais programadas, zero chamadas pagas. Revisão independente por perfis, TDD, regressões, integração, implantação, rollback, restauração e QA passaram. O ambiente descartável foi retirado após preservar as evidências. GitHub e autores são programados neste ensaio: isso qualifica compatibilidade operacional, não comprova uma nova entrega autônoma do produto.
+
+## Verificação pós-instalação
+
+A API confirmou `version=0.22.5`; dashboard, Kanban autenticado e sessões
+históricas responderam HTTP 200. O canal Telegram reconectou em modo somente
+comandos. O dispatcher retomou pelo episódio exato de manutenção, sem efeitos
+pendentes. Cards, responsáveis, conteúdo e histórico de execuções foram comparados
+com o backup; recibos e objetos imutáveis mantiveram seus hashes. Contabilidade e
+política do provedor permaneceram iguais, sem chamadas pagas nesta atualização.
+
+O gateway nativo permanece desligado deliberadamente: dispatcher e canal de
+comandos são os serviços da equipe. O painel explica essa distinção e remove a
+capacidade de atualização administrativa da interface somente leitura. Nenhum
+controle de entrega foi dispensado. O impedimento técnico anterior da entrega do
+produto permanece separado da atualização e não recebeu aprovação retroativa.
