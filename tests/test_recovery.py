@@ -31,6 +31,19 @@ class TechnicalRecovery(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'classified blocker'):diagnostic.decide({**args,'ruling':{**ruling,'blocker':'another_cto_decision'}})
         self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
 
+    def test_author_return_requires_review_incident_and_verification(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        self.assertNotIn('return_author',d.actions())
+        d.level='cto';d.original={**d.original,'reviewing':True}
+        d.incident={**d.incident,'review_escalation':'review','resume_allowed':True}
+        self.assertEqual(d.actions(),['return_author','hold'])
+        args=dict(action='return_author',reason='Correction required',findings=[dict(evidence='incident',detail='Rejected review')])
+        with self.assertRaises(ValueError):d.decide(args)
+        with self.assertRaisesRegex(ValueError,'verification obligations|negative control obligations'):
+            d.decide({**args,'verification':{'reachable_scenario':'Reach branch'}})
+        with self.assertRaisesRegex(ValueError,'real experiment'):
+            d.decide({**args,'verification':dict(reachable_scenario='Reach branch',negative_control='Disable target guard')})
+
     def test_scoped_investigation_cannot_resume_or_hide_owner(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.resolution={'role':'investigate'}

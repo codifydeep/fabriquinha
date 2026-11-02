@@ -16,6 +16,9 @@ flowchart LR
   D -->|resume| I
   D -->|repair_tests| T
   D -->|unmet dependency| B[Visible prerequisite; no recursive retry]
+  R[Escalated rejected review] --> C2[CTO: explicit author-return decision]
+  C2 -->|return_author + verification obligations| A[Original author; new submission]
+  A --> R2[Independent review and required behavioral controls]
 ```
 
 The investigator is read-only and can record findings only. The decision card
@@ -77,3 +80,25 @@ This does not waive independent review/freezing, source identity, idle downstrea
 checks or deployed-repair incompatibility. Replacement cards become available
 only after the new graph is durable. Replaying that handoff uses the same cards.
 A technical test repair is not delivery approval.
+
+## Returning an escalated review to its author
+
+A completed CTO hold on an exact rejected review may create one native CTO
+author-return decision. The old hold is never converted into permission.
+`return_author` requires fresh diagnostic evidence and explicit obligations for
+a reachable scenario and a targeted negative control. The experiment may still
+be Red; that alone does not demonstrate reachability or approve the test.
+
+The controller validates the original independent rejection, snapshot, source
+run, author provenance and settled effects. It returns the blocked review to the
+original author using native parent gating and a `review_reopened` event, in the
+same transaction as durable guidance. Failure/recurrence counters are preserved.
+A rollback leaves the review blocked; replay does not duplicate the handoff.
+No synthetic reviewer run, source edit or approval is created.
+
+Author and subsequent reviewer receive the verification obligations. The author
+must correct the setup without testing a different rejection rule. Independent
+review must assess reachability and retain the specific regression risk; the
+implementation must satisfy the existing behavioral controls before delivery.
+The controller validates identities and structure, not the semantic adequacy of
+prose: independent review and actual negative-control results remain essential.

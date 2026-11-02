@@ -140,6 +140,9 @@ class Diagnostic:
 
     def actions(self):
         if getattr(self,'resolution',{}).get('role')=='investigate':return ['hold']
+        if (self.level=='cto' and self.original.get('reviewing') is True
+                and self.incident.get('review_escalation') and self.incident.get('resume_allowed') is True):
+            return ['return_author','hold']
         repair = (self.level=='cto' and self.original.get('kind')=='implementation'
                   and self.original.get('reviewing') is False
                   and self.incident.get('source_state') in ('blocked','triage')
@@ -238,6 +241,9 @@ class Diagnostic:
                         result['hold_resolution']['investigation_failure']=dict(task=task.id,run=closed.id,
                             outcome=closed.outcome,detail=str(closed.summary or closed.error or 'No completed diagnosis')[:2000],
                             instruction='The investigator failed. CTO owns the remaining diagnosis; do not wait for an impossible completed-parent handoff. No findings were approved.')
+        if 'return_author' in self.actions():
+            result['review_return']=dict(action='return_author',
+                instruction='Return the exact rejected review to its original author for correction, not approval. Choose concrete setup/action guidance within the authorized scope. Require a reachable scenario that isolates the disputed behavior and an independent negative control disabling that specific protection. An unchanged Red baseline that fails earlier does not establish reachability. New author submission and independent freeze/review remain mandatory; never replay an already-used card when that also triggers a different rejection rule.')
         if 'repair_tests' in self.actions():
             key,frozen=self.repair_freeze()
             result['technical_test_repair']=dict(tests=key,cases=frozen['cases'],files=sorted(frozen['tests']),
@@ -492,6 +498,7 @@ class Diagnostic:
         self.board.ensure(self.run)
         expected={'action','reason','findings'}
         if isinstance(args,dict) and args.get('action')=='repair_tests':expected.add('repair_scope')
+        if isinstance(args,dict) and args.get('action')=='return_author':expected.add('verification')
         scoped_hold=bool(getattr(self,'resolution',{})) and isinstance(args,dict) and args.get('action')=='hold'
         if scoped_hold:expected.add('next_step')
         executable=getattr(self,'resolution',{}).get('protocol')=='executable-decision-1'
@@ -499,6 +506,11 @@ class Diagnostic:
         if (not isinstance(args,dict) or set(args)!=expected
                 or args['action'] not in self.actions()):
             raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; preserve native triage and never send technical decisions to CEO')
+        if args['action']=='return_author':
+            verification=args['verification']
+            if (not isinstance(verification,dict) or set(verification)!={'reachable_scenario','negative_control'}
+                    or any(not isinstance(v,str) or not 1<=len(v.strip())<=2000 for v in verification.values())):
+                raise ValueError('author return requires reachable scenario and specific negative control obligations')
         if executable:
             ruling=args['ruling']
             if (not isinstance(ruling,dict) or set(ruling)!={'choice','correction','remaining','blocker'}
@@ -513,7 +525,7 @@ class Diagnostic:
                     or step['owner'] not in self.q.project.technical_roles.values()
                     or any(not isinstance(step[k],str) or not 1<=len(step[k].strip())<=1200 for k in ('operation','expected_evidence','precondition'))):
                 raise ValueError('scoped hold requires a technical owner, concrete operation, expected evidence and unmet precondition')
-        if args['action']=='resume' and self.experiment is None:
+        if args['action'] in ('resume','return_author') and self.experiment is None:
             raise ValueError('resume requires a real experiment in this execution')
         snapshot=self.incident['snapshot']
         if (not isinstance(args['reason'],str) or not 1<=len(args['reason'].strip())<=2000
@@ -546,6 +558,7 @@ class Diagnostic:
             action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False,
             **({'next_step':args['next_step']} if scoped_hold else {}),
             **({'ruling':args['ruling']} if executable else {}),
+            **({'verification':args['verification']} if args['action']=='return_author' else {}),
             **({'test_repair':repair} if repair else {})))
         self.sandbox.close()
         kb,kbc,_=native()
@@ -589,16 +602,18 @@ class Recovery:
             incident=self.store.receipt(record['payload']['incident'],kind='incident')
             scope=incident['binding']
             if (record['binding']['actor']!=row['author'] or record['binding']['kind']!='diagnostic'
-                    or record['payload']['project']!=self.project.fingerprint() or record['payload']['action']!='resume'
+                    or record['payload']['project']!=self.project.fingerprint() or record['payload']['action'] not in ('resume','return_author')
                     or any(scope[k]!=getattr(run,k) for k in ('task','kind','author','release','contract')) or scope['number']>=run.number):
                 raise ValueError('diagnostic guidance belongs to another phase, owner or execution')
             # A completed implementation may now be in independent QA/review.
             # Prior-phase advice is historical context, never a veto or new authority.
-            if scope['reviewing']!=run.reviewing or scope['actor']!=run.actor:continue
+            returned=record['payload']['action']=='return_author' and scope['reviewing'] and not run.reviewing and run.actor==scope['author']
+            if not returned and (scope['reviewing']!=run.reviewing or scope['actor']!=run.actor):continue
             experiment=self.store.receipt(record['payload']['experiment'],kind='diagnostic_experiment')
             if experiment['binding']!=record['binding'] or experiment['payload']['incident']!=record['payload']['incident']:
                 raise ValueError('diagnostic guidance lacks its exact experiment')
-            result.append(dict(receipt=key,verdict=record['payload']['verdict'],experiment=experiment['payload']))
+            result.append(dict(receipt=key,verdict=record['payload']['verdict'],experiment=experiment['payload'],
+                **({'required_verification':record['payload']['verification']} if record['payload']['action']=='return_author' else {})))
         return result
 
     def handoff(self,conn,task):
@@ -675,9 +690,11 @@ class Recovery:
         kb,_,_=native();body=json.loads(task.body)
         decision=self.store.receipt(decision_key,kind='diagnostic_decision');data=decision['payload']
         latest=kb.latest_run(conn,task.id)
+        review_followup=(not body.get('hold_resolution') and body.get('stage')=='cto'
+            and self.store.receipt(data['incident'],kind='incident')['payload'].get('review_escalation'))
         followup=(body.get('hold_resolution',{}).get('protocol')=='evidence-directed-hold-1'
                   and body['hold_resolution'].get('role')=='decide')
-        if (body.get('stage')!='cto' or (not followup and (not body.get('test_repair_scope') or body.get('hold_resolution')))
+        if (body.get('stage')!='cto' or (not followup and not review_followup and (not body.get('test_repair_scope') or body.get('hold_resolution')))
                 or task.status!='done' or not latest or (latest.metadata or {}).get('diagnosis')!=decision_key
                 or not latest.ended_at or latest.outcome!='completed'
                 or task.assignee!=self.project.technical_roles['cto']
@@ -698,8 +715,8 @@ class Recovery:
                 or experiment['binding']!=decision['binding'] or experiment['payload']['incident']!=data['incident']):
             raise ValueError('unchanged settled source and exact evidence required')
         pair=[]
-        protocol='executable-decision-1' if followup else 'evidence-directed-hold-1'
-        stages=(('decide','cto','Choose a technical alternative and bounded corrective work now. Reuse prior evidence. A hypothesis cannot add instrumentation. Test a concrete product-only correction on the disposable snapshot when useful; preserve all frozen tests. Resume may return partial corrections to the author while remaining failures stay mandatory. Hold only for a concrete missing capability, evidence or infrastructure dependency; never request another CTO choice.'),) if followup else (
+        protocol='review-author-return-1' if review_followup else 'executable-decision-1' if followup else 'evidence-directed-hold-1'
+        stages=(('decide','cto','Choose a technical alternative and bounded corrective work now. Reuse prior evidence. A hypothesis cannot add instrumentation. Test a concrete product-only correction on the disposable snapshot when useful; preserve all frozen tests. Resume may return partial corrections to the author while remaining failures stay mandatory. Hold only for a concrete missing capability, evidence or infrastructure dependency; never request another CTO choice.'),) if followup or review_followup else (
             ('investigate','lead','Use the existing observations and source to isolate unresolved causes. Distinguish original HTTP errors from repeated observer assertions. Investigate the unexplained setup/synchronization failure with a bounded hypothesis; record findings and the exact next technical operation, not delivery approval.'),
             ('decide','cto','Use the preceding investigation and retained evidence to choose executable corrective guidance. Decide a reachable deterministic setup for the approved behavior without weakening coverage. Separate product correction from scoped test repair. Use resume or repair_tests when justified; a hold must identify a specific unmet precondition, owner and next operation, not delegate technical choice back to CTO/CEO.'))
         for role,stage,objective in stages:
@@ -855,6 +872,12 @@ class Recovery:
         if data['action']=='escalate':
             if body['stage']!='lead':raise ValueError('only lead escalates to CTO')
             self.create(conn,data['incident'],'cto',previous=task.id);return
+        if data['action']=='hold' and source.get('review_escalation') and not body.get('hold_resolution'):
+            self.coordinate_hold(conn,task,receipt_id)
+            return
+        if data['action']=='return_author':
+            self.return_author(conn,task,receipt_id,receipt,incident)
+            return
         if data['action'] in ('hold','repair_tests'):
             # Keep the hold receipt/source block, but do not strand a technical
             # impediment at Lead. CTO is the final technical decision owner.
@@ -913,6 +936,38 @@ class Recovery:
             if not kb.unblock_task(conn,source['source']):raise EffectBlocked('native resume refused')
             return resumed()
         self.journal.do(key+':resume',identity,resume,resumed)
+
+    def return_author(self,conn,task,key,decision,incident):
+        """Atomic native review reopen; no synthetic reviewer run or delivery approval."""
+        kb,_,_=native();facts=incident['payload'];scope=incident['binding']
+        if (not scope['reviewing'] or not facts.get('review_escalation')
+                or decision['binding']['actor']!=self.project.technical_roles['cto']):
+            raise ValueError('exact independent review and CTO return authority required')
+        escalation=self.store.receipt(facts['review_escalation'],kind='review_escalation')
+        review=self.store.receipt(escalation['payload']['review'],kind='test_review' if scope['kind']=='tests' else 'delivery_review')
+        experiment=self.store.receipt(decision['payload']['experiment'],kind='diagnostic_experiment')
+        if (escalation['binding']!=scope or review['binding']!=scope or review['payload']['snapshot']!=facts['snapshot']
+                or review['payload']['verdict']['decision']!='changes' or scope['actor']==scope['author']
+                or experiment['binding']!=decision['binding'] or experiment['payload']['incident']!=decision['payload']['incident']):
+            raise ValueError('exact rejected snapshot and current CTO evidence required')
+        comment='DIAG '+key
+        with kb.write_txn(conn):
+            if conn.execute("SELECT 1 FROM task_comments WHERE task_id=? AND author=? AND body=?",(facts['source'],task.assignee,comment)).fetchone():return
+            target=kb.get_task(conn,facts['source']);latest=kb.latest_run(conn,target.id)
+            if (target.status!='blocked' or not latest or latest.id!=facts['source_run'] or not latest.ended_at
+                    or target.assignee!=scope['actor'] or digest(json.loads(target.body))!=scope['contract']
+                    or self.expired_effects(target.id)):
+                raise EffectBlocked('review return source changed or still active')
+            handoff,_=self.handoff(conn,target)
+            if handoff.get('implementer')!=scope['author']:raise ValueError('original author provenance changed')
+            # Same parent gating/event as native review reopen, composed atomically
+            # from blocked review. Preserve all failure and recurrence counters.
+            if self.board.guard:self.board.guard()
+            status=kb._landing_status_after_parents(conn,target.id)
+            changed=conn.execute("UPDATE tasks SET status=?, assignee=?, current_run_id=NULL, claim_lock=NULL, claim_expires=NULL, worker_pid=NULL, worker_started_at=NULL WHERE id=? AND status='blocked'",(status,scope['author'],target.id))
+            if changed.rowcount!=1:raise EffectBlocked('author return refused')
+            kb._append_event(conn,target.id,'review_reopened',dict(status=status,implementer=scope['author'],diagnosis=key,review=escalation['payload']['review']))
+            kb.add_comment(conn,target.id,task.assignee,comment)
 
     def reconcile(self,conn,settle):
         if not self.project.technical_roles:return {}
@@ -1012,6 +1067,9 @@ def register_diagnostic(sandbox,quality,on_terminal):
         diagnostic_decide=dict(type='object',additionalProperties=False,required=['action','reason','findings'],properties=dict(
             action={'type':'string','enum':operations.actions()},reason={'type':'string','minLength':1,'maxLength':2000},
             findings=dict(type='array',minItems=1,maxItems=8,items={'oneOf':[finding,reference]}))))
+    if 'return_author' in operations.actions():
+        schemas['diagnostic_decide']['properties']['verification']=dict(type='object',additionalProperties=False,
+            required=['reachable_scenario','negative_control'],properties={k:dict(type='string',minLength=1,maxLength=2000) for k in ('reachable_scenario','negative_control')})
     if 'repair_tests' in operations.actions():
         schemas['diagnostic_decide']['properties']['repair_scope']=dict(
             type='object',additionalProperties=False,required=['test_paths','cases'],

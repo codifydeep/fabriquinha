@@ -334,5 +334,7 @@ See [partial authoring recovery](docs/PARTIAL-AUTHORING-RECOVERY.md).
 Mixed technical holds use a bounded native investigation/decision handoff,
 including a failed-investigator path to the CTO and one bounded executable ruling
 after a decision-stage hold. Partial correction preserves every delivery gate. Technical fixture succession
-is bounded by incident, freeze and authorized scope, not total release age. See
+is bounded by incident, freeze and authorized scope, not total release age.
+Escalated rejected reviews have an explicit CTO-authorized return to the original
+author, preserving independent review and behavioral verification. See
 [evidence-directed holds](docs/EVIDENCE-DIRECTED-HOLDS.md).
