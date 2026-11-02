@@ -127,6 +127,9 @@ class Diagnostic:
                 or self.original['release']!=self.run.release):
             raise ValueError('controller-assigned technical diagnosis required')
         self.level=next(level for level,actor in roles.items() if actor==self.run.actor)
+        reader=getattr(self.board,'diagnostic_resolution',None)
+        value=reader(self.run) if reader else {}
+        self.resolution=value if isinstance(value,dict) else {}
         self.experiment=None
         self.repair=None
         reader=getattr(self.board,'repair_for_task',None);key=reader(self.incident.get('source')) if reader else None
@@ -136,6 +139,7 @@ class Diagnostic:
             if self.store.receipt(key)['binding']['release']!=self.run.release:raise ValueError('foreign corrective diagnosis')
 
     def actions(self):
+        if getattr(self,'resolution',{}).get('role')=='investigate':return ['hold']
         repair = (self.level=='cto' and self.original.get('kind')=='implementation'
                   and self.original.get('reviewing') is False
                   and self.incident.get('source_state') in ('blocked','triage')
@@ -202,6 +206,32 @@ class Diagnostic:
         result=dict(incident={**self.incident,'workspace':'/workspace','recorded_failure_is_historical':True},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
+        if getattr(self,'resolution',{}):
+            previous=self.store.receipt(self.resolution['diagnosis'],kind='diagnostic_decision')
+            if previous['payload']['incident']!=self.board.input(self.run,'incident'):
+                raise ValueError('resolution must reference its exact held incident')
+            experiment=self.store.receipt(previous['payload']['experiment'],kind='diagnostic_experiment')
+            result['hold_resolution']=dict(role=self.resolution['role'],previous=previous['payload'],
+                observations=guidance_context([{'experiment':experiment['payload']}])[0]['experiment'],objective=self.resolution['objective'],
+                instruction='Reuse the supplied HTTP paths/status/context evidence; do not ask for data already supplied. '
+                'Separate observed product faults, unreachable test setup and unresolved hypotheses. '
+                'Repeated assertion messages do not establish repeated HTTP requests: correlate the actual events and observer lifetime. '
+                'A different experiment must name the unresolved question and expected observation. '
+                'Do not whitelist errors, weaken coverage, or send technical choices to the CEO.')
+            if self.resolution.get('investigation'):
+                kb,kbc,_=native()
+                with kbc.connect_closing() as conn:
+                    task=kb.get_task(conn,self.resolution['investigation']);closed=kb.latest_run(conn,task.id) if task else None
+                    if not task or not closed or not closed.ended_at or task.status not in ('done','blocked','triage'):
+                        raise ValueError('settled investigation required before technical decision')
+                    if task.status=='done':
+                        finding=self.store.receipt((closed.metadata or {}).get('diagnosis'),kind='diagnostic_decision')
+                        if finding['payload']['incident']!=previous['payload']['incident']:raise ValueError('foreign investigation')
+                        result['hold_resolution']['investigation']=finding['payload']
+                    else:
+                        result['hold_resolution']['investigation_failure']=dict(task=task.id,run=closed.id,
+                            outcome=closed.outcome,detail=str(closed.summary or closed.error or 'No completed diagnosis')[:2000],
+                            instruction='The investigator failed. CTO owns the remaining diagnosis; do not wait for an impossible completed-parent handoff. No findings were approved.')
         if 'repair_tests' in self.actions():
             key,frozen=self.repair_freeze()
             result['technical_test_repair']=dict(tests=key,cases=frozen['cases'],files=sorted(frozen['tests']),
@@ -456,9 +486,17 @@ class Diagnostic:
         self.board.ensure(self.run)
         expected={'action','reason','findings'}
         if isinstance(args,dict) and args.get('action')=='repair_tests':expected.add('repair_scope')
+        scoped_hold=bool(getattr(self,'resolution',{})) and isinstance(args,dict) and args.get('action')=='hold'
+        if scoped_hold:expected.add('next_step')
         if (not isinstance(args,dict) or set(args)!=expected
                 or args['action'] not in self.actions()):
             raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; preserve native triage and never send technical decisions to CEO')
+        if scoped_hold:
+            step=args['next_step']
+            if (not isinstance(step,dict) or set(step)!={'owner','operation','expected_evidence','precondition'}
+                    or step['owner'] not in self.q.project.technical_roles.values()
+                    or any(not isinstance(step[k],str) or not 1<=len(step[k].strip())<=1200 for k in ('operation','expected_evidence','precondition'))):
+                raise ValueError('scoped hold requires a technical owner, concrete operation, expected evidence and unmet precondition')
         if args['action']=='resume' and self.experiment is None:
             raise ValueError('resume requires a real experiment in this execution')
         snapshot=self.incident['snapshot']
@@ -490,6 +528,7 @@ class Diagnostic:
                                   self.run.binding(),self.experiment,{**scope,'tests':key})
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),
             action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False,
+            **({'next_step':args['next_step']} if scoped_hold else {}),
             **({'test_repair':repair} if repair else {})))
         self.sandbox.close()
         kb,kbc,_=native()
@@ -614,6 +653,58 @@ class Recovery:
             return record['payload']['snapshot']
         return self.store.capture(Path(task.workspace_path))
 
+    def coordinate_hold(self,conn,task,decision_key):
+        """One evidence-directed native pair, never recursive generic diagnoses."""
+        kb,_,_=native();body=json.loads(task.body)
+        decision=self.store.receipt(decision_key,kind='diagnostic_decision');data=decision['payload']
+        latest=kb.latest_run(conn,task.id)
+        if (body.get('stage')!='cto' or not body.get('test_repair_scope') or body.get('hold_resolution')
+                or task.status!='done' or not latest or (latest.metadata or {}).get('diagnosis')!=decision_key
+                or not latest.ended_at or latest.outcome!='completed'
+                or task.assignee!=self.project.technical_roles['cto']
+                or decision['binding']['actor']!=task.assignee or decision['binding']['kind']!='diagnostic'
+                or decision['binding']['reviewing'] is not False or decision['binding']['release']!=body['release']
+                or decision['binding']['task']!=task.id or decision['binding']['number']!=latest.id
+                or decision['binding']['contract']!=digest(body) or data.get('action')!='hold'
+                or data.get('project')!=self.project.fingerprint() or not data.get('experiment')):
+            raise ValueError('exact completed scoped CTO hold required')
+        incident=self.store.receipt(data['incident'],kind='incident');facts=incident['payload'];source=kb.get_task(conn,facts['source'])
+        run=kb.latest_run(conn,source.id) if source else None
+        experiment=self.store.receipt(data['experiment'],kind='diagnostic_experiment')
+        if (data['incident']!=body['inputs']['incident'] or not source or source.status!='blocked'
+                or not run or not run.ended_at or run.id!=facts['source_run']
+                or digest(json.loads(source.body))!=incident['binding']['contract']
+                or self.store.capture(source.workspace_path)!=facts['snapshot']
+                or self.expired_effects(source.id)
+                or experiment['binding']!=decision['binding'] or experiment['payload']['incident']!=data['incident']):
+            raise ValueError('unchanged settled source and exact evidence required')
+        pair=[]
+        for role,stage,objective in (
+            ('investigate','lead','Use the existing observations and source to isolate unresolved causes. Distinguish original HTTP errors from repeated observer assertions. Investigate the unexplained setup/synchronization failure with a bounded hypothesis; record findings and the exact next technical operation, not delivery approval.'),
+            ('decide','cto','Use the preceding investigation and retained evidence to choose executable corrective guidance. Decide a reachable deterministic setup for the approved behavior without weakening coverage. Separate product correction from scoped test repair. Use resume or repair_tests when justified; a hold must identify a specific unmet precondition, owner and next operation, not delegate technical choice back to CTO/CEO.')):
+            resolution=dict(protocol='evidence-directed-hold-1',role=role,diagnosis=decision_key,objective=objective)
+            parent=task.id
+            if pair:
+                investigation=kb.get_task(conn,pair[0]);closed=kb.latest_run(conn,pair[0])
+                if (investigation.status not in ('done','blocked','triage') or not closed or not closed.ended_at
+                        or self.expired_effects(investigation.id)):return pair
+                resolution['investigation']=pair[0]
+                if investigation.status=='done':parent=pair[0]
+            probe=dict(version=1,kind='diagnostic',stage=stage,release=body['release'],
+                source=facts['source'],source_run=facts['source_run'],block_event=facts['block_event'],cause=facts['cause'],
+                inputs={'incident':data['incident']},escalated_from=pair[-1] if pair else task.id,hold_resolution=resolution)
+            key=digest([self.project.fingerprint(),data['incident'],'evidence-directed-hold-1',role])
+            prior=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
+            if prior:
+                if json.loads(prior['body'])!=probe:raise ValueError('resolution handoff identity drift')
+                pair.append(prior['id']);continue
+            if self.board.guard:self.board.guard()
+            pair.append(kb.create_task(conn,title=('INVESTIGATE ' if role=='investigate' else 'DECIDE ')+source.title,
+                body=json.dumps(probe),assignee=self.project.technical_roles[stage],parents=[parent],
+                priority=100,workspace_kind='dir',workspace_path=str(self.store.tree(facts['snapshot'])),
+                completion_contract='local-only',max_retries=0,max_runtime_seconds=600,idempotency_key=key))
+        return pair
+
     def create(self,conn,incident,stage,*,previous=None):
         kb,_,_=native();record=self.store.receipt(incident,kind='incident');data=record['payload']
         if data['project']!=self.project.fingerprint():raise ValueError('diagnostic incident belongs to another project')
@@ -651,6 +742,7 @@ class Recovery:
     def discover(self,conn,task,settle):
         kb,_,_=native();body=json.loads(task.body)
         if body.get('kind')=='diagnostic':
+            if body.get('hold_resolution'):return
             if body['stage']=='lead':self.create(conn,body['inputs']['incident'],'cto',previous=task.id)
             return
         if body.get('version')!=1 or body.get('kind') not in ('brief','plan','tests','implementation','integration'):return
@@ -736,6 +828,9 @@ class Recovery:
                 or data['incident']!=body['inputs']['incident']
                 or task.assignee!=self.project.technical_roles[body['stage']]):raise ValueError('exact native diagnostic evidence required')
         incident=self.store.receipt(data['incident'],kind='incident');source=incident['payload']
+        if body.get('hold_resolution',{}).get('role')=='investigate':
+            if data['action']!='hold':raise ValueError('investigation records findings only; CTO decides')
+            return
         if data['action']=='escalate':
             if body['stage']!='lead':raise ValueError('only lead escalates to CTO')
             self.create(conn,data['incident'],'cto',previous=task.id);return
@@ -863,7 +958,7 @@ class Recovery:
                 source_run=record['payload']['source_run'],block_event=record['payload']['block_event'],
                 owner=target.assignee if state=='revalidating' else task.assignee,
                 resume_allowed=record['payload'].get('resume_allowed',True),
-                next_action=(decision['verdict'] if decision else
+                next_action=(decision.get('next_step',decision['verdict']) if decision else
                     'CTO diagnostic failed: inspect its retained run and repair protocol/capability before another attempt.' if state=='diagnosis_failed' else
                     'Assigned technical diagnosis; inspect recorded failure and execute a permitted experiment.'),
                 delivery_approval=False)
@@ -901,6 +996,12 @@ def register_diagnostic(sandbox,quality,on_terminal):
             type='object',additionalProperties=False,required=['test_paths','cases'],
             properties=dict(test_paths=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
                             cases=dict(type='array',minItems=1,maxItems=20,items=dict(type='string'))))
+    if getattr(operations,'resolution',{}):
+        schemas['diagnostic_decide']['properties']['next_step']=dict(type='object',additionalProperties=False,
+            description='Required for hold: exact technical responsibility and next verifiable operation; not approval.',
+            required=['owner','operation','expected_evidence','precondition'],properties=dict(
+                owner=dict(type='string',enum=list(quality.project.technical_roles.values())),
+                **{key:dict(type='string',minLength=1,maxLength=1200) for key in ('operation','expected_evidence','precondition')}))
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')

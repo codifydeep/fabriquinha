@@ -1018,6 +1018,8 @@ class Repairs:
                 if not key:continue
                 decision=self.store.receipt(key,kind='diagnostic_decision')
                 incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                if body.get('hold_resolution') and decision['payload'].get('action')=='hold':
+                    continue  # A scoped pair never creates another pair or generic probe.
                 if decision['payload'].get('action')=='repair_tests':
                     if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
                         raise EffectBlocked('settle controller effects before test repair')
@@ -1059,6 +1061,10 @@ class Repairs:
                             assignee=self.project.technical_roles['cto'],parents=[task.id],priority=100,
                             workspace_kind='dir',workspace_path=str(self.store.tree(incident['payload']['snapshot'])),
                             completion_contract='local-only',max_retries=0,max_runtime_seconds=600,idempotency_key=identity)
+                    continue
+                if (source.status=='blocked' and decision['payload'].get('action')=='hold'
+                        and body.get('test_repair_scope') and decision['payload'].get('experiment')):
+                    Recovery(self.project,self.store,self.r.board).coordinate_hold(conn,task,key)
                     continue
                 if source.status!='triage':continue
                 if (incident['payload'].get('control_refusal') or protocol_failure(incident['payload'])) and incident['binding'].get('reviewing') is False:

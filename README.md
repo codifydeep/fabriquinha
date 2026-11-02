@@ -330,3 +330,7 @@ budget. A timeout remains a failed job, never delivery evidence. An explicitly
 assisted, operator-scoped continuation can preserve unfrozen partial tests on the
 same native card; independent review and every delivery gate remain mandatory.
 See [partial authoring recovery](docs/PARTIAL-AUTHORING-RECOVERY.md).
+
+Mixed technical holds use a bounded native investigation/decision handoff,
+including a failed-investigator path to the CTO. See
+[evidence-directed holds](docs/EVIDENCE-DIRECTED-HOLDS.md).

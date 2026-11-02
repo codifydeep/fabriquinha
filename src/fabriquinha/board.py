@@ -41,6 +41,14 @@ class Board:
         self.project = project
         self.guard = guard
 
+    def diagnostic_resolution(self,run):
+        self.ensure(run)
+        if run.kind!='diagnostic':raise ValueError('diagnostic context only')
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            task=kb.get_task(conn,run.task)
+            return json.loads(task.body).get('hold_resolution',{})
+
     def current(self, task_id, run_id):
         kb, kbc, _ = native()
         with kbc.connect_closing() as conn:

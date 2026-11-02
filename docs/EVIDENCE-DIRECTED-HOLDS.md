@@ -1,0 +1,48 @@
+# Evidence-directed resolution of mixed technical holds
+
+An implementation hold may contain both a product defect and an unreachable
+frozen-test setup. Repeating the generic test-repair probe loses that distinction.
+After a completed scoped CTO hold, the existing reconciler now creates at most
+one native investigation/decision pair for the exact incident:
+
+```mermaid
+flowchart LR
+  H[Scoped CTO hold] --> L[Tech Lead: investigate evidence gaps]
+  L -->|Completed findings| C[CTO: decide corrective action]
+  L -->|Settled failure, preserved evidence| C
+  C -->|resume| I[Original implementer; frozen tests preserved]
+  C -->|repair_tests| T[Test author and independent review/freezing]
+  C -->|hold| B[Visible prerequisite, technical owner and next operation]
+```
+
+The investigator is read-only and can record findings only. The decision card
+is created after that investigation settles. If it fails, the CTO depends on the
+already completed original diagnosis, receives the investigator's recorded
+failure and does not wait for an impossible completed-parent condition.
+Neither role can modify the implementation or waive TDD/review/CI/QA gates.
+
+Both cards receive the previous decision and observed failures/HTTP paths/status
+with context origins. Repeated case inventories are projected out of the prompt,
+not removed from the immutable receipts. Repeated assertion text must be compared
+with actual response events and observer lifetime before alleging another request.
+Existing evidence is not a delivery approval or a new experiment.
+
+A hold in this pair requires `next_step`: a technical owner, concrete operation,
+expected evidence and unmet precondition. Status exposes that structured step.
+There is no recursive pair or generic probe after the final hold. A further
+failure remains visible and assigned, not homologated or automatically retried.
+This does not promise recovery from every model failure; it removes the known
+failed-parent dependency and gives the CTO a bounded executable decision stage.
+
+Admission binds completed CTO identity, exact source run/contract/snapshot and
+settled effects. Idempotency is per incident and role; interrupted reconciliation
+cannot duplicate tasks. Existing holds remain historical, not retroactive test
+repair authorization. Native parent gating and existing resume/repair contracts
+continue to control any subsequent implementation or fixture change.
+
+Qualification uses a copied native board with no model or worker: one Lead card,
+one CTO card after an injected investigator failure, unchanged source workspace,
+HTTP evidence available to the decision, structured hold, idempotent creation and
+no recursive chain. Unit tests retain legacy recovery and forbid investigator
+resume or CEO assignment. Production delivery remains assisted and unqualified
+until the team completes all gates; this change itself is not homologation.

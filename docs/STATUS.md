@@ -55,3 +55,9 @@ continua bloqueada: cenário de empate inconsistente, 404s e entrada em sala
 ainda exigem diagnóstico. O contrato do CTO passa a resolver o congelamento
 no controlador e recebe observações HTTP por caso. Ver
 [contrato e limites](CTO-REPAIR-CONTRACT.md). Nenhuma homologação nova é declarada.
+
+O CTO concluiu o diagnóstico após a correção do contrato, mas manteve hold por
+causas mistas. Foi qualificado offline o encaminhamento delimitado Lead → CTO,
+incluindo falha do investigador sem dependência impossível e próximo passo
+estruturado. Ver [resolução baseada em evidências](EVIDENCE-DIRECTED-HOLDS.md).
+As falhas do produto e das fixtures continuam sob responsabilidade da equipe.

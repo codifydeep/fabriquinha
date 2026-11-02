@@ -20,6 +20,16 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_scoped_investigation_cannot_resume_or_hide_owner(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.resolution={'role':'investigate'}
+        self.assertEqual(diagnostic.actions(),['hold'])
+        args=dict(action='hold',reason='Observed unresolved prerequisite',findings=[dict(evidence='incident',detail='Existing evidence')])
+        with self.assertRaises(ValueError):diagnostic.decide(args)
+        with self.assertRaisesRegex(ValueError,'technical owner'):
+            diagnostic.decide({**args,'next_step':dict(owner='CEO',operation='Investigate',expected_evidence='Trace',precondition='Unknown origin')})
+        with self.assertRaises(ValueError):diagnostic.decide({**args,'action':'resume'})
+
     def test_timed_out_suite_is_context_only_and_rejects_foreign_execution(self):
         from fabriquinha.recovery import suite_refusal_context
         identity=dict(binding=self.original.binding(),snapshot=self.snapshot,phase='red',
