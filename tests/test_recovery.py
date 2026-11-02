@@ -20,6 +20,17 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_executable_decision_requires_ruling_and_real_hold_dependency(self):
+        diagnostic=Diagnostic(self.sandbox,self.quality)
+        diagnostic.resolution={'protocol':'executable-decision-1','role':'decide'}
+        args=dict(action='hold',reason='Technical decision',findings=[dict(evidence='incident',detail='Retained evidence')],
+            next_step=dict(owner='cto',operation='Choose again',expected_evidence='Choice',precondition='Choice pending'))
+        with self.assertRaises(ValueError):diagnostic.decide(args)
+        ruling=dict(choice='Use reachable setup',correction='Repair product polling',remaining='Full suite and review',blocker='none')
+        with self.assertRaisesRegex(ValueError,'actual unmet dependency'):diagnostic.decide({**args,'ruling':ruling})
+        with self.assertRaisesRegex(ValueError,'classified blocker'):diagnostic.decide({**args,'ruling':{**ruling,'blocker':'another_cto_decision'}})
+        self.assertEqual((self.work/'app.py').read_text(),'VALUE = 1\n')
+
     def test_scoped_investigation_cannot_resume_or_hide_owner(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.resolution={'role':'investigate'}

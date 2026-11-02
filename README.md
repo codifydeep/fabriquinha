@@ -332,5 +332,6 @@ same native card; independent review and every delivery gate remain mandatory.
 See [partial authoring recovery](docs/PARTIAL-AUTHORING-RECOVERY.md).
 
 Mixed technical holds use a bounded native investigation/decision handoff,
-including a failed-investigator path to the CTO. See
+including a failed-investigator path to the CTO and one bounded executable ruling
+after a decision-stage hold. Partial correction preserves every delivery gate. See
 [evidence-directed holds](docs/EVIDENCE-DIRECTED-HOLDS.md).

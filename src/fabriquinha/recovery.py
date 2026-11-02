@@ -211,13 +211,19 @@ class Diagnostic:
             if previous['payload']['incident']!=self.board.input(self.run,'incident'):
                 raise ValueError('resolution must reference its exact held incident')
             experiment=self.store.receipt(previous['payload']['experiment'],kind='diagnostic_experiment')
+            result['diagnostic_capabilities']=dict(observations=['full_suite_report','browser_http_errors_with_path_status_case_context'],
+                unavailable=['response_bodies','successful_join_response','new_browser_listeners_from_hypothesis'],
+                semantics='Hypothesis text never installs instrumentation. Product-only replacements run on a disposable copy; tests stay frozen. A resume authorizes corrective work, not passing tests or delivery. Mixed failures may be repaired incrementally while all gates remain mandatory.')
             result['hold_resolution']=dict(role=self.resolution['role'],previous=previous['payload'],
                 observations=guidance_context([{'experiment':experiment['payload']}])[0]['experiment'],objective=self.resolution['objective'],
                 instruction='Reuse the supplied HTTP paths/status/context evidence; do not ask for data already supplied. '
                 'Separate observed product faults, unreachable test setup and unresolved hypotheses. '
                 'Repeated assertion messages do not establish repeated HTTP requests: correlate the actual events and observer lifetime. '
                 'A different experiment must name the unresolved question and expected observation. '
-                'Do not whitelist errors, weaken coverage, or send technical choices to the CEO.')
+                'Do not whitelist errors, weaken coverage, or send technical choices to the CEO. '
+                'CTO must choose the technical alternative now. Use product-only replacements to test a concrete correction, not another unchanged suite merely with a new hypothesis. '
+                'Remaining failures do not prohibit resume with bounded implementation guidance; they remain mandatory before submission. '
+                'No new HTTP events in later cases is not evidence of missing URLs: inspect observer lifetime and retained messages first.')
             if self.resolution.get('investigation'):
                 kb,kbc,_=native()
                 with kbc.connect_closing() as conn:
@@ -488,9 +494,19 @@ class Diagnostic:
         if isinstance(args,dict) and args.get('action')=='repair_tests':expected.add('repair_scope')
         scoped_hold=bool(getattr(self,'resolution',{})) and isinstance(args,dict) and args.get('action')=='hold'
         if scoped_hold:expected.add('next_step')
+        executable=getattr(self,'resolution',{}).get('protocol')=='executable-decision-1'
+        if executable:expected.add('ruling')
         if (not isinstance(args,dict) or set(args)!=expected
                 or args['action'] not in self.actions()):
             raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; preserve native triage and never send technical decisions to CEO')
+        if executable:
+            ruling=args['ruling']
+            if (not isinstance(ruling,dict) or set(ruling)!={'choice','correction','remaining','blocker'}
+                    or ruling['blocker'] not in ('none','infrastructure','missing_evidence','tool_capability')
+                    or any(not isinstance(ruling[k],str) or not 1<=len(ruling[k].strip())<=2000 for k in ('choice','correction','remaining'))):
+                raise ValueError('executable ruling requires chosen alternative, bounded correction, remaining obligations and classified blocker')
+            if args['action']=='hold' and ruling['blocker']=='none':
+                raise ValueError('hold requires an actual unmet dependency; technical choice belongs to this CTO activity; use resume for demonstrated partial corrections')
         if scoped_hold:
             step=args['next_step']
             if (not isinstance(step,dict) or set(step)!={'owner','operation','expected_evidence','precondition'}
@@ -529,6 +545,7 @@ class Diagnostic:
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),
             action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False,
             **({'next_step':args['next_step']} if scoped_hold else {}),
+            **({'ruling':args['ruling']} if executable else {}),
             **({'test_repair':repair} if repair else {})))
         self.sandbox.close()
         kb,kbc,_=native()
@@ -658,7 +675,9 @@ class Recovery:
         kb,_,_=native();body=json.loads(task.body)
         decision=self.store.receipt(decision_key,kind='diagnostic_decision');data=decision['payload']
         latest=kb.latest_run(conn,task.id)
-        if (body.get('stage')!='cto' or not body.get('test_repair_scope') or body.get('hold_resolution')
+        followup=(body.get('hold_resolution',{}).get('protocol')=='evidence-directed-hold-1'
+                  and body['hold_resolution'].get('role')=='decide')
+        if (body.get('stage')!='cto' or (not followup and (not body.get('test_repair_scope') or body.get('hold_resolution')))
                 or task.status!='done' or not latest or (latest.metadata or {}).get('diagnosis')!=decision_key
                 or not latest.ended_at or latest.outcome!='completed'
                 or task.assignee!=self.project.technical_roles['cto']
@@ -679,10 +698,12 @@ class Recovery:
                 or experiment['binding']!=decision['binding'] or experiment['payload']['incident']!=data['incident']):
             raise ValueError('unchanged settled source and exact evidence required')
         pair=[]
-        for role,stage,objective in (
+        protocol='executable-decision-1' if followup else 'evidence-directed-hold-1'
+        stages=(('decide','cto','Choose a technical alternative and bounded corrective work now. Reuse prior evidence. A hypothesis cannot add instrumentation. Test a concrete product-only correction on the disposable snapshot when useful; preserve all frozen tests. Resume may return partial corrections to the author while remaining failures stay mandatory. Hold only for a concrete missing capability, evidence or infrastructure dependency; never request another CTO choice.'),) if followup else (
             ('investigate','lead','Use the existing observations and source to isolate unresolved causes. Distinguish original HTTP errors from repeated observer assertions. Investigate the unexplained setup/synchronization failure with a bounded hypothesis; record findings and the exact next technical operation, not delivery approval.'),
-            ('decide','cto','Use the preceding investigation and retained evidence to choose executable corrective guidance. Decide a reachable deterministic setup for the approved behavior without weakening coverage. Separate product correction from scoped test repair. Use resume or repair_tests when justified; a hold must identify a specific unmet precondition, owner and next operation, not delegate technical choice back to CTO/CEO.')):
-            resolution=dict(protocol='evidence-directed-hold-1',role=role,diagnosis=decision_key,objective=objective)
+            ('decide','cto','Use the preceding investigation and retained evidence to choose executable corrective guidance. Decide a reachable deterministic setup for the approved behavior without weakening coverage. Separate product correction from scoped test repair. Use resume or repair_tests when justified; a hold must identify a specific unmet precondition, owner and next operation, not delegate technical choice back to CTO/CEO.'))
+        for role,stage,objective in stages:
+            resolution=dict(protocol=protocol,role=role,diagnosis=decision_key,objective=objective)
             parent=task.id
             if pair:
                 investigation=kb.get_task(conn,pair[0]);closed=kb.latest_run(conn,pair[0])
@@ -693,7 +714,7 @@ class Recovery:
             probe=dict(version=1,kind='diagnostic',stage=stage,release=body['release'],
                 source=facts['source'],source_run=facts['source_run'],block_event=facts['block_event'],cause=facts['cause'],
                 inputs={'incident':data['incident']},escalated_from=pair[-1] if pair else task.id,hold_resolution=resolution)
-            key=digest([self.project.fingerprint(),data['incident'],'evidence-directed-hold-1',role])
+            key=digest([self.project.fingerprint(),data['incident'],protocol,role])
             prior=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
             if prior:
                 if json.loads(prior['body'])!=probe:raise ValueError('resolution handoff identity drift')
@@ -1002,6 +1023,12 @@ def register_diagnostic(sandbox,quality,on_terminal):
             required=['owner','operation','expected_evidence','precondition'],properties=dict(
                 owner=dict(type='string',enum=list(quality.project.technical_roles.values())),
                 **{key:dict(type='string',minLength=1,maxLength=1200) for key in ('operation','expected_evidence','precondition')}))
+    if getattr(operations,'resolution',{}).get('protocol')=='executable-decision-1':
+        schemas['diagnostic_decide']['required'].append('ruling')
+        schemas['diagnostic_decide']['properties']['ruling']=dict(type='object',additionalProperties=False,
+            required=['choice','correction','remaining','blocker'],properties=dict(
+                **{k:dict(type='string',minLength=1,maxLength=2000) for k in ('choice','correction','remaining')},
+                blocker=dict(type='string',enum=['none','infrastructure','missing_evidence','tool_capability'])))
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')

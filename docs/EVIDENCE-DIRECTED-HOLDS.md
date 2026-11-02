@@ -12,7 +12,10 @@ flowchart LR
   L -->|Settled failure, preserved evidence| C
   C -->|resume| I[Original implementer; frozen tests preserved]
   C -->|repair_tests| T[Test author and independent review/freezing]
-  C -->|hold| B[Visible prerequisite, technical owner and next operation]
+  C -->|hold| D[One bounded executable CTO ruling]
+  D -->|resume| I
+  D -->|repair_tests| T
+  D -->|unmet dependency| B[Visible prerequisite; no recursive retry]
 ```
 
 The investigator is read-only and can record findings only. The decision card
@@ -29,7 +32,7 @@ Existing evidence is not a delivery approval or a new experiment.
 
 A hold in this pair requires `next_step`: a technical owner, concrete operation,
 expected evidence and unmet precondition. Status exposes that structured step.
-There is no recursive pair or generic probe after the final hold. A further
+A completed decision-stage hold admits one idempotent `executable-decision-1` CTO follow-up, bound to the same unchanged incident. It does not create another investigation pair. The follow-up requires a ruling with a chosen alternative, bounded correction, remaining obligations and a classified blocker. A hold with no blocker is rejected. This structural check does not prove the semantic quality of the ruling. There is no automatic successor after that final hold. A further
 failure remains visible and assigned, not homologated or automatically retried.
 This does not promise recovery from every model failure; it removes the known
 failed-parent dependency and gives the CTO a bounded executable decision stage.
@@ -46,3 +49,16 @@ HTTP evidence available to the decision, structured hold, idempotent creation an
 no recursive chain. Unit tests retain legacy recovery and forbid investigator
 resume or CEO assignment. Production delivery remains assisted and unqualified
 until the team completes all gates; this change itself is not homologation.
+
+## Experiment and partial-correction boundaries
+
+Diagnostic hypotheses are prose, not instrumentation. The fixed validator exposes
+suite assertions and browser HTTP error path/status/case/context observations;
+it does not promise response bodies or successful join responses. Product-only
+replacements can test a concrete hypothesis in a disposable copy, keeping frozen
+tests unchanged. They never become an author delivery.
+
+A `resume` returns bounded corrective guidance to the original implementer;
+it does not require every unrelated failure to have been diagnosed first and
+never approves a failing suite. All remaining failures, independent review,
+PR, CI and QA remain required. No gate or native recovery budget is reset.

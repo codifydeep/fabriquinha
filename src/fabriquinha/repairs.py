@@ -1019,7 +1019,10 @@ class Repairs:
                 decision=self.store.receipt(key,kind='diagnostic_decision')
                 incident=self.store.receipt(decision['payload']['incident'],kind='incident')
                 if body.get('hold_resolution') and decision['payload'].get('action')=='hold':
-                    continue  # A scoped pair never creates another pair or generic probe.
+                    resolution=body['hold_resolution']
+                    if resolution.get('protocol')=='evidence-directed-hold-1' and resolution.get('role')=='decide':
+                        Recovery(self.project,self.store,self.r.board).coordinate_hold(conn,task,key)
+                    continue  # At most one executable decision; never another recursive pair.
                 if decision['payload'].get('action')=='repair_tests':
                     if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
                         raise EffectBlocked('settle controller effects before test repair')
