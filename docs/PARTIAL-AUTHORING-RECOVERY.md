@@ -48,3 +48,8 @@ workspace, graph and run history, without a model or worker.
 
 This repair does not demonstrate autonomous delivery. The current cycle remains
 assisted; a later uninterrupted useful delivery must establish repeatability.
+
+Installed after a verified cold backup and drained pause. The same native tests
+card resumed with its original workspace; dispatcher, dashboard and command relay
+were restarted. No production test was edited manually and no old report was
+converted into new evidence. Running is not delivered or homologated.
