@@ -142,6 +142,21 @@ class Diagnostic:
                   and self.incident.get('controller_effects')==[])
         return (['resume'] if self.incident.get('resume_allowed',True) else [])+(['escalate'] if self.level=='lead' else [])+['hold']+(['repair_tests'] if repair else [])
 
+    def repair_freeze(self):
+        """Resolve the failed implementation's exact native input, not model prose."""
+        if 'repair_tests' not in self.actions():raise ValueError('CTO implementation diagnosis required')
+        kb,kbc,_=native()
+        with kbc.connect_closing() as conn:
+            source=kb.get_task(conn,self.original['task'])
+            if not source or digest(json.loads(source.body))!=self.original['contract']:
+                raise ValueError('diagnostic source contract changed')
+            key=Recovery(self.q.project,self.store,self.board).input(conn,source,'tests')
+        record=self.store.receipt(key,kind='tests_frozen')
+        if record['binding']['release']!=self.run.release:raise ValueError('foreign source test freeze')
+        frozen=self.q.frozen_plan(record)
+        self.q.protect(frozen['snapshot'],self.incident['snapshot'],exact_tests=True)
+        return key,frozen
+
     def qa_correction(self):
         return self.original['kind']=='tests' and self.repair and self.repair['proposal']['classification']=='test_contract'
 
@@ -188,17 +203,27 @@ class Diagnostic:
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
         if 'repair_tests' in self.actions():
+            key,frozen=self.repair_freeze()
+            result['technical_test_repair']=dict(tests=key,cases=frozen['cases'],files=sorted(frozen['tests']),
+                contract='The controller resolves the exact frozen tests from the failed implementation. '
+                'repair_scope accepts only test_paths and cases; do not invent or copy receipt IDs. '
+                'Diagnose 404/roster failures by origin before classifying them as test defects. '
+                'Do not whitelist console messages or turn error observers off. A deliberate negative API probe '
+                'may use the same browser context request client, preserving cookies. '
+                'A tie test requires a deterministic reachable tie setup, not merely an assertion on an impossible deal. '
+                'Preserve approved behavior. Repair requires an actual experiment and independent author review/freezing; '
+                'if the evidence is inconclusive, record hold with a bounded next experiment.')
             kb,kbc,_=native()
             with kbc.connect_closing() as conn:
                 task=kb.get_task(conn,self.run.task)
                 requested=json.loads(task.body or '{}').get('test_repair_scope') if task else None
             if requested:
+                if requested['tests']!=key:raise ValueError('requested repair freeze differs from failed implementation input')
                 frozen=self.q.frozen_plan(self.store.receipt(requested['tests'],kind='tests_frozen'))
                 previous=self.store.receipt(requested['previous_diagnosis'],kind='diagnostic_decision')
-                result['technical_test_repair']=dict(tests=requested['tests'],cases=frozen['cases'],
-                    files=sorted(frozen['tests']),previous=previous['payload'],
+                result['technical_test_repair'].update(previous=previous['payload'],
                     contract='Use a current diagnostic_validate experiment. If a technical test defect is demonstrated, '
-                    'end with repair_tests and repair_scope containing the exact tests receipt, test_paths and cases. '
+                    'end with repair_tests and repair_scope containing test_paths and cases; the controller resolves the tests receipt. '
                     'Preserve accepted product behavior, assertion expressions and browser error observers. '
                     'A deliberate negative HTTP API probe may use the same browser context request client to preserve cookies '
                     'without injecting an expected network error into the UI console. Never ignore console errors globally. '
@@ -391,6 +416,10 @@ class Diagnostic:
                 snapshot=product_mutations(self.q,snapshot,[replacements])[0]
         job,report=DeliveryTools.wait(self,lambda:self.q.observe(self.run,snapshot,'green' if correction else 'diagnostic'))
         observed=self.deployment_observation();extra={} if observed is None else dict(deployment_observation=observed)
+        events=getattr(self.q,'validation_progress',[])
+        if isinstance(events,list):
+            http=[event for event in events if isinstance(event,dict) and event.get('event')=='http_error'][-64:]
+            if http:extra['http_observations']=dict(job=job,events=http,semantics='Sandbox diagnostic clues, not approval. Correlate current case with context_created_in and source before changing tests or product. Never whitelist unexplained errors.')
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
             snapshot=snapshot,source_snapshot=self.incident['snapshot'],hypothesis=args['hypothesis'],job=job,report=report,**extra))
         return dict(experiment=self.experiment,report=report,delivery_approval=False,
@@ -453,8 +482,12 @@ class Diagnostic:
         if args['action']=='repair_tests':
             from .technical_repair import validate_scope
             if self.experiment is None:raise ValueError('test repair requires a current CTO experiment')
+            scope=args['repair_scope'];key,_=self.repair_freeze()
+            if (not isinstance(scope,dict) or set(scope) not in ({'test_paths','cases'},{'tests','test_paths','cases'})
+                    or 'tests' in scope and scope['tests']!=key):
+                raise ValueError('repair_scope must contain test_paths and cases only; the controller resolves the source freeze; legacy tests must match that exact receipt')
             repair=validate_scope(self.q.project,self.store,self.board.input(self.run,'incident'),
-                                  self.run.binding(),self.experiment,args['repair_scope'])
+                                  self.run.binding(),self.experiment,{**scope,'tests':key})
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),
             action=args['action'],verdict=verdict,experiment=self.experiment,delivery_approval=False,
             **({'test_repair':repair} if repair else {})))
@@ -865,15 +898,22 @@ def register_diagnostic(sandbox,quality,on_terminal):
             findings=dict(type='array',minItems=1,maxItems=8,items={'oneOf':[finding,reference]}))))
     if 'repair_tests' in operations.actions():
         schemas['diagnostic_decide']['properties']['repair_scope']=dict(
-            type='object',additionalProperties=False,required=['tests','test_paths','cases'],
-            properties=dict(tests=dict(type='string'),test_paths=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
+            type='object',additionalProperties=False,required=['test_paths','cases'],
+            properties=dict(test_paths=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
                             cases=dict(type='array',minItems=1,maxItems=20,items=dict(type='string'))))
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')
+    failures={}
     def handler(method,terminal):
         def invoke(args,**kwargs):
-            result=method(args)
+            identity=digest([method.__name__,args])
+            if failures.get(identity,0)>=2:
+                raise ValueError('identical diagnostic operation already rejected twice; inspect the returned error and supplied diagnostic context, change the unsupported proposal or record hold; no operation was repeated')
+            try:result=method(args)
+            except (ValueError,EffectBlocked):
+                failures[identity]=failures.get(identity,0)+1
+                raise
             if terminal and on_terminal:on_terminal(result)
             return json.dumps(result)
         return invoke

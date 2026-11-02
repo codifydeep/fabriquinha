@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import unittest
 from unittest.mock import patch, Mock
+from types import SimpleNamespace
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.suite import Result
@@ -14,6 +15,23 @@ from fabriquinha.quality import Quality
 
 
 class ValidationProgress(unittest.TestCase):
+    def test_http_observation_keeps_case_origin_but_not_query_or_headers(self):
+        context=Mock()
+        class Acceptance:
+            def new_context(self):return context
+        fake=SimpleNamespace(AcceptanceTest=Acceptance)
+        output=io.StringIO()
+        with patch.dict(sys.modules,{'fabriquinha_acceptance':fake}),patch('sys.__stdout__',output):
+            result=traced_result(Result)();case=unittest.FunctionTestCase(lambda:None)
+            result.startTest(case);Acceptance().new_context()
+            callback=context.on.call_args.args[1]
+            callback(SimpleNamespace(status=404,url='http://user:password@local/api/rooms/id?token=secret'))
+            result.stopTest(case)
+        _,events=validation_output(output.getvalue());event=next(e for e in events if e['event']=='http_error')
+        self.assertEqual(event['path'],'/api/rooms/id')
+        self.assertEqual(event['context_created_in'],event['case'])
+        self.assertNotIn('secret',output.getvalue());self.assertNotIn('password',output.getvalue())
+
     def test_events_flush_outside_redirected_test_output(self):
         class Cases(unittest.TestCase):
             def runTest(self):self.fail('behavior missing')

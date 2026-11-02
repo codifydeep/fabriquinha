@@ -135,6 +135,7 @@ class Quality:
         self.observed_jobs=set()
         self.control_refusal=None
         self.suite_refusal=None
+        self.validation_progress=[]
         self.submission_refusal=None
         self.review_after=0  # Last applied diagnostic run, not a reset of history/retries.
 
@@ -259,6 +260,7 @@ class Quality:
             raise
         receipt = self.store.receipt(key, kind='suite_job')
         value = receipt['payload']; identity = value['identity']; report = value['report']
+        self.validation_progress=value.get('progress',[])
         if (receipt['binding'] != run.binding() or identity['binding'] != run.binding()
                 or identity['snapshot'] != snapshot or identity['phase'] != phase
                 or identity['project'] != self.project.fingerprint()

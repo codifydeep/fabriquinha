@@ -1,4 +1,4 @@
-# Status do projeto — 1 de novembro de 2026
+# Status do projeto — 2 de novembro de 2026
 
 **Saída e reposição de jogadores homologadas em ciclo assistido**, com dois
 incrementos dependentes. A v0.3 anterior permanece um ciclo autônomo observado;
@@ -46,3 +46,12 @@ Ver também o [fechamento do balanço e sequência executável](PLAN-CHECKPOINT-
 - [Compatibilidade histórica](HISTORICAL-VALIDATOR-RECOVERY.md).
 
 URLs e pendências em auditorias antigas descrevem suas respectivas datas.
+
+## Próximo bloqueio técnico
+
+A autoria parcial chegou a Red, revisão e congelamento; a implementação e um
+ciclo de reparo de fixtures também ocorreram pelo fluxo da equipe. A entrega
+continua bloqueada: cenário de empate inconsistente, 404s e entrada em sala
+ainda exigem diagnóstico. O contrato do CTO passa a resolver o congelamento
+no controlador e recebe observações HTTP por caso. Ver
+[contrato e limites](CTO-REPAIR-CONTRACT.md). Nenhuma homologação nova é declarada.
