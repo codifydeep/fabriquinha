@@ -43,6 +43,17 @@ def job_failure(message, receipt):
     return error
 
 
+def diagnostic_wrapper(store):
+    """Seal public code for unprivileged Docker; exports themselves are 0400."""
+    source=ROOT/'src/fabriquinha/validation_trace.py'
+    if source.is_symlink() or not source.is_file():raise ValueError('regular fixed diagnostic wrapper required')
+    content=source.read_bytes()
+    with tempfile.TemporaryDirectory(prefix='.diagnostic-wrapper-',dir=store.root.parent) as folder:
+        (Path(folder)/'validation_trace.py').write_bytes(content)
+        snapshot=store.capture(Path(folder))
+    return store.tree(snapshot)/'validation_trace.py',hashlib.sha256(content).hexdigest()
+
+
 def seal_validation(store):
     """Copy trusted checkout scripts once; no product files or runtime imports."""
     with tempfile.TemporaryDirectory(prefix='.validation-bundle-',dir=store.root.parent) as folder:
@@ -160,8 +171,8 @@ class Runner:
         if preview or bundle:sources.update({'/opt/fabriquinha/'+file:paths[file] for file in ('suite.py','browser.py')})
         trace=expected.get('diagnostic_trace')
         if trace:
-            path=ROOT/'src/fabriquinha/validation_trace.py'
-            if hashlib.sha256(path.read_bytes()).hexdigest()!=trace:raise ValueError('diagnostic wrapper changed')
+            path,trace_digest=diagnostic_wrapper(self.store)
+            if trace_digest!=trace:raise ValueError('diagnostic wrapper changed')
             sources['/opt/fabriquinha/validation_trace.py']=path
         by_target={mount['Destination']:mount for mount in binds}
         env=config.get('Env',[])
@@ -255,9 +266,8 @@ class Runner:
             raise ValueError('fixed suite operation required')
         expected = dict(binding=run.binding(), project=self.project.fingerprint(),
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)
-        trace=ROOT/'src/fabriquinha/validation_trace.py'
-        if trace.is_symlink() or not trace.is_file():raise ValueError('regular fixed diagnostic wrapper required')
-        expected['diagnostic_trace']=hashlib.sha256(trace.read_bytes()).hexdigest()
+        trace,trace_digest=diagnostic_wrapper(self.store)
+        expected['diagnostic_trace']=trace_digest
         bundle,paths=validation_files(self.project,self.store)
         if bundle:expected['validation_bundle']=bundle
         mode=browser_contract(self.project,self.store)

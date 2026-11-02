@@ -60,8 +60,12 @@ class PinnedValidation(unittest.TestCase):
             mounts=[command[i+1] for i,arg in enumerate(command) if arg=='--mount']
             self.assertEqual(len(mounts),4)
             self.assertTrue(any(str(self.store.tree(self.bundle)/'suite.py') in m for m in mounts))
-            wrappers=[m for m in mounts if str(ROOT/'src/fabriquinha') in m]
-            self.assertEqual(wrappers,[f'type=bind,src={ROOT}/src/fabriquinha/validation_trace.py,dst=/opt/fabriquinha/validation_trace.py,readonly'])
+            self.assertFalse(any(str(ROOT/'src/fabriquinha') in m for m in mounts))
+            wrappers=[m for m in mounts if 'dst=/opt/fabriquinha/validation_trace.py,' in m]
+            self.assertEqual(len(wrappers),1)
+            path=Path(wrappers[0].split('src=')[1].split(',')[0])
+            self.assertEqual(path.stat().st_mode&0o777,0o444)
+            self.assertTrue(path.is_relative_to(self.store.root/'objects'))
             self.assertIn('diagnostic_trace',identity)
 
     def test_modified_bundle_content_is_rejected_even_with_the_same_pointer(self):
