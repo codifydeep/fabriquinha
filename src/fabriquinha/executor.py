@@ -17,6 +17,32 @@ sys.path.insert(0, str(ROOT / 'team-delivery-kit'))
 from docker_grouping import args as grouping
 
 
+def validation_output(output):
+    """Separate bounded diagnostic events from the complete gate report.
+
+    Events originate inside the sandbox: useful clues, never trusted evidence
+    of completion. Legacy single-JSON output remains supported.
+    """
+    events=[];report_lines=[]
+    for line in output.splitlines():
+        if line.startswith('FABRIQUINHA_PROGRESS '):
+            try:
+                item=json.loads(line[len('FABRIQUINHA_PROGRESS '):])
+                if not isinstance(item,dict) or len(line)>4096:continue
+                events.append(item)
+            except ValueError:continue
+        else:report_lines.append(line)
+    try:report=json.loads('\n'.join(report_lines))
+    except ValueError:report=None
+    return report,events[-256:]
+
+
+def job_failure(message, receipt):
+    error=EffectBlocked(message+'; validation job receipt '+receipt)
+    error.validation_job=receipt
+    return error
+
+
 def seal_validation(store):
     """Copy trusted checkout scripts once; no product files or runtime imports."""
     with tempfile.TemporaryDirectory(prefix='.validation-bundle-',dir=store.root.parent) as folder:
@@ -132,6 +158,11 @@ class Runner:
         if preview:
             if preview!=preview_drivers(self.project,expected['phase'],self.store):raise ValueError('preview drivers changed during execution')
         if preview or bundle:sources.update({'/opt/fabriquinha/'+file:paths[file] for file in ('suite.py','browser.py')})
+        trace=expected.get('diagnostic_trace')
+        if trace:
+            path=ROOT/'src/fabriquinha/validation_trace.py'
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=trace:raise ValueError('diagnostic wrapper changed')
+            sources['/opt/fabriquinha/validation_trace.py']=path
         by_target={mount['Destination']:mount for mount in binds}
         env=config.get('Env',[])
         mode=browser_contract(self.project,self.store)
@@ -149,8 +180,8 @@ class Runner:
                 or len(binds)!=len(sources) or set(by_target)!=set(sources)
                 or any(by_target[path]['RW'] or Path(by_target[path]['Source']).resolve()!=source.resolve()
                        for path,source in sources.items())
-                or config.get('Entrypoint')!=['python','-B','/opt/fabriquinha/suite.py']
-                or config.get('Cmd') not in (None,[])
+                or config.get('Entrypoint')!=(['python'] if trace else ['python','-B','/opt/fabriquinha/suite.py'])
+                or (config.get('Cmd')!=['-B','/opt/fabriquinha/validation_trace.py'] if trace else config.get('Cmd') not in (None,[]))
                 or env.count('FABRIQUINHA_TESTS_DIR='+self.project.tests_dir)!=1
                 or ([e for e in env if e.startswith('FABRIQUINHA_QA_PREVIEW=')]
                     !=['FABRIQUINHA_QA_PREVIEW='+expected['snapshot']] if preview else
@@ -224,12 +255,21 @@ class Runner:
             raise ValueError('fixed suite operation required')
         expected = dict(binding=run.binding(), project=self.project.fingerprint(),
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)
+        trace=ROOT/'src/fabriquinha/validation_trace.py'
+        if trace.is_symlink() or not trace.is_file():raise ValueError('regular fixed diagnostic wrapper required')
+        expected['diagnostic_trace']=hashlib.sha256(trace.read_bytes()).hexdigest()
         bundle,paths=validation_files(self.project,self.store)
         if bundle:expected['validation_bundle']=bundle
         mode=browser_contract(self.project,self.store)
         if mode==2:expected['browser_contract']=2
         preview=preview_drivers(self.project,phase,self.store)
         if preview:expected['qa_preview']=preview
+        if mode==2:
+            from .browser import acceptance_manifest
+            count=len(acceptance_manifest(self.store.tree(snapshot)/self.project.tests_dir,allow_empty=phase=='baseline')['cases'])
+            # Cumulative browser suites need room for expected Red waits as
+            # well as regressions. Bounded and recorded, never a per-case retry.
+            expected['runtime_budget_seconds']=max(self.project.timeout_seconds,min(240,30+3*count))
         key = digest(expected)
         expected['key'] = key
         name = self.project.namespace+'-'+phase+'-'+key[:16]
@@ -248,7 +288,8 @@ class Runner:
         if preview or bundle:
             for file in ('suite.py','browser.py'):
                 command+=['--mount',f'type=bind,src={paths[file]},dst=/opt/fabriquinha/{file},readonly']
-        command+=[self.project.validation_image]
+        command+=['--mount',f'type=bind,src={trace},dst=/opt/fabriquinha/validation_trace.py,readonly',
+                  '--entrypoint','python',self.project.validation_image,'-B','/opt/fabriquinha/validation_trace.py']
         return self._execute(run,expected,command)
 
     def _execute(self,run,expected,command):
@@ -272,7 +313,7 @@ class Runner:
                 raise ValueError('job receipt identity drift')
             self.retire(saved['container'], expected, folder)
             if receipt['payload'].get('infrastructure_error'):
-                raise EffectBlocked(receipt['payload']['infrastructure_error'])
+                raise job_failure(receipt['payload']['infrastructure_error'],saved['receipt'])
             return saved['receipt']
         handle = self.journal.do(key+':create', expected,
             lambda: {'container': docker(*command).strip()}, observe_create)
@@ -287,7 +328,7 @@ class Runner:
 
         deadline_path = folder / 'runtime.json'
         if not deadline_path.exists():
-            write_json(deadline_path, dict(deadline=time.time()+self.project.timeout_seconds))
+            write_json(deadline_path, dict(deadline=time.time()+expected.get('runtime_budget_seconds',self.project.timeout_seconds)))
         runtime = json.loads(deadline_path.read_bytes())
         deadline, failure = runtime['deadline'], runtime.get('failure')
         if failure is None:
@@ -318,10 +359,7 @@ class Runner:
             output = ''
             failure = failure or 'Docker logs unavailable: '+type(error).__name__
         write_json(folder / 'output.json', {'output': output[:2*1024*1024]})
-        try:
-            report = json.loads(output)
-        except ValueError:
-            report = None  # Preserve and retire the failed job; never count it as a test result.
+        report,progress=validation_output(output)
         screenshot=None
         if kind=='browser_job' and report and report.get('status')=='passed':
             path=folder/'screenshot.png'
@@ -341,12 +379,13 @@ class Runner:
                  if kind=='browser_job' else dict(network='none',snapshot='readonly',user='65534:65534'))
         payload = dict(identity=expected, exit_code=info['State']['ExitCode'], report=report,
             sandbox=sandbox,screenshot_sha256=screenshot,
-            container=container, qualification=self.project.qualification, infrastructure_error=failure)
+            container=container, qualification=self.project.qualification, infrastructure_error=failure,
+            progress=progress)
         receipt = self.store.record(kind, run.binding(), payload)
         write_json(receipt_path, dict(receipt=receipt, container=container))
         self.retire(container, expected, folder)
         if failure:
-            raise EffectBlocked(failure)
+            raise job_failure(failure,receipt)
         return receipt
 
     def retire(self, container, expected, folder):

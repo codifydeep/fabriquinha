@@ -253,7 +253,10 @@ class Quality:
 
     def observe(self, run, snapshot, phase):
         self.board.ensure(run)
-        key = self.runner.run(run, snapshot, phase)
+        try:key = self.runner.run(run, snapshot, phase)
+        except EffectBlocked as error:
+            if getattr(error,'validation_job',None):self.suite_refusal=error.validation_job
+            raise
         receipt = self.store.receipt(key, kind='suite_job')
         value = receipt['payload']; identity = value['identity']; report = value['report']
         if (receipt['binding'] != run.binding() or identity['binding'] != run.binding()
@@ -726,7 +729,8 @@ class DeliveryTools:
     def wait(self,call,*,jobs=1):
         # These are actual local validation jobs, not model polling or CI waits.
         # Runner owns the per-job deadline/retirement; this is a composite backstop.
-        deadline=time.monotonic()+jobs*(self.quality.project.timeout_seconds+15)
+        budget=max(self.quality.project.timeout_seconds,240 if self.quality.project.browser_tdd else 0)
+        deadline=time.monotonic()+jobs*(budget+15)
         while True:
             try:return call()
             except Pending:

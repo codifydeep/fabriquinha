@@ -40,7 +40,7 @@ from .profile_policy import contract as profile_contract,admission as profile_ad
 class IntegrationRunner(Runner):
     """Wait for bounded local computation, not for external CI or model replies."""
     def _execute(self,*args,**kwargs):
-        deadline=time.monotonic()+self.project.timeout_seconds+15
+        deadline=time.monotonic()+max(self.project.timeout_seconds,240 if self.project.browser_tdd else 0)+15
         while True:
             try:return super()._execute(*args,**kwargs)
             except Pending:

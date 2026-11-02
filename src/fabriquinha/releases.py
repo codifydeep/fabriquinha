@@ -365,6 +365,14 @@ class Releases:
             result['authoring_recovery']=dict(source=recovery['payload']['request']['source'],
                 source_run=recovery['payload']['source_run'],assisted=True,delivery_approval=False,
                 instruction='The old empty test-authoring attempt remains triaged. Author tests for THIS package and its criteria. Baseline Green proves regressions only. Produce fresh behavioral Red and independent freeze; no historical hold or text promise replaces the required tool handoff.')
+        partial=self.store.root/'operations'/('partial-authoring-'+run.task+'.json')
+        if partial.exists() and run.kind=='tests' and not run.reviewing:
+            record=self.store.receipt(json.loads(partial.read_bytes())['receipt'],kind='partial_authoring_resume')
+            if (record['binding']['task']!=run.task or record['binding']['contract']!=run.contract
+                    or record['payload']['project']!=self.project.fingerprint()):raise ValueError('partial authoring scope drift')
+            result['partial_authoring_resume']=dict(snapshot=record['payload']['snapshot'],
+                failed_job=record['payload']['request']['job'],delivery_approval=False,
+                instruction='Continue the existing candidate files; do not discard the partial work or alter baseline tests. The prior full validation timed out and is not Red. Fixed diagnostics now preserve progress. Inspect every new case for real setup/action/observation: absence of a result before playing does not test ties or hand outcomes. Complete the approved behavioral coverage, then submit fresh Red for independent review. Do not simulate tools, skip cases or weaken assertions. Another failure follows the native breaker; this is one assisted resume, not unlimited retries.')
         if body.get('continuation_plan'):
             from .repairs import reviewed
             graph=self.store.receipt(json.loads(self.graph_path(anchor,body).read_bytes())['receipt'],kind='release_graph')['payload']

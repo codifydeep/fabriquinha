@@ -321,3 +321,12 @@ Hermes upgrade compatibility and operational limits are recorded in
 [the v0.22.5 qualification](docs/HERMES-0225-UPGRADE.md). Existing installations
 require a drained maintenance window and verified backup; changing the source pin
 alone does not migrate an installation or authorize new delivery evidence.
+
+### Validation timeouts and partial authoring
+
+A fixed read-only diagnostic wrapper preserves per-case progress without changing
+pinned validators. Cumulative browser suites have a bounded recorded runtime
+budget. A timeout remains a failed job, never delivery evidence. An explicitly
+assisted, operator-scoped continuation can preserve unfrozen partial tests on the
+same native card; independent review and every delivery gate remain mandatory.
+See [partial authoring recovery](docs/PARTIAL-AUTHORING-RECOVERY.md).

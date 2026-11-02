@@ -20,6 +20,21 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_timed_out_suite_is_context_only_and_rejects_foreign_execution(self):
+        from fabriquinha.recovery import suite_refusal_context
+        identity=dict(binding=self.original.binding(),snapshot=self.snapshot,phase='red',
+                      project=self.project.fingerprint(),image=self.project.validation_image)
+        key=self.store.record('suite_job',self.original.binding(),dict(identity=identity,
+            sandbox=dict(network='none',snapshot='readonly',user='65534:65534'),
+            infrastructure_error='validation job exceeded its persistent runtime',report=None,
+            progress=[dict(event='test_started',case='pending')],exit_code=137))
+        facts=suite_refusal_context(self.store,self.project,self.original.binding(),key,self.snapshot)
+        self.assertFalse(facts['delivery_approval']);self.assertIsNone(facts['report'])
+        self.assertEqual(facts['progress'][-1]['case'],'pending')
+        self.assertTrue(facts['requires_fresh_validation'])
+        with self.assertRaises(ValueError):
+            suite_refusal_context(self.store,self.project,replace(self.original,number=99).binding(),key,self.snapshot)
+
     def test_failed_package_context_is_exact_and_not_baseline_inventory(self):
         body={'package':'hand-play','release':'r','criteria':['PLAY'],'acceptance':'Play a card'}
         binding={'contract':digest(body),'release':'r'}

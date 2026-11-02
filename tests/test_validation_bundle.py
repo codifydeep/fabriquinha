@@ -58,9 +58,11 @@ class PinnedValidation(unittest.TestCase):
             _,identity,command=execute.call_args.args
             self.assertEqual(identity['validation_bundle'],self.bundle)
             mounts=[command[i+1] for i,arg in enumerate(command) if arg=='--mount']
-            self.assertEqual(len(mounts),3)
+            self.assertEqual(len(mounts),4)
             self.assertTrue(any(str(self.store.tree(self.bundle)/'suite.py') in m for m in mounts))
-            self.assertFalse(any(str(ROOT/'src/fabriquinha') in m for m in mounts))
+            wrappers=[m for m in mounts if str(ROOT/'src/fabriquinha') in m]
+            self.assertEqual(wrappers,[f'type=bind,src={ROOT}/src/fabriquinha/validation_trace.py,dst=/opt/fabriquinha/validation_trace.py,readonly'])
+            self.assertIn('diagnostic_trace',identity)
 
     def test_modified_bundle_content_is_rejected_even_with_the_same_pointer(self):
         path=self.store.tree(self.bundle)/'browser.py';path.chmod(0o644);path.write_text('# tampered\n')

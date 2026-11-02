@@ -91,6 +91,15 @@ class FailedJobRecovery(unittest.TestCase):
     def test_timeout_is_archived_retired_and_never_restarted(self):
         self.check_failure()
 
+    def test_timeout_preserves_last_case_without_qualifying_a_report(self):
+        self.output='FABRIQUINHA_PROGRESS {"event":"test_started","case":"test_missing"}\n'
+        self.check_failure()
+        path=next((self.store.root/'jobs').glob('*/result.json'))
+        key=json.loads(path.read_text())['receipt']
+        payload=self.store.receipt(key,kind='suite_job')['payload']
+        self.assertIsNone(payload['report'])
+        self.assertEqual(payload['progress'][-1]['case'],'test_missing')
+
     def test_browser_capability_requires_a_qualified_image_label(self):
         project=Project.parse({**configuration(),'browser_tdd':True})
         image=dict(Id=project.validation_image,Config=dict(User='65534:65534',
@@ -111,7 +120,8 @@ class FailedJobRecovery(unittest.TestCase):
         self.assertEqual(command[command.index('--network')+1],'none')
         self.assertIn('--read-only',command)
         self.assertIn('/tmp:rw,noexec,nosuid,size=128m',command)
-        self.assertTrue(command[-2].endswith(',dst=/workspace,readonly'))
+        self.assertTrue(any(c.endswith(',dst=/workspace,readonly') for c in command))
+        self.assertEqual(command[-3:], [self.runner.project.validation_image,'-B','/opt/fabriquinha/validation_trace.py'])
 
     def test_frozen_preview_binds_trusted_scripts_and_is_mandatory_only_for_delivery_phases(self):
         value={**configuration(),'browser_tdd':True,'browser_image':'sha256:'+'b'*64,
@@ -126,11 +136,11 @@ class FailedJobRecovery(unittest.TestCase):
                 self.assertNotIn('qa_preview',identity);continue
             self.assertEqual(set(identity['qa_preview']),{'reporter','driver'})
             mounts=[command[i+1] for i,arg in enumerate(command) if arg=='--mount']
-            self.assertEqual(len(mounts),3);self.assertTrue(all(m.endswith(',readonly') for m in mounts))
+            self.assertEqual(len(mounts),4);self.assertTrue(all(m.endswith(',readonly') for m in mounts))
             self.assertIn('FABRIQUINHA_QA_PREVIEW='+self.snapshot,command)
             sources={m.split('dst=')[1].split(',')[0]:m.split('src=')[1].split(',')[0] for m in mounts}
             info=dict(Image=self.runner.project.validation_image,
-                Config=dict(User='65534:65534',Entrypoint=['python','-B','/opt/fabriquinha/suite.py'],Cmd=None,
+                Config=dict(User='65534:65534',Entrypoint=['python'],Cmd=['-B','/opt/fabriquinha/validation_trace.py'],
                     Labels={'fabriquinha.job':identity['key'],'com.docker.compose.project':self.runner.project.namespace+'-tests'},
                     Env=['FABRIQUINHA_TESTS_DIR=tests','FABRIQUINHA_QA_PREVIEW='+self.snapshot]),
                 HostConfig=dict(NetworkMode='none',ReadonlyRootfs=True,CapDrop=['ALL']),

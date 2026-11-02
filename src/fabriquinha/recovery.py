@@ -73,7 +73,14 @@ def suite_refusal_context(store,project,binding,key,current_snapshot):
             or identity['image']!=project.validation_image or identity['phase']=='diagnostic'
             or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
         raise ValueError('suite refusal must match the exact failed execution and fixed validator')
-    report=suite_report(data,diagnostic=True);store.tree(identity['snapshot'])
+    store.tree(identity['snapshot'])
+    if data.get('infrastructure_error'):
+        return dict(receipt=key,phase=identity['phase'],snapshot=identity['snapshot'],report=None,
+            infrastructure_error=data['infrastructure_error'],progress=data.get('progress',[]),
+            progress_semantics='Sandbox diagnostic clues only; incomplete execution is never Red, Green or approval.',
+            matches_current_snapshot=identity['snapshot']==current_snapshot,
+            delivery_approval=False,requires_fresh_validation=True)
+    report=suite_report(data,diagnostic=True)
     if not any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes')) and report.get('qa_preview',{}).get('status')!='failed':
         raise ValueError('negative quality report required, never a passing-job approval')
     return dict(receipt=key,phase=identity['phase'],snapshot=identity['snapshot'],report=report,
@@ -650,7 +657,10 @@ class Recovery:
                         control_refusal=failure_record['payload'].get('control_refusal')
                         if control_refusal:control_refusal_context(self.store,self.project,source.binding(),control_refusal,snapshot)
                         suite_refusal=failure_record['payload'].get('suite_refusal')
-                        if suite_refusal:suite_refusal_context(self.store,self.project,source.binding(),suite_refusal,snapshot)
+                        if suite_refusal:
+                            facts=suite_refusal_context(self.store,self.project,source.binding(),suite_refusal,snapshot)
+                            if facts.get('infrastructure_error'):
+                                failure='Validation job failed: '+facts['infrastructure_error']+'; receipt '+suite_refusal+'; activity: '+failure
                         browser_refusal=failure_record['payload'].get('browser_refusal')
                         if browser_refusal:browser_refusal_context(self.store,self.project,source.binding(),browser_refusal)
                 if data.get('category')=='review_escalation':
