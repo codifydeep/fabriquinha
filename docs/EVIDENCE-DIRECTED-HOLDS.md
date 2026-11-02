@@ -62,3 +62,18 @@ A `resume` returns bounded corrective guidance to the original implementer;
 it does not require every unrelated failure to have been diagnosed first and
 never approves a failing suite. All remaining failures, independent review,
 PR, CI and QA remain required. No gate or native recovery budget is reset.
+
+## Incident-scoped fixture succession
+
+Controller-admitted technical test repairs are limited by the exact incident,
+frozen-test receipt, authorized paths and cases, rather than the lifetime count
+of fixture repairs in the release. The controller reads immutable graph ancestry
+and its reviewed repair authorities; a repeated identity is rejected even after
+restart. Different evidence/scopes still require a newly validated CTO admission.
+Historical receipts gain no permissions, and `fixture_depth` remains an audit
+count. Legacy generic continuations retain their previous limits.
+
+This does not waive independent review/freezing, source identity, idle downstream
+checks or deployed-repair incompatibility. Replacement cards become available
+only after the new graph is durable. Replaying that handoff uses the same cards.
+A technical test repair is not delivery approval.

@@ -258,6 +258,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
         graph=dict(project=f.project.fingerprint(),items=items,validation_bundle='bundle',submission_depth=2 if fixture and not direct else 0)
         releases=Releases(f.project,f.store,SimpleNamespace(guard=None),Mock());releases.closed=Mock(return_value=('approval',None,None))
         releases.folder=lambda a:f.store.root/'releases'/digest('v1')
+        if direct:graph['fixture_depth']=3  # Historical depth alone must not strand a distinct authorized repair.
         old=f.store.record('release_graph',releases.binding(anchor),graph)
         authority=dict(task=plan,proposal=dict(classification='submission'),context={**facts,'repair_kind':'submission','prior_graph':old})
         if fixture:
@@ -268,6 +269,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
             tasks['implementation'].status='blocked'
             original['implementation']['status']='blocked'
             authority['controller_admission']=True
+            authority['proposal']['test_paths']=['tests/test_existing.py']
         expected_count=6 if fixture else 5
         target=releases.folder(anchor)/('continuation-'+plan+'.json')
         def latest(connection,ident):
@@ -307,7 +309,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
             self.assertEqual(len(created),expected_count);self.assertEqual(len(activated),expected_count)
             if not fixture:self.assertEqual(result['items'][0]['cards']['tests'],first_tests)
             else:
-                self.assertEqual(result['submission_depth'],0 if direct else 2);self.assertEqual(result['fixture_depth'],1)
+                self.assertEqual(result['submission_depth'],0 if direct else 2);self.assertEqual(result['fixture_depth'],4 if direct else 1)
                 self.assertNotEqual(result['items'][0]['cards']['tests']['id'],first_tests['id'])
             new_first=result['items'][0]['cards'];new_second=result['items'][1]['cards']
             self.assertEqual(new_second['tests']['body']['inputs']['baseline'],'parent:'+new_first['integration']['id']+':baseline')
@@ -323,3 +325,22 @@ class SubmissionRepairAdmission(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class FixtureScopeAdmission(unittest.TestCase):
+    def test_exact_scope_repetition_blocked_but_new_freeze_or_incident_allowed(self):
+        from fabriquinha.repairs import fixture_scope_key,admit_fixture_scope
+        from fabriquinha.effects import EffectBlocked
+        old=dict(context=dict(repair_kind='fixture',incident='incident1',tests='freeze1',cases=['b','a']),proposal=dict(test_paths=['tests/a.py']))
+        binding={'release':'r'}
+        store=Mock();store.receipt.return_value=dict(binding=binding,payload={'continuation_review':'old'})
+        with patch('fabriquinha.repairs.reviewed',return_value=old):
+            for graph in ({'continuation_review':'old'},{'previous_graph':'history'}):
+                with self.assertRaises(EffectBlocked):admit_fixture_scope(None,store,graph,binding,old)
+            for field,value in [('incident','incident2'),('tests','freeze2'),('cases',['c'])]:
+                new={**old,'context':{**old['context'],field:value}}
+                self.assertEqual(admit_fixture_scope(None,store,{'previous_graph':'history'},binding,new),fixture_scope_key(new))
+            reordered={**old,'context':{**old['context'],'cases':['a','b','a']}}
+            self.assertEqual(fixture_scope_key(old),fixture_scope_key(reordered))
+            store.receipt.return_value=dict(binding={'release':'other'},payload={})
+            with self.assertRaises(ValueError):admit_fixture_scope(None,store,{'previous_graph':'history'},binding,old)

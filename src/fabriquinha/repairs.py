@@ -21,6 +21,35 @@ SUBMISSION_PROTOCOLS=('complete-control-set-1','complete-control-set-2',SUBMISSI
 REVIEW_ADMISSION_PROTOCOL='direct-independent-review-1'
 
 
+
+def fixture_scope_key(authority):
+    """Scope identity excludes diagnosis wording and execution retry counters."""
+    data=authority['context'];paths=authority['proposal'].get('test_paths',[])
+    cases=data.get('cases',[])
+    if (not all(isinstance(data.get(k),str) and data[k] for k in ('incident','tests'))
+            or not isinstance(paths,list) or not paths or any(not isinstance(p,str) or not p for p in paths)
+            or not isinstance(cases,list) or any(not isinstance(c,str) or not c for c in cases)):
+        raise ValueError('exact fixture incident, freeze and authorized scope required')
+    return digest(dict(incident=data['incident'],freeze=data['tests'],paths=sorted(set(paths)),cases=sorted(set(cases))))
+
+
+def admit_fixture_scope(project,store,graph,binding,authority):
+    """Read durable graph ancestry; do not grant new permission to old receipts."""
+    key=fixture_scope_key(authority);current=graph;seen=set()
+    while True:
+        approval=current.get('continuation_review')
+        if approval:
+            old=reviewed(project,store,approval)
+            if old['context'].get('repair_kind')=='fixture' and fixture_scope_key(old)==key:
+                raise EffectBlocked('fixture incident/freeze/scope already continued; new evidence and authorization required')
+        previous=current.get('previous_graph')
+        if not previous:return key
+        if previous in seen:raise ValueError('cyclic release graph history')
+        seen.add(previous);record=store.receipt(previous,kind='release_graph')
+        if record['binding']!=binding:raise ValueError('foreign release graph history')
+        current=record['payload']
+
+
 def review_admission(project,store,key):
     """Validate controller permission to request review, never an approval."""
     record=store.receipt(key,kind='review_admission');scope=record['binding'];data=record['payload']
@@ -806,7 +835,9 @@ class Repairs:
         previous=self.store.receipt(data['prior_graph'],kind='release_graph')
         if previous['binding']!=self.r.binding(anchor) or previous['payload']!=graph:
             raise ValueError('proposal must refer to the exact unchanged release graph')
-        if ((not reassessment and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
+        scoped_fixture=fixture and authority.get('controller_admission') is True
+        scope_key=admit_fixture_scope(self.project,self.store,graph,self.r.binding(anchor),authority) if scoped_fixture else None
+        if ((not reassessment and not scoped_fixture and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
                 or any(i.get('repair_context') for i in graph['items'])):
             raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
         if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
@@ -868,7 +899,8 @@ class Repairs:
             result={**graph,'items':items,'previous_graph':data['prior_graph'],'continuation_review':approval,
                 'superseded_cards':sorted(set(graph.get('superseded_cards',[]))|set(retired)),
                 'submission_depth':graph.get('submission_depth',0)+(0 if fixture or reassessment else 1),
-                **({'fixture_depth':graph.get('fixture_depth',0)+1} if fixture else {})}
+                **({'fixture_depth':graph.get('fixture_depth',0)+1} if fixture else {}),
+                **({'fixture_repair_scope':scope_key} if scoped_fixture else {})}
             receipt=self.store.record('release_graph',self.r.binding(anchor),result);write_json(path,{'receipt':receipt})
         # Transfer review before releasing any downstream worker. On restart the
         # native handoff is acknowledged without creating another author run.
