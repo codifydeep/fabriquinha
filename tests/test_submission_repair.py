@@ -192,7 +192,7 @@ class SubmissionRepairAdmission(unittest.TestCase):
     def test_dispatch_waits_for_review_then_follows_replacement_without_reset(self):
         f=self.fixture;facts=self.evaluate();source=f.implementer.task
         row=SimpleNamespace(id=f.implementer.number,ended_at=1)
-        tasks={source:SimpleNamespace(id=source,status='triage'),
+        tasks={'tests':SimpleNamespace(id='tests',status='done',body='{}'),source:SimpleNamespace(id=source,status='triage'),
                'diagnosis':SimpleNamespace(id='diagnosis',status='done',body=json.dumps(dict(
                    kind='diagnostic',source=source,source_run=row.id,stage='cto'))),
                'proposal':SimpleNamespace(id='proposal',status='review'),
@@ -202,8 +202,8 @@ class SubmissionRepairAdmission(unittest.TestCase):
         kb=SimpleNamespace(get_task=lambda conn,ident:tasks.get(ident),latest_run=latest)
         releases=SimpleNamespace(project=f.project,store=f.store,board=Mock(),closed=Mock(return_value=('approved',None,None)))
         operation=Repairs(releases);operation.propose_submission=Mock(return_value='proposal')
-        graph=dict(items=[dict(cards=dict(implementation={'id':source}))])
-        replacement=dict(items=[dict(cards=dict(implementation={'id':'replacement'}))],submission_depth=1)
+        graph=dict(items=[dict(cards=dict(tests={'id':'tests'},implementation={'id':source}))])
+        replacement=dict(items=[dict(cards=dict(tests={'id':'tests'},implementation={'id':'replacement'}))],submission_depth=1)
         operation.materialize_submission=Mock(return_value=replacement)
         with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),\
              patch('fabriquinha.repairs.Recovery.cards',return_value=[tasks['diagnosis']]):

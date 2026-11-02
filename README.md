@@ -336,5 +336,6 @@ including a failed-investigator path to the CTO and one bounded executable rulin
 after a decision-stage hold. Partial correction preserves every delivery gate. Technical fixture succession
 is bounded by incident, freeze and authorized scope, not total release age.
 Escalated rejected reviews have an explicit CTO-authorized return to the original
-author, preserving independent review and behavioral verification. See
+author, preserving independent review and behavioral verification. A bounded
+fixture-author syntax successor preserves the original scope and strict guard. See
 [evidence-directed holds](docs/EVIDENCE-DIRECTED-HOLDS.md).

@@ -239,16 +239,16 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
     freeze=store.receipt(context['tests'],kind='tests_frozen')
     previous=quality.frozen_plan(freeze)
     review=store.receipt(authority['review'])
-    if review['kind'] not in ('plan_review','test_repair_admission'):raise ValueError('test repair authority required')
+    if review['kind'] not in ('plan_review','test_repair_admission','fixture_author_admission'):raise ValueError('test repair authority required')
     if (context['snapshot']!=previous['snapshot']
             or freeze['binding']['release']!=review['binding']['release']):
         raise ValueError('fixture source must be the exact old freeze')
     if type(contract) is not int or contract not in (1,2,3):raise ValueError('unknown candidate revision contract')
-    if (review['kind']=='test_repair_admission')!=(contract==3):
+    if (review['kind'] in ('test_repair_admission','fixture_author_admission'))!=(contract==3):
         raise ValueError('technical repair authority requires contract 3; historical contracts remain unchanged')
     fixture_snapshot_diff(store,previous['snapshot'],candidate,authority['proposal']['test_paths'],project.tests_dir,candidate=contract in (2,3))
     if contract==3:
-        if review['kind']!='test_repair_admission':raise ValueError('structured CTO authority required')
+        if review['kind'] not in ('test_repair_admission','fixture_author_admission'):raise ValueError('structured CTO authority required')
         for path in authority['proposal']['test_paths']:
             before=(store.tree(previous['snapshot'])/path).read_text()
             after=(store.tree(candidate)/path).read_text()

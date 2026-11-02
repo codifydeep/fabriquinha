@@ -102,3 +102,24 @@ review must assess reachability and retain the specific regression risk; the
 implementation must satisfy the existing behavioral controls before delivery.
 The controller validates identities and structure, not the semantic adequacy of
 prose: independent review and actual negative-control results remain essential.
+
+## Strict fixture-author syntax recovery
+
+The assertion/early-exit guard is unchanged. Exact assertion expressions include
+message literals; adding assertions is not allowed by this narrowly scoped
+contract. Local assignment/comprehension setup can preserve existing assertions
+without `break`, `continue`, `return` or `raise`. Passing this structural check
+does not prove behavioral equivalence.
+
+A triaged fixture author with a matching structural submission refusal and exact
+completed CTO diagnosis may receive one successor under the original repair
+authority. The controller validates the incident, refused snapshot, original
+freeze/paths/cases, idle graph tail and immutable diagnosis. The old triage and
+counters remain historical; no reset occurs. A second syntax successor under
+that authority is refused. New Red, independent review, freeze, full Green and
+targeted negative controls remain required. The preserved implementation and
+author snapshots remain separate. Offline prototypes are never agent deliveries.
+
+Old held review decisions whose source run has advanced are historical and are
+not reapplied to the new run. This avoids stale reconciliation alerts without
+ignoring mismatches in a current recovery.

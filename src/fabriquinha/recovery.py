@@ -318,7 +318,7 @@ class Diagnostic:
             from .repairs import context_view
             result['repair_authority']={**self.repair,'context':context_view(self.store,self.repair['context'])}
             reviewed=self.store.receipt(self.repair['review'])
-            if reviewed['kind']=='test_repair_admission':
+            if reviewed['kind'] in ('test_repair_admission','fixture_author_admission'):
                 kb,api,_=native()
                 with api.connect_closing() as conn:
                     source=kb.get_task(conn,self.incident['source'])
@@ -873,6 +873,8 @@ class Recovery:
             if body['stage']!='lead':raise ValueError('only lead escalates to CTO')
             self.create(conn,data['incident'],'cto',previous=task.id);return
         if data['action']=='hold' and source.get('review_escalation') and not body.get('hold_resolution'):
+            target=kb.get_task(conn,source['source']);current=kb.latest_run(conn,target.id) if target else None
+            if current and current.id!=source['source_run']:return  # Historical decision; never reapply to new work.
             self.coordinate_hold(conn,task,receipt_id)
             return
         if data['action']=='return_author':

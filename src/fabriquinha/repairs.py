@@ -260,8 +260,38 @@ def fixture_failure(project,store,incident,decision,tests,current_snapshot):
             'red_baseline':frozen['baseline'],'qa_paths':eligible}
 
 
+
+def fixture_author_context(project,store,parent,incident,diagnosis,graph):
+    """One syntax-recovery successor under unchanged test-repair authority."""
+    authority=reviewed(project,store,parent);old=authority['context']
+    if old.get('repair_kind')!='fixture' or old.get('fixture_author_parent'):
+        raise EffectBlocked('fixture author syntax recovery already used or unauthorized')
+    record=store.receipt(incident,kind='incident');scope=record['binding'];facts=record['payload']
+    held_incident(project,store,incident,diagnosis,facts['snapshot'])
+    if scope['kind']!='tests' or scope['reviewing'] or not facts.get('submission_refusal'):
+        raise ValueError('exact test-author submission refusal required')
+    refusal=store.receipt(facts['submission_refusal'],kind='submission_refusal')
+    if (refusal['binding']!=scope or refusal['payload']['snapshot']!=facts['snapshot']
+            or refusal['payload']['error'] not in ('technical repair cannot add or change early exits',
+                'technical repair must preserve assertion expressions and control nesting')):
+        raise ValueError('qualified structural refusal required')
+    return {**old,'fixture_author_parent':parent,'prior_graph':graph,'incident':incident,
+        'current_diagnosis':diagnosis,'reviewed_diagnosis':diagnosis,'source':scope['task'],
+        'source_run':scope['number'],'source_contract':scope['contract'],
+        'author_snapshot':facts['snapshot']}
+
+
 def reviewed(project,store,key):
     record=store.receipt(key)
+    if record['kind']=='fixture_author_admission':
+        data=record['payload'];context=fixture_author_context(project,store,data['fixture_author_parent'],data['incident'],data['current_diagnosis'],data['prior_graph'])
+        prior=store.receipt(data['prior_graph'],kind='release_graph')
+        if context!=data or record['binding']!=prior['binding'] or record['binding'].get('actor')!='controller':
+            raise ValueError('exact fixture author continuation required')
+        parent=reviewed(project,store,data['fixture_author_parent'])
+        diagnosis=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
+        return dict(review=key,proposal=parent['proposal'],context=data,context_id=key,
+            task=diagnosis['binding']['task'],controller_admission=True)
     if record['kind']=='test_repair_admission':
         from .technical_repair import validate_scope, PROTOCOL
         data=record['payload']
@@ -397,7 +427,7 @@ def context_view(store,value):
         result['fixture_syntax']='Add new local assignments and calls to methods or existing imported functions. New with blocks may manage setup resources, but may not wrap preserved statements. No new imports/helpers, rebinding, exits or changes to existing assertions.'
         if value.get('protocol')=='technical-test-repair-1':
             result['cases']=value['cases']
-            result['fixture_syntax']='Change setup or actions only inside the exact scoped cases. Preserve assertions, their conditions, neighboring cases, helpers, imports and test definitions. No early exits or observer suppression. A new independent freeze and fresh negative controls for every repaired case are mandatory.'
+            result['fixture_syntax']='Change setup or actions only inside the exact scoped cases. Preserve assertions, their conditions, neighboring cases, helpers, imports and test definitions. Keep assertion expressions AND their message literals byte-for-byte semantically identical; do not insert new assertions in this strict repair. Use local assignments/comprehensions for setup; no break/continue/return/raise. Indexing a nonempty candidate list fails visibly if no valid setup exists; never skip the scenario. No early exits or observer suppression. A new independent freeze and fresh negative controls for every repaired case are mandatory.'
     if value.get('repair_kind')=='review':
         decision=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')
         prior=store.receipt(decision['payload']['experiment'],kind='diagnostic_experiment')
@@ -858,12 +888,12 @@ class Repairs:
             for n,item in enumerate(graph['items']):
                 for phase,card in item['cards'].items():
                     task=self.r.check_card(conn,card);latest=kb.latest_run(conn,task.id)
-                    if n<index or n==index and phase=='tests' and (fixture or not replace_tests):
+                    if n<index or n==index and phase=='tests' and task.id!=data['source'] and (fixture or not replace_tests):
                         if task.status!='done':raise ValueError('completed prefix and frozen tests required')
                     elif task.id==data['source']:
                         if task.status not in (('blocked','triage') if authority.get('controller_admission') and fixture else ('triage',)) or not latest or latest.id!=data['source_run'] or not latest.ended_at:
                             raise ValueError('source triage changed before replacement')
-                        if self.store.capture(task.workspace_path)!=(data['implementation_snapshot'] if fixture else data['snapshot']):raise ValueError('source snapshot changed')
+                        if self.store.capture(task.workspace_path)!=(data.get('author_snapshot',data['implementation_snapshot']) if fixture else data['snapshot']):raise ValueError('source snapshot changed')
                     elif latest is not None or task.status not in ('todo','ready','blocked'):
                         raise EffectBlocked('downstream activity already started; preserve it')
             mapping={};items=list(graph['items'][:index]);retired=[]
@@ -1037,6 +1067,26 @@ class Repairs:
         """Reconcile a bounded pre-merge correction through existing plan roles."""
         kb,_,_=native()
         for item in graph['items']:
+            author=kb.get_task(conn,item['cards']['tests']['id'])
+            body=json.loads(author.body);parent=body.get('inputs',{}).get('repair_review')
+            if author.status=='triage' and parent:
+                latest=kb.latest_run(conn,author.id)
+                if latest and latest.ended_at and not Recovery(self.project,self.store,self.r.board).expired_effects(author.id):
+                    for diagnostic in Recovery(self.project,self.store,self.r.board).cards(conn):
+                        db=json.loads(diagnostic.body or '{}')
+                        if (db.get('kind')!='diagnostic' or db.get('stage')!='cto' or diagnostic.status!='done'
+                                or db.get('source')!=author.id or db.get('source_run')!=latest.id):continue
+                        dr=kb.latest_run(conn,diagnostic.id);key=(dr.metadata or {}).get('diagnosis') if dr else None
+                        if not key:continue
+                        decision=self.store.receipt(key,kind='diagnostic_decision')
+                        if decision['payload']['action']!='hold':continue
+                        prior=self.store.record('release_graph',self.r.binding(anchor),graph)
+                        context=fixture_author_context(self.project,self.store,parent,decision['payload']['incident'],key,prior)
+                        if (context['source_contract']!=digest(body) or self.store.capture(author.workspace_path)!=context['author_snapshot']):
+                            raise ValueError('fixture author changed before syntax continuation')
+                        admission=self.store.record('fixture_author_admission',self.r.binding(anchor),context)
+                        result=self.materialize_submission(conn,anchor,graph,admission)
+                        return self.continue_submission(conn,anchor,spec,result)
             source=kb.get_task(conn,item['cards']['implementation']['id'])
             if not source or source.status not in ('blocked','triage'):continue
             latest=kb.latest_run(conn,source.id)

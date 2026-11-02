@@ -118,3 +118,13 @@ class CandidateRevision(unittest.TestCase):
         self.assertIn('count(creator), 0',result['diff'])
 
 if __name__=='__main__':unittest.main()
+
+
+class StrictRepairSetupTest(__import__('unittest').TestCase):
+    def test_comprehension_setup_preserves_exact_assertions_without_exits(self):
+        from fabriquinha.test_revision import technical_repair_diff
+        before="class T:\n def test_case(self):\n  remaining = []\n  self.assertTrue(remaining, 'preserved message')\n"
+        after=before.replace('remaining = []','candidates = [x for x in [1, 2] if x > 1]\n  remaining = candidates[:1]')
+        technical_repair_diff(before,after,cases=['T.test_case'])
+        with self.assertRaises(ValueError):technical_repair_diff(before,after.replace('preserved message','different message'),cases=['T.test_case'])
+        with self.assertRaises(ValueError):technical_repair_diff(before,after.replace('remaining = candidates[:1]','remaining = candidates[:1]\n  for x in candidates:\n   continue'),cases=['T.test_case'])
