@@ -13,6 +13,12 @@ transfer responsibility. Existing native decision and independent review gates
 remain mandatory. Decision validation errors identify required, missing and
 unexpected fields so the agent can correct its call without guessing.
 
+A rejected negative control identifies its one-based position in the submitted
+set, mutant snapshot, retained suite job, failure count and suite membership
+result. A surviving mutation is not evidence of delivery: investigate whether
+the scenario reaches the affected behavior before replacing a control or
+proposing independently reviewed test maintenance.
+
 Diagnostic event retention reserves up to 128 slots for HTTP/network errors and
 server resource observations before filling a 256-event window with recent
 traffic. This bounded view is not a complete capture; raw job output remains

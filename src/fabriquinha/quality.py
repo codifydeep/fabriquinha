@@ -607,13 +607,16 @@ class Quality:
             from .maintenance import reviewed
             observer_paths=set(reviewed(self.project,self.store,maintenance)['paths'])
         coverage, jobs = set(), []
-        for mutant in mutants:
+        for index,mutant in enumerate(mutants,1):
             if mutant == data['snapshot']:
                 raise ValueError('control must change product behavior')
             self.protect(data['snapshot'], mutant, exact_tests=True)
             job, report = self.observe(run, mutant, 'control')
             if set(report['cases']) != set(frozen['cases']) or not report['failures']:
-                raise ValueError('negative control must fail the complete frozen suite')
+                raise ValueError('negative control must fail the complete frozen suite: '+json.dumps(dict(
+                    index=index,snapshot=mutant,job=job,tests_run=report['tests_run'],
+                    failures=len(report['failures']),membership_matches=set(report['cases'])==set(frozen['cases']),
+                    delivery_approval=False)))
             for failure in report['failures']:
                 if failure['assertion'] and any(f['file'].startswith(self.project.tests_dir+'/') and
                         f['function'].startswith('test') for f in failure['frames']):

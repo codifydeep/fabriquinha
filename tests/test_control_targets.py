@@ -1,5 +1,6 @@
 """Behavior controls do not require corrupting immutable QA metadata."""
 from dataclasses import replace
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -61,6 +62,21 @@ class BehaviorControlTargets(unittest.TestCase):
         controls=self.q.controls(self.implementer,green,[mutant])
         self.assertEqual(self.store.receipt(controls)['payload']['coverage'],['feature'])
         self.assertEqual(self.calls[-1],(mutant,'control'))
+
+    def test_surviving_control_identifies_exact_mutation_and_retained_job(self):
+        self.freeze();green,mutant=self.green_and_mutant();self.failing=[]
+        with self.assertRaises(ValueError) as error:
+            self.q.controls(self.implementer,green,[mutant])
+        text=str(error.exception)
+        self.assertIn(mutant,text)
+        self.assertIn('"index": 1',text)
+        feedback=json.loads(text.split(': ',1)[1])
+        job=self.store.receipt(feedback['job'],kind='suite_job')
+        self.assertEqual(job['binding'],self.implementer.binding())
+        self.assertEqual(job['payload']['identity']['snapshot'],mutant)
+        self.assertEqual(feedback['failures'],0)
+        self.assertFalse(feedback['delivery_approval'])
+        self.assertFalse(any(self.store.receipt(p.stem)['kind']=='controls' for p in (self.store.root/'receipts').glob('*.json')))
 
     def test_reviewer_can_require_a_passing_risk_and_author_cannot_ignore_it(self):
         self.freeze([dict(case='passing_risk',reason='A passing security assertion still needs a negative control.')])
