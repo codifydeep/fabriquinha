@@ -213,12 +213,15 @@ class Diagnostic:
             previous=self.store.receipt(self.resolution['diagnosis'],kind='diagnostic_decision')
             if previous['payload']['incident']!=self.board.input(self.run,'incident'):
                 raise ValueError('resolution must reference its exact held incident')
-            experiment=self.store.receipt(previous['payload']['experiment'],kind='diagnostic_experiment')
+            experiment_key=previous['payload']['experiment']
+            experiment=(self.store.receipt(experiment_key,kind='diagnostic_experiment')
+                if experiment_key is not None else None)
             result['diagnostic_capabilities']=dict(observations=['full_suite_report','browser_http_errors_with_path_status_case_context','room_request_response_method_status_context_order'],
                 unavailable=['response_bodies','successful_join_response','new_browser_listeners_from_hypothesis'],
                 semantics='Hypothesis text never installs instrumentation. Product-only replacements run on a disposable copy; tests stay frozen. A resume authorizes corrective work, not passing tests or delivery. Mixed failures may be repaired incrementally while all gates remain mandatory.')
             result['hold_resolution']=dict(role=self.resolution['role'],previous=previous['payload'],
-                observations=guidance_context([{'experiment':experiment['payload']}])[0]['experiment'],objective=self.resolution['objective'],
+                observations=(guidance_context([{'experiment':experiment['payload']}])[0]['experiment']
+                    if experiment is not None else None),objective=self.resolution['objective'],
                 instruction='Reuse the supplied HTTP paths/status/context evidence; do not ask for data already supplied. '
                 'Separate observed product faults, unreachable test setup and unresolved hypotheses. '
                 'Repeated assertion messages do not establish repeated HTTP requests: correlate the actual events and observer lifetime. '

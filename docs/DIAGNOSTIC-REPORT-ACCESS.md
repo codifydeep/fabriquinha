@@ -32,6 +32,11 @@ The controller revalidates the receipt on each decision, including after activit
 reconstruction. A historical citation never populates the current experiment;
 resume and test repair still require their existing current-experiment gates.
 
+A held decision may have no new experiment. Its continuation preserves that
+absence as `observations: null`, retaining the prior decision and its citations
+without inventing validation. It can proceed with diagnosis; author resumption
+still requires a fresh experiment. Malformed non-null receipt IDs remain errors.
+
 Diagnostic session anchors include a tool-contract version. Changing that
 version preserves old transcripts but starts a fresh diagnostic context. Retries
 under the same version retain their anchor; this is not authorization to replay

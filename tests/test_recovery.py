@@ -20,6 +20,19 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_hold_without_new_experiment_can_resume_diagnosis_not_delivery(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        previous=self.store.record('diagnostic_decision',d.run.binding(),dict(
+            incident=self.incident,action='hold',experiment=None,delivery_approval=False))
+        d.resolution=dict(diagnosis=previous,role='decide',objective='Test the bounded hypothesis')
+        context=d.evidence()['hold_resolution']
+        self.assertIsNone(context['observations'])
+        self.assertIsNone(context['previous']['experiment'])
+        self.assertFalse(context['previous']['delivery_approval'])
+        self.assertIsNone(d.experiment)
+        with self.assertRaisesRegex(ValueError,'real experiment'):
+            d.decide(dict(action='resume',reason='No fresh validation',findings=[]))
+
     def test_historical_report_can_be_cited_without_authorizing_resume(self):
         d=Diagnostic(self.sandbox,self.quality)
         binding={**d.run.binding(),'number':d.run.number+100}
