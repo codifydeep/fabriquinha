@@ -37,6 +37,33 @@ from .source import environment as check_source
 from .profile_policy import contract as profile_contract,admission as profile_admission,report as profile_report
 
 
+_PROVIDER_ADMISSION_LOCK=threading.RLock()
+
+
+@contextmanager
+def provider_claim_guard(dispatch,conn,*,ready):
+    """Scoped adapter at the pinned native pre-claim seam; never replaces a guard.
+
+    Other connections delegate unchanged. Restoration is exception-safe; our
+    dispatcher ticks serialize adapter installation within this process.
+    """
+    with _PROVIDER_ADMISSION_LOCK:
+        original=dispatch.check_respawn_guard
+        if ready:
+            yield
+            return
+        def guarded(connection,task,**kwargs):
+            reason=original(connection,task,**kwargs)
+            if reason is not None or connection is not conn:return reason
+            row=connection.execute('SELECT body FROM tasks WHERE id=?',(task,)).fetchone()
+            try:fixed=bool(row and json.loads(row[0]).get('kind')=='integration')
+            except (ValueError,TypeError,AttributeError):fixed=False
+            return None if fixed else 'provider_unavailable'
+        dispatch.check_respawn_guard=guarded
+        try:yield
+        finally:dispatch.check_respawn_guard=original
+
+
 class IntegrationRunner(Runner):
     """Wait for bounded local computation, not for external CI or model replies."""
     def _execute(self,*args,**kwargs):
@@ -473,8 +500,11 @@ class Runtime:
             admission=self.check_admission()
             transfers=self.board.pending_review_transfers(conn)
             if transfers:self.release_issues['pending_review_transfers']=dict(cards=transfers,owner=(self.project.coordination_roles or {}).get('lead','lead'))
-            return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=self.project.max_workers if admission['ready'] and not transfers else 0,
-                max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)
+            capacity=self.project.max_workers if admission['ready'] and not transfers else 0
+            provider=self.provider_status() if capacity else {'ready':True}
+            with provider_claim_guard(dispatch,conn,ready=provider['ready']):
+                return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=capacity,
+                    max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)
 
     def park_integration(self,run,*,now=None):
         if run.kind!='integration' or run.reviewing:

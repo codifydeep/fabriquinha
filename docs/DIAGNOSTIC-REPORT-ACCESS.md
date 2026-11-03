@@ -51,6 +51,14 @@ homologation. The executable-decision variant also passed a dedicated native fix
 real Docker observations: historical-only resume was refused, the current CTO
 experiment allowed a structured ruling, and reconstruction applied exactly one
 author resume. This second proof uses a programmed initial decision context and
-does not claim autonomous incident classification. Provider admission before
-claim remains pending. These changes are source-only until the complete
-installation batch is qualified.
+does not claim autonomous incident classification. Provider admission is now checked before native claim through a scoped adapter
+at the pinned Hermes respawn-guard seam. The original guard runs first; another
+connection is unaffected; restoration occurs on success or exception. No upstream
+file is changed. This compatibility seam must be requalified on Hermes upgrades.
+
+`qualify_provider_admission.py` used real native dispatch with a programmed spawn
+callback: repeated provider unavailability created no model task runs, fixed
+integration remained eligible, and availability admitted the model task once.
+This is an admission proof, not execution of a real deployment. The final
+combined recovery scenario must pass before installation. Source changes do not
+raise the provider quota or release its operational pause.
