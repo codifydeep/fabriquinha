@@ -34,7 +34,13 @@ def validation_output(output):
         else:report_lines.append(line)
     try:report=json.loads('\n'.join(report_lines))
     except ValueError:report=None
-    return report,events[-256:]
+    # Reserve space for errors before routine polling can evict them.
+    important=[i for i,e in enumerate(events) if e.get('event') in ('http_error','room_request_failed','server_resources')]
+    selected=set(important[-128:])
+    for i in range(len(events)-1,-1,-1):
+        if len(selected)>=256:break
+        selected.add(i)
+    return report,[events[i] for i in sorted(selected)]
 
 
 def job_failure(message, receipt):

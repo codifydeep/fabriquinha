@@ -469,6 +469,10 @@ class Diagnostic:
         if len(json.dumps(result))>6000:
             return dict(experiment=self.experiment,job=job,tests_run=report.get('tests_run'),
                 failures=len(report.get('failures',[])),errors=len(report.get('errors',[])),
+                qa_status=report.get('qa_preview',{}).get('status'),
+                http_errors=[e for e in extra.get('http_observations',{}).get('events',[])
+                    if e.get('event') in ('http_error','room_request_failed')][:4],
+                observation_limits='At most 128 priority events and 256 total retained; summary shows first 4 errors. Full raw output remains in the job archive. Absence does not prove no errors.',
                 report_access='Call diagnostic_report with offset=0 and follow next_offset. Full immutable report is retained by the controller; do not use host/cache paths.',
                 delivery_approval=False)
         return result
