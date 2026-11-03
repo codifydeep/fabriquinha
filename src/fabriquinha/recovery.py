@@ -503,7 +503,9 @@ class Diagnostic:
         end=min(offset+1800,len(text))
         report=receipt['payload'].get('report',{})
         summary=dict(tests_run=report.get('tests_run'),failures=len(report.get('failures',[])),
-            errors=len(report.get('errors',[])),qa_status=report.get('qa_preview',{}).get('status'))
+            errors=len(report.get('errors',[])),qa_status=report.get('qa_preview',{}).get('status'),
+            qa_failure_kind=report.get('qa_preview',{}).get('failure_kind'),
+            qa_errors=[str(error)[:1200] for error in report.get('qa_preview',{}).get('errors',[])[:4]])
         return dict(experiment=key,summary=summary,offset=offset,total=len(text),text=text[offset:end],
                     next_offset=end if end<len(text) else None,delivery_approval=False)
 

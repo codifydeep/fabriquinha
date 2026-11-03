@@ -94,6 +94,15 @@ class TechnicalRecovery(unittest.TestCase):
             foreign=self.store.record('diagnostic_experiment',{**binding,'release':'other'},payload)
             with self.assertRaisesRegex(ValueError,'foreign'):d.report_page({'offset':0,'experiment':foreign})
 
+    def test_report_summary_exposes_qa_failure_without_paging_case_inventory(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        d.experiment=self.store.record('diagnostic_experiment',d.run.binding(),dict(report={
+            'cases':['case']*1000,'failures':[],'errors':[],
+            'qa_preview':{'status':'failed','failure_kind':'behavior','errors':['browser HTTP 409 on play']}}))
+        summary=d.report_page({'offset':0})['summary']
+        self.assertEqual(summary['qa_errors'],['browser HTTP 409 on play'])
+        self.assertEqual(summary['qa_failure_kind'],'behavior')
+
     def test_report_pages_preserve_full_payload_and_reject_foreign_binding(self):
         d=Diagnostic(self.sandbox,self.quality)
         payload={'report':{'failures':[{'detail':'x'*12000}]}}
