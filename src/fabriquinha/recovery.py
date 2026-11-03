@@ -464,8 +464,28 @@ class Diagnostic:
             if http:extra['http_observations']=dict(job=job,events=http,semantics='Bounded tail of sandbox events, not a complete network capture or approval. Absence of an event does not prove absence of a request. Correlate case, context, timestamps and source; never whitelist unexplained errors.')
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
             snapshot=snapshot,source_snapshot=self.incident['snapshot'],hypothesis=args['hypothesis'],job=job,report=report,**extra))
-        return dict(experiment=self.experiment,report=report,delivery_approval=False,
+        result=dict(experiment=self.experiment,report=report,delivery_approval=False,
                     **self.review_probe_feedback(),**extra)
+        if len(json.dumps(result))>6000:
+            return dict(experiment=self.experiment,job=job,tests_run=report.get('tests_run'),
+                failures=len(report.get('failures',[])),errors=len(report.get('errors',[])),
+                report_access='Call diagnostic_report with offset=0 and follow next_offset. Full immutable report is retained by the controller; do not use host/cache paths.',
+                delivery_approval=False)
+        return result
+
+    def report_page(self,args):
+        self.board.ensure(self.run)
+        if (not isinstance(args,dict) or set(args)!={'offset'} or type(args['offset']) is not int or args['offset']<0):
+            raise ValueError('nonnegative integer offset required')
+        if not self.experiment:raise ValueError('run diagnostic_validate first; no current experiment')
+        receipt=self.store.receipt(self.experiment,kind='diagnostic_experiment')
+        if receipt['binding']!=self.run.binding():raise ValueError('foreign experiment')
+        text=json.dumps(receipt['payload'],ensure_ascii=True)
+        offset=args['offset']
+        if offset>len(text):raise ValueError('offset beyond report')
+        end=min(offset+1800,len(text))
+        return dict(experiment=self.experiment,offset=offset,total=len(text),text=text[offset:end],
+                    next_offset=end if end<len(text) else None,delivery_approval=False)
 
     def review_probe_feedback(self):
         """Expose succession admission before the CTO ends its live activity.
@@ -505,7 +525,7 @@ class Diagnostic:
         if executable:expected.add('ruling')
         if (not isinstance(args,dict) or set(args)!=expected
                 or args['action'] not in self.actions()):
-            raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; preserve native triage and never send technical decisions to CEO')
+            raise ValueError('permitted technical actions: '+', '.join(self.actions())+'; required fields for this action: '+', '.join(sorted(expected))+'; missing fields: '+', '.join(sorted(expected-set(args) if isinstance(args,dict) else expected))+'; unexpected fields: '+', '.join(sorted(set(args)-expected) if isinstance(args,dict) else [])+'; preserve native triage and never send technical decisions to CEO')
         if args['action']=='return_author':
             verification=args['verification']
             if (not isinstance(verification,dict) or set(verification)!={'reachable_scenario','negative_control'}
@@ -1092,6 +1112,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')
+    schemas['diagnostic_report']=dict(type='object',additionalProperties=False,required=['offset'],properties=dict(offset=dict(type='integer',minimum=0)))
     failures={}
     def handler(method,terminal):
         def invoke(args,**kwargs):
@@ -1105,7 +1126,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
             if terminal and on_terminal:on_terminal(result)
             return json.dumps(result)
         return invoke
-    for name,method in (('diagnostic_validate',operations.validate),('diagnostic_decide',operations.decide)):
+    for name,method in (('diagnostic_validate',operations.validate),('diagnostic_decide',operations.decide),('diagnostic_report',operations.report_page)):
         registry.register(name=name,toolset='fabriquinha_delivery',schema=dict(name=name,parameters=schemas[name],
             description='Technical diagnosis only. Read immutable evidence, run a fixed disposable SPIKE, propose guidance or escalate. '
                 'Cite a real source line or evidence=incident/experiment for an operational finding; never invent a product defect. '

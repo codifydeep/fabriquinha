@@ -20,6 +20,20 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_report_pages_preserve_full_payload_and_reject_foreign_binding(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        payload={'report':{'failures':[{'detail':'x'*12000}]}}
+        d.experiment=self.store.record('diagnostic_experiment',d.run.binding(),payload)
+        chunks=[];offset=0
+        while offset is not None:
+            page=d.report_page({'offset':offset});chunks.append(page['text'])
+            self.assertLessEqual(len(page['text']),1800)
+            offset=page['next_offset']
+        self.assertEqual(json.loads(''.join(chunks)),payload)
+        with self.assertRaises(ValueError):d.report_page({'offset':True})
+        d.experiment=self.store.record('diagnostic_experiment',{'foreign':True},payload)
+        with self.assertRaisesRegex(ValueError,'foreign'):d.report_page({'offset':0})
+
     def test_executable_decision_requires_ruling_and_real_hold_dependency(self):
         diagnostic=Diagnostic(self.sandbox,self.quality)
         diagnostic.resolution={'protocol':'executable-decision-1','role':'decide'}

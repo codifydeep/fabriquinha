@@ -19,6 +19,7 @@ class DiagnosticRetryBoundary(unittest.TestCase):
             def __init__(self):self.calls=0
             def actions(self):return ['hold']
             def validate(self,args):return {}
+            def report_page(self,args):return {}
             def decide(self,args):self.calls+=1;raise ValueError('invalid scope')
         operations=Operations();registered={}
         registry=SimpleNamespace(register=lambda **kwargs:registered.update({kwargs['name']:kwargs}))
