@@ -47,7 +47,10 @@ requested by an independent reviewer, corrected submission, review, and service
 restart without duplicated recovery actions. No paid model was called.
 
 This proves the baseline recovery protocol, not LLM reasoning or product
-homologation. The executable-decision variant has focused handler coverage;
-its complete native path remains to be qualified. Provider admission before
-claim also remains pending. These changes are source-only until the complete
+homologation. The executable-decision variant also passed a dedicated native fixture with
+real Docker observations: historical-only resume was refused, the current CTO
+experiment allowed a structured ruling, and reconstruction applied exactly one
+author resume. This second proof uses a programmed initial decision context and
+does not claim autonomous incident classification. Provider admission before
+claim remains pending. These changes are source-only until the complete
 installation batch is qualified.
