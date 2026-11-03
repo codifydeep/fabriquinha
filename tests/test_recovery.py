@@ -20,6 +20,66 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_historical_report_can_be_cited_without_authorizing_resume(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        binding={**d.run.binding(),'number':d.run.number+100}
+        key=self.store.record('diagnostic_experiment',binding,dict(
+            incident='same-incident',source_snapshot=d.incident['snapshot'],report={'failures':[]}))
+        kb=SimpleNamespace(complete_task=lambda *a,**kw:True)
+        with patch.object(d.board,'input',return_value='same-incident'), patch(
+                'fabriquinha.recovery.native',return_value=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)):
+            page=d.report_page({'offset':0,'experiment':key})
+            finding=dict(evidence=page['experiment'],detail='Retained observation; no new validation claimed')
+            with self.assertRaisesRegex(ValueError,'real experiment'):
+                d.decide(dict(action='resume',reason='Historical observation alone is insufficient',findings=[finding]))
+            result=d.decide(dict(action='hold',reason='Current validation still required',findings=[finding]))
+        self.assertEqual(result['status'],'diagnosis_completed')
+        receipt=self.store.receipt(result['diagnosis'],kind='diagnostic_decision')['payload']
+        self.assertIsNone(receipt['experiment'])
+        self.assertEqual(receipt['verdict']['findings'],[finding])
+        self.assertFalse(receipt['delivery_approval'])
+
+    def test_historical_citation_revalidates_scope_after_reconstruction(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        binding={**d.run.binding(),'number':d.run.number+100}
+        payload=dict(incident=self.incident,source_snapshot=d.incident['snapshot'],report={})
+        with patch.object(d.board,'input',return_value=self.incident):
+            key=self.store.record('diagnostic_experiment',binding,payload)
+            d.report_page({'offset':0,'experiment':key})
+            # No in-memory allowlist: a reconstructed activity must validate receipts again.
+            restored=Diagnostic(self.sandbox,self.quality)
+            variants=[(binding,dict(payload,incident='other')),
+                      (binding,dict(payload,source_snapshot='other')),
+                      ({**binding,'release':'other'},payload),
+                      ({**binding,'kind':'implementation'},payload)]
+            for bad_binding,bad_payload in variants:
+                bad=self.store.record('diagnostic_experiment',bad_binding,bad_payload)
+                with self.subTest(binding=bad_binding,payload=bad_payload):
+                    with self.assertRaisesRegex(ValueError,'foreign'):
+                        restored.decide(dict(action='hold',reason='Do not accept foreign observations',
+                            findings=[dict(evidence=bad,detail='Invalid reference')]))
+            self.assertIsNone(restored.experiment)
+
+    def test_executable_cto_decision_can_cite_retained_report_with_explicit_owner(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        d.resolution={'protocol':'executable-decision-1','role':'decide'}
+        key=self.store.record('diagnostic_experiment',{**d.run.binding(),'number':100},dict(
+            incident=self.incident,source_snapshot=d.incident['snapshot'],report={'failures':[]}))
+        kb=SimpleNamespace(complete_task=lambda *a,**kw:True)
+        with patch('fabriquinha.recovery.native',return_value=(kb,SimpleNamespace(connect_closing=lambda:nullcontext(None)),None)):
+            d.report_page({'offset':0,'experiment':key})
+            result=d.decide(dict(action='hold',reason='Need current reproduction before transition',
+                findings=[dict(evidence=key,detail='Historical evidence is readable and cited exactly')],
+                next_step=dict(owner='cto',operation='Execute bounded reproduction',
+                    expected_evidence='Current experiment receipt',precondition='Validation infrastructure available'),
+                ruling=dict(choice='Preserve tests',correction='Validate the candidate on a disposable snapshot',
+                    remaining='Current experiment and independent review',blocker='infrastructure')))
+        receipt=self.store.receipt(result['diagnosis'],kind='diagnostic_decision')['payload']
+        self.assertEqual(receipt['next_step']['owner'],'cto')
+        self.assertEqual(receipt['ruling']['blocker'],'infrastructure')
+        self.assertIsNone(receipt['experiment'])
+        self.assertFalse(receipt['delivery_approval'])
+
     def test_historical_report_is_scoped_read_only(self):
         d=Diagnostic(self.sandbox,self.quality)
         binding={**d.run.binding(),'number':d.run.number+100}

@@ -477,12 +477,8 @@ class Diagnostic:
                 delivery_approval=False)
         return result
 
-    def report_page(self,args):
-        self.board.ensure(self.run)
-        if (not isinstance(args,dict) or not {'offset'}<=set(args) or set(args)-{'offset','experiment'} or type(args['offset']) is not int or args['offset']<0):
-            raise ValueError('nonnegative integer offset required')
-        key=args.get('experiment',self.experiment)
-        if not key:raise ValueError('provide a retained experiment receipt or run diagnostic_validate')
+    def citable_experiment(self,key):
+        """Resolve a fact reference; never promote it to current execution authority."""
         receipt=self.store.receipt(key,kind='diagnostic_experiment')
         if receipt['binding']!=self.run.binding():
             data=receipt['payload'];binding=receipt['binding']
@@ -490,7 +486,16 @@ class Diagnostic:
                     or data.get('incident')!=self.board.input(self.run,'incident')
                     or data.get('source_snapshot',data.get('snapshot'))!=self.incident['snapshot']):
                 raise ValueError('foreign experiment: same incident, release and source snapshot required')
-        # Reading history does not set self.experiment or authorize a decision.
+        return receipt
+
+
+    def report_page(self,args):
+        self.board.ensure(self.run)
+        if (not isinstance(args,dict) or not {'offset'}<=set(args) or set(args)-{'offset','experiment'} or type(args['offset']) is not int or args['offset']<0):
+            raise ValueError('nonnegative integer offset required')
+        key=args.get('experiment',self.experiment)
+        if not key:raise ValueError('provide a retained experiment receipt or run diagnostic_validate')
+        receipt=self.citable_experiment(key)
 
         text=json.dumps(receipt['payload'],ensure_ascii=True)
         offset=args['offset']
@@ -569,10 +574,13 @@ class Diagnostic:
         files=[]
         for finding in args['findings']:
             if isinstance(finding,dict) and set(finding)=={'evidence','detail'}:
-                if (finding['evidence'] not in ('incident','experiment')
-                        or finding['evidence']=='experiment' and self.experiment is None
+                evidence=finding['evidence']
+                if (not isinstance(evidence,str)
+                        or evidence=='experiment' and self.experiment is None
                         or not isinstance(finding['detail'],str) or not 1<=len(finding['detail'].strip())<=2000):
-                    raise ValueError('finding must cite the current incident or actual experiment')
+                    raise ValueError('finding must cite incident, current experiment, or an exact retained experiment receipt')
+                if evidence not in ('incident','experiment'):
+                    self.citable_experiment(evidence)
             else:files.append(finding)
         if (args['action']=='resume' and self.qa_correction()
                 and any(f.get('path') not in self.repair['proposal']['test_paths'] for f in files)):
@@ -1097,7 +1105,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
     finding=dict(type='object',additionalProperties=False,required=['path','line','detail'],properties=dict(
         path={'type':'string'},line={'type':'integer','minimum':1},detail={'type':'string','minLength':1,'maxLength':2000}))
     reference=dict(type='object',additionalProperties=False,required=['evidence','detail'],properties=dict(
-        evidence=dict(type='string',enum=['incident','experiment']),detail=dict(type='string',minLength=1,maxLength=2000)))
+        evidence=dict(type='string',pattern=r'^(incident|experiment|[a-f0-9]{64})$',description='incident, current experiment, or exact retained diagnostic experiment receipt from diagnostic_report; citation grants no transition authority'),detail=dict(type='string',minLength=1,maxLength=2000)))
     schemas=dict(diagnostic_validate=dict(type='object',additionalProperties=False,required=['hypothesis'],properties=dict(
         hypothesis={'type':'string','minLength':1,'maxLength':2000},replacements=dict(type='object',minProperties=1,maxProperties=16,
             additionalProperties={'type':'string','maxLength':131072}))),
@@ -1144,7 +1152,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
     for name,method in (('diagnostic_validate',operations.validate),('diagnostic_decide',operations.decide),('diagnostic_report',operations.report_page)):
         registry.register(name=name,toolset='fabriquinha_delivery',schema=dict(name=name,parameters=schemas[name],
             description='Technical diagnosis only. Read immutable evidence, run a fixed disposable SPIKE, propose guidance or escalate. '
-                'Cite a real source line or evidence=incident/experiment for an operational finding; never invent a product defect. '
+                'Cite a real source line, evidence=incident/current experiment, or the exact retained experiment receipt returned by diagnostic_report. Historical citation does not authorize resume or test repair; those still require a current experiment. Never invent a product defect. '
                 'Never edit the author, weaken tests, approve delivery or send technical decisions to the CEO.'),
             handler=handler(method,name=='diagnostic_decide'))
     return set(schemas),operations

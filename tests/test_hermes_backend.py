@@ -76,6 +76,19 @@ class NativeBackendPolicy(unittest.TestCase):
         self.assertNotEqual(recovered,activity_anchor(self.project,self.run,route,'e'*64))
         with self.assertRaises(ValueError):activity_anchor(self.project,self.run,route,'model-declared-recovery')
 
+    def test_diagnostic_context_changes_with_tool_contract_but_not_retry(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from fabriquinha.hermes import activity_anchor
+        route=dict(model='same-model',provider='custom',api_mode='chat_completions')
+        run=replace(self.run,kind='diagnostic')
+        with patch('fabriquinha.hermes.DIAGNOSTIC_CONTEXT_VERSION','old',create=True):
+            old=activity_anchor(self.project,run,route)
+        with patch('fabriquinha.hermes.DIAGNOSTIC_CONTEXT_VERSION','new',create=True):
+            new=activity_anchor(self.project,run,route)
+            self.assertEqual(new,activity_anchor(self.project,replace(run,number=run.number+1),route))
+        self.assertNotEqual(old,new)
+
     def test_submission_system_instruction_and_session_do_not_inherit_deployed_qa_mode(self):
         from dataclasses import replace
         from fabriquinha.artifacts import digest

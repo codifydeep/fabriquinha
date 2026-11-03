@@ -26,7 +26,9 @@ from fabriquinha.kanban_lane import native
 from fabriquinha.runtime import Runtime, worker_alive, recorded_worker
 
 
-def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False,pr_in_guidance=False,review_churn=False):
+def qualify(root,upstream,image,*,notifications=False,review_escalation=False,provider_error=False,control_refusal=False,invalid_red=False,terminal_deadline=False,pr_in_guidance=False,review_churn=False,historical_citation=False):
+    if historical_citation and any((review_escalation,control_refusal,invalid_red,review_churn)):
+        raise ValueError("historical citation uses the baseline recovery chain")
     if review_churn:review_escalation=True
     if sum((review_escalation,control_refusal,invalid_red))>1 or (invalid_red or terminal_deadline) and provider_error:
         raise ValueError('choose one independent recovery scenario')
@@ -41,6 +43,7 @@ def qualify(root,upstream,image,*,notifications=False,review_escalation=False,pr
     project=json.loads((root/'project.json').read_bytes());project['technical_roles']=dict(lead='flow-lead',cto='flow-cto')
     write_json(root/'project.json',project);runtime=Runtime(root,upstream)
     resumed=threading.Event();release=threading.Event();sequences={};requests={};services=[];escalated_reviews=[];feedback_seen=[]
+    historical_refs=[]
     churn_reviews=[];churn_context=[];churn_refusals=[];churn_observations=[]
     control_ready=threading.Event();control_release=threading.Event();control_failed=[];control_seen=[];negative_reports=[]
     terminal_cids=[];terminal_verified=[]
@@ -201,6 +204,19 @@ print(json.dumps(rows))'''
                 if pr_in_guidance and run.task==source and not run.reviewing and run.number>1:
                     assert reference in str(body['messages']),'full guidance must be resolved from the immutable receipt'
                     guidance_seen.append(run.number)
+                if historical_citation and run.kind=='diagnostic' and run.actor=='flow-cto':
+                    incident=runtime.board.input(run,'incident')
+                    with kbc.connect_closing() as conn:
+                        receipts=[json.loads(row['metadata'])['diagnosis'] for row in conn.execute(
+                            "SELECT metadata FROM task_runs WHERE outcome='completed' AND metadata IS NOT NULL")
+                            if 'diagnosis' in json.loads(row['metadata'])]
+                    prior=[runtime.store.receipt(key,kind='diagnostic_decision')['payload'] for key in receipts]
+                    retained=next(item['experiment'] for item in prior if item['incident']==incident and item.get('experiment'))
+                    historical_refs.append(retained)
+                    fact=dict(evidence=retained,detail='Prior Lead observation is context, not current transition authority')
+                    sequence=[('diagnostic_report',dict(offset=0,experiment=retained)),
+                        ('diagnostic_decide',dict(action='resume',reason='History alone must not authorize resume',findings=[fact]))]+sequence
+                    sequence[-1][1]['findings'].append(fact)
                 sequences[run.number]=sequence
             index=requests.get(run.number,0);requests[run.number]=index+1
             if run.number in churn_context and index==3:
@@ -252,6 +268,12 @@ print(json.dumps(rows))'''
                 terminal_verified.append(run.number)
             if run.kind=='diagnostic' and run.actor=='flow-lead' and index==1:
                 assert 'VALUE' in str(body['messages'][-1].get('content')),'diagnostic must actually read the mounted source'
+            if historical_citation and run.kind=='diagnostic' and run.actor=='flow-cto':
+                if index==1:
+                    observed=json.loads(body['messages'][-1]['content'])
+                    assert observed['experiment']==historical_refs[-1] and not observed['delivery_approval']
+                if index==2:
+                    assert 'real experiment in this execution' in str(body['messages'][-1]['content'])
             if index>=len(sequences[run.number]):self.send_error(400);return
             if run.task==source and run.number!=1 and not run.reviewing and not resumed.is_set():
                 assert not any(m.get('role')=='assistant' and m.get('content')=='I will finish the task later.'
@@ -374,6 +396,11 @@ print(json.dumps(rows))'''
             source_unchanged_by_diagnosticians=True,author_resumed_with_guidance=True,restart_did_not_duplicate_actions=True,
             incident_resolved_only_after_delivery_evidence=True,tdd_revalidated=True,diagnostics=len(decisions),runs=len(runs),
             local_http_requests=sum(requests.values()),synthetic_responses=True,model_calls=0,delivery_approval=False,migration=False)
+        if historical_citation:
+            assert len(historical_refs)==1
+            assert decisions[-1]['payload']['experiment']!=historical_refs[0]
+            assert any(f.get('evidence')==historical_refs[0] for f in decisions[-1]['payload']['verdict']['findings'])
+            proof.update(historical_report_cited_in_native_decision=True,historical_citation_did_not_authorize_resume=True)
         if review_escalation:proof.update(review_escalation_resumed_review=True,structured_findings_reached_author=True)
         if review_churn:
             assert len(churn_reviews)==3 and len(churn_context)==1
@@ -456,11 +483,12 @@ if __name__=='__main__':
     scenario.add_argument('--invalid-red',action='store_true',help='Observe test errors in diagnosis, then require author repair and genuine Red/review/Green')
     parser.add_argument('--provider-error',action='store_true',help='Inject a local HTTP 422 to verify actual SDK error propagation')
     parser.add_argument('--terminal-deadline',action='store_true',help='Qualify actual browser/detached-child retirement after host exec client timeout')
+    parser.add_argument('--historical-citation',action='store_true')
     parser.add_argument('--pr-in-guidance',action='store_true')
     args=parser.parse_args()
     root=args.root.resolve();fresh=not root.exists()
     try:qualify(root,args.upstream.resolve(),args.image,notifications=args.notifications,review_escalation=args.review_escalation,
-        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline,pr_in_guidance=args.pr_in_guidance,review_churn=args.review_churn)
+        provider_error=args.provider_error,control_refusal=args.control_refusal,invalid_red=args.invalid_red,terminal_deadline=args.terminal_deadline,pr_in_guidance=args.pr_in_guidance,review_churn=args.review_churn,historical_citation=args.historical_citation)
     except Exception as error:
         if fresh and root.exists():write_json(root/'failure.json',dict(qualification=False,error=type(error).__name__,
             reason=str(error),model_calls=0,native_state_preserved=True))

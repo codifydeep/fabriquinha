@@ -75,9 +75,14 @@ def bounded_exec(cid,argv,timeout,*,stdin=False):
             format(min(timeout,120),'g'),*argv]
 
 
+# Preserve transcripts while invalidating diagnostic context when tool semantics change.
+DIAGNOSTIC_CONTEXT_VERSION='retained-evidence-citation-1'
+
+
 def activity_anchor(project,run,route,recovery_epoch=None,*,phase_contract=None):
     identity=dict(project=project.fingerprint(),subject=run.subject(),model=route['model'],
                   provider=route['provider'],api_mode=route['api_mode'])
+    if run.kind=='diagnostic':identity['diagnostic_contract']=DIAGNOSTIC_CONTEXT_VERSION
     if recovery_epoch is not None:
         if not isinstance(recovery_epoch,str) or not re.fullmatch('[a-f0-9]{64}',recovery_epoch):
             raise ValueError('controller-validated diagnostic receipt required for context refresh')
