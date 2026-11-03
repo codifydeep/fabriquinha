@@ -60,5 +60,8 @@ file is changed. This compatibility seam must be requalified on Hermes upgrades.
 callback: repeated provider unavailability created no model task runs, fixed
 integration remained eligible, and availability admitted the model task once.
 This is an admission proof, not execution of a real deployment. The final
-combined recovery scenario must pass before installation. Source changes do not
+combined recovery scenario passed again with context versioning and
+provider admission connected: nine native runs, independent change request and
+review, real Docker validation and supervisor restart without duplicate recovery.
+The full offline suite passed 587 tests. Source changes do not
 raise the provider quota or release its operational pause.
