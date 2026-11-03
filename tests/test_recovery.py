@@ -20,6 +20,20 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_historical_report_is_scoped_read_only(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        binding={**d.run.binding(),'number':d.run.number+100}
+        payload=dict(incident='same-incident',source_snapshot=d.incident['snapshot'],report={'failures':[]})
+        key=self.store.record('diagnostic_experiment',binding,payload)
+        with patch.object(d.board,'input',return_value='same-incident'):
+            self.assertEqual(d.report_page({'offset':0,'experiment':key})['experiment'],key)
+            self.assertIsNone(d.experiment)
+            for bad in [dict(payload,incident='other'),dict(payload,source_snapshot='other')]:
+                foreign=self.store.record('diagnostic_experiment',binding,bad)
+                with self.assertRaisesRegex(ValueError,'foreign'):d.report_page({'offset':0,'experiment':foreign})
+            foreign=self.store.record('diagnostic_experiment',{**binding,'release':'other'},payload)
+            with self.assertRaisesRegex(ValueError,'foreign'):d.report_page({'offset':0,'experiment':foreign})
+
     def test_report_pages_preserve_full_payload_and_reject_foreign_binding(self):
         d=Diagnostic(self.sandbox,self.quality)
         payload={'report':{'failures':[{'detail':'x'*12000}]}}

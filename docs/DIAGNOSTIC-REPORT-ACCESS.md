@@ -17,3 +17,8 @@ server resource observations before filling a 256-event window with recent
 traffic. This bounded view is not a complete capture; raw job output remains
 archived. Compact results include QA status and up to four error events so
 routine polling cannot hide the reason for failure behind report pagination.
+
+Historical lookup accepts an explicit `experiment` receipt with `offset`.
+A prior run is readable only when its diagnostic kind, release, incident and
+source snapshot match the current diagnostic. Reading never selects that
+experiment as a fresh decision authorization. Cross-incident access is rejected.

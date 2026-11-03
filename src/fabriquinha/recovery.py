@@ -479,16 +479,27 @@ class Diagnostic:
 
     def report_page(self,args):
         self.board.ensure(self.run)
-        if (not isinstance(args,dict) or set(args)!={'offset'} or type(args['offset']) is not int or args['offset']<0):
+        if (not isinstance(args,dict) or not {'offset'}<=set(args) or set(args)-{'offset','experiment'} or type(args['offset']) is not int or args['offset']<0):
             raise ValueError('nonnegative integer offset required')
-        if not self.experiment:raise ValueError('run diagnostic_validate first; no current experiment')
-        receipt=self.store.receipt(self.experiment,kind='diagnostic_experiment')
-        if receipt['binding']!=self.run.binding():raise ValueError('foreign experiment')
+        key=args.get('experiment',self.experiment)
+        if not key:raise ValueError('provide a retained experiment receipt or run diagnostic_validate')
+        receipt=self.store.receipt(key,kind='diagnostic_experiment')
+        if receipt['binding']!=self.run.binding():
+            data=receipt['payload'];binding=receipt['binding']
+            if (binding.get('kind')!='diagnostic' or binding.get('release')!=self.run.release
+                    or data.get('incident')!=self.board.input(self.run,'incident')
+                    or data.get('source_snapshot',data.get('snapshot'))!=self.incident['snapshot']):
+                raise ValueError('foreign experiment: same incident, release and source snapshot required')
+        # Reading history does not set self.experiment or authorize a decision.
+
         text=json.dumps(receipt['payload'],ensure_ascii=True)
         offset=args['offset']
         if offset>len(text):raise ValueError('offset beyond report')
         end=min(offset+1800,len(text))
-        return dict(experiment=self.experiment,offset=offset,total=len(text),text=text[offset:end],
+        report=receipt['payload'].get('report',{})
+        summary=dict(tests_run=report.get('tests_run'),failures=len(report.get('failures',[])),
+            errors=len(report.get('errors',[])),qa_status=report.get('qa_preview',{}).get('status'))
+        return dict(experiment=key,summary=summary,offset=offset,total=len(text),text=text[offset:end],
                     next_offset=end if end<len(text) else None,delivery_approval=False)
 
     def review_probe_feedback(self):
@@ -1116,7 +1127,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')
-    schemas['diagnostic_report']=dict(type='object',additionalProperties=False,required=['offset'],properties=dict(offset=dict(type='integer',minimum=0)))
+    schemas['diagnostic_report']=dict(type='object',additionalProperties=False,required=['offset'],properties=dict(offset=dict(type='integer',minimum=0),experiment=dict(type='string',pattern='^[a-f0-9]{64}$',description='Optional retained diagnostic experiment from the same incident; read-only, never approval.')))
     failures={}
     def handler(method,terminal):
         def invoke(args,**kwargs):
