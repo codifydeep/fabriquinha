@@ -24,13 +24,33 @@ class ValidationProgress(unittest.TestCase):
         with patch.dict(sys.modules,{'fabriquinha_acceptance':fake}),patch('sys.__stdout__',output):
             result=traced_result(Result)();case=unittest.FunctionTestCase(lambda:None)
             result.startTest(case);Acceptance().new_context()
-            callback=context.on.call_args.args[1]
+            callback=next(c.args[1] for c in context.on.call_args_list if c.args[0]=='response')
             callback(SimpleNamespace(status=404,url='http://user:password@local/api/rooms/id?token=secret'))
             result.stopTest(case)
         _,events=validation_output(output.getvalue());event=next(e for e in events if e['event']=='http_error')
         self.assertEqual(event['path'],'/api/rooms/id')
         self.assertEqual(event['context_created_in'],event['case'])
         self.assertNotIn('secret',output.getvalue());self.assertNotIn('password',output.getvalue())
+
+    def test_successful_join_and_failed_transport_are_observed_without_payloads(self):
+        context=Mock()
+        class Acceptance:
+            def new_context(self):return context
+        output=io.StringIO()
+        with patch.dict(sys.modules,{'fabriquinha_acceptance':SimpleNamespace(AcceptanceTest=Acceptance)}),patch('sys.__stdout__',output):
+            result=traced_result(Result)();case=unittest.FunctionTestCase(lambda:None)
+            result.startTest(case);Acceptance().new_context()
+            callbacks={c.args[0]:c.args[1] for c in context.on.call_args_list}
+            request=SimpleNamespace(url='http://local/api/rooms/123/join?secret=hidden',method='POST',post_data='private nickname')
+            callbacks['request'](request)
+            callbacks['response'](SimpleNamespace(url=request.url,status=200))
+            callbacks['requestfailed'](request)
+            callbacks['request'](SimpleNamespace(url='https://external/private',method='GET'))
+        _,events=validation_output(output.getvalue())
+        self.assertEqual([e['event'] for e in events],['test_started','room_request','room_response','room_request_failed'])
+        self.assertEqual(events[2]['status'],200)
+        self.assertEqual(events[1]['context_id'],events[2]['context_id'])
+        self.assertNotIn('hidden',output.getvalue());self.assertNotIn('nickname',output.getvalue());self.assertNotIn('external',output.getvalue())
 
     def test_events_flush_outside_redirected_test_output(self):
         class Cases(unittest.TestCase):

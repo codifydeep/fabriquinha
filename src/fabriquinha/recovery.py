@@ -214,7 +214,7 @@ class Diagnostic:
             if previous['payload']['incident']!=self.board.input(self.run,'incident'):
                 raise ValueError('resolution must reference its exact held incident')
             experiment=self.store.receipt(previous['payload']['experiment'],kind='diagnostic_experiment')
-            result['diagnostic_capabilities']=dict(observations=['full_suite_report','browser_http_errors_with_path_status_case_context'],
+            result['diagnostic_capabilities']=dict(observations=['full_suite_report','browser_http_errors_with_path_status_case_context','room_request_response_method_status_context_order'],
                 unavailable=['response_bodies','successful_join_response','new_browser_listeners_from_hypothesis'],
                 semantics='Hypothesis text never installs instrumentation. Product-only replacements run on a disposable copy; tests stay frozen. A resume authorizes corrective work, not passing tests or delivery. Mixed failures may be repaired incrementally while all gates remain mandatory.')
             result['hold_resolution']=dict(role=self.resolution['role'],previous=previous['payload'],
@@ -460,8 +460,8 @@ class Diagnostic:
         observed=self.deployment_observation();extra={} if observed is None else dict(deployment_observation=observed)
         events=getattr(self.q,'validation_progress',[])
         if isinstance(events,list):
-            http=[event for event in events if isinstance(event,dict) and event.get('event')=='http_error'][-64:]
-            if http:extra['http_observations']=dict(job=job,events=http,semantics='Sandbox diagnostic clues, not approval. Correlate current case with context_created_in and source before changing tests or product. Never whitelist unexplained errors.')
+            http=[event for event in events if isinstance(event,dict) and event.get('event') in ('http_error','room_request','room_response','room_request_failed')][-256:]
+            if http:extra['http_observations']=dict(job=job,events=http,semantics='Bounded tail of sandbox events, not a complete network capture or approval. Absence of an event does not prove absence of a request. Correlate case, context, timestamps and source; never whitelist unexplained errors.')
         self.experiment=self.q.record(self.run,'diagnostic_experiment',dict(incident=self.board.input(self.run,'incident'),
             snapshot=snapshot,source_snapshot=self.incident['snapshot'],hypothesis=args['hypothesis'],job=job,report=report,**extra))
         return dict(experiment=self.experiment,report=report,delivery_approval=False,
