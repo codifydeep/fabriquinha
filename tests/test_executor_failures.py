@@ -116,7 +116,7 @@ class FailedJobRecovery(unittest.TestCase):
             self.runner.run(self.run,self.snapshot,'red')
         command=execute.call_args.args[2]
         self.assertEqual(command[command.index('--memory')+1],'512m')
-        self.assertEqual(command[command.index('--pids-limit')+1],'128')
+        self.assertEqual(command[command.index('--pids-limit')+1],'256')
         self.assertEqual(command[command.index('--network')+1],'none')
         self.assertIn('--read-only',command)
         self.assertIn('/tmp:rw,noexec,nosuid,size=128m',command)

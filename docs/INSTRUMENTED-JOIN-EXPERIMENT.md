@@ -49,3 +49,17 @@ Validate offline, then install during a drained maintenance window with preserve
 state. Do not clear provider-pause markers, reset budgets, alter active cards or
 start model calls as part of this preparation. Keep source and publication checks
 separate from claims about the product investigation outcome.
+
+## Resource correlation and bounded correction
+
+The offline reproduction reached the browser-suite cgroup limit of 128 tasks
+(processes plus threads). Failed room requests coincided with 22 pids-limit
+refusals and 22 server `can't start new thread` messages. The server stderr is
+now summarized as allowlisted resource-error counts, not emitted verbatim.
+Resource observations are diagnostic clues, never delivery approvals.
+
+The browser suite now has a bounded 256-task limit, matching the existing browser
+QA runner. Non-browser suites retain 128. Memory, CPU, suite selection, timeout,
+assertions and negative-control requirements are unchanged. A passing suite after
+this adjustment does not resolve a separate browser-console 409 gate or prove the
+after-hand-end mutation control. Those require their own receipts.

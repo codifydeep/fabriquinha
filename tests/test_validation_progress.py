@@ -52,6 +52,16 @@ class ValidationProgress(unittest.TestCase):
         self.assertEqual(events[1]['context_id'],events[2]['context_id'])
         self.assertNotIn('hidden',output.getvalue());self.assertNotIn('nickname',output.getvalue());self.assertNotIn('external',output.getvalue())
 
+    def test_resource_counters_are_allowlisted_and_missing_files_are_tolerated(self):
+        from fabriquinha.validation_trace import resource_observation
+        values=['128','128','1234','536870912','max 7']
+        with patch('fabriquinha.validation_trace.Path.read_text',side_effect=values):
+            result=resource_observation()
+        self.assertEqual(result['pids.current'],'128')
+        self.assertEqual(result['pids_limit_hits'],7)
+        with patch('fabriquinha.validation_trace.Path.read_text',side_effect=OSError):
+            self.assertEqual(resource_observation(),{})
+
     def test_events_flush_outside_redirected_test_output(self):
         class Cases(unittest.TestCase):
             def runTest(self):self.fail('behavior missing')
