@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Balanço crítico e plano proposto — 28 de outubro de 2026
 
 **Auditoria originalmente produzida durante a pausa.** O proprietário aprovou

@@ -1,3 +1,0 @@
-FROM delivery-kit-execution-broker:20261015.483
-COPY broker/calibration_controls_diagnostic.py /
-RUN PYTHONPATH=/ PYTHONDONTWRITEBYTECODE=1 python -c "import calibration_controls_diagnostic"

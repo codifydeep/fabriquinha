@@ -1,27 +1,18 @@
-# Roadmap corrente — 31/10/2026
+# Próximos marcos
 
-Fonte corrente: [balanço e plano detalhado](EXECUTION-REVIEW-2026-10-31.md).
-Manter Hermes + Kanban, modelo e contratos de qualidade. Nenhum novo brief está
-aprovado por este documento.
+1. **Concluir a recuperação atual pelo fluxo nativo.** Diagnóstico com relatório
+   acessível, decisão válida, retorno ao autor e revisão independente. Preservar
+   resultados assistidos; não reinterpretar experiências offline como aprovações.
+2. **Concluir a entrega.** Congelamento adequado, suíte completa e controles
+   negativos, PR, CI no SHA exato, implantação e QA com recibo final verificável.
+3. **Comprovar autonomia repetível.** Uma entrega útil com dois incrementos
+   dependentes após o aceite, sem alterações manuais em cards, testes ou workspaces.
+   Eventuais impedimentos devem ser resolvidos pelo fluxo registrado.
+4. **Qualificar distribuição.** Clone limpo, dependências fixadas, preparo privado
+   documentado, backup/restauração e entrega em uma segunda instalação. A limpeza
+   do repositório melhora a entrada, mas não substitui essa prova.
+5. **Expandir somente após essas evidências.** Novas stacks, mobile, observabilidade
+   de produto e experimentação devem ter contrato e validação próprios.
 
-| Ordem | Trabalho | Critério de saída |
-|---|---|---|
-| A | Resumo somente leitura no Kanban; classificar aviso incerto | Saúde, progresso, dono e próxima ação compreensíveis; histórico preservado |
-| B | Consolidar prova de compatibilidade entre bundles/releases | Consumidores do histórico e novos gates validados juntos; retomada sem duplicação |
-| C | Primeira fatia útil do motor do Truco, proposta pelo time | Brief aprovado; dois incrementos; nova entrega integral sem intervenção |
-| D | Interrupção/restore isolados e instalação por outro operador | Reconciliação comprovada e entrega seguindo somente documentação pública |
-| E | Evoluir produto e qualificar capacidades separadamente | Persistência, frontend/3D/mobile com evidências próprias |
-
-A/P1: matriz alinhada, fixtures homologadas e resumo visual instalado. Aviso
-incerto classificado como histórico, sem presumir entrega. B: cenário determinístico
-consolidado aprovado; não equivale a migração de produção nem autonomia de agentes.
-Detalhamento: [checkpoint e próximos passos](PLAN-CHECKPOINT-2026-10-31.md).
-P2: saída/reposição entregue, mas assistida. Preservar a comprovação autônoma
-anterior da v0.3; não declarar repetibilidade com base no trecho final isolado.
-P3/P4: provas parciais não substituem recuperação operacional e distribuição.
-Não condicionar todo trabalho útil à conclusão da publicação para terceiros.
-
-Evitar nova rodada genérica de ensaios sem hipótese e critério de saída.
-A proposta de repetibilidade inicial é duas entregas consecutivas sem intervenção,
-não uma promessa de confiabilidade universal. Decisões de produto continuam com
-CEO/Produto; decisões técnicas com Lead/CTO; reparos da plataforma com mantenedor.
+Manter Hermes + Kanban, controles de regressão e revisão independente. Não
+introduzir orquestradores ou serviços para contornar lacunas de protocolo.

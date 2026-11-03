@@ -1,4 +1,0 @@
-# Revalidate the same completed CTO task; no new model run or approval.
-FROM delivery-kit-execution-broker:20261009.438
-COPY broker/handoff_runtime.py /handoff_runtime.py
-COPY broker/mediation_diagnosis_recovery.py /mediation_diagnosis_recovery.py

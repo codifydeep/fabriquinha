@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Balanço crítico e próximos passos — 31/10/2026
 
 ## Parecer e correção da comunicação

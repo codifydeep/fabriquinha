@@ -1,3 +1,0 @@
-FROM delivery-kit-execution-broker:20261008.361
-COPY broker/calibration_rework.py /calibration_rework.py
-RUN PYTHONPATH=/ python -c "import calibration_rework"

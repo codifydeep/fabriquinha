@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Fabriquinha: revisão estratégica e plano de simplificação
 
 Data do plano: 24 de outubro de 2026. Base examinada: `e33c893f`.

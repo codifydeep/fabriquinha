@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Revisão da execução e próximos passos
 
 Data: 25 de outubro de 2026. Código auditado: `98e0906947674134ea567b16188db5a6c1c61c90`.

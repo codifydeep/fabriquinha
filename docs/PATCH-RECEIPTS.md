@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Patch observability boundary
 
 Scope note, **24 October 2026**: this document describes patch adapters and

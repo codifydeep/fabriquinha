@@ -72,3 +72,16 @@
 !/team-delivery-kit/evaluation/STARTUP-POLICY-OBSERVATIONS-2026-10-07.json
 /team-delivery-kit/launchd/
 **/*.operator-local.md
+
+# Retired orchestration and experiments are not part of the public distribution.
+/bootstrap/
+/team-delivery-kit/*
+!/team-delivery-kit/README.md
+!/team-delivery-kit/docker_grouping.py
+!/team-delivery-kit/cleanup_port2_history.py
+!/team-delivery-kit/cleanup_obsolete_images.py
+!/team-delivery-kit/tests/
+/team-delivery-kit/tests/*
+!/team-delivery-kit/tests/test_docker_grouping.py
+!/team-delivery-kit/tests/test_cleanup_port2_history.py
+!/team-delivery-kit/tests/test_cleanup_obsolete_images.py

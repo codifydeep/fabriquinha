@@ -1,2 +1,0 @@
-FROM delivery-kit-hermes-wrapper:20261007.1
-COPY model_policy.py /opt/model_policy.py

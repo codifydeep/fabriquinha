@@ -1,2 +1,0 @@
-FROM delivery-kit-execution-broker:20261005.214
-COPY broker/lifecycle_publication.py /lifecycle_publication.py

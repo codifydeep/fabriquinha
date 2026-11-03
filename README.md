@@ -1,157 +1,62 @@
 # Fabriquinha
 
-Uma equipe de agentes para transformar um brief em software revisado, testado e
-entregue em homologação, com GitHub e infraestrutura própria.
+Equipe de agentes para transformar um brief aprovado em software testado,
+revisado e entregue em homologação, usando **Hermes + Kanban**, GitHub e Docker local.
 
-**Experimental. v0.3 homologada em ciclo autônomo observado após o aceite.**
-Dois incrementos dependentes passaram por TDD, revisão, PR/CI, implantação,
-rollback e QA; um impedimento foi diagnosticado e retomado pela própria equipe.
-O escopo comprovado é Python/HTTP web local, um host e uma release ativa.
-Autonomia geral, operação recuperável e instalação por terceiros ainda exigem provas.
+**Experimental.** Há entregas delimitadas comprovadas, mas a recuperação de todos
+os impedimentos e a instalação reproduzível por terceiros ainda não estão
+qualificadas. O escopo atual é Python/HTTP web local, um host e uma release ativa.
+Multica e Temporal não fazem parte da arquitetura atual.
 
-O caminho atual usa **Hermes + Kanban nativos** e operações determinísticas de
-qualidade/publicação/implantação. Multica foi retirado de execução; Temporal não
-é dependência. Evidências históricas e backups permanecem privados.
+[Instalação](docs/SETUP.md) · [Arquitetura](docs/ARCHITECTURE.md) ·
+[Qualificação](docs/STATUS.md) · [Roadmap](docs/ROADMAP.md) · [Documentação](docs/README.md)
 
-[Status atual](docs/STATUS.md) · [Próximos passos](docs/ROADMAP.md) ·
-[Balanço de 30/10/2026](docs/EXECUTION-REVIEW-2026-10-30.md) ·
-[Documentação](docs/README.md)
-
-## O que queremos construir
-
-O proprietário informa o objetivo de uma versão e aprova seu brief. A equipe
-planeja, escreve testes, implementa, revisa, integra e entrega uma URL de
-homologação com evidências. Impasses técnicos pertencem ao Tech Lead e ao CTO;
-decisões de negócio pertencem ao proprietário.
-
-A release só termina com sucesso em `HOMOLOGADA`. Worker ativo, card concluído
-ou testes do controlador passando não equivalem a uma release entregue. Uma
-pausa humana ou dependência externa também não significa cancelamento.
-
-## Arquitetura atual
-
-```mermaid
-flowchart LR
-    DASH[Hermes dashboard: consulta local] --> K
-    CEO[Proprietário: brief e decisões de negócio] --> TG[Telegram: comando explícito e identidade humana]
-    TG --> IN[Intake: card e revisão exatos]
-    IN --> K[Hermes Kanban]
-    LS[launchd opcional: supervisão macOS] --> C[Controlador nativo: pausa e lock único]
-    C --> K
-    A[Admissão: imagens, disco e redes reservadas] --> K
-    SRC[Commit Git: export fechado e hash verificado] --> W[Agentes via SDK Hermes]
-    PC[Perfil: contrato e configuração efetiva] --> W
-    K --> W
-    W --> S[Sandbox por atividade e deadline interno]
-    S --> E[Snapshot e recibos imutáveis]
-    E --> V[Validação fixa em Docker]
-    VB[Bundle imutável e mesma aceitação congelada] --> V
-    VB --> D
-    V --> K
-    K --> G[PR e CI local no GitHub]
-    GI[Conta GitHub do controlador: vínculo explícito por perfil] --> G
-    G --> D[Compose local e QA]
-    D --> H[Gate de homologação]
-    H --> K
-    H -.-> HM[Última decisão homologada: contexto histórico limitado]
-    HM -.-> W
-    K --> O[Outbox persistente e status]
-    O --> TG
-    W --> U[Relay: consumo por atividade]
-    K --> R[Diagnóstico técnico Lead / CTO]
-    V -.->|recusa vinculada ao diagnóstico| R
-    R --> X[Experimento fixo e evidência]
-    X -->|retomada segura na fase original| K
-    X -->|sem operação segura| B[Bloqueio com responsável e próxima ação]
-```
-
-Kanban é o dono do ciclo de vida. O controlador executa operações fixas e verifica
-artefatos; os agentes não recebem credenciais de infraestrutura nem socket Docker.
-O journal de efeitos evita duplicar ações com confirmação incerta e não é um
-segundo gerenciador de tarefas.
-
-Diagnósticos podem observar relatórios com erros para orientar reparos; esses
-relatórios continuam impedindo aprovação em todos os gates de entrega.
-
-A [continuação após submissão incompleta](docs/S6-CONTROL-SUBMISSION-RECOVERY.md)
-passou na qualificação offline com participantes programados. Ela reutiliza Lead, CTO e
-Kanban, preserva a triagem histórica e exige novos gates para a entrega. Está instalada, mas ainda
-não foi comprovada com agentes reais; não constitui recuperação
-genérica de qualquer impedimento.
-
-Uma orientação técnica aplicada abre contexto SDK novo, reconstituído pelos
-artefatos e achados duráveis. O histórico anterior permanece arquivado. Pausas
-financeiras mantêm a sessão e a fase; não são tratadas como uma falha técnica nova.
-
-Entregas reais exigem as duas redes de homologação reservadas antes do despacho
-pago. O deploy usa essas redes como externas; não aloca sub-redes implicitamente.
-O preparo é explícito e não remove redes desconhecidas ou repete criações incertas.
-
-O suporte atual é limitado a uma stack Python/HTTP local, containers Linux ARM64
-na instalação de referência e uma release ativa por projeto. Não há instalador
-completo qualificado para terceiros. A matriz de nove perfis permite especialistas
-sob demanda; não exige nove passagens para toda atividade.
-
-## Fluxo da equipe
+## Fluxo de entrega
 
 ```mermaid
 flowchart TD
-    B[Produto: brief aprovado pelo proprietário] --> P[Tech Lead: plano]
-    MA[Operador: manutenção delimitada da entrega aceita] --> P
-    P --> C[CTO: revisão técnica]
-    C -->|mudanças| P
-    C --> T[QA: Red novo ou regressão existente no SHA exato]
-    C -->|manutenção de observador| MT[QA: nova revisão técnica e suítes completas]
-    MT -->|plano contraditório: triagem e hold CTO| MR[Operador: retomada delimitada, histórico preservado]
-    MR --> P
-    MT --> F
-    T --> F[Revisão independente e freeze]
-    F -->|mudanças| T
-    F --> I[Desenvolvedor: suíte Green e QA congelado local]
-    I --> N[Controles negativos e revisão da entrega]
-    N -->|mudanças| I
-    F -->|devoluções recorrentes| ER[CTO: SPIKE e orientação]
-    N -->|devoluções recorrentes| ER
-    ER -->|revisão de testes| F
-    ER -->|revisão da entrega| N
-    N --> PR[PR e CI no SHA exato]
-    PR --> M[Integração: suíte e mesmo QA congelado]
-    M --> D[DevOps: deploy e rollback]
-    D --> QC[Instância limpa do mesmo artefato aprovado]
-    QC --> Q[QA independente do ambiente]
-    Q -->|aprovado| H[HOMOLOGADA com URL e evidências]
-    Q -->|estado residual qualificado e hold CTO| QR[Sucessor de QA; entrega preservada, uma retomada]
-    QR --> QC
-    Q -->|outra falha| X[Lead: classificar erro contra o brief]
-    X --> R[Proposta corretiva e revisão independente]
-    R -->|produto| T
-    R -->|expectativa textual no contrato legado| RT[Correção restrita; Red histórico preservado]
-    RT --> F
-    R -->|teste Python congelado sem reparo qualificado| E
-    R -->|infraestrutura ou escopo| E[Impedimento explícito com responsável]
+    CEO[Proprietário: objetivo e aprovação do brief] --> PM[Produto: brief]
+    PM --> PLAN[Lead: plano e dependências / CTO: revisão]
+    PLAN --> RED[QA: testes e Red]
+    RED --> FREEZE[Revisão independente e congelamento]
+    FREEZE --> DEV[Autor: implementação e Green]
+    DEV --> REVIEW[Controles negativos e revisão independente]
+    REVIEW --> PR[PR e CI no SHA exato]
+    PR --> DEPLOY[DevOps: deploy local e rollback]
+    DEPLOY --> QA[QA da implantação]
+    QA --> DONE[HOMOLOGADA: URL, commit e evidências]
+    REVIEW -->|mudanças| DEV
+    DEV -->|impedimento| DIAG[Lead / CTO: diagnóstico e experimento]
+    DIAG -->|retomada admissível| DEV
+    DIAG -->|defeito no teste| REPAIR[Reparo delimitado pelo autor e nova revisão]
+    REPAIR --> FREEZE
 ```
 
-O código conecta essas etapas; as provas determinísticas exercitam a cadeia.
-O [reparo mínimo](docs/ADR-0004-SCOPED-REPAIR.md) limita-se ao último pacote
-serializado e, para testes, à expectativa textual QA explicitamente autorizada.
-Não é replanejamento geral nem permissão para remover cobertura.
-O [contrato novo](docs/ADR-0006-SHARED-ACCEPTANCE.md) executa a mesma aceitação
-Python/Playwright em prévia e deploy. Revisão de teste Python já congelado ainda
-é impedimento técnico ao CTO, sem autorização implícita para editar a entrega.
-A exceção delimitada de [manutenção do observador](docs/OBSERVER-MAINTENANCE.md)
-reutiliza os gates existentes, com autorização explícita e novos recibos. A prova
-isolada passou; a entrega do reparo pelos agentes continua pendente.
-O [PR 59](https://github.com/codifydeep/descartavel2/pull/59) completou a primeira
-entrega técnica sem intervenção externa: nove testes, controles, revisão,
-PR/CI, deploy, rollback e QA. O ensaio reutilizou explicitamente um brief já
-aprovado; não comprova descoberta de requisitos novos. Veja o
-[escopo da qualificação S4](docs/HERMES-S4-QUALIFICATION.md). Continuidade entre
-versões, distribuição e canais de comunicação ainda exigem validação.
+Uma resposta do agente ou uma suíte verde não homologa uma release. Decisões
+tecnológicas ficam com Lead/CTO; decisões de negócio e mudanças de escopo ficam
+com o proprietário. Impedimentos não são concluídos artificialmente.
 
-A [auditoria](docs/EXECUTION-REVIEW-2026-10-25.md) encontrou um gate de mutações
-incompatível com um teste auxiliar congelado. O [contrato 2 aprovado](docs/ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
-corrige essa exigência e passou em prova física de navegador. Caminhos de
-recuperação, memória entre versões e portabilidade continuam incompletos.
+## Componentes
+
+```mermaid
+flowchart LR
+    TG[Telegram: comandos autorizados] --> K[Hermes Kanban]
+    DASH[Dashboard local] --> K
+    K --> C[Controlador: operações fixas e efeitos persistentes]
+    C --> A[Agentes via SDK Hermes]
+    A --> S[Sandbox por execução]
+    S --> R[Snapshots e recibos imutáveis]
+    R --> V[Validação Docker isolada]
+    V --> K
+    C --> G[GitHub: PR e CI local]
+    G --> D[Compose: homologação e QA]
+    C --> O[Outbox: notificações]
+    O --> TG
+```
+
+O Kanban controla o ciclo de vida. O controlador verifica identidades, artefatos,
+revisões e efeitos externos; não é um segundo gerenciador de tarefas. Agentes não
+recebem credenciais de infraestrutura nem o socket Docker.
 
 ## Qualidade e segurança
 
@@ -177,26 +82,7 @@ recuperação, memória entre versões e portabilidade continuam incompletos.
 - Recuperação técnica já foi demonstrada em cenários delimitados. Não há
   garantia de recuperação de todo impasse ou ausência universal de starvation.
 
-## Organização do código
-
-```text
-src/fabriquinha/       Caminho novo: runtime, Kanban, qualidade e entrega
-tests/                Testes offline do núcleo
-scripts/              Preparação parcial, qualificações e publicação segura
-docs/                 Status, plano vigente, arquitetura e provas delimitadas
-Dockerfile*           Receitas de imagem; veja limites de reprodução
-team-delivery-kit/    Legado preservado e utilitário de agrupamento Docker
-bootstrap/infra/      Histórico; não iniciar junto ao caminho novo
-```
-
-Os caminhos legados permanecem para recuperação e referências de builds.
-Não são o ponto de partida de uma instalação nova. Histórico detalhado e versões
-anteriores deste README continuam no Git; o README não é diário de operação.
-
-## Começar sem gastar tokens
-
-A suíte do núcleo foi verificada com Python 3.14, inclusive sem pacotes de
-`site-packages`. Ela não precisa do SDK Hermes, Docker ou chave de modelo:
+## Começar sem consumir modelo
 
 ```bash
 git clone https://github.com/codifydeep/fabriquinha.git
@@ -204,138 +90,35 @@ cd fabriquinha
 python3.14 -m venv .venv
 . .venv/bin/activate
 PYTHONPATH=src python -m unittest discover -s tests -q
+PYTHONPATH=team-delivery-kit python -m unittest discover -s team-delivery-kit/tests -q
+python scripts/check_publication.py --self-test
 python scripts/check_publication.py
 ```
 
-Isso testa o controlador, não inicia agentes e não instala a plataforma. As
-qualificações com Hermes/Docker têm dependências próprias e procedimentos em
-[SETUP](docs/SETUP.md). Não execute overrides de instalações históricas como
-se fossem um instalador. Imagens locais por digest ainda não asseguram
-reprodução a partir de um clone limpo. A [receita pública do navegador](docs/SETUP.md#imagens-públicas-da-stack-pythonhttp)
-já passou em probes TDD/QA sobre Linux ARM64; o instalador completo continua em S6.
+Esses comandos validam código; não instalam serviços nem iniciam agentes.
+Leia [SETUP](docs/SETUP.md) antes de provisionar o SDK, imagens, GitHub ou provedor.
 
-## Situação das validações
+## Organização
 
-Em 28/10/2026, a suíte passou em 490 testes. As provas operacionais do Hermes
-usam o SDK preparado em Python 3.14.10; as qualificações históricas mantêm seus
-ambientes e limites próprios. A [entrada operacional de S6](docs/S6-PORTABILITY-PLAN.md)
-passou em clone/board novos, sob pausa, com fonte verificada e lock exclusivo;
-isso ainda não é uma instalação completa ou nova entrega de produto.
-O preparo público também verificou nove perfis, recusa de configuração antiga
-e admissão independente. O contrato passou em oito atividades SDK com respostas
-locais, TDD e pausa/reinício, sem chamadas pagas. Modelo/orçamento ficam na política
-do controlador; os perfis gerenciados seguem essa rota.
-O reparo mínimo completou uma
-homologação assistida. As provas S1–S3 e extensões qualificam fronteiras
-específicas; decisões programadas não são julgamento de um agente real.
+| Caminho | Responsabilidade |
+|---|---|
+| `src/fabriquinha/` | Runtime, contratos, Kanban, ferramentas e entrega |
+| `tests/` | Regressões offline do núcleo atual |
+| `scripts/` | Preparação, operação e qualificações delimitadas |
+| `examples/python-http/` | Exemplo de configuração, sem credenciais |
+| `docs/` | Guias, contratos e histórico de qualificação identificado |
+| `team-delivery-kit/` | Utilitários de agrupamento/limpeza ainda usados e seus testes |
+| `Dockerfile*` | Receitas de validação e aplicação |
 
-O [ADR 0005](docs/ADR-0005-VALIDATION-AND-ACCOUNTING.md) fixa os validadores das
-instalações novas e contabiliza campos de custo/cache retornados pelo provedor,
-sem estimar gasto ausente. Foi qualificado em treze jobs Docker/Chromium e nove
-atividades SDK com respostas locais, sem chamadas pagas. O comando `runtime
-costs` consulta o relay local autenticado e não libera pausas nem faz inferência.
+O nome histórico de `team-delivery-kit` é mantido por compatibilidade de imports
+e exportações. Controladores e ensaios aposentados ficam no histórico Git,
+não no caminho de instalação. Veja [a política de manutenção](docs/REPOSITORY-MAINTENANCE.md).
 
-O [S4](docs/HERMES-S4-QUALIFICATION.md) foi concluído sem correção externa do
-controlador ou dos artefatos após o aceite do brief. Foram 31 chamadas e
-US$ 0,074938 reportados. Os PRs 57/58 permanecem assistidos. O [S5](docs/HERMES-S5-QUALIFICATION.md) entregou Reset/Undo com 29 testes,
-memória entre perfis e recuperação real, preservando sete intervenções externas.
-Ainda faltam ciclo limpo nessa fronteira, atribuição auxiliar completa e uma
-instalação reproduzível em outro repositório. O canal Telegram já recebeu objetivo e aceite; recuperação operacional completa continua pendente.
-Veja o [roadmap](docs/ROADMAP.md).
+## Contribuição
 
-## Retirada de recursos de teste
+Leia [CONTRIBUTING](CONTRIBUTING.md), [SECURITY](SECURITY.md) e [AGENTS](AGENTS.md).
+Não publique instalações, conversas, chaves, bancos, snapshots ou worktrees de
+produtos. Containers devem ser agrupados por Compose; limpeza exige propriedade
+comprovada, sem prune global nem exclusão de volumes.
 
-Todo container novo deve aparecer em um grupo Compose no Docker Desktop.
-Serviços, testes descartáveis e homologação têm grupos próprios por instância.
-
-Antes e depois de um ciclo, inventarie apenas recursos com propriedade comprovada.
-Confirme ausência de leases ativos, preserve logs e recuperação e remova por ID
-exato. O preview `team-delivery-kit/cleanup_port2_history.py --tests-only` vale
-somente para os helpers port2 qualificados, não para qualquer nome parecido.
-A limpeza de imagens usa `cleanup_obsolete_images.py` e o hash do plano revisado.
-
-Não usar prune global, force ou apagar volumes/snapshots como rotina. Preservar
-deploy atual, referências de build, rollback e projetos alheios, incluindo
-`toso-*` e `reforma`. Consulte [AGENTS.md](AGENTS.md).
-
-## Contribuição e licença
-
-Não publicar chaves, instalações privadas, bancos, conversas, snapshots ou
-worktrees de produtos. Rodar `python scripts/check_publication.py` sobre o
-conteúdo staged antes de publicar. Mudanças da automação e entregas de produtos
-têm contratos de revisão distintos; nunca transportar uma dispensa entre eles.
-
-Código próprio sob [MIT](LICENSE). Dependências mantêm suas licenças.
-
-### Recuperação de revisão
-
-```mermaid
-flowchart LR
-    B[Revisão bloqueada] --> D[Diagnóstico CTO em cópia descartável]
-    D --> A[Admissão determinística com evidências]
-    A --> R[Revisão independente da entrega original]
-    R -->|Mudanças| I[Autor corrige e submete nova entrega]
-    I --> R
-    R -->|Aprovação vinculada à entrega| G[Próximos gates obrigatórios]
-```
-
-A admissão permite revisar; não aprova testes, código ou release. A proposta
-intermediária de recuperação foi removida apenas desse caminho. A prova nativa
-isolada valida transferência e recuperação de crash com decisões programadas;
-a recuperação real com modelo e a homologação completa do S6 seguem pendentes.
-
-### Recuperação técnica de testes
-
-O contrato de reparo técnico preserva os testes anteriores e permite correções
-restritas a casos autorizados pelo CTO, com novo congelamento independente e
-controles negativos obrigatórios. A qualificação isolada inclui executor Docker
-e recuperação de cards no Kanban; ainda não comprova entrega autônoma.
-Veja [contrato e evidências](docs/TECHNICAL-TEST-REPAIR.md).
-
-```mermaid
-flowchart LR
-    B[Implementação bloqueada] --> C[CTO: experimento e escopo exato]
-    C --> A[Controlador: validar identidade e dependências]
-    A --> T[Autor: nova revisão dos testes]
-    T --> R[Revisor independente: novo congelamento]
-    R --> I[Implementação: Green e controles negativos]
-    I --> D[Revisão, PR, CI, deploy e QA]
-```
-
-A transição mantém o incidente e os snapshots antigos; um worker ativo ou um
-novo congelamento não equivale a homologação.
-
-Local board access and observation limits: [Local Hermes Kanban](docs/LOCAL-KANBAN.md).
-
-Python acceptance regressions accumulate independently of the current brief.
-See [cumulative capacity and rejected-submission recovery](docs/CUMULATIVE-ACCEPTANCE-RECOVERY.md)
-for the bounded inventory, preserved rejection evidence and explicitly assisted recovery.
-
-[Historical validator provenance](docs/HISTORICAL-VALIDATOR-RECOVERY.md) keeps accepted
-evidence readable across validator upgrades without qualifying it for new delivery.
-
-Current assessment and next milestones: [31 October review](docs/EXECUTION-REVIEW-2026-10-31.md).
-The earlier v0.3 autonomous observation remains valid; the latest delivery is assisted.
-
-Hermes upgrade compatibility and operational limits are recorded in
-[the v0.22.5 qualification](docs/HERMES-0225-UPGRADE.md). Existing installations
-require a drained maintenance window and verified backup; changing the source pin
-alone does not migrate an installation or authorize new delivery evidence.
-
-### Validation timeouts and partial authoring
-
-A fixed read-only diagnostic wrapper preserves per-case progress without changing
-pinned validators. Cumulative browser suites have a bounded recorded runtime
-budget. A timeout remains a failed job, never delivery evidence. An explicitly
-assisted, operator-scoped continuation can preserve unfrozen partial tests on the
-same native card; independent review and every delivery gate remain mandatory.
-See [partial authoring recovery](docs/PARTIAL-AUTHORING-RECOVERY.md).
-
-Mixed technical holds use a bounded native investigation/decision handoff,
-including a failed-investigator path to the CTO and one bounded executable ruling
-after a decision-stage hold. Partial correction preserves every delivery gate. Technical fixture succession
-is bounded by incident, freeze and authorized scope, not total release age.
-Escalated rejected reviews have an explicit CTO-authorized return to the original
-author, preserving independent review and behavioral verification. A bounded
-fixture-author syntax successor preserves the original scope and strict guard. See
-[evidence-directed holds](docs/EVIDENCE-DIRECTED-HOLDS.md).
+Código próprio sob [MIT](LICENSE); [dependências mantêm suas licenças](THIRD_PARTY_NOTICES.md).

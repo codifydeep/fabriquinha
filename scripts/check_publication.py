@@ -24,15 +24,17 @@ PRIVATE_COMPONENTS = {'node_modules', '__pycache__', '.venv', '.git',
 def findings(path, content, *, mode='100644'):
     p = PurePosixPath(path)
     errors = []
-    public_evidence = {
-        'team-delivery-kit/evaluation/sources.lock.json',
-        'team-delivery-kit/evaluation/SURGICAL-DRIVER-V3-QUALIFICATION-2026-10-04.json',
-        'team-delivery-kit/evaluation/TEMPLATE-LINES-V6-SOURCE-CANARY-2026-10-07.json',
-        'team-delivery-kit/evaluation/STARTUP-POLICY-OBSERVATIONS-2026-10-07.json',
+    retained_helpers = {
+        'team-delivery-kit/README.md',
+        'team-delivery-kit/docker_grouping.py',
+        'team-delivery-kit/cleanup_port2_history.py',
+        'team-delivery-kit/cleanup_obsolete_images.py',
+        'team-delivery-kit/tests/test_docker_grouping.py',
+        'team-delivery-kit/tests/test_cleanup_port2_history.py',
+        'team-delivery-kit/tests/test_cleanup_obsolete_images.py',
     }
-    if (path.startswith('team-delivery-kit/evaluation/') and p.suffix in {'.md', '.json'}
-            and path not in public_evidence):
-        errors.append('operational history is not part of the public source export')
+    if path.startswith('bootstrap/') or path.startswith('team-delivery-kit/') and path not in retained_helpers:
+        errors.append('retired implementation is not part of the public distribution')
     if mode not in {'100644', '100755'}:
         errors.append('symlink or nested repository is not a public source file')
     if (any(x.startswith('.local') or x in PRIVATE_COMPONENTS for x in p.parts)
@@ -71,9 +73,11 @@ class PublicationTests(unittest.TestCase):
         self.assertFalse(findings('config/.env.example', b'OPENROUTER_API_KEY=\n'))
         self.assertFalse(findings('README.md', b'Use ${GH_TOKEN}; no actual credential.'))
 
-    def test_explicit_zero_model_qualification_still_checks_credentials(self):
+    def test_retired_experiments_cannot_reenter_distribution(self):
         path='team-delivery-kit/evaluation/STARTUP-POLICY-OBSERVATIONS-2026-10-07.json'
-        self.assertFalse(findings(path,b'{"model_calls":0,"delivery_approval":false}'))
+        self.assertTrue(findings(path,b'{"model_calls":0,"delivery_approval":false}'))
+        self.assertTrue(findings('bootstrap/infra/old.py',b'pass'))
+        self.assertFalse(findings('team-delivery-kit/docker_grouping.py',b'pass'))
         self.assertTrue(findings(path,b'OPENROUTER_API_KEY=' + b'sk-or-v1-' + b'a'*64))
         self.assertTrue(findings('team-delivery-kit/evaluation/private-startup.json',b'{}'))
 

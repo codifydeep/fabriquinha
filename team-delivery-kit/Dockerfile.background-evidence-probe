@@ -1,3 +1,0 @@
-FROM delivery-kit-request-scope-probe:20261007.2
-LABEL delivery-kit.purpose="calibration-evidence-observation"
-COPY service_mode_background_qualification.py /service_mode_background_qualification.py

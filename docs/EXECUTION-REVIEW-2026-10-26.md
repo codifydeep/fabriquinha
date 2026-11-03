@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Revisão crítica da execução — 26 de outubro de 2026
 
 **Estado da auditoria: proposta apresentada durante a pausa.**

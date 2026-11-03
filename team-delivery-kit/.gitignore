@@ -1,7 +1,0 @@
-.local/
-.local-port2/
-__pycache__/
-*.pyc
-.env
-.env.*
-!.env.example

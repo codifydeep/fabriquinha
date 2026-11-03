@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Revisão antes do S6 — 27 de outubro de 2026
 
 Estado: **refinamentos e plano aprovados pelo proprietário em 27/10/2026**.

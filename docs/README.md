@@ -1,62 +1,77 @@
-# Documentação da Fabriquinha
+# Documentação
 
-Referência: **28 de outubro de 2026**. Trabalho pausado. Plataforma experimental; S4 técnico
-qualificado, autonomia geral e distribuição ainda não concluídas. Documentos públicos descrevem contratos,
-arquitetura, resultados agregados e limites. Instalações, transcrições, bancos,
-snapshots e recibos operacionais completos permanecem privados.
+## Entrada atual
 
-## Ordem de leitura
+1. [Estado e limites de qualificação](STATUS.md)
+2. [Preparação e operação](SETUP.md)
+3. [Arquitetura](ARCHITECTURE.md)
+4. [Próximos marcos](ROADMAP.md)
+5. [Manutenção do repositório](REPOSITORY-MAINTENANCE.md)
+6. [Acesso aos relatórios diagnósticos](DIAGNOSTIC-REPORT-ACCESS.md)
 
-1. [Status atual](STATUS.md): o que foi comprovado e o que falta.
-2. [Balanço de 30/10](EXECUTION-REVIEW-2026-10-30.md): v0.3, autonomia observada, custos e plano.
-   [Balanço histórico de 28/10](EXECUTION-REVIEW-2026-10-28.md): régua anterior e bloqueios daquela data.
-   [Revisão antes do S6, 27/10](EXECUTION-REVIEW-2026-10-27.md): capacidade de
-   aceitação entre sessões, autoridade técnica, operação, memória e custos;
-   refinamentos aprovados e em qualificação no [ADR 0006](ADR-0006-SHARED-ACCEPTANCE.md).
-   A [revisão de 26/10](EXECUTION-REVIEW-2026-10-26.md)
-   fundamentou os refinamentos já aceitos no [ADR 0004](ADR-0004-SCOPED-REPAIR.md).
-3. [Validação fixada e custos](ADR-0005-VALIDATION-AND-ACCOUNTING.md): bundle
-   imutável, atribuição por atividade e tratamento de custos desconhecidos.
-4. [Roadmap vigente](ROADMAP.md): próxima sequência e critérios de saída.
-5. [Plano aprovado de 24/10](SIMPLIFICATION-REVIEW-2026-10-24.md) e
-   [ADR 0001](ADR-0001-HERMES-FIRST.md): estratégia Hermes + Kanban.
-6. [Arquitetura](ARCHITECTURE.md) e [instalação/limites](SETUP.md):
-   distinguir caminho novo e referência histórica.
+## Contratos e mecanismos
 
-O [README principal](../README.md) apresenta os diagramas atuais. O aceite
-posterior do [ADR 0003](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md) autorizou o F1;
-as correções offline não autorizam consumo adicional nem homologam o S4.
+Os ADRs registram decisões e seu escopo; decisões posteriores podem refinar as
+anteriores. Não são instruções para executar um ensaio histórico.
 
-## Provas delimitadas do caminho Hermes
+- [ADR-0001-HERMES-FIRST](ADR-0001-HERMES-FIRST.md)
+- [ADR-0002-LOCAL-WEB-AND-QA-NETWORKS](ADR-0002-LOCAL-WEB-AND-QA-NETWORKS.md)
+- [ADR-0003-BEHAVIOR-CONTROL-TARGETS](ADR-0003-BEHAVIOR-CONTROL-TARGETS.md)
+- [ADR-0004-SCOPED-REPAIR](ADR-0004-SCOPED-REPAIR.md)
+- [ADR-0005-VALIDATION-AND-ACCOUNTING](ADR-0005-VALIDATION-AND-ACCOUNTING.md)
+- [ADR-0006-SHARED-ACCEPTANCE](ADR-0006-SHARED-ACCEPTANCE.md)
+- [ADR-0007-EVIDENCE-BASED-SUCCESSION](ADR-0007-EVIDENCE-BASED-SUCCESSION.md)
 
-| Documento | O que qualifica |
-|---|---|
-| [S1](HERMES-S1-QUALIFICATION.md) | Kanban/dispatcher nativos e fronteira Docker |
-| [S2](HERMES-S2-QUALIFICATION.md) | Mecanismos Red, freeze, Green e controles |
-| [S3](HERMES-S3-QUALIFICATION.md) | Cadeia determinística de integração, deploy e QA |
-| [S4](HERMES-S4-QUALIFICATION.md) | Primeira entrega técnica por agentes reais, sem intervenção externa, com limites explícitos |
-| [Contratos S5](S5-CONTRACT-QUALIFICATION.md) | Regressão existente com CI restrita e projeção histórica de decisões |
-| [Entrega S5](HERMES-S5-QUALIFICATION.md) | Segunda homologação com memória e recuperação reais; sete intervenções preservadas |
-| [S6](S6-PORTABILITY-PLAN.md) | Export e operação pausada em clone/board novos; instalação completa e entrega portátil pendentes |
-| [Agentes](HERMES-AGENT-QUALIFICATION.md) | SDK, ferramentas e sessões |
-| [Runtime](HERMES-RUNTIME-QUALIFICATION.md) | Serviço, reinício e worker órfão |
-| [Recuperação](HERMES-RECOVERY-QUALIFICATION.md) | Diagnóstico Lead/CTO em cenários delimitados |
-| [Notificações](HERMES-NOTIFICATIONS-QUALIFICATION.md) | Outbox, falha de conexão e ACK |
-| [Integração](HERMES-INTEGRATION-QUALIFICATION.md) | Esperas, publicação e implantação conectadas |
-| [Operações](HERMES-OPERATIONS-QUALIFICATION.md) | Admissão, pausa e retomada |
-| [Intake](HERMES-INTAKE-QUALIFICATION.md) | Brief, perguntas, aprovação e plano |
-| [Provedor](HERMES-PROVIDER-QUALIFICATION.md) | Relay e espera sem perder orçamento funcional |
-| [TDD de navegador](BROWSER-TDD-QUALIFICATION.md) | Chromium real em Red/Green e isolamento |
+## Referências de qualificação e histórico
 
-Resultados determinísticos não são julgamento autônomo de modelo. Um turno
-concluído não aprova sua entrega; uma entrega aprovada não homologa a release.
-Somente a cadeia completa com evidências permite `HOMOLOGADA`.
+Os relatórios abaixo descrevem a situação da data e do cenário em que foram
+produzidos. Não são instaladores, tarefas pendentes automáticas ou autorizações
+para alterar a instalação. Limites atuais estão em STATUS e ROADMAP.
 
-## Referências históricas
-
-[VALIDATION](VALIDATION.md), [QA-PROTOCOL-RECOVERY](QA-PROTOCOL-RECOVERY.md) e
-[PATCH-RECEIPTS](PATCH-RECEIPTS.md) preservam contratos e qualificações de outras
-etapas. Verificar a arquitetura e data de cada seção antes de usar procedimentos.
-
-As versões extensas anteriores de README, STATUS e ROADMAP permanecem no Git.
-Não são próximas tarefas do caminho Hermes nem instruções para reativar o legado.
+- [BROWSER-TDD-QUALIFICATION](BROWSER-TDD-QUALIFICATION.md)
+- [CHANNEL-AND-OPERATIONS-P5](CHANNEL-AND-OPERATIONS-P5.md)
+- [CTO-REPAIR-CONTRACT](CTO-REPAIR-CONTRACT.md)
+- [CUMULATIVE-ACCEPTANCE-RECOVERY](CUMULATIVE-ACCEPTANCE-RECOVERY.md)
+- [EMPTY-AUTHORING-RECOVERY](EMPTY-AUTHORING-RECOVERY.md)
+- [EVIDENCE-DIRECTED-HOLDS](EVIDENCE-DIRECTED-HOLDS.md)
+- [EXECUTION-REVIEW-2026-10-25](EXECUTION-REVIEW-2026-10-25.md)
+- [EXECUTION-REVIEW-2026-10-26](EXECUTION-REVIEW-2026-10-26.md)
+- [EXECUTION-REVIEW-2026-10-27](EXECUTION-REVIEW-2026-10-27.md)
+- [EXECUTION-REVIEW-2026-10-28](EXECUTION-REVIEW-2026-10-28.md)
+- [EXECUTION-REVIEW-2026-10-30](EXECUTION-REVIEW-2026-10-30.md)
+- [EXECUTION-REVIEW-2026-10-31](EXECUTION-REVIEW-2026-10-31.md)
+- [HERMES-0225-UPGRADE](HERMES-0225-UPGRADE.md)
+- [HERMES-AGENT-QUALIFICATION](HERMES-AGENT-QUALIFICATION.md)
+- [HERMES-INTAKE-QUALIFICATION](HERMES-INTAKE-QUALIFICATION.md)
+- [HERMES-INTEGRATION-QUALIFICATION](HERMES-INTEGRATION-QUALIFICATION.md)
+- [HERMES-NOTIFICATIONS-QUALIFICATION](HERMES-NOTIFICATIONS-QUALIFICATION.md)
+- [HERMES-OPERATIONS-QUALIFICATION](HERMES-OPERATIONS-QUALIFICATION.md)
+- [HERMES-PROVIDER-QUALIFICATION](HERMES-PROVIDER-QUALIFICATION.md)
+- [HERMES-RECOVERY-QUALIFICATION](HERMES-RECOVERY-QUALIFICATION.md)
+- [HERMES-RUNTIME-QUALIFICATION](HERMES-RUNTIME-QUALIFICATION.md)
+- [HERMES-S1-QUALIFICATION](HERMES-S1-QUALIFICATION.md)
+- [HERMES-S2-QUALIFICATION](HERMES-S2-QUALIFICATION.md)
+- [HERMES-S3-QUALIFICATION](HERMES-S3-QUALIFICATION.md)
+- [HERMES-S4-QUALIFICATION](HERMES-S4-QUALIFICATION.md)
+- [HERMES-S5-QUALIFICATION](HERMES-S5-QUALIFICATION.md)
+- [HISTORICAL-VALIDATOR-RECOVERY](HISTORICAL-VALIDATOR-RECOVERY.md)
+- [INSTRUMENTED-JOIN-EXPERIMENT](INSTRUMENTED-JOIN-EXPERIMENT.md)
+- [LOCAL-KANBAN](LOCAL-KANBAN.md)
+- [OBSERVER-MAINTENANCE](OBSERVER-MAINTENANCE.md)
+- [P1-SIMPLIFICATION-IMPLEMENTATION](P1-SIMPLIFICATION-IMPLEMENTATION.md)
+- [PARTIAL-AUTHORING-RECOVERY](PARTIAL-AUTHORING-RECOVERY.md)
+- [PATCH-RECEIPTS](PATCH-RECEIPTS.md)
+- [PLAN-CHECKPOINT-2026-10-31](PLAN-CHECKPOINT-2026-10-31.md)
+- [POST-QA-REWORK-2026-10-26](POST-QA-REWORK-2026-10-26.md)
+- [QA-PROTOCOL-RECOVERY](QA-PROTOCOL-RECOVERY.md)
+- [REVIEW-RECOVERY-SIMPLIFICATION-2026-10-28](REVIEW-RECOVERY-SIMPLIFICATION-2026-10-28.md)
+- [S5-CONTINUITY-PLAN](S5-CONTINUITY-PLAN.md)
+- [S5-CONTRACT-QUALIFICATION](S5-CONTRACT-QUALIFICATION.md)
+- [S5-DEPLOYMENT-CONTINUITY](S5-DEPLOYMENT-CONTINUITY.md)
+- [S5-REVIEW-IMPASSE](S5-REVIEW-IMPASSE.md)
+- [S6-CONTROL-SUBMISSION-RECOVERY](S6-CONTROL-SUBMISSION-RECOVERY.md)
+- [S6-HTTP-CLIENT-DIAGNOSIS](S6-HTTP-CLIENT-DIAGNOSIS.md)
+- [S6-PORTABILITY-PLAN](S6-PORTABILITY-PLAN.md)
+- [SIMPLIFICATION-REVIEW-2026-10-24](SIMPLIFICATION-REVIEW-2026-10-24.md)
+- [TECHNICAL-TEST-REPAIR](TECHNICAL-TEST-REPAIR.md)
+- [VALIDATION](VALIDATION.md)

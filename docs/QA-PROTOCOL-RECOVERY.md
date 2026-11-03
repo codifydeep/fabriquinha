@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Evidence-bound QA protocol recovery
 
 Provider transport failures and product failures are different incidents. A

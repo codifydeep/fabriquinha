@@ -1,3 +1,5 @@
+> Historical reference. Describes its original scope and date; not current installation instructions. See [current status](STATUS.md) and [setup](SETUP.md).
+
 # Estado de validação — 2026-10-24
 
 ## Caminho novo Hermes
@@ -67,7 +69,7 @@ com modelo continuam pendentes. Zero chamadas ao modelo e nenhuma migração.
 ## Referência atual
 
 O resumo vigente está em [STATUS.md](STATUS.md). O contrato atual é
-[qualidade v2](../team-delivery-kit/contracts/quality-lifecycle-v2.md): Red real
+[qualidade v2](https://github.com/codifydeep/fabriquinha/blob/bd9ad85e23624c0b9aa49507e3658049cce61557/team-delivery-kit/contracts/quality-lifecycle-v2.md): Red real
 → revisão independente e congelamento dos testes → implementação/Green →
 controles negativos obrigatórios → revisão da entrega e gates de publicação.
 
