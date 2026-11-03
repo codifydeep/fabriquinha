@@ -8,6 +8,7 @@
 4. [Próximos marcos](ROADMAP.md)
 5. [Manutenção do repositório](REPOSITORY-MAINTENANCE.md)
 6. [Acesso aos relatórios diagnósticos](DIAGNOSTIC-REPORT-ACCESS.md)
+7. [Balanço e estratégia para retomar progresso](DELIVERY-RECOVERY-STRATEGY.md)
 
 ## Contratos e mecanismos
 

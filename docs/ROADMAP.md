@@ -1,5 +1,9 @@
 # Próximos marcos
 
+A sequência detalhada proposta, os critérios de saída e o balanço crítico estão
+em [Estratégia de recuperação](DELIVERY-RECOVERY-STRATEGY.md). O plano distingue
+correção offline, entrega assistida e comprovação posterior de autonomia.
+
 1. **Concluir a recuperação atual pelo fluxo nativo.** Diagnóstico com relatório
    acessível, decisão válida, retorno ao autor e revisão independente. Preservar
    resultados assistidos; não reinterpretar experiências offline como aprovações.
