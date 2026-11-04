@@ -782,7 +782,8 @@ class Recovery:
         incident=self.store.receipt(data['incident'],kind='incident');facts=incident['payload'];source=kb.get_task(conn,facts['source'])
         run=kb.latest_run(conn,source.id) if source else None
         experiment=self.store.receipt(data['experiment'],kind='diagnostic_experiment')
-        if (data['incident']!=body['inputs']['incident'] or not source or source.status!='blocked'
+        settled_states=('blocked','triage') if review_followup else ('blocked',)
+        if (data['incident']!=body['inputs']['incident'] or not source or source.status not in settled_states
                 or not run or not run.ended_at or run.id!=facts['source_run']
                 or digest(json.loads(source.body))!=incident['binding']['contract']
                 or self.store.capture(source.workspace_path)!=facts['snapshot']

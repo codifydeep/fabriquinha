@@ -1083,6 +1083,10 @@ class Repairs:
                         dr=kb.latest_run(conn,diagnostic.id);key=(dr.metadata or {}).get('diagnosis') if dr else None
                         if not key:continue
                         decision=self.store.receipt(key,kind='diagnostic_decision')
+                        incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                        # Review holds belong to Recovery's CTO decision lane. They
+                        # are not failed author submissions or syntax-repair authority.
+                        if incident['binding'].get('reviewing') is True:continue
                         if decision['payload']['action']=='repair_tests':
                             from .technical_repair import validate_scope, STRENGTHEN, scope_input
                             scope=decision['payload']['test_repair']

@@ -116,3 +116,16 @@ follow `next_offset` for subsequent pages. Do not combine this with `experiment`
 The controller resolves the snapshot from the validated repair authority, checks
 the immutable file hash and limits each page. The caller cannot choose a snapshot
 or host path. Reading code never selects a fresh experiment or authorizes delivery.
+
+## Review holds and author failures
+
+A settled review escalation may be in native `blocked` or `triage`. The CTO
+follow-up requires the exact latest ended run, contract, unchanged snapshot,
+current experiment and settled controller effects. Its existing idempotency key
+prevents duplicate follow-ups after restart. This does not approve tests or
+reopen implementation automatically.
+
+Review incidents do not enter the test-author syntax-repair lane. A coverage gap
+outside a maintenance authorization remains an independent review finding; the
+CTO must supply an executable, scoped technical decision. Existing assertions,
+case inventory and release quality gates remain protected.
