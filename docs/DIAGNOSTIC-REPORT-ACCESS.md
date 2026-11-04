@@ -105,3 +105,14 @@ Offline qualification is available through `qualify_test_strengthening.py`
 `qualify_strengthening_native.py` (native Kanban successor/restart with programmed
 suite reports). Neither script establishes autonomous model reasoning or product
 homologation.
+
+## Preserved implementation during test repair
+
+A test-author workspace is the Red baseline and may intentionally lack the
+implementation being repaired. When the current repair authority retains an
+implementation snapshot, diagnostic context lists its bounded root Python files.
+Use `diagnostic_report` with `implementation_path` and `offset: 0` to read it;
+follow `next_offset` for subsequent pages. Do not combine this with `experiment`.
+The controller resolves the snapshot from the validated repair authority, checks
+the immutable file hash and limits each page. The caller cannot choose a snapshot
+or host path. Reading code never selects a fresh experiment or authorizes delivery.

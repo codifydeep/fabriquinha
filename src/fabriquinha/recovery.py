@@ -321,6 +321,12 @@ class Diagnostic:
         if self.qa_correction():
             from .repairs import context_view
             result['repair_authority']={**self.repair,'context':context_view(self.store,self.repair['context'])}
+            preserved=self.repair['context'].get('implementation_snapshot')
+            if preserved:
+                result['preserved_implementation']=dict(snapshot=preserved,
+                    files={p:meta for p,meta in self.store.manifest(preserved).items() if '/' not in p and p.endswith('.py') and meta['bytes']<=131072},
+                    instruction='Use diagnostic_report with implementation_path and offset=0 to inspect this immutable product source. Follow next_offset. The current /workspace is the Red baseline and may intentionally lack these functions. Reading retained code never grants approval or replaces a current experiment.')
+
             reviewed=self.store.receipt(self.repair['review'])
             if reviewed['kind'] in ('test_repair_admission','fixture_author_admission'):
                 kb,api,_=native()
@@ -495,8 +501,24 @@ class Diagnostic:
 
     def report_page(self,args):
         self.board.ensure(self.run)
-        if (not isinstance(args,dict) or not {'offset'}<=set(args) or set(args)-{'offset','experiment'} or type(args['offset']) is not int or args['offset']<0):
+        if (not isinstance(args,dict) or not {'offset'}<=set(args) or set(args)-{'offset','experiment','implementation_path'} or type(args['offset']) is not int or args['offset']<0):
             raise ValueError('nonnegative integer offset required')
+        if 'implementation_path' in args:
+            if 'experiment' in args:raise ValueError('choose a report or preserved implementation, not both')
+            context=(self.repair or {}).get('context',{})
+            snapshot=context.get('implementation_snapshot')
+            if not snapshot:raise ValueError('no authorized preserved implementation for this incident')
+            manifest=self.store.manifest(snapshot);path=args['implementation_path']
+            if (not isinstance(path,str) or path not in manifest or '/' in path or not path.endswith('.py')
+                    or manifest[path]['bytes']>131072):
+                raise ValueError('bounded existing root Python product file required')
+            text=(self.store.tree(snapshot)/path).read_text();offset=args['offset']
+            if offset>len(text):raise ValueError('offset beyond preserved implementation')
+            end=min(offset+1800,len(text))
+            return dict(snapshot=snapshot,path=path,sha256=manifest[path]['sha256'],offset=offset,
+                line_start=text[:offset].count('\n')+1,total=len(text),text=text[offset:end],
+                next_offset=end if end<len(text) else None,delivery_approval=False,
+                semantics='Preserved implementation evidence only; not the test-author baseline, current experiment or approval.')
         key=args.get('experiment',self.experiment)
         if not key:raise ValueError('provide a retained experiment receipt or run diagnostic_validate')
         receipt=self.citable_experiment(key)
@@ -1147,7 +1169,7 @@ def register_diagnostic(sandbox,quality,on_terminal):
     if operations.incident.get('document_kind'):
         properties=schemas['diagnostic_validate']['properties'];properties.pop('replacements')
         properties['document']=dict(type='object',description='Optional proposed brief/plan for the fixed validator. Never writes the source. Omit to validate document.json from the incident.')
-    schemas['diagnostic_report']=dict(type='object',additionalProperties=False,required=['offset'],properties=dict(offset=dict(type='integer',minimum=0),experiment=dict(type='string',pattern='^[a-f0-9]{64}$',description='Optional retained diagnostic experiment from the same incident; read-only, never approval.')))
+    schemas['diagnostic_report']=dict(type='object',additionalProperties=False,required=['offset'],properties=dict(offset=dict(type='integer',minimum=0),experiment=dict(type='string',pattern='^[a-f0-9]{64}$',description='Optional retained diagnostic experiment from the same incident; read-only, never approval.'),implementation_path=dict(type='string',description='Read an authorized preserved root Python product file instead of an experiment report. Offset is a character offset; not a workspace path or caller-selected snapshot.')))
     failures={}
     def handler(method,terminal):
         def invoke(args,**kwargs):

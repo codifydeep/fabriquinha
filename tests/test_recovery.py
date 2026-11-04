@@ -20,6 +20,22 @@ from test_delivery_core import configuration
 
 
 class TechnicalRecovery(unittest.TestCase):
+    def test_preserved_implementation_reader_is_bound_readonly_and_not_validation(self):
+        d=Diagnostic(self.sandbox,self.quality)
+        d.repair={'context':{'implementation_snapshot':self.snapshot}}
+        page=d.report_page({'implementation_path':'app.py','offset':0})
+        self.assertEqual(page['text'],'VALUE = 1\n')
+        self.assertEqual(page['snapshot'],self.snapshot)
+        self.assertEqual(page['sha256'],self.store.manifest(self.snapshot)['app.py']['sha256'])
+        self.assertFalse(page['delivery_approval']);self.assertIsNone(d.experiment)
+        for args in ({'implementation_path':'../app.py','offset':0},
+                     {'implementation_path':'tests/test_existing.py','offset':0},
+                     {'implementation_path':'app.py','offset':0,'experiment':'a'*64},
+                     {'implementation_path':'app.py','offset':999999}):
+            with self.subTest(args=args),self.assertRaises(ValueError):d.report_page(args)
+        d.repair=None
+        with self.assertRaises(ValueError):d.report_page({'implementation_path':'app.py','offset':0})
+
     def test_hold_without_new_experiment_can_resume_diagnosis_not_delivery(self):
         d=Diagnostic(self.sandbox,self.quality)
         previous=self.store.record('diagnostic_decision',d.run.binding(),dict(
