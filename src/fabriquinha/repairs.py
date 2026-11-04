@@ -433,6 +433,11 @@ def context_view(store,value):
         if value.get('protocol')=='technical-test-strengthening-1':
             result['cases']=value['cases']
             result['product_imports']=value['product_imports']
+            if value.get('preserve_snapshot'):
+                current=store.manifest(value['preserve_snapshot'])
+                if sum(current[p]['bytes'] for p in paths)>131072:raise ValueError('bounded cumulative fixture sources required')
+                result['preserved_candidate']=value['preserve_snapshot']
+                result['fixture_sources']={p:dict(sha256=current[p]['sha256'],text=(store.tree(value['preserve_snapshot'])/p).read_text()) for p in paths}
             result['fixture_syntax']='Explicit scoped strengthening: preserve every old statement in order, unchanged. Append only local import of an authorized root product module (use a fresh alias), fresh local literal/product-call assignments and direct self.assertEqual/assertNotEqual/assertTrue/assertFalse/assertIs/assertIsNot/assertIn/assertNotIn calls. No subTest/with/loops, new helpers, top-level imports, rebinding, early exits or changes to existing assertions. Keep the complete case inventory. Independent review, new freeze and negative controls remain mandatory.'
     if value.get('repair_kind')=='review':
         decision=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')
@@ -925,6 +930,9 @@ class Repairs:
                     if n==index and ((phase=='implementation' and not fixture and not reassessment) or (reassessment and phase==source_phase)):
                         if not any(workspace.iterdir()):self.store.checkout(data['snapshot'],workspace)
                         elif self.store.capture(workspace)!=data['snapshot']:raise ValueError('unfinished replacement workspace changed')
+                    if fixture and n==index and phase=='tests' and data.get('preserve_snapshot'):
+                        if not any(workspace.iterdir()):self.store.checkout(data['preserve_snapshot'],workspace)
+                        elif self.store.capture(workspace)!=data['preserve_snapshot']:raise ValueError('coverage successor workspace changed')
                     ident=kb.create_task(conn,title=phase.upper()+' '+item['package']['title'],body=json.dumps(body),
                         assignee=old['owner'],parents=parents,workspace_kind='dir',workspace_path=str(workspace),
                         completion_contract=old['completion_contract'],initial_status='blocked',max_retries=2,max_runtime_seconds=600,
@@ -1088,7 +1096,7 @@ class Repairs:
                         incident=self.store.receipt(decision['payload']['incident'],kind='incident')
                         # Review holds belong to Recovery's CTO decision lane. They
                         # are not failed author submissions or syntax-repair authority.
-                        if incident['binding'].get('reviewing') is True:continue
+                        if incident['binding'].get('reviewing') is True and decision['payload']['action']!='repair_tests':continue
                         if decision['payload']['action']=='repair_tests':
                             from .technical_repair import validate_scope, STRENGTHEN, scope_input
                             scope=decision['payload']['test_repair']

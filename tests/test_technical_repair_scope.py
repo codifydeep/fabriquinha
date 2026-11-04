@@ -81,3 +81,18 @@ class ScopeTests(unittest.TestCase):
             self.assertEqual(self.validate()['parent_repair'],'parent')
             authority['context']['protocol']='technical-test-strengthening-1'
             with self.assertRaises(ValueError):self.validate()
+
+    def test_review_coverage_keeps_current_candidate_and_parent_scope(self):
+        self.records['incident']['binding'].update(kind='tests',reviewing=True)
+        self.records['incident']['payload'].update(source_state='triage',review_escalation='escalation')
+        self.scope.update(mode='strengthen',product_imports=['app'],parent_repair='parent')
+        self.records['parent']=dict(binding={'release':'v2'})
+        self.records['escalation']=dict(binding=self.records['incident']['binding'].copy(),payload={'snapshot':'implementation'})
+        self.store.manifest.return_value={'app.py':{}}
+        authority=dict(review='parent',context=dict(protocol='technical-test-strengthening-1',tests='freeze',implementation_snapshot='preserved-product',cases=self.scope['cases'],test_paths=self.scope['test_paths'],product_imports=['app']),proposal=dict(classification='test_contract'))
+        with patch('fabriquinha.repairs.reviewed',return_value=authority),patch('fabriquinha.test_revision.revision_context') as check:
+            result=self.validate()
+            self.assertEqual(result['preserve_snapshot'],'implementation')
+            self.assertEqual(result['implementation_snapshot'],'preserved-product')
+            check.assert_called_once()
+            self.quality.protect.assert_not_called()

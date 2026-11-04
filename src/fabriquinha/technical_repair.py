@@ -18,10 +18,11 @@ def validate_scope(project, store, incident, binding, experiment, scope):
         raise ValueError('exact CTO technical repair scope required')
     source = store.receipt(incident, kind='incident')
     data = source['payload']
+    coverage=extended and source['binding'].get('kind')=='tests' and source['binding'].get('reviewing') is True
     if (data.get('project') != project.fingerprint()
             or source['binding'].get('release') != binding.get('release')
             or source['binding'].get('kind') not in (('implementation','tests') if extended else ('implementation',))
-            or source['binding'].get('reviewing') is not False
+            or not (source['binding'].get('reviewing') is False or coverage)
             or data.get('source_state') not in ('blocked', 'triage')
             or data.get('controller_effects') != []
             or data.get('source') != source['binding'].get('task')
@@ -32,7 +33,7 @@ def validate_scope(project, store, incident, binding, experiment, scope):
         from .repairs import reviewed
         parent=reviewed(project,store,scope.get('parent_repair'))
         old=parent['context']
-        if (old.get('protocol')!=PROTOCOL or old.get('tests')!=scope['tests']
+        if (old.get('protocol')!=(STRENGTHEN if coverage else PROTOCOL) or old.get('tests')!=scope['tests']
                 or parent['proposal'].get('classification')!='test_contract'
                 or store.receipt(scope['parent_repair'])['binding']['release']!=binding['release']):
             raise ValueError('exact prior strict repair authority required for strengthening successor')
@@ -49,7 +50,13 @@ def validate_scope(project, store, incident, binding, experiment, scope):
     frozen = quality.frozen_plan(freeze)
     if freeze['binding'].get('release') != binding['release']:
         raise ValueError('foreign test freeze')
-    quality.protect(frozen['snapshot'], data['snapshot'], exact_tests=True)
+    if coverage:
+        escalation=store.receipt(data.get('review_escalation'),kind='review_escalation')
+        if escalation['binding']!=source['binding'] or escalation['payload'].get('snapshot')!=data['snapshot']:
+            raise ValueError('exact immutable rejected test review required')
+        from .test_revision import revision_context
+        revision_context(project,store,quality,parent,data['snapshot'],contract=3)
+    else:quality.protect(frozen['snapshot'], data['snapshot'], exact_tests=True)
     paths, cases = scope['test_paths'], scope['cases']
     for values in (paths, cases):
         if (not isinstance(values, list) or not 1 <= len(values) <= 20
@@ -75,6 +82,13 @@ def validate_scope(project, store, incident, binding, experiment, scope):
         extra=dict(mode='strengthen',product_imports=sorted(imports))
         if parent:
             extra.update(parent_repair=scope['parent_repair'],author_snapshot=data['snapshot'])
+        if coverage:
+            paths=sorted(set(paths)|set(old['test_paths']))
+            cases=sorted(set(cases)|set(old['cases']))
+            extra['product_imports']=sorted(set(imports)|set(old['product_imports']))
+            extra['preserve_snapshot']=data['snapshot']
+            if len(paths)>20 or len(cases)>20 or len(extra['product_imports'])>4:
+                raise ValueError('cumulative coverage scope exceeds bounded authority')
     return dict(protocol=STRENGTHEN if extended else PROTOCOL,**extra, tests=scope['tests'], test_paths=sorted(paths),
                 cases=sorted(cases), snapshot=frozen['snapshot'],
                 implementation_snapshot=parent['context']['implementation_snapshot'] if parent else data['snapshot'], red_baseline=frozen['baseline'],

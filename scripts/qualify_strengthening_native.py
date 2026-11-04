@@ -141,9 +141,43 @@ def qualify(root,upstream):
         assert store.capture(work)==implementation_snapshot
         assert strengthened['items'][0]['cards']['tests']['id']!=failed.task
         assert kb.get_task(conn,strengthened['items'][0]['cards']['implementation']['id']).status=='todo'
+    # A real native independent review rejects coverage; CTO widens only additive scope.
+    current=strengthened['items'][0]['cards']['tests'];current_work=Path(current['workspace'])
+    store.checkout(frozen_snapshot,current_work)
+    original=(current_work/path).read_text()
+    (current_work/path).write_text(original+"  import app as first_rules\n  self.assertEqual(first_rules.value(1), 1)\n")
+    preserved=store.capture(current_work);test_author=claim(current['id'])
+    red=q.red(test_author,frozen_snapshot,preserved)
+    q.handoff(test_author,'Programmed strengthened candidate',{'red':red})
+    rejected=claim(current['id'],True)
+    with api.connect_closing() as conn:
+        assert kb.block_task(conn,rejected.task,reason='Programmed coverage gap',expected_run_id=rejected.number)
+        conn.execute("UPDATE tasks SET status='triage' WHERE id=?",(rejected.task,))
+    escalation=store.record('review_escalation',rejected.binding(),dict(snapshot=preserved))
+    ri=store.record('incident',rejected.binding(),dict(project=project.fingerprint(),source=rejected.task,source_run=rejected.number,
+        source_state='triage',snapshot=preserved,controller_effects=[],resume_allowed=False,review_escalation=escalation))
+    coverage_id,_=create('diagnostic','cto',{'incident':ri},extra=dict(stage='cto',source=rejected.task,source_run=rejected.number))
+    coverage_cto=claim(coverage_id);job,report=q.observe(coverage_cto,preserved,'diagnostic')
+    experiment=q.record(coverage_cto,'diagnostic_experiment',dict(incident=ri,snapshot=preserved,job=job,report=report))
+    scope=validate_scope(project,store,ri,coverage_cto.binding(),experiment,dict(tests=freeze,test_paths=[path],cases=[case],
+        mode='strengthen',product_imports=['app'],parent_repair=current['body']['inputs']['repair_review']))
+    assert scope['preserve_snapshot']==preserved
+    choice=q.record(coverage_cto,'diagnostic_decision',dict(incident=ri,action='repair_tests',experiment=experiment,test_repair=scope,delivery_approval=False))
+    with api.connect_closing() as conn:
+        assert kb.complete_task(conn,coverage_id,summary='Programmed coverage authorization',metadata={'diagnosis':choice},expected_run_id=coverage_cto.number)
+        expanded=operation.continue_submission(conn,anchor,spec,strengthened)
+        assert operation.continue_submission(conn,anchor,spec,strengthened)==expanded
+    successor=expanded['items'][0]['cards']['tests'];successor_work=Path(successor['workspace'])
+    assert store.capture(successor_work)==preserved
+    (successor_work/path).write_text((successor_work/path).read_text()+"  import app as second_rules\n  self.assertEqual(second_rules.value(2), 2)\n")
+    next_author=claim(successor['id']);next_red=q.red(next_author,frozen_snapshot,store.capture(successor_work))
+    q.handoff(next_author,'Programmed cumulative coverage',{'red':next_red})
+    independent=claim(successor['id'],True)
+    new_freeze=q.tests_review(independent,next_red,dict(decision='approve',reason='Programmed preserved assertions and added coverage',findings=[]))
+    board.finish_review(independent,'Programmed independent cumulative freeze',{'tests':new_freeze})
     result=dict(passed=True,model_calls=0,native_kanban=True,roles_programmed=True,suite_reports_programmed=True,
                 independent_original_review=True,restart_idempotent=True,original_block_preserved=True,
-                dependent_waits_for_new_freeze=True,strengthening_successor=True,prior_implementation_preserved=True,delivery_approval=False)
+                dependent_waits_for_new_freeze=True,strengthening_successor=True,coverage_successor=True,cumulative_independent_freeze=True,prior_implementation_preserved=True,delivery_approval=False)
     write_json(root/'result.json',result);return result
 
 if __name__=='__main__':

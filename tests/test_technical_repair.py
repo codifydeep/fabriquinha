@@ -74,3 +74,13 @@ class StrengtheningTests(unittest.TestCase):
                       BEFORE+suffix+'        self.assertEqual = rules.compare_cards\n',
                       BEFORE+suffix.replace('rules.compare_cards','rules.__dict__.clear')):
             with self.subTest(after=after),self.assertRaises(ValueError):self.check(after)
+
+class CumulativeStrengtheningTests(unittest.TestCase):
+    def test_prior_added_assertions_are_protected_when_scope_grows(self):
+        from fabriquinha.test_revision import cumulative_strengthening_diff
+        first=BEFORE+"        import app as cards\n        self.assertEqual(cards.compare_cards(('5','Hearts'),('5','Spades'),'5'), 'A')\n"
+        second=first+"        import app as outcome\n        self.assertEqual(outcome.hand_outcome(['T','A','B']), 'draw')\n"
+        args=dict(cases=['Cancellation.test_full_room'],product_imports=['app'])
+        cumulative_strengthening_diff(BEFORE,first,second,**args)
+        with self.assertRaises(ValueError):
+            cumulative_strengthening_diff(BEFORE,first,second.replace("        self.assertEqual(cards.compare_cards(('5','Hearts'),('5','Spades'),'5'), 'A')\n",''),**args)

@@ -73,3 +73,12 @@ class ReviewHoldRouting(TestCase):
         with patch('fabriquinha.repairs.native',return_value=(self.kb,None,None)),patch.object(Recovery,'cards',return_value=[self.task]),patch('fabriquinha.repairs.fixture_author_context',side_effect=AssertionError('review sent to author syntax path')):
             result=Repairs(releases).continue_submission(self.conn,NS(id='anchor'),{},graph)
         self.assertEqual(result,graph)
+
+class CoverageActions(TestCase):
+    def test_only_cto_rejected_strengthening_review_can_request_coverage(self):
+        from fabriquinha.recovery import Diagnostic
+        d=object.__new__(Diagnostic);d.level='cto';d.original={'kind':'tests','reviewing':True}
+        d.incident={'source_state':'triage','controller_effects':[],'review_escalation':'review','resume_allowed':False}
+        d.repair={'proposal':{'classification':'test_contract'},'context':{'repair_kind':'fixture','protocol':'technical-test-strengthening-1'}}
+        self.assertIn('repair_tests',d.actions())
+        d.level='lead';self.assertNotIn('repair_tests',d.actions())

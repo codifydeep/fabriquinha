@@ -167,6 +167,12 @@ def strengthening_diff(before,after,*,cases,product_imports):
     return findings
 
 
+def cumulative_strengthening_diff(original, preserved, candidate, *, cases, product_imports):
+    """New scope cannot discard checks added after the original freeze."""
+    strengthening_diff(original,candidate,cases=cases,product_imports=product_imports)
+    return strengthening_diff(preserved,candidate,cases=cases,product_imports=product_imports)
+
+
 def technical_repair_diff(before, after, *, cases=None):
     """Evidence for the stricter technical-repair contract, never authority.
 
@@ -299,6 +305,8 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
     This does not approve the candidate or the delivery.
     """
     context=authority['context']
+    if context.get('preserve_snapshot')==candidate:
+        raise ValueError('coverage candidate is unchanged; append the authorized behavioral checks')
     if context.get('repair_kind')!='fixture' or authority['proposal']['classification']!='test_contract':
         raise ValueError('independently reviewed fixture proposal required')
     freeze=store.receipt(context['tests'],kind='tests_frozen')
@@ -322,7 +330,12 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
                 prefix=PurePosixPath(path).stem+'.'
                 scoped=[c[len(prefix):] for c in context['cases'] if c.startswith(prefix)]
                 if context.get('protocol')=='technical-test-strengthening-1':
-                    strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'])
+                    if context.get('preserve_snapshot'):
+                        preserved=(store.tree(context['preserve_snapshot'])/path).read_text()
+                        if preserved!=after:
+                            cumulative_strengthening_diff(before,preserved,after,cases=scoped,product_imports=context['product_imports'])
+                        else:strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'])
+                    else:strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'])
                 else:technical_repair_diff(before,after,cases=scoped)
     if contract==3:
         protect_repaired_baseline(project,store,previous['baseline'],candidate,authority['proposal']['test_paths'])

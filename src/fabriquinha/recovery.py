@@ -140,6 +140,10 @@ class Diagnostic:
 
     def actions(self):
         if getattr(self,'resolution',{}).get('role')=='investigate':return ['hold']
+        if (self.level=='cto' and self.coverage_correction()
+                and self.incident.get('source_state') in ('blocked','triage')
+                and self.incident.get('controller_effects')==[]):
+            return ['repair_tests','hold']
         if (self.level=='cto' and self.original.get('reviewing') is True
                 and self.incident.get('review_escalation') and self.incident.get('resume_allowed') is True):
             return ['return_author','hold']
@@ -162,8 +166,16 @@ class Diagnostic:
         record=self.store.receipt(key,kind='tests_frozen')
         if record['binding']['release']!=self.run.release:raise ValueError('foreign source test freeze')
         frozen=self.q.frozen_plan(record)
-        self.q.protect(frozen['snapshot'],self.incident['snapshot'],exact_tests=True)
+        if self.coverage_correction():
+            from .test_revision import revision_context
+            revision_context(self.q.project,self.store,self.q,self.repair,self.incident['snapshot'],contract=3)
+        else:self.q.protect(frozen['snapshot'],self.incident['snapshot'],exact_tests=True)
         return key,frozen
+
+    def coverage_correction(self):
+        return (self.original.get('kind')=='tests' and self.original.get('reviewing') is True and self.fixture_correction()
+            and self.incident.get('review_escalation')
+            and self.repair['context'].get('protocol')=='technical-test-strengthening-1')
 
     def qa_correction(self):
         return self.original['kind']=='tests' and self.repair and self.repair['proposal']['classification']=='test_contract'

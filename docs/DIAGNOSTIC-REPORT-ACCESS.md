@@ -136,7 +136,27 @@ diagnosis is never overwritten. A hold without a current experiment remains a
 technical impediment with an explicit missing-evidence reason; it cannot become
 authorization by attempting to load a null receipt.
 
-Coverage expansion beyond an existing maintenance scope is not yet authorized
-by this routing correction. Such a successor must protect both the original
+Coverage expansion beyond an existing maintenance scope requires the explicit
+cumulative authorization below. Such a successor protects both the original
 freeze and the complete current candidate, including previously added checks.
-A technical ruling alone does not widen the test-writing tools.
+A textual technical ruling alone does not widen the test-writing tools.
+
+## Cumulative coverage authorization
+
+A settled independent review of an explicitly strengthened test candidate may
+request `repair_tests` from the CTO. The authorization retains the exact parent
+repair, original freeze and current candidate. It allows only additive checks in
+named existing cases using authorized product modules. Helpers, browser observers,
+discovery, case inventory and existing statements remain protected.
+
+The controller validates the current candidate against its parent authority and
+checks the successor against both the original freeze and that candidate. This
+prevents removing checks added since the old freeze. The QA workspace starts
+from the current candidate; implementation still uses the preserved product
+only after a new independent freeze. Red, Green, relevant negative controls and
+delivery review remain required. A repeated unchanged submission is rejected.
+
+The programmed native strengthening qualification includes rejected coverage,
+CTO authorization, an idempotent successor, cumulative QA submission and an
+independent freeze. Its reports are programmed; it does not qualify autonomous
+reasoning or replace real executor and end-to-end delivery evidence.
