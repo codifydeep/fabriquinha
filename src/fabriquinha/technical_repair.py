@@ -2,10 +2,17 @@
 from pathlib import PurePosixPath
 
 PROTOCOL = 'technical-test-repair-1'
+STRENGTHEN = 'technical-test-strengthening-1'
+
+def scope_input(scope):
+    return {k:scope[k] for k in ('tests','test_paths','cases','mode','product_imports','parent_repair') if k in scope}
 
 
 def validate_scope(project, store, incident, binding, experiment, scope):
-    if (not isinstance(scope, dict) or set(scope) != {'tests', 'test_paths', 'cases'}
+    extended=isinstance(scope,dict) and scope.get('mode')=='strengthen'
+    keys={'tests','test_paths','cases'}|({'mode','product_imports'} if extended else set())
+    if extended and 'parent_repair' in scope:keys.add('parent_repair')
+    if (not isinstance(scope, dict) or set(scope) != keys
             or binding.get('actor') != project.technical_roles.get('cto')
             or binding.get('kind') != 'diagnostic' or binding.get('reviewing') is not False):
         raise ValueError('exact CTO technical repair scope required')
@@ -13,13 +20,23 @@ def validate_scope(project, store, incident, binding, experiment, scope):
     data = source['payload']
     if (data.get('project') != project.fingerprint()
             or source['binding'].get('release') != binding.get('release')
-            or source['binding'].get('kind') != 'implementation'
+            or source['binding'].get('kind') not in (('implementation','tests') if extended else ('implementation',))
             or source['binding'].get('reviewing') is not False
             or data.get('source_state') not in ('blocked', 'triage')
             or data.get('controller_effects') != []
             or data.get('source') != source['binding'].get('task')
             or data.get('source_run') != source['binding'].get('number')):
         raise ValueError('settled blocked or triaged implementation incident required')
+    parent=None
+    if source['binding']['kind']=='tests':
+        from .repairs import reviewed
+        parent=reviewed(project,store,scope.get('parent_repair'))
+        old=parent['context']
+        if (old.get('protocol')!=PROTOCOL or old.get('tests')!=scope['tests']
+                or parent['proposal'].get('classification')!='test_contract'
+                or store.receipt(scope['parent_repair'])['binding']['release']!=binding['release']):
+            raise ValueError('exact prior strict repair authority required for strengthening successor')
+    elif 'parent_repair' in scope:raise ValueError('parent repair applies only to failed test authors')
     observation = store.receipt(experiment, kind='diagnostic_experiment')
     if (observation['binding'] != binding
             or observation['payload'].get('incident') != incident
@@ -49,7 +66,16 @@ def validate_scope(project, store, incident, binding, experiment, scope):
     modules = {PurePosixPath(path).stem for path in paths}
     if {case.split('.')[0] for case in cases} != modules:
         raise ValueError('every scoped file must have an exact scoped case')
-    return dict(protocol=PROTOCOL, tests=scope['tests'], test_paths=sorted(paths),
+    extra={}
+    if extended:
+        imports=scope['product_imports'];manifest=store.manifest(data['snapshot'])
+        if (not isinstance(imports,list) or not 1<=len(imports)<=4 or len(set(imports))!=len(imports)
+                or any(not isinstance(m,str) or not m.isidentifier() or m.startswith('_') or m+'.py' not in manifest for m in imports)):
+            raise ValueError('explicit existing root product modules required')
+        extra=dict(mode='strengthen',product_imports=sorted(imports))
+        if parent:
+            extra.update(parent_repair=scope['parent_repair'],author_snapshot=data['snapshot'])
+    return dict(protocol=STRENGTHEN if extended else PROTOCOL,**extra, tests=scope['tests'], test_paths=sorted(paths),
                 cases=sorted(cases), snapshot=frozen['snapshot'],
-                implementation_snapshot=data['snapshot'], red_baseline=frozen['baseline'],
+                implementation_snapshot=parent['context']['implementation_snapshot'] if parent else data['snapshot'], red_baseline=frozen['baseline'],
                 delivery_approval=False, independent_freeze_required=True)

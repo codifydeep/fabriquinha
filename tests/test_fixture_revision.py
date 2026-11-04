@@ -78,7 +78,10 @@ class SnapshotFixtureRevision(unittest.TestCase):
             path='tests/acceptance_capacity.py'
             (work/path).write_text(OLD);(work/'app.py').write_text('product')
             (work/'tests/acceptance.json').write_text('{}')
-            before=store.capture(work);(work/path).write_text(NEW);after=store.capture(work)
+            before=store.capture(work)
+            with self.assertRaisesRegex(ValueError,'candidate is unchanged'):
+                fixture_snapshot_diff(store,before,before,[path],'tests')
+            (work/path).write_text(NEW);after=store.capture(work)
             self.assertEqual(list(fixture_snapshot_diff(store,before,after,[path],'tests')),[path])
             for paths in ([],[path,path],['tests/../tests/acceptance_capacity.py'],['app.py'],['tests/acceptance.json']):
                 with self.subTest(paths=paths),self.assertRaises(ValueError):

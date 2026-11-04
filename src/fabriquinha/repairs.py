@@ -293,16 +293,16 @@ def reviewed(project,store,key):
         return dict(review=key,proposal=parent['proposal'],context=data,context_id=key,
             task=diagnosis['binding']['task'],controller_admission=True)
     if record['kind']=='test_repair_admission':
-        from .technical_repair import validate_scope, PROTOCOL
+        from .technical_repair import validate_scope, PROTOCOL, STRENGTHEN, scope_input
         data=record['payload']
         diagnosis=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
         choice=diagnosis['payload'];scope=choice.get('test_repair',{})
         facts=validate_scope(project,store,data['incident'],diagnosis['binding'],choice['experiment'],
-            {k:scope[k] for k in ('tests','test_paths','cases')})
+            scope_input(scope))
         graph=store.receipt(data['prior_graph'],kind='release_graph')
         incident=store.receipt(data['incident'],kind='incident')
         if (choice.get('action')!='repair_tests' or choice.get('incident')!=data['incident']
-                or scope!=facts or data.get('protocol')!=PROTOCOL
+                or scope!=facts or data.get('protocol')!=facts['protocol']
                 or record['binding']!=graph['binding'] or record['binding'].get('actor')!='controller'
                 or record['binding'].get('release')!=diagnosis['binding']['release']
                 or data.get('project')!=project.fingerprint() or data.get('repair_kind')!='fixture'
@@ -428,6 +428,10 @@ def context_view(store,value):
         if value.get('protocol')=='technical-test-repair-1':
             result['cases']=value['cases']
             result['fixture_syntax']='Change setup or actions only inside the exact scoped cases. Preserve assertions, their conditions, neighboring cases, helpers, imports and test definitions. Keep assertion expressions AND their message literals byte-for-byte semantically identical; do not insert new assertions in this strict repair. Use local assignments/comprehensions for setup; no break/continue/return/raise. Indexing a nonempty candidate list fails visibly if no valid setup exists; never skip the scenario. No early exits or observer suppression. A new independent freeze and fresh negative controls for every repaired case are mandatory.'
+        if value.get('protocol')=='technical-test-strengthening-1':
+            result['cases']=value['cases']
+            result['product_imports']=value['product_imports']
+            result['fixture_syntax']='Explicit scoped strengthening: preserve every old statement in order, unchanged. Append only local import of an authorized root product module (use a fresh alias), fresh local literal/product-call assignments and direct self.assertEqual/assertNotEqual/assertTrue/assertFalse/assertIs/assertIsNot/assertIn/assertNotIn calls. No subTest/with/loops, new helpers, top-level imports, rebinding, early exits or changes to existing assertions. Keep the complete case inventory. Independent review, new freeze and negative controls remain mandatory.'
     if value.get('repair_kind')=='review':
         decision=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')
         prior=store.receipt(decision['payload']['experiment'],kind='diagnostic_experiment')
@@ -1079,7 +1083,32 @@ class Repairs:
                         dr=kb.latest_run(conn,diagnostic.id);key=(dr.metadata or {}).get('diagnosis') if dr else None
                         if not key:continue
                         decision=self.store.receipt(key,kind='diagnostic_decision')
+                        if decision['payload']['action']=='repair_tests':
+                            from .technical_repair import validate_scope, STRENGTHEN, scope_input
+                            scope=decision['payload']['test_repair']
+                            facts=validate_scope(self.project,self.store,decision['payload']['incident'],decision['binding'],
+                                decision['payload']['experiment'],scope_input(scope))
+                            if facts['protocol']!=STRENGTHEN or facts.get('parent_repair')!=parent:
+                                raise ValueError('exact strengthening successor authority required')
+                            if self.store.capture(author.workspace_path)!=facts.get('author_snapshot',facts['implementation_snapshot']):
+                                raise ValueError('failed author changed after strengthening diagnosis')
+                            prior=self.store.record('release_graph',self.r.binding(anchor),graph)
+                            context=dict(**facts,project=self.project.fingerprint(),repair_kind='fixture',prior_graph=prior,
+                                current_diagnosis=key,reviewed_diagnosis=key,incident=decision['payload']['incident'],
+                                source=author.id,source_run=latest.id,source_contract=digest(body),
+                                qa_paths=facts['test_paths'],package=item['package'],
+                                architecture=spec['document']['architecture'],observability=spec['document']['observability'])
+                            admission=self.store.record('test_repair_admission',self.r.binding(anchor),context)
+                            result=self.materialize_submission(conn,anchor,graph,admission)
+                            return self.continue_submission(conn,anchor,spec,result)
                         if decision['payload']['action']!='hold':continue
+                        # A newer explicit diagnosis must be considered before an older hold.
+                        newer=[t for t in Recovery(self.project,self.store,self.r.board).cards(conn)
+                            if t.status=='done' and json.loads(t.body or '{}').get('kind')=='diagnostic'
+                            and json.loads(t.body or '{}').get('stage')=='cto' and json.loads(t.body or '{}').get('source')==author.id
+                            and json.loads(t.body or '{}').get('source_run')==latest.id
+                            and kb.latest_run(conn,t.id).id>dr.id]
+                        if newer:continue
                         prior=self.store.record('release_graph',self.r.binding(anchor),graph)
                         context=fixture_author_context(self.project,self.store,parent,decision['payload']['incident'],key,prior)
                         if (context['source_contract']!=digest(body) or self.store.capture(author.workspace_path)!=context['author_snapshot']):
@@ -1108,10 +1137,10 @@ class Repairs:
                 if decision['payload'].get('action')=='repair_tests':
                     if Recovery(self.project,self.store,self.r.board).expired_effects(source.id):
                         raise EffectBlocked('settle controller effects before test repair')
-                    from .technical_repair import validate_scope, PROTOCOL
+                    from .technical_repair import validate_scope, PROTOCOL, STRENGTHEN, scope_input
                     scope=decision['payload']['test_repair']
                     facts=validate_scope(self.project,self.store,decision['payload']['incident'],decision['binding'],
-                        decision['payload']['experiment'],{k:scope[k] for k in ('tests','test_paths','cases')})
+                        decision['payload']['experiment'],scope_input(scope))
                     if self.store.capture(source.workspace_path)!=facts['implementation_snapshot']:
                         raise ValueError('implementation changed after CTO test-repair decision')
                     frozen,_,_=self.r.closed(item['cards']['tests']['id'],'tests','tests_frozen')

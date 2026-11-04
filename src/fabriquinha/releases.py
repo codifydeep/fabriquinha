@@ -392,6 +392,11 @@ class Releases:
                             'delivery_submit validates the original baseline, any scoped corrected baseline and fresh feature Red. Independent review must freeze the corrected tests; '
                             'every repaired case requires a fresh product negative control. No old Red, Green or approval is inherited.')
                         result['browser']='Preserve browser error observers. For deliberate negative API probes, the same browser context request client preserves cookies without injecting an expected HTTP failure into the UI console.'
+                    if continuation['context'].get('protocol')=='technical-test-strengthening-1':
+                        result['tdd']=('Strengthen only the exact CTO-authorized cases: append direct behavioral assertions and authorized local product imports after every unchanged old statement. '
+                            'Keep all original assertions, case inventory, observers, helpers and discovery. No product edits. Use fixture_revision.fixture_syntax for the allowed syntax. '
+                            'delivery_submit requires fresh baseline and Red; independent review freezes the revision. Fresh Green and negative controls must kill the previously surviving mutation. No inherited approval.')
+                        result['browser']='Keep every existing browser scenario unchanged; additional direct checks of the authorized product module complement browser coverage. Do not change the deal or add production test switches.'
                 elif run.kind=='implementation' and authority:
                     result['tdd']=('Continue preserved product work using the newly reviewed frozen tests. Use delivery_validate for the full suite, '
                         'then submit fresh Green and the complete negative-control set for this exact revision. '

@@ -143,7 +143,7 @@ class Diagnostic:
         if (self.level=='cto' and self.original.get('reviewing') is True
                 and self.incident.get('review_escalation') and self.incident.get('resume_allowed') is True):
             return ['return_author','hold']
-        repair = (self.level=='cto' and self.original.get('kind')=='implementation'
+        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and self.repair['context'].get('protocol')=='technical-test-repair-1')
                   and self.original.get('reviewing') is False
                   and self.incident.get('source_state') in ('blocked','triage')
                   and self.incident.get('controller_effects')==[])
@@ -157,7 +157,8 @@ class Diagnostic:
             source=kb.get_task(conn,self.original['task'])
             if not source or digest(json.loads(source.body))!=self.original['contract']:
                 raise ValueError('diagnostic source contract changed')
-            key=Recovery(self.q.project,self.store,self.board).input(conn,source,'tests')
+            key=(self.repair['context']['tests'] if self.original.get('kind')=='tests' and self.fixture_correction()
+                else Recovery(self.q.project,self.store,self.board).input(conn,source,'tests'))
         record=self.store.receipt(key,kind='tests_frozen')
         if record['binding']['release']!=self.run.release:raise ValueError('foreign source test freeze')
         frozen=self.q.frozen_plan(record)
@@ -251,7 +252,7 @@ class Diagnostic:
             key,frozen=self.repair_freeze()
             result['technical_test_repair']=dict(tests=key,cases=frozen['cases'],files=sorted(frozen['tests']),
                 contract='The controller resolves the exact frozen tests from the failed implementation. '
-                'repair_scope accepts only test_paths and cases; do not invent or copy receipt IDs. '
+                'repair_scope requires test_paths and cases. For explicit additive coverage only, use mode=strengthen and product_imports naming existing root product modules; prior assertions/statements must remain unchanged and additions are appended in scoped cases. No receipt IDs. '
                 'Diagnose 404/roster failures by origin before classifying them as test defects. '
                 'Do not whitelist console messages or turn error observers off. A deliberate negative API probe '
                 'may use the same browser context request client, preserving cookies. '
@@ -597,9 +598,13 @@ class Diagnostic:
             from .technical_repair import validate_scope
             if self.experiment is None:raise ValueError('test repair requires a current CTO experiment')
             scope=args['repair_scope'];key,_=self.repair_freeze()
-            if (not isinstance(scope,dict) or set(scope) not in ({'test_paths','cases'},{'tests','test_paths','cases'})
+            allowed={'test_paths','cases'}|({'mode','product_imports'} if isinstance(scope,dict) and scope.get('mode')=='strengthen' else set())
+            if (not isinstance(scope,dict) or set(scope) not in (allowed,allowed|{'tests'})
                     or 'tests' in scope and scope['tests']!=key):
                 raise ValueError('repair_scope must contain test_paths and cases only; the controller resolves the source freeze; legacy tests must match that exact receipt')
+            if self.original['kind']=='tests':
+                if scope.get('mode')!='strengthen':raise ValueError('failed strict test repair requires explicit strengthening authority')
+                scope={**scope,'parent_repair':self.repair['review']}
             repair=validate_scope(self.q.project,self.store,self.board.input(self.run,'incident'),
                                   self.run.binding(),self.experiment,{**scope,'tests':key})
         receipt=self.q.record(self.run,'diagnostic_decision',dict(incident=self.board.input(self.run,'incident'),
@@ -1124,7 +1129,9 @@ def register_diagnostic(sandbox,quality,on_terminal):
         schemas['diagnostic_decide']['properties']['repair_scope']=dict(
             type='object',additionalProperties=False,required=['test_paths','cases'],
             properties=dict(test_paths=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
-                            cases=dict(type='array',minItems=1,maxItems=20,items=dict(type='string'))))
+                            cases=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
+                            mode=dict(type='string',enum=['strengthen']),
+                            product_imports=dict(type='array',minItems=1,maxItems=4,items=dict(type='string'))))
     if getattr(operations,'resolution',{}):
         schemas['diagnostic_decide']['properties']['next_step']=dict(type='object',additionalProperties=False,
             description='Required for hold: exact technical responsibility and next verifiable operation; not approval.',

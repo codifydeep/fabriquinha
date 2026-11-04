@@ -19,7 +19,7 @@ class ScopeTests(unittest.TestCase):
             'experiment':dict(binding=self.binding.copy(),payload=dict(project='project',incident='incident',snapshot='implementation')),
             'freeze':dict(binding=dict(release='v2'),payload={})}
         self.store=Mock()
-        self.store.receipt.side_effect=lambda key,kind:self.records[key]
+        self.store.receipt.side_effect=lambda key,kind=None:self.records[key]
         self.quality=Mock()
         self.quality.frozen_plan.return_value=dict(snapshot='frozen',baseline='base',tests={'tests/acceptance_cancel.py':{}},cases=self.scope['cases'])
 
@@ -59,3 +59,25 @@ class ScopeTests(unittest.TestCase):
     def test_unchanged_tests_are_mandatory(self):
         self.quality.protect.side_effect=ValueError('frozen tests changed')
         with self.assertRaises(ValueError):self.validate()
+
+    def test_strengthening_is_explicit_and_old_authority_stays_strict(self):
+        self.assertEqual(self.validate()['protocol'],'technical-test-repair-1')
+        self.store.manifest.return_value={'app.py':{}}
+        self.scope.update(mode='strengthen',product_imports=['app'])
+        result=self.validate()
+        self.assertEqual(result['protocol'],'technical-test-strengthening-1')
+        self.assertEqual(result['product_imports'],['app'])
+        for imports in (['os'],['app','app'],[],['../app']):
+            self.scope['product_imports']=imports
+            with self.subTest(imports=imports),self.assertRaises(ValueError):self.validate()
+
+    def test_test_author_successor_requires_exact_prior_strict_authority(self):
+        self.records['incident']['binding']['kind']='tests'
+        self.scope.update(mode='strengthen',product_imports=['app'],parent_repair='parent')
+        self.records['parent']=dict(binding={'release':'v2'})
+        self.store.manifest.return_value={'app.py':{}}
+        authority=dict(context=dict(protocol='technical-test-repair-1',tests='freeze',implementation_snapshot='preserved-product'),proposal=dict(classification='test_contract'))
+        with patch('fabriquinha.repairs.reviewed',return_value=authority):
+            self.assertEqual(self.validate()['parent_repair'],'parent')
+            authority['context']['protocol']='technical-test-strengthening-1'
+            with self.assertRaises(ValueError):self.validate()

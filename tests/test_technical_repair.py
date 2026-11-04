@@ -54,3 +54,23 @@ class TechnicalRepairTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class StrengtheningTests(unittest.TestCase):
+    def check(self,after):
+        from fabriquinha.test_revision import strengthening_diff
+        return strengthening_diff(BEFORE,after,cases=['Cancellation.test_full_room'],product_imports=['app'])
+
+    def test_explicit_app_assertions_append_without_changing_old_statements(self):
+        after=BEFORE+"        import app as rules\n        self.assertEqual(rules.compare_cards(('5','Hearts'),('5','Spades'),'5'), 'A')\n"
+        self.assertTrue(self.check(after)['semantic_review_required'])
+        with self.assertRaises(ValueError):technical_repair_diff(BEFORE,after)
+
+    def test_rejects_weakened_old_assertion_and_shadowing_and_foreign_import(self):
+        suffix="        import app as rules\n        self.assertEqual(rules.compare_cards(('5','Hearts'),('5','Spades'),'5'), 'A')\n"
+        for after in (BEFORE.replace('409','200')+suffix,
+                      BEFORE+suffix.replace('as rules','as self'),
+                      BEFORE+suffix.replace('import app','import os'),
+                      BEFORE+'        return\n'+suffix,
+                      BEFORE+suffix+'        self.assertEqual = rules.compare_cards\n',
+                      BEFORE+suffix.replace('rules.compare_cards','rules.__dict__.clear')):
+            with self.subTest(after=after),self.assertRaises(ValueError):self.check(after)

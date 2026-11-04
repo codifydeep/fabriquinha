@@ -76,3 +76,32 @@ provider admission connected: nine native runs, independent change request and
 review, real Docker validation and supervisor restart without duplicate recovery.
 The full offline suite passed 587 tests. Source changes do not
 raise the provider quota or release its operational pause.
+
+## Explicit strengthening of a scoped test
+
+`technical-test-repair-1` remains a setup/action repair with unchanged assertions.
+A CTO can instead select `mode: strengthen` with exact existing cases, paths and
+`product_imports`. The controller records `technical-test-strengthening-1`; an
+old authorization is never converted into this permission.
+
+Strengthening appends direct unittest assertions after every unchanged existing
+statement. It permits authorized local imports of existing root product modules
+and fresh local literal/product-call assignments. It forbids changing old
+statements, helpers, discovery, neighboring cases, early exits, rebinding and
+production code. This deliberately small syntax does not include loops or
+`subTest` blocks. Independent semantic review remains required: structural
+preservation alone cannot establish meaningful coverage.
+
+An unchanged candidate is rejected explicitly, separately from changes outside
+the allowed paths. A failed strict test author can receive one new strengthening
+authority linked to the exact parent repair, incident, current experiment and
+freeze. The new graph preserves the old attempt and the original implementation
+snapshot. It requires fresh Red, independent freeze, Green, effective controls
+and independent delivery review. Repeating a failed strengthening authority is
+not implicitly authorized.
+
+Offline qualification is available through `qualify_test_strengthening.py`
+(real isolated Docker tests and controls with programmed roles) and
+`qualify_strengthening_native.py` (native Kanban successor/restart with programmed
+suite reports). Neither script establishes autonomous model reasoning or product
+homologation.

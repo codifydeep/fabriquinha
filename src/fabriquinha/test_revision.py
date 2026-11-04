@@ -103,6 +103,70 @@ def candidate_diff(before,after):
     return dict(diff=diff,structural=structural,semantic_review_required=True)
 
 
+def strengthening_diff(before,after,*,cases,product_imports):
+    """Append scoped behavioral checks; old statements and authority stay intact."""
+    findings=candidate_diff(before,after)
+    left,right=ast.parse(before),ast.parse(after)
+    allowed=set(cases);found=set();added_assertions=0
+    names={n.id for n in ast.walk(left) if isinstance(n,ast.Name)}
+    names.update(n.arg for n in ast.walk(left) if isinstance(n,ast.arg))
+    names.update(n.name for n in ast.walk(left) if isinstance(n,(ast.FunctionDef,ast.ClassDef)))
+    for cls in right.body:
+        if not isinstance(cls,ast.ClassDef):continue
+        prior_cls=next((c for c in left.body if isinstance(c,ast.ClassDef) and c.name==cls.name),None)
+        if prior_cls is None:raise ValueError('test definitions must remain unchanged')
+        for method in cls.body:
+            if not isinstance(method,ast.FunctionDef) or cls.name+'.'+method.name not in allowed:continue
+            found.add(cls.name+'.'+method.name)
+            prior=next(m for m in prior_cls.body if isinstance(m,ast.FunctionDef) and m.name==method.name)
+            if [shape(n) for n in method.body[:len(prior.body)]]!=[shape(n) for n in prior.body]:
+                raise ValueError('strengthening must preserve every existing statement before additions')
+            imported=set();fresh=set()
+            def expression(node):
+                if isinstance(node,ast.Constant):return
+                if isinstance(node,(ast.Tuple,ast.List)):
+                    for item in node.elts:expression(item)
+                    return
+                if isinstance(node,ast.Name) and node.id in fresh:return
+                if (isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
+                        and isinstance(node.func.value,ast.Name) and node.func.value.id in imported
+                        and not node.func.attr.startswith('_')):
+                    for arg in node.args:expression(arg)
+                    for kw in node.keywords:
+                        if kw.arg is None:raise ValueError('explicit product arguments required')
+                        expression(kw.value)
+                    return
+                raise ValueError('only explicit product calls and local literal setup allowed')
+            def statements(nodes):
+                nonlocal added_assertions
+                for node in nodes:
+                    if isinstance(node,ast.Import):
+                        for alias in node.names:
+                            name=alias.asname or alias.name
+                            if alias.name not in product_imports or name in names|fresh|imported:
+                                raise ValueError('only authorized nonshadowing local product imports allowed')
+                            imported.add(name)
+                    elif isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name):
+                        name=node.targets[0].id
+                        if name in names|fresh|imported:raise ValueError('cannot rebind existing names')
+                        expression(node.value);fresh.add(name)
+                    elif (isinstance(node,ast.Expr) and isinstance(node.value,ast.Call)
+                          and isinstance(node.value.func,ast.Attribute) and isinstance(node.value.func.value,ast.Name)
+                          and node.value.func.value.id=='self' and node.value.func.attr in
+                          ('assertEqual','assertNotEqual','assertTrue','assertFalse','assertIs','assertIsNot','assertIn','assertNotIn')):
+                        for arg in node.value.args:expression(arg)
+                        for kw in node.value.keywords:
+                            if kw.arg!='msg':raise ValueError('only assertion message keyword permitted')
+                            expression(kw.value)
+                        added_assertions+=1
+                    else:raise ValueError('append only local product setup and explicit unittest assertions')
+            statements(method.body[len(prior.body):])
+            method.body=copy.deepcopy(prior.body)
+    if found!=allowed or shape(left)!=shape(right) or not added_assertions:
+        raise ValueError('exact scoped methods and additional assertions required; preserve all other code')
+    return findings
+
+
 def technical_repair_diff(before, after, *, cases=None):
     """Evidence for the stricter technical-repair contract, never authority.
 
@@ -182,7 +246,8 @@ def fixture_snapshot_diff(store,before,after,paths,tests_dir,*,candidate=False):
                 or item.suffix!='.py' or path not in left or path not in right):
             raise ValueError('only existing direct acceptance Python files eligible')
     changed={p for p in set(left)|set(right) if left.get(p)!=right.get(p)}
-    if not changed or not changed<=set(paths):raise ValueError('only proposed fixture files may change')
+    if not changed:raise ValueError('fixture candidate is unchanged; submit an actual scoped correction')
+    if not changed<=set(paths):raise ValueError('only proposed fixture files may change')
     result={}
     for path in sorted(changed):
         if left[path]['executable']!=right[path]['executable']:
@@ -255,7 +320,10 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
             if before!=after:
                 from pathlib import PurePosixPath
                 prefix=PurePosixPath(path).stem+'.'
-                technical_repair_diff(before,after,cases=[c[len(prefix):] for c in context['cases'] if c.startswith(prefix)])
+                scoped=[c[len(prefix):] for c in context['cases'] if c.startswith(prefix)]
+                if context.get('protocol')=='technical-test-strengthening-1':
+                    strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'])
+                else:technical_repair_diff(before,after,cases=scoped)
     if contract==3:
         protect_repaired_baseline(project,store,previous['baseline'],candidate,authority['proposal']['test_paths'])
     else:quality.protect(previous['baseline'],candidate)
