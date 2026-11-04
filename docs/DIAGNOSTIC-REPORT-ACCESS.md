@@ -129,3 +129,14 @@ Review incidents do not enter the test-author syntax-repair lane. A coverage gap
 outside a maintenance authorization remains an independent review finding; the
 CTO must supply an executable, scoped technical decision. Existing assertions,
 case inventory and release quality gates remain protected.
+
+A repeated CTO hold for the same immutable incident reuses the original decision
+activity after validating its incident, role, release and payload. Its recorded
+diagnosis is never overwritten. A hold without a current experiment remains a
+technical impediment with an explicit missing-evidence reason; it cannot become
+authorization by attempting to load a null receipt.
+
+Coverage expansion beyond an existing maintenance scope is not yet authorized
+by this routing correction. Such a successor must protect both the original
+freeze and the complete current candidate, including previously added checks.
+A technical ruling alone does not widen the test-writing tools.

@@ -35,6 +35,15 @@ class ReviewHoldRouting(TestCase):
         body=json.loads(self.kb.create_task.call_args.kwargs['body'])
         self.assertEqual(body['hold_resolution']['protocol'],'review-author-return-1')
         self.assertEqual(body['inputs'],json.loads(self.task.body)['inputs'])
+    def test_repeated_decision_reuses_existing_incident_followup(self):
+        with patch('fabriquinha.recovery.native',return_value=(self.kb,None,None)):
+            first=self.recovery.coordinate_hold(self.conn,self.task,self.decision)
+            body=json.loads(self.kb.create_task.call_args.kwargs['body'])
+            record=self.store.receipt(self.decision,kind='diagnostic_decision')
+            body['hold_resolution']['diagnosis']=self.store.record('diagnostic_decision',record['binding'],{**record['payload'],'note':'earlier ruling'})
+            self.conn.execute.return_value.fetchone.return_value={'id':first[0],'body':json.dumps(body)}
+            self.assertEqual(self.recovery.coordinate_hold(self.conn,self.task,self.decision),first)
+        self.assertEqual(self.kb.create_task.call_count,1)
     def test_active_stale_or_changed_source_cannot_create_followup(self):
         for field,value in [('status','running'),('status','review')]:
             self.source.status=value

@@ -810,7 +810,24 @@ class Recovery:
             key=digest([self.project.fingerprint(),data['incident'],protocol,role])
             prior=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
             if prior:
-                if json.loads(prior['body'])!=probe:raise ValueError('resolution handoff identity drift')
+                previous=json.loads(prior['body'])
+                if review_followup and previous!=probe:
+                    # One incident gets one decision activity. A later hold is
+                    # retained history, not authority to rewrite or duplicate it.
+                    old_key=previous.get('hold_resolution',{}).get('diagnosis')
+                    old=self.store.receipt(old_key,kind='diagnostic_decision')
+                    expected={**probe,'escalated_from':previous.get('escalated_from'),
+                        'hold_resolution':{**probe['hold_resolution'],'diagnosis':old_key}}
+                    if (previous!=expected or old['payload'].get('incident')!=data['incident']
+                            or old['payload'].get('action')!='hold'
+                            or old['payload'].get('project')!=self.project.fingerprint()
+                            or old['binding'].get('task')!=previous.get('escalated_from')
+                            or old['binding'].get('actor')!=self.project.technical_roles['cto']
+                            or old['binding'].get('release')!=body['release']
+                            or old['binding'].get('kind')!='diagnostic'
+                            or old['binding'].get('reviewing') is not False):
+                        raise ValueError('resolution handoff identity drift')
+                elif previous!=probe:raise ValueError('resolution handoff identity drift')
                 pair.append(prior['id']);continue
             if self.board.guard:self.board.guard()
             pair.append(kb.create_task(conn,title=('INVESTIGATE ' if role=='investigate' else 'DECIDE ')+source.title,

@@ -121,6 +121,8 @@ def held_incident(project,store,incident_key,decision_key,current_snapshot):
             or choice.get('project')!=project.fingerprint() or choice.get('incident')!=incident_key
             or choice.get('action')!='hold' or choice.get('delivery_approval') is not False):
         raise ValueError('exact triaged source and CTO hold required for technical succession')
+    if choice.get('experiment') is None:
+        raise EffectBlocked('current CTO experiment missing; retain technical hold without author or review admission')
     experiment=store.receipt(choice['experiment'],kind='diagnostic_experiment')
     if (experiment['binding']!=actor or experiment['payload'].get('incident')!=incident_key
             or experiment['payload'].get('project')!=project.fingerprint()

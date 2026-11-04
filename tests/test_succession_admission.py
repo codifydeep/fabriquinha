@@ -27,6 +27,12 @@ class SuccessionAdmission(unittest.TestCase):
 
     def admit(self):return held_incident(self.project,self.store,'incident','decision','snapshot')
 
+    def test_hold_without_experiment_has_actionable_block_not_receipt_lookup(self):
+        from fabriquinha.effects import EffectBlocked
+        self.records['decision']['payload']['experiment']=None
+        with self.assertRaisesRegex(EffectBlocked,'current CTO experiment'):
+            self.admit()
+
     def test_review_hold_is_read_only_admission_not_resume(self):
         before=copy.deepcopy(self.records)
         incident,decision=self.admit()
