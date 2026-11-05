@@ -156,3 +156,41 @@ def bind_claim(store, run, submission, *, legacy=False):
     if path.exists() and json.loads(path.read_bytes()) != {'claim':claim}:
         raise ValueError('control claim already bound to another submission')
     write_json(path,dict(claim=claim))
+
+
+def refusal_origin(store, project, live_binding, record):
+    """Resolve diagnostic provenance only through the exact persisted native claim."""
+    if live_binding == record['binding']:
+        return live_binding
+    live = Run(**live_binding)
+    path = store.root/'control-claims'/(digest([live.task,live.number])+'.json')
+    if not path.is_file() or not live.same_subject(record['binding']) or live.number <= record['binding']['number']:
+        raise ValueError('refusal lacks an exact continuation claim')
+    claim = store.receipt(json.loads(path.read_bytes())['claim'], kind='control_claim')
+    submission = claim['payload']['submission']
+    plan = store.receipt(submission, kind='control_submission')
+    data = plan['payload']
+    if claim['binding'] != live_binding or plan['binding'] != record['binding'] or data['project'] != project.fingerprint():
+        raise ValueError('refusal origin differs from sealed plan')
+    def check_job(job, mutant):
+        identity = job['payload']['identity']
+        if (job['binding'] != plan['binding'] or identity['binding'] != plan['binding']
+                or identity['phase'] != 'control' or identity['snapshot'] != mutant
+                or identity['project'] != data['project'] or identity['image'] != project.validation_image
+                or identity.get('control_submission') != (None if data['legacy'] else submission)):
+            raise ValueError('refusal job differs from sealed plan')
+    if record['kind']=='control_refusal':
+        refusal = record['payload']
+        if (refusal['green'] != data['green'] or len(refusal['jobs']) != len(data['mutants'])
+                or refusal['snapshot'] != data['snapshot'] or refusal['freeze'] != data['freeze']):
+            raise ValueError('refusal belongs to another control submission')
+        for key, mutant in zip(refusal['jobs'],data['mutants']):
+            check_job(store.receipt(key,kind='suite_job'),mutant)
+    elif record['kind']=='suite_job':
+        mutant = record['payload']['identity']['snapshot']
+        if mutant not in data['mutants']:
+            raise ValueError('refused job outside submission')
+        check_job(record,mutant)
+    else:
+        raise ValueError('unsupported continuation refusal')
+    return plan['binding']

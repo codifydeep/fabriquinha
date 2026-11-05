@@ -69,6 +69,9 @@ def submission_refusal_context(store,project,binding,key,current_snapshot):
 
 def suite_refusal_context(store,project,binding,key,current_snapshot):
     record=store.receipt(key,kind='suite_job');data=record['payload'];identity=data['identity']
+    if record['binding']!=binding:
+        from .control_submission import refusal_origin
+        binding=refusal_origin(store,project,binding,record)
     if (record['binding']!=binding or identity['binding']!=binding or identity['project']!=project.fingerprint()
             or identity['image']!=project.validation_image or identity['phase']=='diagnostic'
             or data['sandbox']!=dict(network='none',snapshot='readonly',user='65534:65534')):
@@ -90,6 +93,9 @@ def suite_refusal_context(store,project,binding,key,current_snapshot):
 def control_refusal_context(store,project,binding,key,current_snapshot):
     record=store.receipt(key,kind='control_refusal');data=record['payload']
     green=store.receipt(data['green'],kind='green')
+    if record['binding']!=binding:
+        from .control_submission import refusal_origin
+        binding=refusal_origin(store,project,binding,record)
     if (binding.get('kind')!='implementation' or binding.get('reviewing') is not False
             or record['binding']!=binding or green['binding']!=binding
             or data['project']!=project.fingerprint() or green['payload']['project']!=project.fingerprint()

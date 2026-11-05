@@ -8,7 +8,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from fabriquinha.artifacts import Store
 from fabriquinha.board import Run
 from fabriquinha.config import Project
-from fabriquinha.control_submission import advance,seal,NextControl
+from fabriquinha.control_submission import advance,seal,NextControl,bind_claim
+from fabriquinha.recovery import control_refusal_context
 from fabriquinha.effects import EffectBlocked
 from fabriquinha.quality import Quality,product_mutations
 from fixtures.control_evidence import frozen_evidence
@@ -58,6 +59,12 @@ class ControlContinuation(unittest.TestCase):
         with self.assertRaises(NextControl):advance(self.q,self.run,self.plan)
         with self.assertRaisesRegex(ValueError,'did not witness'):advance(self.q,replace(self.run,number=5),self.plan)
         self.assertFalse(self.reviews)
+        live=replace(self.run,number=5)
+        bind_claim(self.store,live,self.plan)
+        feedback=control_refusal_context(self.store,self.project,live.binding(),self.q.control_refusal,self.snapshot)
+        self.assertEqual(feedback['missing'],['new'])
+        with self.assertRaises(ValueError):
+            control_refusal_context(self.store,self.project,replace(live,number=6).binding(),self.q.control_refusal,self.snapshot)
 
     def test_changed_workspace_or_subject_or_freeze_refused(self):
         with self.assertRaises(ValueError):advance(self.q,replace(self.run,author='other'),self.plan)
