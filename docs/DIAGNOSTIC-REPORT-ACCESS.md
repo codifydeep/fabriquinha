@@ -183,3 +183,10 @@ An assisted migration of a pre-existing timeout requires its exact author tool
 call and matching Green, snapshot, current native card and ordered mutants.
 Runs with identical code still have distinct evidence identities. The native
 offline proof uses programmed suite results and real scheduling and review claims.
+
+A resumed batch still collects its remaining ordered controls after a mutant
+survives a complete valid suite. The final refusal records every surviving
+mutant and the missing targets. A survivor alone vetoes review even when other
+mutations witness all mandatory cases. Infrastructure errors and incomplete
+suite membership stop observation. Recovery checks the active claim and the
+sealed submission before reading a refusal under its original Green identity.

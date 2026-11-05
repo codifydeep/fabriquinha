@@ -93,7 +93,7 @@ def advance(quality, live, submission):
         raise EffectBlocked('changed Green, workspace or freeze; preserve submission')
     fixed = Quality(quality.project, store, OneControl(store, quality.runner, plan, submission), guard)
     try:
-        controls = fixed.controls(origin, data['green'], data['mutants'])
+        controls = fixed.controls(origin, data['green'], data['mutants'], collect_survivors=True)
     finally:
         quality.control_refusal = fixed.control_refusal
         quality.suite_refusal = fixed.suite_refusal
@@ -112,6 +112,30 @@ def wait_payload(store, project, run, submission):
         raise ValueError('foreign control wait')
     return store.record('control_wait', run.binding(), dict(submission=submission,
                         project=project.fingerprint(), delivery_approval=False))
+
+
+def unfinished_survivor(store, row, claim):
+    """A known fail-fast veto may resume observation of its outstanding suffix."""
+    try:
+        detail = json.loads(row['summary'] or '{}')
+        failure = store.receipt(detail['failure'], kind='worker_failure')
+    except (KeyError, ValueError, TypeError):
+        return False
+    prefix = 'negative control must fail the complete frozen suite: '
+    message = failure['payload'].get('message','')
+    if failure['binding'] != claim['binding'] or not message.startswith(prefix):
+        return False
+    result = json.loads(message[len(prefix):])
+    key = claim['payload']['submission']
+    plan = store.receipt(key, kind='control_submission')
+    index = result['index']
+    if type(index) is not int or not 1 <= index < len(plan['payload']['mutants']):
+        return False
+    mutant = plan['payload']['mutants'][index-1]
+    path = store.root/'control-submissions'/key/(str(index-1)+'.json')
+    return (result['failures']==0 and result['membership_matches'] is True
+            and result['snapshot']==mutant and path.is_file()
+            and json.loads(path.read_bytes())==dict(submission=key,mutant=mutant,job=result['job']))
 
 
 def previous_submission(conn, store, run):
@@ -138,7 +162,8 @@ def previous_submission(conn, store, run):
         record = store.receipt(json.loads(path.read_bytes())['claim'])
         if record['kind'] not in ('control_claim','legacy_control_claim'):
             raise ValueError('invalid continuation claim')
-        if row['outcome']=='blocked' and record['kind']!='legacy_control_claim':
+        if (row['outcome']=='blocked' and record['kind']!='legacy_control_claim'
+                and not unfinished_survivor(store,row,record)):
             return None  # A rejected submission goes through native technical recovery.
         if record['binding'] != {**run.binding(), 'number':row['id']}:
             raise ValueError('stale continuation claim')

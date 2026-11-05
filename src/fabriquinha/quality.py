@@ -608,7 +608,7 @@ class Quality:
             raise ValueError('Green requires complete frozen membership passing')
         return self.record(run, 'green', dict(freeze=freeze_id, snapshot=snapshot, job=job, cases=report['cases']))
 
-    def controls(self, run, green_id, mutants):
+    def controls(self, run, green_id, mutants, *, collect_survivors=False):
         self.check(run, 'implementation')
         green = self.store.receipt(green_id, kind='green')
         if green['binding'] != run.binding() or not 1 <= len(mutants) <= 8:
@@ -622,17 +622,19 @@ class Quality:
         if maintenance:
             from .maintenance import reviewed
             observer_paths=set(reviewed(self.project,self.store,maintenance)['paths'])
-        coverage, jobs = set(), []
+        coverage, jobs, surviving = set(), [], []
         for index,mutant in enumerate(mutants,1):
             if mutant == data['snapshot']:
                 raise ValueError('control must change product behavior')
             self.protect(data['snapshot'], mutant, exact_tests=True)
             job, report = self.observe(run, mutant, 'control')
-            if set(report['cases']) != set(frozen['cases']) or not report['failures']:
+            if set(report['cases']) != set(frozen['cases']) or (not report['failures'] and not collect_survivors):
                 raise ValueError('negative control must fail the complete frozen suite: '+json.dumps(dict(
                     index=index,snapshot=mutant,job=job,tests_run=report['tests_run'],
                     failures=len(report['failures']),membership_matches=set(report['cases'])==set(frozen['cases']),
                     delivery_approval=False)))
+            if not report['failures']:
+                surviving.append(dict(index=index,snapshot=mutant,job=job))
             for failure in report['failures']:
                 if failure['assertion'] and any(f['file'].startswith(self.project.tests_dir+'/') and
                         f['function'].startswith('test') for f in failure['frames']):
@@ -644,11 +646,15 @@ class Quality:
         if observer_paths-observer_covered:
             raise ValueError('maintenance negative control must fail the preserved pair errors assertion in each repaired fixture: '+str(sorted(observer_paths-observer_covered)))
         missing=sorted(set(frozen['control_cases'])-coverage)
-        if missing:
+        if missing or surviving:
             feedback=dict(missing=missing[:32],missing_count=len(missing),covered=sorted(coverage)[:32],
                 covered_count=len(coverage),required_count=len(frozen['control_cases']))
+            if surviving:feedback['surviving']=surviving
             self.control_refusal=self.record(run,'control_refusal',dict(green=green_id,freeze=data['freeze'],
-                snapshot=data['snapshot'],jobs=jobs,missing=missing,coverage=sorted(coverage),feedback=feedback,delivery_approval=False))
+                snapshot=data['snapshot'],jobs=jobs,missing=missing,coverage=sorted(coverage),feedback=feedback,
+                **({'surviving':surviving} if surviving else {}),delivery_approval=False))
+            if surviving:
+                raise ValueError('surviving controls prevent review: '+json.dumps({**feedback,'refusal':self.control_refusal}))
             raise ValueError('negative controls did not witness all independently frozen behavior targets: '+json.dumps({**feedback,'refusal':self.control_refusal})+
                 '. Correct product mutations for the missing cases; preserve the full suite and frozen tests. '+CONTROL_SUBMISSION_CONTRACT)
         self.control_refusal=None

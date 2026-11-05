@@ -35,11 +35,13 @@ class ControlContinuation(unittest.TestCase):
         self.mutants=product_mutations(self.q,self.snapshot,[{'app.py':'value=2'},{'app.py':'value=3'}])
         self.plan=seal(self.q,self.run,self.green,self.mutants)
         self.case='new'
+        self.survives=set()
 
     def execute(self,run,tree,phase):
         self.executions.append(tree)
-        return self.store.record('suite_job',run.binding(),dict(exit_code=1,report=dict(version=1,tests_run=2,
-            cases=['existing','new'],failures=[dict(case=self.case,assertion=True,frames=[dict(file='tests/test_new.py',function='test_behavior')])],
+        failures=[] if tree in self.survives else [dict(case=self.case,assertion=True,frames=[dict(file='tests/test_new.py',function='test_behavior')])]
+        return self.store.record('suite_job',run.binding(),dict(exit_code=int(bool(failures)),report=dict(version=1,tests_run=2,
+            cases=['existing','new'],failures=failures,
             errors=[],skips=[],expected_failures=[],unexpected_successes=[]),identity=dict(binding=run.binding(),project=self.project.fingerprint(),
             snapshot=tree,phase=phase,image=self.project.validation_image,control_submission=self.runner.control_submission),
             sandbox=dict(network='none',snapshot='readonly',user='65534:65534')))
@@ -73,3 +75,15 @@ class ControlContinuation(unittest.TestCase):
         self.freeze=old;(self.work/'app.py').write_text('different')
         with self.assertRaises(EffectBlocked):advance(self.q,self.run,self.plan)
         self.assertFalse(self.executions)
+
+    def test_surviving_mutant_remains_veto_after_rest_of_batch_is_observed(self):
+        self.survives.add(self.mutants[0])
+        with self.assertRaises(NextControl):advance(self.q,self.run,self.plan)
+        with self.assertRaisesRegex(ValueError,'surviving controls'):
+            advance(self.q,replace(self.run,number=5),self.plan)
+        receipt=self.store.receipt(self.q.control_refusal,kind='control_refusal')['payload']
+        self.assertEqual(receipt['missing'],[])
+        self.assertEqual(receipt['surviving'][0]['index'],1)
+        self.assertEqual(len(receipt['jobs']),2)
+        self.assertEqual(self.executions,self.mutants)
+        self.assertFalse(self.reviews)
