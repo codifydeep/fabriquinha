@@ -10,6 +10,13 @@ class ProbeContract(unittest.TestCase):
         self.spec=dict(case='spec.C.test_rule',prefix='/api/rooms/',action='play',pair='pair',resource='room_id',actor='guest',peer='host',payload={'rank':['held',0],'suit':['held',1]})
         self.old='class C:\n    def test_rule(self):\n        pair = self.setup()\n        held = (4, 5)\n        self.assertTrue(self.visible)\n'
         self.new=self.old+''.join('        '+line+'\n' for line in probe_source(self.spec).splitlines())
+    def test_exact_error_distinguishes_two_409_responses(self):
+        spec={**self.spec,'expected_error':'That card is not in your hand.'}
+        candidate=self.old+''.join('        '+line+'\n' for line in probe_source(spec).splitlines())
+        probe_diff(self.old,candidate,spec)
+        with self.assertRaises(ValueError):
+            probe_diff(self.old,candidate.replace('That card is not in your hand.', 'It is not your turn.'),spec)
+
     def test_exact_suffix(self):
         probe_diff(self.old,self.new,self.spec)
     def test_rejects_other_origin_actor_card_or_weaker_expectation(self):

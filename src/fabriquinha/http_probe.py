@@ -13,7 +13,7 @@ def name(value):
 
 
 def probe_source(spec):
-    if set(spec)!={'case','prefix','action','pair','resource','actor','peer','payload'}:
+    if set(spec)-{'expected_error'}!={'case','prefix','action','pair','resource','actor','peer','payload'}:
         raise ValueError('closed probe descriptor required')
     if len(spec['case'].split('.'))!=3:
         raise ValueError('exact module.class.case required')
@@ -21,6 +21,12 @@ def probe_source(spec):
     pair=name(spec['pair']); resource=name(spec['resource']); actor=name(spec['actor']);peer=name(spec['peer'])
     if actor==peer or not re.fullmatch(r'/(?:[A-Za-z0-9_-]+/){1,6}',spec['prefix']) or not re.fullmatch(r'[A-Za-z0-9_-]{1,48}',spec['action']):
         raise ValueError('distinct contexts and fixed local route required')
+    message_check=()
+    if 'expected_error' in spec:
+        message=spec['expected_error']
+        if not isinstance(message,str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .,!?'-]{0,159}",message):
+            raise ValueError('bounded literal error message required')
+        message_check=(f"self.assertEqual(probe_response.json()['error'], {message!r})",)
     fields=spec['payload']
     if not isinstance(fields,dict) or len(fields)>8:raise ValueError('bounded JSON object required')
     items=[]
@@ -38,6 +44,7 @@ def probe_source(spec):
         'self.assertEqual(probe_peer_before.status, 200)',
         f'probe_response = probe_actor.post(probe_url + {("/"+spec["action"])!r}, data={{{", ".join(items)}}}, max_redirects=0)',
         'self.assertEqual(probe_response.status, 409)',
+        *message_check,
         'probe_actor_after = probe_actor.get(probe_url, max_redirects=0)',
         'probe_peer_after = probe_peer.get(probe_url, max_redirects=0)',
         'self.assertEqual(probe_actor_after.status, 200)',
