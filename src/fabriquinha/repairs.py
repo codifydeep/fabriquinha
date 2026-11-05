@@ -439,6 +439,10 @@ def context_view(store,value):
                 result['preserved_candidate']=value['preserve_snapshot']
                 result['fixture_sources']={p:dict(sha256=current[p]['sha256'],text=(store.tree(value['preserve_snapshot'])/p).read_text()) for p in paths}
             result['fixture_syntax']='Explicit scoped strengthening: preserve every old statement in order, unchanged. Append only local import of an authorized root product module (use a fresh alias), fresh local literal/product-call assignments and direct self.assertEqual/assertNotEqual/assertTrue/assertFalse/assertIs/assertIsNot/assertIn/assertNotIn calls. No subTest/with/loops, new helpers, top-level imports, rebinding, early exits or changes to existing assertions. Keep the complete case inventory. Independent review, new freeze and negative controls remain mandatory.'
+    if value.get('probe_offer'):
+        from .http_probe import probe_source
+        result['fixture_syntax']='Append exactly the following qualified HTTP probe to the existing authorized case. Preserve every existing statement. The sealed template fixes authentication, origin, action and both state comparisons. New Red and independent freeze are mandatory.'
+        result['authorized_append']=probe_source(value['probe_spec'])
     if value.get('repair_kind')=='review':
         decision=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')
         prior=store.receipt(decision['payload']['experiment'],kind='diagnostic_experiment')

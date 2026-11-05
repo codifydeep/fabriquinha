@@ -190,3 +190,13 @@ mutant and the missing targets. A survivor alone vetoes review even when other
 mutations witness all mandatory cases. Infrastructure errors and incomplete
 suite membership stop observation. Recovery checks the active claim and the
 sealed submission before reading a refusal under its original Green identity.
+
+An authenticated rejection probe can be offered for a single existing case after
+a rejected additive repair. The offer binds the source incident, parent repair,
+freeze and offline experiment. The fixed operation uses two existing browser
+contexts, the local target, a fixed route, a bounded JSON payload and redirects
+disabled. Acceptance requires the rejected POST to return 409 and both contexts
+to observe their previous state. The entire suffix is compared structurally and
+all preceding statements and other methods remain protected. The CTO must issue
+a fresh scoped repair decision before the author receives the template. The
+candidate still requires Red and independent review.

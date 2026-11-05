@@ -329,7 +329,10 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
                 from pathlib import PurePosixPath
                 prefix=PurePosixPath(path).stem+'.'
                 scoped=[c[len(prefix):] for c in context['cases'] if c.startswith(prefix)]
-                if context.get('protocol')=='technical-test-strengthening-1':
+                if context.get('probe_offer'):
+                    from .http_probe import probe_diff
+                    probe_diff(before,after,context['probe_spec'])
+                elif context.get('protocol')=='technical-test-strengthening-1':
                     if context.get('preserve_snapshot'):
                         preserved=(store.tree(context['preserve_snapshot'])/path).read_text()
                         if preserved!=after:

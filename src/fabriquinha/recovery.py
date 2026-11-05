@@ -153,7 +153,7 @@ class Diagnostic:
         if (self.level=='cto' and self.original.get('reviewing') is True
                 and self.incident.get('review_escalation') and self.incident.get('resume_allowed') is True):
             return ['return_author','hold']
-        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and self.repair['context'].get('protocol')=='technical-test-repair-1')
+        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and (self.repair['context'].get('protocol')=='technical-test-repair-1' or self.resolution.get('probe_offer')))
                   and self.original.get('reviewing') is False
                   and self.incident.get('source_state') in ('blocked','triage')
                   and self.incident.get('controller_effects')==[])
@@ -175,6 +175,9 @@ class Diagnostic:
         if self.coverage_correction():
             from .test_revision import revision_context
             revision_context(self.q.project,self.store,self.q,self.repair,self.incident['snapshot'],contract=3)
+        elif getattr(self,'resolution',{}).get('probe_offer'):
+            from .http_probe import check_offer
+            check_offer(self.store,self.q.project,self.resolution['probe_offer'],self.board.input(self.run,'incident'),self.repair['review'],key)
         else:self.q.protect(frozen['snapshot'],self.incident['snapshot'],exact_tests=True)
         return key,frozen
 
@@ -642,6 +645,10 @@ class Diagnostic:
             if (not isinstance(scope,dict) or set(scope) not in (allowed,allowed|{'tests'})
                     or 'tests' in scope and scope['tests']!=key):
                 raise ValueError('repair_scope must contain test_paths and cases only; the controller resolves the source freeze; legacy tests must match that exact receipt')
+            if self.resolution.get('probe_offer'):
+                if args['repair_scope'].get('cases')!=[self.store.receipt(self.resolution['probe_offer'],kind='http_probe_offer')['payload']['spec']['case']]:
+                    raise ValueError('choose the single offered authenticated probe case')
+                scope={**scope,'probe_offer':self.resolution['probe_offer']}
             if self.original['kind']=='tests':
                 if scope.get('mode')!='strengthen':raise ValueError('failed strict test repair requires explicit strengthening authority')
                 scope={**scope,'parent_repair':self.repair['review']}

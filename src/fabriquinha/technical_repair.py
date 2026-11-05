@@ -5,12 +5,14 @@ PROTOCOL = 'technical-test-repair-1'
 STRENGTHEN = 'technical-test-strengthening-1'
 
 def scope_input(scope):
-    return {k:scope[k] for k in ('tests','test_paths','cases','mode','product_imports','parent_repair') if k in scope}
+    return {k:scope[k] for k in ('tests','test_paths','cases','mode','product_imports','parent_repair','probe_offer') if k in scope}
 
 
 def validate_scope(project, store, incident, binding, experiment, scope):
     extended=isinstance(scope,dict) and scope.get('mode')=='strengthen'
     keys={'tests','test_paths','cases'}|({'mode','product_imports'} if extended else set())
+    probe=extended and 'probe_offer' in scope
+    if probe:keys.add('probe_offer')
     if extended and 'parent_repair' in scope:keys.add('parent_repair')
     if (not isinstance(scope, dict) or set(scope) != keys
             or binding.get('actor') != project.technical_roles.get('cto')
@@ -28,12 +30,13 @@ def validate_scope(project, store, incident, binding, experiment, scope):
             or data.get('source') != source['binding'].get('task')
             or data.get('source_run') != source['binding'].get('number')):
         raise ValueError('settled blocked or triaged implementation incident required')
+    if probe and (coverage or source['binding']['kind']!='tests'):raise ValueError('probe requires failed test author')
     parent=None
     if source['binding']['kind']=='tests':
         from .repairs import reviewed
         parent=reviewed(project,store,scope.get('parent_repair'))
         old=parent['context']
-        if (old.get('protocol')!=(STRENGTHEN if coverage else PROTOCOL) or old.get('tests')!=scope['tests']
+        if (old.get('protocol')!=(STRENGTHEN if coverage or probe else PROTOCOL) or old.get('tests')!=scope['tests']
                 or parent['proposal'].get('classification')!='test_contract'
                 or store.receipt(scope['parent_repair'])['binding']['release']!=binding['release']):
             raise ValueError('exact prior strict repair authority required for strengthening successor')
@@ -56,6 +59,15 @@ def validate_scope(project, store, incident, binding, experiment, scope):
             raise ValueError('exact immutable rejected test review required')
         from .test_revision import revision_context
         revision_context(project,store,quality,parent,data['snapshot'],contract=3)
+    elif probe:
+        from .http_probe import check_offer
+        spec=check_offer(store,project,scope['probe_offer'],incident,scope['parent_repair'],scope['tests'])
+        offer=store.receipt(scope['probe_offer'],kind='http_probe_offer')['payload']
+        trial=store.receipt(offer['qualification'],kind='offline_http_probe_qualification')['payload']
+        if (trial['green']!=old['implementation_snapshot'] or scope['cases']!=[spec['case']] or spec['case'] not in old['cases'] or old.get('probe_offer')
+                or scope['test_paths']!=[project.tests_dir+'/'+spec['case'].split('.')[0]+'.py']
+                or scope['test_paths'][0] not in old['test_paths']):
+            raise ValueError('one existing authorized probe case required')
     else:quality.protect(frozen['snapshot'], data['snapshot'], exact_tests=True)
     paths, cases = scope['test_paths'], scope['cases']
     for values in (paths, cases):
@@ -82,6 +94,8 @@ def validate_scope(project, store, incident, binding, experiment, scope):
         extra=dict(mode='strengthen',product_imports=sorted(imports))
         if parent:
             extra.update(parent_repair=scope['parent_repair'],author_snapshot=data['snapshot'])
+        if probe:
+            extra.update(probe_offer=scope['probe_offer'],probe_spec=spec)
         if coverage:
             paths=sorted(set(paths)|set(old['test_paths']))
             cases=sorted(set(cases)|set(old['cases']))
