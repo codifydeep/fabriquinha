@@ -160,3 +160,9 @@ The programmed native strengthening qualification includes rejected coverage,
 CTO authorization, an idempotent successor, cumulative QA submission and an
 independent freeze. Its reports are programmed; it does not qualify autonomous
 reasoning or replace real executor and end-to-end delivery evidence.
+
+Suite rejection messages prioritize a bounded QA failure summary before other
+error categories. They include the test count and referenced job, not the full
+case inventory. This prevents tool-output truncation from hiding the assertion
+that failed. The immutable job retains the complete report; truncation of the
+message never changes validation outcomes or grants delivery credit.

@@ -19,6 +19,24 @@ PROTECTED = ('.github/', 'pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini',
 REVIEW_FINDINGS_CONTRACT=('findings lists blocking defects only. approve requires findings=[]; '
     'put positive observations in reason. changes or escalate requires at least one concrete finding.')
 CONTROL_CONTRACT = 2
+
+
+def refusal_summary(report):
+    """Put actionable failure facts before inventory; full evidence stays in the job."""
+    result={}
+    preview=report.get('qa_preview',{})
+    if preview.get('status')=='failed':
+        errors=preview.get('errors',[])
+        result['qa_preview']=dict(status='failed',failure_kind=preview.get('failure_kind'),
+            errors=[str(error)[:700] for error in errors[:2]],error_count=len(errors),
+            case_count=len(preview.get('cases',[])))
+    for field in ('errors','skips','expected_failures','unexpected_successes'):
+        values=report.get(field,[])
+        if values:result[field]=dict(count=len(values),cases=[str(value)[:256] for value in values[:2]])
+    result['tests_run']=report.get('tests_run')
+    result['detail_limit']='Bounded summary; complete report retained in the referenced suite job.'
+    return result
+
 CONTROL_SUBMISSION_CONTRACT=('Submit the complete set of 1-8 mutations together in one delivery_submit call. '
     'Each mutation maps existing product paths to either complete replacement strings or exact edits {before: old text, after: new text}. '
     'Prefer exact edits: before must be nonempty and occur exactly once in the original Green file; no regex or commands. '
@@ -277,9 +295,7 @@ class Quality:
             try:facts=suite_report(value,diagnostic=True)
             except ValueError:raise error
             self.suite_refusal=key
-            details={field:dict(count=len(facts[field]),cases=facts[field][:8])
-                     for field in ('errors','skips','expected_failures','unexpected_successes') if facts[field]}
-            if facts.get('qa_preview',{}).get('status')=='failed':details['qa_preview']=facts['qa_preview']
+            details=refusal_summary(facts)
             raise ValueError(phase+' suite rejected; job '+key+': '+json.dumps(details)+
                 '. Fix the reported cases; this job does not qualify delivery or controls.') from None
         self.board.ensure(run)
