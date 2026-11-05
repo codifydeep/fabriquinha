@@ -523,6 +523,20 @@ class Runtime:
                 raise ValueError('native integration wait refused')
         return dict(status='scheduled',wait=receipt,delivery_approval=False)
 
+    def park_controls(self,run,submission):
+        from .control_submission import bind_claim,wait_payload
+        self.board.ensure(run)
+        kb,api,_=native()
+        with api.connect_closing() as conn:
+            row=conn.execute('SELECT worker_pid FROM task_runs WHERE id=? AND task_id=?',(run.number,run.task)).fetchone()
+            if not row or row['worker_pid']!=os.getpid():
+                raise EffectBlocked('control handoff requires current worker ownership')
+            bind_claim(self.store,run,submission)
+            wait=wait_payload(self.store,self.project,run,submission)
+            if not kb.schedule_task(conn,run.task,reason=json.dumps({'control_wait':wait}),expected_run_id=run.number):
+                raise EffectBlocked('native control handoff refused')
+        return dict(status='controls_scheduled',submission=submission,delivery_approval=False)
+
     def wake_integrations(self,conn,*,now=None):
         """Only our exact scheduled effect waits; no general auto-unblock policy."""
         kb,_,_=native();issues={};now=time.time() if now is None else now
@@ -536,19 +550,21 @@ class Runtime:
                 reason=json.loads(event[0]).get('reason')
                 try:values=json.loads(reason) if isinstance(reason,str) else {}
                 except ValueError:continue
-                if not isinstance(values,dict) or set(values)!={'integration_wait'}:continue
-                receipt=self.store.receipt(values['integration_wait'],kind='integration_wait')
+                if not isinstance(values,dict) or set(values) not in ({'integration_wait'},{'control_wait'}):continue
+                key=next(iter(values))
+                kind='implementation' if key=='control_wait' else 'integration'
+                receipt=self.store.receipt(values[key],kind=key)
                 data,binding=receipt['payload'],receipt['binding'];body=json.loads(task['body'])
                 if not all(isinstance(value,dict) for value in (data,binding,body)):
                     raise ValueError('structured integration wait required')
                 if (data['project']!=self.project.fingerprint() or binding['task']!=task['id']
                         or binding['number']!=row['id'] or binding['actor']!=row['profile']
                         or binding['actor']!=task['assignee'] or binding['author']!=task['assignee']
-                        or binding['kind']!='integration' or binding['reviewing'] is not False
+                        or binding['kind']!=kind or binding['reviewing'] is not False
                         or binding['contract']!=digest(body) or binding['release']!=body.get('release')
-                        or body.get('version')!=1 or body.get('kind')!='integration'):
+                        or body.get('version')!=1 or body.get('kind')!=kind):
                     raise ValueError('integration wait contract or owner changed')
-                if now<data['wake_at'] or worker_alive(recorded_worker(conn,row)):continue
+                if (key=='integration_wait' and now<data['wake_at']) or worker_alive(recorded_worker(conn,row)):continue
                 if not kb.unblock_task(conn,task['id']):raise ValueError('native integration wake refused')
             except (ValueError,KeyError,TypeError,OSError,EffectBlocked) as error:
                 issues[task['id']]=type(error).__name__
@@ -720,6 +736,18 @@ class Runtime:
                     result=self.park_integration(run)
                 write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
                 return
+            if run.kind=='implementation' and not run.reviewing and self.project.browser_tdd:
+                from .control_submission import previous_submission,advance,NextControl,bind_claim
+                quality.queue_controls=self.park_controls
+                with kbc.connect_closing() as conn:
+                    submission=previous_submission(conn,self.store,run)
+                if submission:
+                    self.board.guard=self.control.ensure
+                    bind_claim(self.store,run,submission)
+                    try:result=advance(quality,run,submission)
+                    except NextControl:result=self.park_controls(run,submission)
+                    write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
+                    return
             guidance=self.recovery.guidance(run)
             if guidance:quality.review_after=self.store.receipt(guidance[-1]['receipt'],kind='diagnostic_decision')['binding']['number']
             if guidance:prompt+='\nController-recorded diagnostic guidance:\n'+json.dumps(guidance_context(guidance))

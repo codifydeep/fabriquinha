@@ -272,6 +272,8 @@ class Runner:
             raise ValueError('fixed suite operation required')
         expected = dict(binding=run.binding(), project=self.project.fingerprint(),
                         snapshot=snapshot, phase=phase, image=self.project.validation_image)
+        if phase=='control' and getattr(self,'control_submission',None):
+            expected['control_submission']=self.control_submission
         trace,trace_digest=diagnostic_wrapper(self.store)
         expected['diagnostic_trace']=trace_digest
         bundle,paths=validation_files(self.project,self.store)

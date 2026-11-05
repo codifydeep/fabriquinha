@@ -166,3 +166,20 @@ error categories. They include the test count and referenced job, not the full
 case inventory. This prevents tool-output truncation from hiding the assertion
 that failed. The immutable job retains the complete report; truncation of the
 message never changes validation outcomes or grants delivery credit.
+
+## Resuming local negative controls
+
+For browser TDD, the model submits its complete ordered mutation set once.
+The controller seals the Green receipt, original native run, freeze, project,
+product snapshot and mutant snapshots in a private submission receipt. Hermes
+schedules the implementation card and resumes the same author in bounded local
+validation steps. Each step revalidates saved job evidence and starts at most one
+additional control. The complete receipt and reviewed test-author exclusion are
+required before requesting independent implementation review. A missing target,
+surviving mutant, changed workspace, different freeze or foreign claim blocks
+that transition.
+
+An assisted migration of a pre-existing timeout requires its exact author tool
+call and matching Green, snapshot, current native card and ordered mutants.
+Runs with identical code still have distinct evidence identities. The native
+offline proof uses programmed suite results and real scheduling and review claims.

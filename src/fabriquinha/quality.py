@@ -794,6 +794,12 @@ class DeliveryTools:
                 frozen_id=self.board.input(run,'tests')
                 green=self.wait(lambda:q.green(run,frozen_id,snapshot))
                 mutants=self.mutants(snapshot,args['mutations'])
+                queue=getattr(q,'queue_controls',None)
+                if queue is not None:
+                    from .control_submission import seal
+                    submission=seal(q,run,green,mutants)
+                    self.sandbox.close()
+                    return queue(run,submission)
                 controls=self.wait(lambda:q.controls(run,green,mutants),jobs=len(mutants))
                 exclude=(q.freeze(run,frozen_id)['test_author'],)
                 evidence={'green':green,'controls':controls}
