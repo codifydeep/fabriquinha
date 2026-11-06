@@ -98,6 +98,11 @@ class ScopeTests(unittest.TestCase):
         before={'app.py':'same','tests/acceptance_cancel.py':'old'}
         self.store.manifest.side_effect=lambda key:before if key=='frozen' else {**before,'tests/acceptance_cancel.py':'candidate'}
         self.assertTrue(refused_instance_candidate(self.store,self.project,incident,parent))
+        incident['payload']['snapshot']='frozen'
+        self.assertTrue(refused_instance_candidate(self.store,self.project,incident,parent))
+        incident['payload']['snapshot']='unrelated'
+        self.assertFalse(refused_instance_candidate(self.store,self.project,incident,parent))
+        incident['payload']['snapshot']='implementation'
         for field,value in [('baseline','foreign'),('phase','implementation'),('delivery_approval',True)]:
             self.records['refusal']['payload']={**refusal,field:value}
             self.assertFalse(refused_instance_candidate(self.store,self.project,incident,parent))
