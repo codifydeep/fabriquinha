@@ -87,6 +87,24 @@ class ScopeTests(unittest.TestCase):
                 self.scope['stateful_api']={'module':'app','class':'Game','methods':['play'],**bad}
                 with self.subTest(bad=bad),self.assertRaises(ValueError):self.validate()
 
+    def test_instance_repair_is_offered_only_for_exact_refused_author_snapshot(self):
+        from fabriquinha.technical_repair import refused_instance_candidate
+        incident=self.records['incident'];incident['binding']['kind']='tests'
+        incident['payload']['submission_refusal']='refusal'
+        parent=dict(snapshot='frozen',test_paths=['tests/acceptance_cancel.py'])
+        refusal=dict(project='project',phase='tests',operation='delivery_submit',delivery_approval=False,
+            error='only explicit product calls and local literal setup allowed',snapshot='implementation',baseline='frozen')
+        self.records['refusal']=dict(binding=incident['binding'].copy(),payload=refusal)
+        before={'app.py':'same','tests/acceptance_cancel.py':'old'}
+        self.store.manifest.side_effect=lambda key:before if key=='frozen' else {**before,'tests/acceptance_cancel.py':'candidate'}
+        self.assertTrue(refused_instance_candidate(self.store,self.project,incident,parent))
+        for field,value in [('baseline','foreign'),('phase','implementation'),('delivery_approval',True)]:
+            self.records['refusal']['payload']={**refusal,field:value}
+            self.assertFalse(refused_instance_candidate(self.store,self.project,incident,parent))
+        self.records['refusal']['payload']=refusal
+        self.store.manifest.side_effect=lambda key:before if key=='frozen' else {**before,'app.py':'changed'}
+        self.assertFalse(refused_instance_candidate(self.store,self.project,incident,parent))
+
     def test_test_author_successor_requires_exact_prior_strict_authority(self):
         self.records['incident']['binding']['kind']='tests'
         self.scope.update(mode='strengthen',product_imports=['app'],parent_repair='parent')

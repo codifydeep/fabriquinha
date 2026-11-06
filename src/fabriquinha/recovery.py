@@ -164,6 +164,13 @@ class Diagnostic:
             self.repair=reviewed(self.q.project,self.store,key)
             if self.store.receipt(key)['binding']['release']!=self.run.release:raise ValueError('foreign corrective diagnosis')
 
+        self.instance_repair = False
+        if (self.fixture_correction() and not self.original['reviewing']
+                and self.repair['context'].get('protocol')=='technical-test-strengthening-1'
+                and not self.repair['context'].get('stateful_api') and self.incident.get('submission_refusal')):
+            from .technical_repair import refused_instance_candidate
+            self.instance_repair=refused_instance_candidate(self.store,quality.project,record,self.repair['context'])
+
         self.control_return = None
         if (self.level == 'cto' and self.original['kind'] == 'tests' and not self.original['reviewing']
                 and self.incident.get('source_state') == 'triage' and self.repair
@@ -177,6 +184,8 @@ class Diagnostic:
 
     def actions(self):
         if getattr(self,'resolution',{}).get('role')=='investigate':return ['hold']
+        if getattr(self,'instance_repair',False):
+            return ['repair_tests','hold'] if self.level=='cto' else ['escalate','hold']
         if getattr(self, 'control_return', None):
             return ['return_controls', 'hold']
         if getattr(self, 'invalid_mutation', False):
@@ -196,7 +205,7 @@ class Diagnostic:
         if (self.level=='cto' and self.original.get('reviewing') is True
                 and self.incident.get('review_escalation') and self.incident.get('resume_allowed') is True):
             return ['return_author','hold']
-        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and (self.repair['context'].get('protocol')=='technical-test-repair-1' or self.resolution.get('probe_offer') or self.resolution.get('stateful_api_case')))
+        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and (self.repair['context'].get('protocol')=='technical-test-repair-1' or self.resolution.get('probe_offer') or getattr(self,'instance_repair',False)))
                   and self.original.get('reviewing') is False
                   and self.incident.get('source_state') in ('blocked','triage')
                   and self.incident.get('controller_effects')==[])
@@ -221,7 +230,8 @@ class Diagnostic:
         elif getattr(self,'resolution',{}).get('probe_offer'):
             from .http_probe import check_offer
             check_offer(self.store,self.q.project,self.resolution['probe_offer'],self.board.input(self.run,'incident'),self.repair['review'],key)
-        else:self.q.protect(frozen['snapshot'],self.incident['snapshot'],exact_tests=True)
+        elif not getattr(self,'instance_repair',False):
+            self.q.protect(frozen['snapshot'],self.incident['snapshot'],exact_tests=True)
         return key,frozen
 
     def coverage_correction(self):
@@ -274,6 +284,12 @@ class Diagnostic:
         result=dict(incident={**self.incident,'workspace':'/workspace','recorded_failure_is_historical':True},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
+        if getattr(self,'instance_repair',False):
+            result['stateful_repair_guidance']=('An exact structural refusal was recorded on the scoped test file. Lead escalates the capability gap to CTO. '
+                'If the behavioral scenario requires a product instance, choose a fresh current experiment and '
+                'repair_tests with mode strengthen, the same paths, cases and product_imports, plus stateful_api '
+                '{module, class, methods}. Name only the public methods needed for that scenario. '
+                'The successor starts from the reviewed freeze and must submit a fresh Red, independent review and controls.')
         if getattr(self, 'invalid_mutation', False) and 'return_controls' in self.actions():
             result['control_return_guidance'] = ('After a fresh experiment use return_controls to assign correction of '
                 'the invalid product mutation to its implementation author. The original card remains in triage. '
@@ -703,8 +719,7 @@ class Diagnostic:
             if (not isinstance(scope,dict) or set(scope) not in (allowed,allowed|{'tests'})
                     or 'tests' in scope and scope['tests']!=key):
                 raise ValueError('repair_scope must contain test_paths and cases only; the controller resolves the source freeze; legacy tests must match that exact receipt')
-            if self.resolution.get('stateful_api_case') and (not scope.get('stateful_api')
-                    or scope.get('cases') != [self.resolution['stateful_api_case']]):
+            if getattr(self,'instance_repair',False) and not scope.get('stateful_api'):
                 raise ValueError('fresh explicit public class and methods within the exact case required')
             if self.resolution.get('probe_offer'):
                 if args['repair_scope'].get('cases')!=[self.store.receipt(self.resolution['probe_offer'],kind='http_probe_offer')['payload']['spec']['case']]:

@@ -26,6 +26,21 @@ def validate_stateful_api(store, snapshot, modules, api):
     return {'module':api['module'],'class':api['class'],'methods':sorted(methods)}
 
 
+def refused_instance_candidate(store, project, incident, previous):
+    facts=incident['payload'];key=facts.get('submission_refusal')
+    if not key:return False
+    refusal=store.receipt(key,kind='submission_refusal')
+    data=refusal['payload']
+    if not (refusal['binding']==incident['binding'] and data.get('project')==project.fingerprint()
+            and data.get('phase')=='tests' and data.get('operation')=='delivery_submit'
+            and data.get('delivery_approval') is False and data.get('error')=='only explicit product calls and local literal setup allowed'
+            and data.get('snapshot')==facts['snapshot'] and data.get('baseline')==previous['snapshot']):
+        return False
+    before=store.manifest(data['baseline']);after=store.manifest(data['snapshot'])
+    changed={p for p in before.keys()|after.keys() if before.get(p)!=after.get(p)}
+    return bool(changed) and changed<=set(previous['test_paths']) and before.keys()==after.keys()
+
+
 def validate_scope(project, store, incident, binding, experiment, scope):
     extended=isinstance(scope,dict) and scope.get('mode')=='strengthen'
     keys={'tests','test_paths','cases'}|({'mode','product_imports'} if extended else set())
@@ -87,6 +102,9 @@ def validate_scope(project, store, incident, binding, experiment, scope):
                 or scope['test_paths']!=[project.tests_dir+'/'+spec['case'].split('.')[0]+'.py']
                 or scope['test_paths'][0] not in old['test_paths']):
             raise ValueError('one existing authorized probe case required')
+    elif parent and 'stateful_api' in scope:
+        if not refused_instance_candidate(store, project, source, old):
+            raise ValueError('exact structural refusal limited to the prior frozen test scope required')
     else:quality.protect(frozen['snapshot'], data['snapshot'], exact_tests=True)
     paths, cases = scope['test_paths'], scope['cases']
     for values in (paths, cases):
