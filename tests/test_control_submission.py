@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from fabriquinha.artifacts import Store
+from fabriquinha.artifacts import Store,digest
 from fabriquinha.board import Run
 from fabriquinha.config import Project
 from fabriquinha.control_submission import advance,seal,NextControl,bind_claim
@@ -22,8 +22,8 @@ class ControlContinuation(unittest.TestCase):
         root=Path(temp.name); self.work=root/'work'; self.work.mkdir()
         (self.work/'app.py').write_text('value=1')
         self.store=Store(root/'private'); self.snapshot=self.store.capture(self.work)
-        self.project=Project.parse({**configuration(),'reviewers':{'backend':['lead','cto']}})
-        self.run=Run('task',4,'backend','implementation',False,'backend','release','contract')
+        self.project=Project.parse({**configuration(),'technical_roles':{'lead':'lead','cto':'cto'},'reviewers':{'backend':['lead','cto']}})
+        self.run=Run('task',4,'backend','implementation',False,'backend','release',digest({'kind':'implementation'}))
         author=Run('tests',1,'lead','tests',False,'lead','release','tests-contract')
         self.freeze=frozen_evidence(self.store,self.project,author,self.snapshot,self.snapshot,'cto')
         self.green=self.store.record('green',self.run.binding(),dict(project=self.project.fingerprint(),freeze=self.freeze,snapshot=self.snapshot))
@@ -65,6 +65,38 @@ class ControlContinuation(unittest.TestCase):
         self.assertEqual(set(diag.actions()),{'hold','resume'})
         diag.incident['resume_allowed']=False
         self.assertEqual(diag.actions(),['hold'])
+
+    def test_invalid_mutant_triage_requires_cto_experiment_and_one_scoped_return(self):
+        from fabriquinha.control_return import invalid_control_retry
+        self.runner.control_submission=self.plan
+        payload=self.store.receipt(self.execute(self.run,self.mutants[0],'control'))['payload']
+        payload['report'].update(errors=['new'],failures=[])
+        job=self.store.record('suite_job',self.run.binding(),payload)
+        body={'kind':'implementation'}
+        live=replace(self.run,number=5)
+        bind_claim(self.store,live,self.plan)
+        project=self.project.fingerprint()
+        incident=self.store.record('incident',live.binding(),dict(project=project,source_state='triage',controller_effects=[],
+            resume_allowed=False,source=live.task,source_run=live.number,snapshot=self.snapshot,suite_refusal=job))
+        actor=Run('decision',6,'cto','diagnostic',False,'cto',live.release,'decision-body')
+        exp=self.store.record('diagnostic_experiment',actor.binding(),dict(project=project,snapshot=self.snapshot,incident=incident))
+        choice=dict(action='return_controls',experiment=exp,incident=incident,delivery_approval=False,project=project)
+        decision=self.store.record('diagnostic_decision',actor.binding(),choice)
+        binding={'release':live.release,'actor':'controller'}
+        cards=dict(implementation=dict(id=live.task,body=body,owner=live.author),tests=dict(id='tests'))
+        graph=dict(project=project,items=[dict(cards=cards)])
+        pointer=self.store.record('release_graph',binding,graph)
+        wrong=self.store.record('release_graph',binding,{**graph,'items':[dict(cards={**cards,
+            'implementation':{**cards['implementation'],'body':{'kind':'other'}}})]})
+        with self.assertRaisesRegex(ValueError,'exact current author'):
+            invalid_control_retry(self.project,self.store,decision,wrong)
+        result=invalid_control_retry(self.project,self.store,decision,pointer)
+        self.assertEqual(result['rejected_mutant'],self.mutants[0])
+        exhausted=self.store.record('release_graph',binding,{**graph,'invalid_control_retries':[result['retry']]})
+        with self.assertRaisesRegex(ValueError,'already returned'):
+            invalid_control_retry(self.project,self.store,decision,exhausted)
+        stale=self.store.record('diagnostic_decision',actor.binding(),{**choice,'experiment':None})
+        with self.assertRaises(ValueError):invalid_control_retry(self.project,self.store,stale,pointer)
 
     def test_restart_new_claim_reuses_checks_and_hands_off_original_green(self):
         with self.assertRaises(NextControl):advance(self.q,replace(self.run,number=5),self.plan)

@@ -404,7 +404,17 @@ class Releases:
                     result['tdd']=('Continue preserved product work using the newly reviewed frozen tests. Use delivery_validate for the full suite, '
                         'then submit fresh Green and the complete negative-control set for this exact revision. '
                         'Do not change tests, reuse old Green or infer approval from the fixture repair proposal.')
-            else:result['submission_continuation']=continuation_context(continuation)
+            else:
+                result['submission_continuation']=continuation_context(continuation)
+                context=continuation['context']
+                if (run.kind=='implementation' and context.get('repair_kind')=='control_retry'
+                        and self.board.input(run,'tests')==context['tests']):
+                    from .control_submission import prior_batch_for_retry
+                    with kbc.connect_closing() as conn:
+                        prior=prior_batch_for_retry(conn,self.store,self.project,context)
+                    if prior:result['submission_continuation']['previous_batch']=prior
+                    result['submission_continuation']['rejected_mutant']=context['rejected_mutant']
+                    quality.rejected_control=(context['snapshot'],context['rejected_mutant'])
         from .maintenance import run_authority
         maintenance=run_authority(self.project,self.store,self.board,run)
         if maintenance:

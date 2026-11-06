@@ -305,6 +305,15 @@ def reviewed(project, store, key):
 
 def _verify_review(project,store,key):
     record=store.receipt(key)
+    if record['kind'] == 'invalid_control_retry':
+        from .control_return import invalid_control_retry
+        data = record['payload']
+        if (record['binding'] != store.receipt(data['prior_graph'],kind='release_graph')['binding']
+                or data != invalid_control_retry(project,store,data['current_diagnosis'],data['prior_graph'])):
+            raise ValueError('invalid control succession provenance')
+        decision=store.receipt(data['current_diagnosis'],kind='diagnostic_decision')
+        return dict(review=key,proposal={'classification':'submission'},context=data,context_id=key,
+                    task=decision['binding']['task'],controller_admission=True)
     if record['kind'] == 'control_return_admission':
         from .control_return import admission_context
         data = record['payload']
@@ -902,17 +911,18 @@ class Repairs:
         """Immutable replacement tail; the source triage and completed tests remain."""
         from .executor import validation_files
         kb,_,_=native();authority=reviewed(self.project,self.store,approval);data=authority['context']
+        retry=data.get('repair_kind')=='control_retry'
         returning=data.get('repair_kind')=='control_return'
         fixture=data.get('repair_kind')=='fixture';reassessment=data.get('repair_kind')=='review'
         expected='reassess' if reassessment else 'test_contract' if fixture else 'submission'
-        if data.get('repair_kind') not in ('submission','fixture','review','control_return') or authority['proposal']['classification']!=expected:
+        if data.get('repair_kind') not in ('submission','fixture','review','control_return','control_retry') or authority['proposal']['classification']!=expected:
             raise EffectBlocked('independently approved continuation required')
         previous=self.store.receipt(data['prior_graph'],kind='release_graph')
         if previous['binding']!=self.r.binding(anchor) or previous['payload']!=graph:
             raise ValueError('proposal must refer to the exact unchanged release graph')
         scoped_fixture=fixture and authority.get('controller_admission') is True
         scope_key=admit_fixture_scope(self.project,self.store,graph,self.r.binding(anchor),authority) if scoped_fixture else None
-        if ((not returning and not reassessment and not scoped_fixture and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
+        if ((not retry and not returning and not reassessment and not scoped_fixture and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
                 or any(i.get('repair_context') for i in graph['items'])):
             raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
         if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
@@ -924,6 +934,11 @@ class Repairs:
         if source_phase not in ('tests','implementation'):raise ValueError('reviewable source phase required')
         replace_tests=fixture or reassessment and source_phase=='tests'
         if index is None:raise ValueError('continuation source missing from graph')
+        if retry:
+            tests=graph['items'][index]['cards']['tests']
+            if (source_phase!='implementation' or self.r.closed(tests['id'],'tests','tests_frozen')[0]!=data['tests']
+                    or Recovery(self.project,self.store,self.r.board).expired_effects(data['source'])):
+                raise EffectBlocked('current closed freeze and settled implementation required')
         if returning:
             proof = data['proof']
             original = self.store.receipt(proof['prior_graph'], kind='release_graph')
@@ -1002,6 +1017,8 @@ class Repairs:
                 'submission_depth':graph.get('submission_depth',0)+(0 if fixture or reassessment else 1),
                 **({'fixture_depth':graph.get('fixture_depth',0)+1} if fixture else {}),
                 **({'fixture_repair_scope':scope_key} if scoped_fixture else {})}
+            if retry:
+                result['invalid_control_retries'] = [*graph.get('invalid_control_retries', []), data['retry']]
             if returning:
                 result['superseded_cards'] = sorted(set(result['superseded_cards']) - {restored['id']})
             receipt=self.store.record('release_graph',self.r.binding(anchor),result);write_json(path,{'receipt':receipt})
@@ -1209,6 +1226,13 @@ class Repairs:
                 if not key:continue
                 decision=self.store.receipt(key,kind='diagnostic_decision')
                 incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                if decision['payload'].get('action')=='return_controls' and incident['binding']['kind']=='implementation':
+                    from .control_return import invalid_control_retry
+                    prior=self.store.record('release_graph',self.r.binding(anchor),graph)
+                    context=invalid_control_retry(self.project,self.store,key,prior)
+                    admission=self.store.record('invalid_control_retry',self.r.binding(anchor),context)
+                    replacement=self.materialize_submission(conn,anchor,graph,admission)
+                    return self.continue_submission(conn,anchor,spec,replacement)
                 if body.get('hold_resolution') and decision['payload'].get('action')=='hold':
                     resolution=body['hold_resolution']
                     if resolution.get('protocol')=='evidence-directed-hold-1' and resolution.get('role')=='decide':

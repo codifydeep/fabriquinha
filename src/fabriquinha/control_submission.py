@@ -303,3 +303,28 @@ def mutation_guidance(store, project, incident):
                 instruction='Retain effective exact edits on the same source. Diagnose each survivor against its '
                 'intended behavior. If legal play differs and the test cannot distinguish it, escalate the '
                 'reachable scenario for independent test review. All new submissions require fresh executions.')
+
+
+def prior_batch_for_retry(conn, store, project, context):
+    """Look up the last completed rejection on the same native author and frozen source."""
+    rows = conn.execute("SELECT id,summary FROM task_runs WHERE task_id=? AND id<? AND outcome='blocked' "
+                        "ORDER BY id DESC LIMIT 16", (context['source'], context['source_run']))
+    for number, summary in rows:
+        try:
+            key = json.loads(summary or '{}')['failure']
+        except (ValueError, TypeError, KeyError):
+            continue
+        failure = store.receipt(key, kind='worker_failure')
+        bound = failure['binding']
+        if bound['task'] != context['source'] or bound['number'] != number or failure['payload']['project'] != project.fingerprint():
+            raise ValueError('historical failure differs from native retry source')
+        refusal_key = failure['payload'].get('control_refusal')
+        if not refusal_key:
+            continue
+        refusal = store.receipt(refusal_key, kind='control_refusal')['payload']
+        if refusal['freeze'] == context['tests'] and refusal['snapshot'] == context['snapshot']:
+            guidance = mutation_guidance(store, project, dict(binding=bound,
+                payload=dict(control_refusal=refusal_key, snapshot=context['snapshot'])))
+            if guidance:
+                return guidance
+    return None

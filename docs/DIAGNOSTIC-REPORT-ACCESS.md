@@ -221,3 +221,12 @@ reviewed snapshot. The controller restores the exact native tests card and
 creates a Backend successor from the corresponding Green implementation. It
 publishes the replacement graph before activating workers. The successor must
 produce fresh Green, controls and independent implementation review.
+
+If the implementation itself reaches native triage after a sealed mutation
+produces a runtime error, a fresh CTO experiment and `return_controls` can
+also create a successor for that same implementation author. The successor
+keeps the reviewed tests card and receives the last completed control report
+on the exact product and freeze, including edits, survivors and assertion
+failures. It must submit a fresh batch. The controller refuses the same
+rejected mutant on unchanged source and limits this succession to one per
+product, freeze and rejected mutation.

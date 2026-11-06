@@ -183,6 +183,9 @@ class Diagnostic:
             actions = ['hold']
             if self.incident.get('resume_allowed', True):
                 actions.append('resume')
+            if (self.level == 'cto' and self.incident.get('source_state') == 'triage'
+                    and self.incident.get('controller_effects') == []):
+                actions.append('return_controls')
             if self.level == 'lead':
                 actions.append('escalate')
             return actions
@@ -271,6 +274,10 @@ class Diagnostic:
         result=dict(incident={**self.incident,'workspace':'/workspace','recorded_failure_is_historical':True},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
+        if getattr(self, 'invalid_mutation', False) and 'return_controls' in self.actions():
+            result['control_return_guidance'] = ('After a fresh experiment use return_controls to assign correction of '
+                'the invalid product mutation to its implementation author. The original card remains in triage. '
+                'Fresh Green, a complete control batch, and independent review are required.')
         if getattr(self, 'control_return', None):
             result['control_return'] = self.control_return
             result['control_return_guidance'] = ('The sealed invalid mutation produced a runtime error. If the existing '

@@ -825,8 +825,11 @@ class DeliveryTools:
                     if not isinstance(args['mutations'], list):
                         raise ValueError('ordered mutations required')
                     validate_control_targets(q.freeze(run, frozen_id)['control_cases'], len(args['mutations']), args['targets'])
-                green=self.wait(lambda:q.green(run,frozen_id,snapshot))
                 mutants=self.mutants(snapshot,args['mutations'])
+                rejected=getattr(q,'rejected_control',None)
+                if rejected and snapshot==rejected[0] and rejected[1] in mutants:
+                    raise ValueError('repeated exact invalid product mutation on unchanged source; correct the mutation before Green')
+                green=self.wait(lambda:q.green(run,frozen_id,snapshot))
                 queue=getattr(q,'queue_controls',None)
                 if queue is not None:
                     from .control_submission import seal
