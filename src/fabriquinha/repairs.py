@@ -4,6 +4,8 @@ V1 is deliberately limited to the last serialized package and expected-text QA
 corrections. No graph reset, test deletion, arbitrary exception or old approval.
 """
 import json
+from contextvars import ContextVar
+from copy import deepcopy
 from .artifacts import digest
 from .board import Run
 from .effects import EffectBlocked,write_json
@@ -283,7 +285,25 @@ def fixture_author_context(project,store,parent,incident,diagnosis,graph):
         'author_snapshot':facts['snapshot']}
 
 
-def reviewed(project,store,key):
+_review_ancestry = ContextVar('review_ancestry', default=None)
+
+
+def reviewed(project, store, key):
+    """Validate shared ancestors once within this read of immutable review evidence."""
+    cache = _review_ancestry.get()
+    if cache is None:
+        token = _review_ancestry.set({})
+        try:
+            return _verify_review(project, store, key)
+        finally:
+            _review_ancestry.reset(token)
+    identity = (id(store), project.fingerprint(), key)
+    if identity not in cache:
+        cache[identity] = _verify_review(project, store, key)
+    return deepcopy(cache[identity])
+
+
+def _verify_review(project,store,key):
     record=store.receipt(key)
     if record['kind'] == 'control_return_admission':
         from .control_return import admission_context
