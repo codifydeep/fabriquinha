@@ -412,6 +412,11 @@ class Diagnostic:
             from .quality import CONTROL_SUBMISSION_CONTRACT
             result['last_control_refusal']=control_refusal_context(self.store,self.q.project,self.original,
                 self.incident['control_refusal'],self.incident['snapshot'])
+            from .control_submission import mutation_guidance
+            prior_controls = mutation_guidance(self.store, self.q.project,
+                {'binding': self.original, 'payload': self.incident})
+            if prior_controls:
+                result['prior_controls'] = prior_controls
             result['control_submission_contract']=CONTROL_SUBMISSION_CONTRACT
             result['experiment_semantics']+=' For a control refusal, a passing unmodified suite only reconfirms Green; it does not resolve missing mutation targets. Address the recorded negative-control coverage in the technical guidance.'
         historical=[]
@@ -757,7 +762,12 @@ class Recovery:
             experiment=self.store.receipt(record['payload']['experiment'],kind='diagnostic_experiment')
             if experiment['binding']!=record['binding'] or experiment['payload']['incident']!=record['payload']['incident']:
                 raise ValueError('diagnostic guidance lacks its exact experiment')
+            prior_controls = None
+            if run.kind == 'implementation' and not run.reviewing and incident['payload'].get('control_refusal'):
+                from .control_submission import mutation_guidance
+                prior_controls = mutation_guidance(self.store, self.project, incident)
             result.append(dict(receipt=key,verdict=record['payload']['verdict'],experiment=experiment['payload'],
+                **({'prior_controls':prior_controls} if prior_controls else {}),
                 **({'required_verification':record['payload']['verification']} if record['payload']['action']=='return_author' else {})))
         return result
 

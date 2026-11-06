@@ -221,3 +221,71 @@ def refusal_origin(store, project, live_binding, record):
     else:
         raise ValueError('unsupported continuation refusal')
     return plan['binding']
+
+
+def retained_edit(original, mutant):
+    """Return a bounded unique line edit that recreates this exact disposable mutant."""
+    left, right = original.splitlines(True), mutant.splitlines(True)
+    start = 0
+    while start < min(len(left), len(right)) and left[start] == right[start]:
+        start += 1
+    end, stop = len(left), len(right)
+    while end > start and stop > start and left[end-1] == right[stop-1]:
+        end -= 1
+        stop -= 1
+    while True:
+        before, after = ''.join(left[start:end]), ''.join(right[start:stop])
+        if len(before) + len(after) > 4096:
+            return None
+        if before and original.count(before) == 1 and original.replace(before, after, 1) == mutant:
+            return dict(before=before, after=after)
+        if start:
+            start -= 1
+        elif end < len(left):
+            end += 1
+            stop += 1
+        else:
+            return None
+
+
+def mutation_guidance(store, project, incident):
+    """Return prior edits as authoring material. Every resubmission executes new jobs."""
+    from .recovery import control_refusal_context
+    facts = incident['payload']
+    key = facts['control_refusal']
+    refusal = store.receipt(key, kind='control_refusal')['payload']
+    control_refusal_context(store, project, incident['binding'], key, facts['snapshot'])
+    jobs = refusal.get('jobs', [])  # Historical summaries have no replayable mutations.
+    records = [store.receipt(job, kind='suite_job')['payload'] for job in jobs]
+    submission = records[0]['identity'].get('control_submission') if records else None
+    if not submission:
+        return None
+    plan = store.receipt(submission, kind='control_submission')['payload']
+    if (plan['green'] != refusal['green'] or plan['freeze'] != refusal['freeze']
+            or plan['snapshot'] != facts['snapshot'] or len(records) != len(plan['mutants'])
+            or 'targets' not in plan):
+        return None
+    base = store.tree(plan['snapshot'])
+    manifest = store.manifest(plan['snapshot'])
+    items = []
+    edit_budget = 24000
+    for i, job in enumerate(records):
+        mutant = plan['mutants'][i]
+        if job['identity'].get('control_submission') != submission or job['identity']['snapshot'] != mutant:
+            raise ValueError('control guidance requires the exact ordered jobs')
+        tree = store.tree(mutant)
+        changed = {p for p, meta in store.manifest(mutant).items() if manifest.get(p) != meta}
+        edits = {p: retained_edit((base/p).read_text(), (tree/p).read_text()) for p in sorted(changed)}
+        cost = len(json.dumps(edits))
+        if not all(edits.values()) or cost > edit_budget:
+            edits = None
+        else:
+            edit_budget -= cost
+        failures = job['report']['failures']
+        items.append(dict(index=i+1, targets=plan['targets'][i], survived=not failures,
+                          observed=sorted({f['case'] for f in failures if f['assertion']})[:32],
+                          edits=edits))
+    return dict(submission=submission, green=plan['green'], freeze=plan['freeze'], controls=items,
+                instruction='Retain effective exact edits on the same source. Diagnose each survivor against its '
+                'intended behavior. If legal play differs and the test cannot distinguish it, escalate the '
+                'reachable scenario for independent test review. All new submissions require fresh executions.')
