@@ -41,6 +41,54 @@ def refused_instance_candidate(store, project, incident, previous):
     return bool(changed) and changed<=set(previous['test_paths']) and before.keys()==after.keys()
 
 
+def missing_prerequisite(store, project, incident, parent):
+    """Identify a single public method used by a rejected append on a fresh product instance."""
+    api=parent.get('stateful_api')
+    if not api or not refused_instance_candidate(store,project,incident,parent):
+        return None
+    facts=incident['payload']
+    rejected=store.receipt(facts['submission_refusal'],kind='submission_refusal')['payload']
+    missing=set()
+    for path in parent['test_paths']:
+        module=PurePosixPath(path).stem
+        cases={tuple(c.split('.')[1:]) for c in parent['cases'] if c.split('.')[0]==module}
+        def methods(snapshot):
+            tree=ast.parse((store.tree(snapshot)/path).read_text())
+            return {(cls.name,fn.name):fn for cls in tree.body if isinstance(cls,ast.ClassDef)
+                    for fn in cls.body if isinstance(fn,ast.FunctionDef) and (cls.name,fn.name) in cases}
+        old,new=methods(rejected['baseline']),methods(rejected['snapshot'])
+        if set(old)!=cases or set(new)!=cases:return None
+        for case in sorted(cases):
+            prefix=old[case].body
+            if [ast.dump(n) for n in new[case].body[:len(prefix)]]!=[ast.dump(n) for n in prefix]:
+                return None
+            modules=set();constructors=set();instances=set()
+            def named_class(node):
+                return (isinstance(node,ast.Attribute) and isinstance(node.value,ast.Name)
+                        and node.value.id in modules and node.attr==api['class'])
+            for statement in new[case].body[len(prefix):]:
+                if isinstance(statement,ast.Import):
+                    modules.update(a.asname or a.name for a in statement.names if a.name==api['module'])
+                if isinstance(statement,ast.Assign) and len(statement.targets)==1 and isinstance(statement.targets[0],ast.Name):
+                    name=statement.targets[0].id;value=statement.value
+                    if named_class(value):
+                        constructors.add(name)
+                    elif isinstance(value,ast.Call) and (named_class(value.func)
+                            or isinstance(value.func,ast.Name) and value.func.id in constructors):
+                        instances.add(name)
+                for call in ast.walk(statement):
+                    if (isinstance(call,ast.Call) and isinstance(call.func,ast.Attribute)
+                            and isinstance(call.func.value,ast.Name) and call.func.value.id in instances
+                            and call.func.attr not in api['methods']):
+                        missing.add(call.func.attr)
+    if len(missing)!=1:return None
+    name=missing.pop()
+    try:validate_stateful_api(store,parent['implementation_snapshot'],parent['product_imports'],
+                              {**api,'methods':[*api['methods'],name]})
+    except ValueError:return None
+    return name
+
+
 def validate_scope(project, store, incident, binding, experiment, scope):
     extended=isinstance(scope,dict) and scope.get('mode')=='strengthen'
     keys={'tests','test_paths','cases'}|({'mode','product_imports'} if extended else set())
@@ -131,11 +179,17 @@ def validate_scope(project, store, incident, binding, experiment, scope):
         extra=dict(mode='strengthen',product_imports=sorted(imports))
         if 'stateful_api' in scope:
             if coverage or probe:raise ValueError('distinct scoped author decision required for stateful product API')
-            if parent and (old.get('stateful_api') or not set(paths)<=set(old['test_paths'])
+            if parent and (not set(paths)<=set(old['test_paths'])
                            or not set(cases)<=set(old['cases']) or not set(imports)<=set(old['product_imports'])):
                 raise ValueError('stateful successor must stay inside its prior case, path and module scope')
             product=parent['context']['implementation_snapshot'] if parent else data['snapshot']
-            extra['stateful_api']=validate_stateful_api(store,product,imports,scope['stateful_api'])
+            api=validate_stateful_api(store,product,imports,scope['stateful_api'])
+            if parent and old.get('stateful_api'):
+                prior=old['stateful_api'];method=missing_prerequisite(store,project,source,old)
+                if (not method or api['module']!=prior['module'] or api['class']!=prior['class']
+                        or set(api['methods'])!=set(prior['methods'])|{method}):
+                    raise ValueError('only the observed missing public setup method may extend the prior API')
+            extra['stateful_api']=api
         if parent:
             extra.update(parent_repair=scope['parent_repair'],author_snapshot=data['snapshot'])
         if probe:

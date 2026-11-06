@@ -479,7 +479,26 @@ def context_view(store,value):
             result['fixture_syntax']='Explicit scoped strengthening: preserve every old statement in order, unchanged. Append only local import of an authorized root product module (use a fresh alias), fresh local literal/product-call assignments and direct self.assertEqual/assertNotEqual/assertTrue/assertFalse/assertIs/assertIsNot/assertIn/assertNotIn calls. No subTest/with/loops, new helpers, top-level imports, rebinding, early exits or changes to existing assertions. Keep the complete case inventory. Independent review, new freeze and negative controls remain mandatory.'
     if value.get('stateful_api'):
         result['stateful_api']=value['stateful_api']
-        result['fixture_syntax']+=' Construct the authorized class via a fresh module alias, assign the instance to a fresh local, and call only its authorized methods. Assign each result to a new local; access it with a literal public key or nonnegative index in a separate assignment or assertion. Store each setup action result; avoid tuple unpacking, chained calls, loops and rebinding. Verify the behavior transition with the existing assertion methods.'
+        result['fixture_syntax']+=' Construct directly in one assignment (fresh_instance = fresh_module_alias.ClassName()), and call only its authorized methods. Assign each result to a new local; access it with a literal public key or nonnegative index in a separate assignment or assertion. Store each setup action result; avoid tuple unpacking, chained calls, loops and rebinding. Verify the behavior transition with the existing assertion methods.'
+        if value.get('parent_repair') and value.get('incident'):
+            incident=store.receipt(value['incident'],kind='incident')
+            key=incident['payload'].get('submission_refusal')
+            if key:
+                from pathlib import PurePosixPath
+                from .test_revision import fixture_snapshot_diff
+                record=store.receipt(key,kind='submission_refusal')
+                rejected=record['payload']
+                if (record['binding']==incident['binding'] and rejected['project']==value['project']
+                        and rejected['baseline']==value['snapshot'] and rejected['delivery_approval'] is False):
+                    try:
+                        changes=fixture_snapshot_diff(store,value['snapshot'],rejected['snapshot'],value['test_paths'],
+                            PurePosixPath(value['test_paths'][0]).parent.as_posix(),candidate=True)
+                    except ValueError:
+                        changes=None  # A historical attempt outside the new scope supplies no authoring material.
+                    if changes:
+                        result['rejected_attempt']=dict(receipt=key,reason=rejected['error'],changes=changes,
+                            instruction='Use the prior author work as a reference. Construct directly from the module; '
+                                        'avoid assigning the class to another variable. Submit a fresh candidate for independent review.')
     if value.get('probe_offer'):
         from .http_probe import probe_source
         result['fixture_syntax']='Append exactly the following qualified HTTP probe to the existing authorized case. Preserve every existing statement. The sealed template fixes authentication, origin, action and both state comparisons. New Red and independent freeze are mandatory.'

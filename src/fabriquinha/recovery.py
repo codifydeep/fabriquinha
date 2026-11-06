@@ -165,11 +165,17 @@ class Diagnostic:
             if self.store.receipt(key)['binding']['release']!=self.run.release:raise ValueError('foreign corrective diagnosis')
 
         self.instance_repair = False
+        self.missing_method = None
         if (self.fixture_correction() and not self.original['reviewing']
                 and self.repair['context'].get('protocol')=='technical-test-strengthening-1'
-                and not self.repair['context'].get('stateful_api') and self.incident.get('submission_refusal')):
+                and self.incident.get('submission_refusal')):
             from .technical_repair import refused_instance_candidate
-            self.instance_repair=refused_instance_candidate(self.store,quality.project,record,self.repair['context'])
+            if self.repair['context'].get('stateful_api'):
+                from .technical_repair import missing_prerequisite
+                self.missing_method=missing_prerequisite(self.store,quality.project,record,self.repair['context'])
+                self.instance_repair=self.missing_method is not None
+            else:
+                self.instance_repair=refused_instance_candidate(self.store,quality.project,record,self.repair['context'])
 
         self.control_return = None
         if (self.level == 'cto' and self.original['kind'] == 'tests' and not self.original['reviewing']
@@ -290,6 +296,13 @@ class Diagnostic:
                 'repair_tests with mode strengthen, the same paths, cases and product_imports, plus stateful_api '
                 '{module, class, methods}. Name only the public methods needed for that scenario. '
                 'The successor starts from the reviewed freeze and must submit a fresh Red, independent review and controls.')
+        if getattr(self,'missing_method',None):
+            api=self.repair['context']['stateful_api']
+            result['observed_missing_method']=dict(method=self.missing_method,
+                proposed_stateful_api={**api,'methods':sorted([*api['methods'],self.missing_method])},
+                instruction='The rejected candidate called this additional public method on the authorized class. '
+                'Lead escalates. CTO must validate its necessity and explicitly authorize the exact extension '
+                'after a fresh experiment. QA must construct the instance directly as fresh_module_alias.ClassName().')
         if getattr(self, 'invalid_mutation', False) and 'return_controls' in self.actions():
             result['control_return_guidance'] = ('After a fresh experiment use return_controls to assign correction of '
                 'the invalid product mutation to its implementation author. The original card remains in triage. '

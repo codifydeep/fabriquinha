@@ -247,3 +247,11 @@ and inspect returned data with bounded literal keys or indices. This permits a
 reachable sequence of domain operations while preserving every existing
 statement in the test. A previous authorization without this field retains its
 original grammar. Independent freeze and behavioral controls are mandatory.
+
+If a rejected QA append calls exactly one additional public method on the same
+fresh product instance, diagnosis can name that missing prerequisite from the
+preserved candidate. A new CTO decision may authorize precisely that method
+in addition to the prior method list. The class, frozen test paths and cases
+stay scoped, and the product must actually define the method. The prior
+attempt is available as a diff for the author. It still requires a fresh
+submission, independent freeze and negative controls.

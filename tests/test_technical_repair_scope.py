@@ -110,6 +110,30 @@ class ScopeTests(unittest.TestCase):
         self.store.manifest.side_effect=lambda key:before if key=='frozen' else {**before,'app.py':'changed'}
         self.assertFalse(refused_instance_candidate(self.store,self.project,incident,parent))
 
+    def test_only_one_missing_declared_method_on_a_fresh_product_instance_is_suggested(self):
+        import tempfile
+        from fabriquinha.technical_repair import missing_prerequisite
+        from fabriquinha.artifacts import Store
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);work=root/'work';work.mkdir();(work/'tests').mkdir();store=Store(root/'private')
+            (work/'app.py').write_text('class Game:\n    def play(self): pass\n    def ready(self): pass\n    def other(self): pass\n')
+            file=work/'tests/acceptance_cancel.py'
+            text='class Cancel:\n    def test_full(self):\n        self.assertTrue(True)\n'
+            file.write_text(text);base=store.capture(work)
+            parent=dict(snapshot=base,implementation_snapshot=base,product_imports=['app'],stateful_api=dict(
+                module='app',methods=['play'],**{'class':'Game'}),**{k:self.scope[k] for k in ('cases','test_paths')})
+            binding=self.records['incident']['binding'];binding['kind']='tests'
+            def identify(code):
+                file.write_text(text+code);snap=store.capture(work)
+                refusal=store.record('submission_refusal',binding,dict(project='project',phase='tests',operation='delivery_submit',
+                    delivery_approval=False,error='only explicit product calls and local literal setup allowed',baseline=base,snapshot=snap))
+                return missing_prerequisite(store,self.project,dict(binding=binding,payload=dict(submission_refusal=refusal,snapshot=base)),parent)
+            for ctor in ('        table=g.Game()\n','        factory=g.Game\n        table=factory()\n'):
+                setup='        import app as g\n'+ctor
+                self.assertEqual(identify(setup+'        value=table.ready()\n'),'ready')
+                for action in ('table.unknown()', 'another.ready()', 'table.ready(); table.other()'):
+                    self.assertIsNone(identify(setup+'        '+action+'\n'))
+
     def test_test_author_successor_requires_exact_prior_strict_authority(self):
         self.records['incident']['binding']['kind']='tests'
         self.scope.update(mode='strengthen',product_imports=['app'],parent_repair='parent')
