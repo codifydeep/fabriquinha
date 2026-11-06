@@ -433,6 +433,18 @@ class Releases:
             else:
                 result['submission_continuation']=continuation_context(continuation)
                 context=continuation['context']
+                offer=context.get('fixed_replay')
+                if (offer and repaired_implementation and not run.reviewing and context['repair_kind']=='submission'
+                        and continuation['proposal']['classification']=='submission' and freeze_key==offer['freeze']):
+                    from .control_submission import replay_after_fixture
+                    with kbc.connect_closing() as conn:
+                        batch=replay_after_fixture(conn,self.store,self.project,graph,authority['context'],current_freeze)
+                    if (not batch or batch['submission']!=offer['submission']
+                            or self.store.receipt(batch['submission'],kind='control_submission')['binding']['author']!=run.author
+                            or self.store.capture(self.board.workspace(run))!=offer['snapshot']):
+                        raise EffectBlocked('reviewed replay requires its exact batch, freeze and source')
+                    quality.fixed_replay=offer
+                    quality.fixture_replay=(batch,freeze_key)
                 if (run.kind=='implementation' and context.get('repair_kind')=='control_retry'
                         and self.board.input(run,'tests')==context['tests']):
                     from .control_submission import prior_batch_for_retry

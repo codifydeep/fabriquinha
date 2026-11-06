@@ -263,3 +263,14 @@ edits against the **new** tests, starting with the previously surviving
 mutation. It is available only when the earlier proposal belongs to the same
 release history, maps all current required cases, and its surviving controls
 target the repaired cases. Every suite job runs on the new Green.
+
+If an author completes Green but does not submit a batch, a reviewed
+submission-recovery proposal can explicitly select a fixed replay. This applies
+only when the product and author match the earlier batch, every required case
+is mapped, and independent review has already frozen the stronger tests. The
+Tech Lead proposes the bounded operation and an eligible reviewer approves it.
+A fresh native Backend claim then runs Green and queues the earlier edits on
+the new freeze without a model call. A prior started attempt cannot start the
+same fixed replay again. The native control checkpoints still handle restarts.
+Submission-recovery limits apply to attempts for the package's current tests
+card; prior freezes and their refused executions remain in the graph history.

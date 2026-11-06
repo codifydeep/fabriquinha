@@ -24,6 +24,31 @@ REVIEW_ADMISSION_PROTOCOL='direct-independent-review-1'
 
 
 
+def submission_attempts(store, graph, item):
+    """Count bounded submission recoveries for this package's current tests card."""
+    depth=graph.get('submission_depth',0)
+    if not graph.get('previous_graph'):return depth
+    package=item['package']['id']
+    cards=item['cards'];current=graph;visited=set();attempts=0
+    while current.get('previous_graph'):
+        key=current['previous_graph']
+        if key in visited:raise ValueError('cyclic submission history')
+        visited.add(key)
+        parent=store.receipt(key,kind='release_graph')['payload']
+        if parent.get('project')!=graph.get('project') or parent.get('plan_review')!=graph.get('plan_review'):
+            raise ValueError('foreign graph in submission history')
+        matches=[entry['cards'] for entry in parent['items'] if entry['package']['id']==package]
+        if len(matches)!=1:raise ValueError('one package required in submission history')
+        before=matches[0]
+        if before['tests']['id']!=cards['tests']['id']:return attempts
+        delta=current.get('submission_depth',0)-parent.get('submission_depth',0)
+        if delta not in (0,1):raise ValueError('unexpected submission depth transition')
+        if before['implementation']['id']!=cards['implementation']['id']:attempts+=delta
+        cards=before;current=parent
+    return attempts+current.get('submission_depth',0)
+
+
+
 def fixture_scope_key(authority):
     """Scope identity excludes diagnosis wording and execution retry counters."""
     data=authority['context'];paths=authority['proposal'].get('test_paths',[])
@@ -448,7 +473,7 @@ def repair_document(value,context):
 def context_view(store,value):
     """Model context needs failure facts, not private graph/workspace copies."""
     keys=('source','source_run','snapshot','commit','tests','browser_job','failure','package','qa_paths','failed_stage','retry_rule','prior_authority',
-          'repair_kind','control_refusal','protocol_failure','submission_contract')
+          'repair_kind','control_refusal','protocol_failure','submission_contract','fixed_replay')
     result={k:value[k] for k in keys if k in value}
     if value.get('reviewed_diagnosis'):
         result['prior_diagnosis']=store.receipt(value['reviewed_diagnosis'],kind='diagnostic_decision')['payload']['verdict']
@@ -905,6 +930,22 @@ class Repairs:
         key=digest([self.project.fingerprint(),source.id,latest.id,SUBMISSION_PROTOCOL,'proposal'])
         existing=conn.execute('SELECT id,body FROM tasks WHERE idempotency_key=?',(key,)).fetchone()
         submission_contract=CONTROL_SUBMISSION_CONTRACT
+        offer=None
+        if not existing and facts.get('protocol_failure') and graph.get('continuation_review'):
+            previous=reviewed(self.project,self.store,graph['continuation_review'])
+            if previous['context'].get('repair_kind')=='fixture':
+                from .control_submission import replay_after_fixture,matching_product
+                freeze_data=Quality(self.project,self.store,None,None).frozen_plan(self.store.receipt(frozen,kind='tests_frozen'))
+                batch=replay_after_fixture(conn,self.store,self.project,graph,previous['context'],freeze_data)
+                if batch:
+                    old=self.store.receipt(batch['submission'],kind='control_submission')
+                    if (old['binding']['author']==source.assignee and old['binding']['release']==self.r.binding(anchor)['release']
+                            and matching_product(self.store,facts['snapshot'],old['payload']['snapshot'],self.project.tests_dir)):
+                        offer=dict(submission=batch['submission'],freeze=frozen,snapshot=facts['snapshot'])
+                        submission_contract=('Review the fixed local replay of the implementation author’s earlier product edits '
+                            'on this independently revised freeze. Approval of classification submission assigns a native '
+                            'implementation successor to run a fresh Green and every control, former survivors first, '
+                            'without another model call. Independent implementation review remains mandatory.')
         if existing:
             saved=json.loads(existing['body'])
             if not isinstance(saved,dict) or not isinstance(saved.get('repair_context'),str):
@@ -912,11 +953,12 @@ class Repairs:
             prior=self.store.receipt(saved['repair_context'],kind='repair_context')
             if prior['binding']!=self.r.binding(anchor):raise ValueError('proposal context authority changed')
             submission_contract=prior['payload']['submission_contract']
+            offer=prior['payload'].get('fixed_replay')
         prior_graph=self.store.record('release_graph',self.r.binding(anchor),graph)
         context=self.store.record('repair_context',self.r.binding(anchor),dict(**facts,
             project=self.project.fingerprint(),repair_kind='submission',submission_protocol=SUBMISSION_PROTOCOL,
             prior_graph=prior_graph,prior_proposal_review=prior_review,
-            submission_contract=submission_contract,qa_paths=[],package=item['package'],
+            submission_contract=submission_contract,**({'fixed_replay':offer} if offer else {}),qa_paths=[],package=item['package'],
             architecture=spec['document']['architecture'],observability=spec['document']['observability']))
         body=dict(version=1,kind='plan',release=self.r.binding(anchor)['release'],anchor=anchor.id,
             repair_of=source.id,repair_context=context,repair_protocol=SUBMISSION_PROTOCOL,
@@ -944,7 +986,7 @@ class Repairs:
             raise ValueError('proposal must refer to the exact unchanged release graph')
         scoped_fixture=fixture and authority.get('controller_admission') is True
         scope_key=admit_fixture_scope(self.project,self.store,graph,self.r.binding(anchor),authority) if scoped_fixture else None
-        if ((not retry and not returning and not reassessment and not scoped_fixture and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
+        if ((fixture and not scoped_fixture and graph.get('fixture_depth',0)>=1)
                 or any(i.get('repair_context') for i in graph['items'])):
             raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
         if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
@@ -956,6 +998,9 @@ class Repairs:
         if source_phase not in ('tests','implementation'):raise ValueError('reviewable source phase required')
         replace_tests=fixture or reassessment and source_phase=='tests'
         if index is None:raise ValueError('continuation source missing from graph')
+        if (not retry and not returning and not fixture and not reassessment
+                and submission_attempts(self.store,graph,graph['items'][index])>=2):
+            raise EffectBlocked('bounded submission continuation exhausted for current tests')
         if retry:
             tests=graph['items'][index]['cards']['tests']
             if (source_phase!='implementation' or self.r.closed(tests['id'],'tests','tests_frozen')[0]!=data['tests']
@@ -1314,7 +1359,7 @@ class Repairs:
                     decisions.append((decision['payload']['incident'],key))
             if not decisions:continue
             if len(decisions)!=1:raise ValueError('one exact CTO disposition required for continuation')
-            propose=self.propose_fixture if graph.get('submission_depth',0)>=2 else self.propose_submission
+            propose=self.propose_fixture if submission_attempts(self.store,graph,item)>=2 else self.propose_submission
             proposal=propose(conn,anchor,spec,item,*decisions[0],graph)
             task=kb.get_task(conn,proposal)
             if task.status!='done':return graph

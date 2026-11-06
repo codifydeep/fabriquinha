@@ -38,3 +38,18 @@ class CurrentFreeze(unittest.TestCase):
         files['app.py']='product';tool.board.input.return_value='old-freeze'
         with self.assertRaises(ValueError):tool.replay_controls({})
         self.assertEqual(tool.submit.call_count,1)
+
+    def test_submission_budget_counts_only_this_package_on_the_same_tests_card(self):
+        from unittest.mock import Mock
+        from fabriquinha.repairs import submission_attempts
+        def graph(tests,implementation,depth,previous=None):
+            return dict(items=[dict(package={'id':'P'},cards={'tests':{'id':tests},'implementation':{'id':implementation}})],
+                        submission_depth=depth,previous_graph=previous,project='p',plan_review='approved')
+        store=Mock()
+        history={'original':graph('old','A',2),'repaired':graph('new','B',2,'original'),
+                 'other-package':graph('new','B',3,'repaired')}
+        store.receipt.side_effect=lambda ref,kind:{'payload':history[ref]}
+        current=graph('new','C',4,'other-package')
+        self.assertEqual(submission_attempts(store,current,current['items'][0]),1)
+        history['original']['project']='other project'
+        with self.assertRaises(ValueError):submission_attempts(store,current,current['items'][0])

@@ -750,6 +750,18 @@ class Runtime:
                     except NextControl:result=self.park_controls(run,submission)
                     write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result))
                     return
+                if getattr(quality,'fixed_replay',None):
+                    from .quality import DeliveryTools
+                    with kbc.connect_closing() as conn:
+                        prior=conn.execute('SELECT 1 FROM task_runs WHERE task_id=? AND id<? '
+                            'AND worker_started_at IS NOT NULL LIMIT 1',(run.task,run.number)).fetchone()
+                    if prior:raise EffectBlocked('reviewed replay already attempted; require new diagnostic evidence')
+                    self.board.guard=self.control.ensure
+                    sandbox=Sandbox(self.project,self.store,self.board,run)
+                    result=DeliveryTools(sandbox,quality).replay_controls({})
+                    write_json(self.root/'runs'/str(number)/'activity.json',dict(binding=run.binding(),result=result,
+                        fixed_replay=quality.fixed_replay,model_calls=0))
+                    return
             guidance=self.recovery.guidance(run)
             if guidance:quality.review_after=self.store.receipt(guidance[-1]['receipt'],kind='diagnostic_decision')['binding']['number']
             if guidance:prompt+='\nController-recorded diagnostic guidance:\n'+json.dumps(guidance_context(guidance))
