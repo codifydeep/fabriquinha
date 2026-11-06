@@ -1162,7 +1162,7 @@ class Repairs:
         for item in graph['items']:
             author=kb.get_task(conn,item['cards']['tests']['id'])
             body=json.loads(author.body);parent=body.get('inputs',{}).get('repair_review')
-            if author.status=='triage' and parent:
+            if author.status in ('blocked','triage') and parent:
                 latest=kb.latest_run(conn,author.id)
                 if latest and latest.ended_at and not Recovery(self.project,self.store,self.r.board).expired_effects(author.id):
                     for diagnostic in Recovery(self.project,self.store,self.r.board).cards(conn):
@@ -1173,6 +1173,9 @@ class Repairs:
                         if not key:continue
                         decision=self.store.receipt(key,kind='diagnostic_decision')
                         incident=self.store.receipt(decision['payload']['incident'],kind='incident')
+                        if author.status=='blocked' and (decision['payload']['action']!='repair_tests'
+                                or not decision['payload'].get('test_repair',{}).get('stateful_api')):
+                            continue
                         # Review holds belong to Recovery's CTO decision lane. They
                         # are not failed author submissions or syntax-repair authority.
                         if incident['binding'].get('reviewing') is True and decision['payload']['action']!='repair_tests':continue
