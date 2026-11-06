@@ -1,11 +1,29 @@
 """Scoped CTO test-repair decisions. Admission never approves tests or delivery."""
+import ast
+import keyword
 from pathlib import PurePosixPath
 
 PROTOCOL = 'technical-test-repair-1'
 STRENGTHEN = 'technical-test-strengthening-1'
 
 def scope_input(scope):
-    return {k:scope[k] for k in ('tests','test_paths','cases','mode','product_imports','parent_repair','probe_offer') if k in scope}
+    return {k:scope[k] for k in ('tests','test_paths','cases','mode','product_imports','parent_repair','probe_offer','stateful_api') if k in scope}
+
+
+def validate_stateful_api(store, snapshot, modules, api):
+    if not isinstance(api,dict) or set(api)!={'module','class','methods'} or api['module'] not in modules:
+        raise ValueError('one explicitly authorized product class required')
+    methods=api['methods']
+    if (not isinstance(methods,list) or not 1<=len(methods)<=12
+            or any(not isinstance(name,str) or not name.isidentifier() or name.startswith('_')
+                   or keyword.iskeyword(name) for name in [api['class'],*methods])
+            or len(set(methods))!=len(methods)):
+        raise ValueError('bounded distinct public method names required')
+    tree=ast.parse((store.tree(snapshot)/(api['module']+'.py')).read_text())
+    classes=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name==api['class']]
+    if len(classes)!=1 or not set(methods)<={n.name for n in classes[0].body if isinstance(n,ast.FunctionDef)}:
+        raise ValueError('methods must be defined on the preserved product class')
+    return {'module':api['module'],'class':api['class'],'methods':sorted(methods)}
 
 
 def validate_scope(project, store, incident, binding, experiment, scope):
@@ -13,6 +31,7 @@ def validate_scope(project, store, incident, binding, experiment, scope):
     keys={'tests','test_paths','cases'}|({'mode','product_imports'} if extended else set())
     probe=extended and 'probe_offer' in scope
     if probe:keys.add('probe_offer')
+    if extended and 'stateful_api' in scope:keys.add('stateful_api')
     if extended and 'parent_repair' in scope:keys.add('parent_repair')
     if (not isinstance(scope, dict) or set(scope) != keys
             or binding.get('actor') != project.technical_roles.get('cto')
@@ -36,7 +55,7 @@ def validate_scope(project, store, incident, binding, experiment, scope):
         from .repairs import reviewed
         parent=reviewed(project,store,scope.get('parent_repair'))
         old=parent['context']
-        if (old.get('protocol')!=(STRENGTHEN if coverage or probe else PROTOCOL) or old.get('tests')!=scope['tests']
+        if (old.get('protocol')!=(STRENGTHEN if coverage or probe or 'stateful_api' in scope else PROTOCOL) or old.get('tests')!=scope['tests']
                 or parent['proposal'].get('classification')!='test_contract'
                 or store.receipt(scope['parent_repair'])['binding']['release']!=binding['release']):
             raise ValueError('exact prior strict repair authority required for strengthening successor')
@@ -92,6 +111,13 @@ def validate_scope(project, store, incident, binding, experiment, scope):
                 or any(not isinstance(m,str) or not m.isidentifier() or m.startswith('_') or m+'.py' not in manifest for m in imports)):
             raise ValueError('explicit existing root product modules required')
         extra=dict(mode='strengthen',product_imports=sorted(imports))
+        if 'stateful_api' in scope:
+            if coverage or probe:raise ValueError('distinct scoped author decision required for stateful product API')
+            if parent and (old.get('stateful_api') or not set(paths)<=set(old['test_paths'])
+                           or not set(cases)<=set(old['cases']) or not set(imports)<=set(old['product_imports'])):
+                raise ValueError('stateful successor must stay inside its prior case, path and module scope')
+            product=parent['context']['implementation_snapshot'] if parent else data['snapshot']
+            extra['stateful_api']=validate_stateful_api(store,product,imports,scope['stateful_api'])
         if parent:
             extra.update(parent_repair=scope['parent_repair'],author_snapshot=data['snapshot'])
         if probe:
@@ -101,6 +127,8 @@ def validate_scope(project, store, incident, binding, experiment, scope):
             cases=sorted(set(cases)|set(old['cases']))
             extra['product_imports']=sorted(set(imports)|set(old['product_imports']))
             extra['preserve_snapshot']=data['snapshot']
+            prior_api=old.get('stateful_api') or old.get('preserved_stateful_api')
+            if prior_api:extra['preserved_stateful_api']=prior_api
             if len(paths)>20 or len(cases)>20 or len(extra['product_imports'])>4:
                 raise ValueError('cumulative coverage scope exceeds bounded authority')
     return dict(protocol=STRENGTHEN if extended else PROTOCOL,**extra, tests=scope['tests'], test_paths=sorted(paths),

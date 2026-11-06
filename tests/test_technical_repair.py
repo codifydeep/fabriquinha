@@ -84,3 +84,26 @@ class CumulativeStrengtheningTests(unittest.TestCase):
         cumulative_strengthening_diff(BEFORE,first,second,**args)
         with self.assertRaises(ValueError):
             cumulative_strengthening_diff(BEFORE,first,second.replace("        self.assertEqual(cards.compare_cards(('5','Hearts'),('5','Spades'),'5'), 'A')\n",''),**args)
+
+class ScopedInstanceStrengthening(unittest.TestCase):
+    methods={'module':'app','class':'Game','methods':['start','play']}
+    suffix="""        import app as game_api
+        table = game_api.Game()
+        created = table.start('a')
+        code = created['id']
+        response = table.play(code, 'b', 5)
+        self.assertIs(response[1], None)
+"""
+    def validate(self,after):
+        from fabriquinha.test_revision import strengthening_diff
+        return strengthening_diff(BEFORE,after,cases=['Cancellation.test_full_room'],product_imports=['app'],
+                                  stateful_api=self.methods)
+    def test_only_declared_receiver_methods_and_bounded_result_reads(self):
+        self.validate(BEFORE+self.suffix)
+        for bad in ('created.play(code,','table.close(code,'):
+            with self.assertRaises(ValueError):self.validate(BEFORE+self.suffix.replace('table.play(code,',bad))
+        for bad in ('response.__dict__','response[table]','response[-1]'):
+            with self.assertRaises(ValueError):self.validate(BEFORE+self.suffix.replace('response[1]',bad))
+        from fabriquinha.test_revision import strengthening_diff
+        with self.assertRaises(ValueError):
+            strengthening_diff(BEFORE,BEFORE+self.suffix,cases=['Cancellation.test_full_room'],product_imports=['app'])

@@ -196,7 +196,7 @@ class Diagnostic:
         if (self.level=='cto' and self.original.get('reviewing') is True
                 and self.incident.get('review_escalation') and self.incident.get('resume_allowed') is True):
             return ['return_author','hold']
-        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and (self.repair['context'].get('protocol')=='technical-test-repair-1' or self.resolution.get('probe_offer')))
+        repair = (self.level=='cto' and (self.original.get('kind')=='implementation' or self.fixture_correction() and (self.repair['context'].get('protocol')=='technical-test-repair-1' or self.resolution.get('probe_offer') or self.resolution.get('stateful_api_case')))
                   and self.original.get('reviewing') is False
                   and self.incident.get('source_state') in ('blocked','triage')
                   and self.incident.get('controller_effects')==[])
@@ -325,7 +325,7 @@ class Diagnostic:
             key,frozen=self.repair_freeze()
             result['technical_test_repair']=dict(tests=key,cases=frozen['cases'],files=sorted(frozen['tests']),
                 contract='The controller resolves the exact frozen tests from the failed implementation. '
-                'repair_scope requires test_paths and cases. For explicit additive coverage only, use mode=strengthen and product_imports naming existing root product modules; prior assertions/statements must remain unchanged and additions are appended in scoped cases. No receipt IDs. '
+                'repair_scope requires test_paths and cases. For explicit additive coverage only, use mode=strengthen and product_imports naming existing root product modules; prior assertions/statements must remain unchanged and additions are appended in scoped cases. For a stateful scenario also name stateful_api with module, class and a short list of public methods declared on the preserved product class. No receipt IDs. '
                 'Diagnose 404/roster failures by origin before classifying them as test defects. '
                 'Do not whitelist console messages or turn error observers off. A deliberate negative API probe '
                 'may use the same browser context request client, preserving cookies. '
@@ -699,9 +699,13 @@ class Diagnostic:
             if self.experiment is None:raise ValueError('test repair requires a current CTO experiment')
             scope=args['repair_scope'];key,_=self.repair_freeze()
             allowed={'test_paths','cases'}|({'mode','product_imports'} if isinstance(scope,dict) and scope.get('mode')=='strengthen' else set())
+            if isinstance(scope,dict) and scope.get('mode')=='strengthen' and 'stateful_api' in scope:allowed.add('stateful_api')
             if (not isinstance(scope,dict) or set(scope) not in (allowed,allowed|{'tests'})
                     or 'tests' in scope and scope['tests']!=key):
                 raise ValueError('repair_scope must contain test_paths and cases only; the controller resolves the source freeze; legacy tests must match that exact receipt')
+            if self.resolution.get('stateful_api_case') and (not scope.get('stateful_api')
+                    or scope.get('cases') != [self.resolution['stateful_api_case']]):
+                raise ValueError('fresh explicit public class and methods within the exact case required')
             if self.resolution.get('probe_offer'):
                 if args['repair_scope'].get('cases')!=[self.store.receipt(self.resolution['probe_offer'],kind='http_probe_offer')['payload']['spec']['case']]:
                     raise ValueError('choose the single offered authenticated probe case')
@@ -1260,7 +1264,10 @@ def register_diagnostic(sandbox,quality,on_terminal):
             properties=dict(test_paths=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
                             cases=dict(type='array',minItems=1,maxItems=20,items=dict(type='string')),
                             mode=dict(type='string',enum=['strengthen']),
-                            product_imports=dict(type='array',minItems=1,maxItems=4,items=dict(type='string'))))
+                            product_imports=dict(type='array',minItems=1,maxItems=4,items=dict(type='string')),
+                            stateful_api=dict(type='object',additionalProperties=False,required=['module','class','methods'],
+                                properties={'module':dict(type='string'),'class':dict(type='string'),
+                                    'methods':dict(type='array',minItems=1,maxItems=12,items=dict(type='string'))})))
     if getattr(operations,'resolution',{}):
         schemas['diagnostic_decide']['properties']['next_step']=dict(type='object',additionalProperties=False,
             description='Required for hold: exact technical responsibility and next verifiable operation; not approval.',

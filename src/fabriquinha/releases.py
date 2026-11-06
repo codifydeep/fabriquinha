@@ -397,6 +397,8 @@ class Releases:
                             'Keep all original assertions, case inventory, observers, helpers and discovery. No product edits. Use fixture_revision.fixture_syntax for the allowed syntax. '
                             'delivery_submit requires fresh baseline and Red; independent review freezes the revision. Fresh Green and negative controls must kill the previously surviving mutation. No inherited approval.')
                         result['browser']='Keep every existing browser scenario unchanged; additional direct checks of the authorized product module complement browser coverage. Do not change the deal or add production test switches.'
+                    if continuation['context'].get('stateful_api'):
+                        result['tdd']=result['fixture_revision']['fixture_syntax']
                     if continuation['context'].get('probe_offer'):
                         result['tdd']=result['fixture_revision']['fixture_syntax']
                         result['browser']='Use the exact authorized_append from fixture_revision in its assigned case.'

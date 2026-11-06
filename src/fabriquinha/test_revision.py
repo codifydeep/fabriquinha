@@ -103,7 +103,7 @@ def candidate_diff(before,after):
     return dict(diff=diff,structural=structural,semantic_review_required=True)
 
 
-def strengthening_diff(before,after,*,cases,product_imports):
+def strengthening_diff(before,after,*,cases,product_imports,stateful_api=None):
     """Append scoped behavioral checks; old statements and authority stay intact."""
     findings=candidate_diff(before,after)
     left,right=ast.parse(before),ast.parse(after)
@@ -121,16 +121,23 @@ def strengthening_diff(before,after,*,cases,product_imports):
             prior=next(m for m in prior_cls.body if isinstance(m,ast.FunctionDef) and m.name==method.name)
             if [shape(n) for n in method.body[:len(prior.body)]]!=[shape(n) for n in prior.body]:
                 raise ValueError('strengthening must preserve every existing statement before additions')
-            imported=set();fresh=set()
+            imported=set();fresh=set();module_aliases={};instances=set()
             def expression(node):
                 if isinstance(node,ast.Constant):return
                 if isinstance(node,(ast.Tuple,ast.List)):
                     for item in node.elts:expression(item)
                     return
                 if isinstance(node,ast.Name) and node.id in fresh:return
+                if stateful_api and isinstance(node,ast.Subscript) and isinstance(node.value,ast.Name):
+                    key=node.slice.value if isinstance(node.slice,ast.Constant) else None
+                    if (node.value.id in fresh-instances and
+                            (type(key) is int and 0<=key<64 or isinstance(key,str) and key.isidentifier()
+                             and not key.startswith('_') and len(key)<=64)):
+                        return
                 if (isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
-                        and isinstance(node.func.value,ast.Name) and node.func.value.id in imported
-                        and not node.func.attr.startswith('_')):
+                        and isinstance(node.func.value,ast.Name) and not node.func.attr.startswith('_')
+                        and (node.func.value.id in imported or
+                             stateful_api and node.func.value.id in instances and node.func.attr in stateful_api['methods'])):
                     for arg in node.args:expression(arg)
                     for kw in node.keywords:
                         if kw.arg is None:raise ValueError('explicit product arguments required')
@@ -145,11 +152,17 @@ def strengthening_diff(before,after,*,cases,product_imports):
                             name=alias.asname or alias.name
                             if alias.name not in product_imports or name in names|fresh|imported:
                                 raise ValueError('only authorized nonshadowing local product imports allowed')
-                            imported.add(name)
+                            imported.add(name);module_aliases[name]=alias.name
                     elif isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name):
                         name=node.targets[0].id
                         if name in names|fresh|imported:raise ValueError('cannot rebind existing names')
                         expression(node.value);fresh.add(name)
+                        call=node.value
+                        if (stateful_api and isinstance(call,ast.Call) and isinstance(call.func,ast.Attribute)
+                                and isinstance(call.func.value,ast.Name)
+                                and module_aliases.get(call.func.value.id)==stateful_api['module']
+                                and call.func.attr==stateful_api['class']):
+                            instances.add(name)
                     elif (isinstance(node,ast.Expr) and isinstance(node.value,ast.Call)
                           and isinstance(node.value.func,ast.Attribute) and isinstance(node.value.func.value,ast.Name)
                           and node.value.func.value.id=='self' and node.value.func.attr in
@@ -167,9 +180,9 @@ def strengthening_diff(before,after,*,cases,product_imports):
     return findings
 
 
-def cumulative_strengthening_diff(original, preserved, candidate, *, cases, product_imports):
+def cumulative_strengthening_diff(original, preserved, candidate, *, cases, product_imports, prior_api=None):
     """New scope cannot discard checks added after the original freeze."""
-    strengthening_diff(original,candidate,cases=cases,product_imports=product_imports)
+    strengthening_diff(original,candidate,cases=cases,product_imports=product_imports,stateful_api=prior_api)
     return strengthening_diff(preserved,candidate,cases=cases,product_imports=product_imports)
 
 
@@ -336,9 +349,12 @@ def revision_context(project,store,quality,authority,candidate,*,contract=1):
                     if context.get('preserve_snapshot'):
                         preserved=(store.tree(context['preserve_snapshot'])/path).read_text()
                         if preserved!=after:
-                            cumulative_strengthening_diff(before,preserved,after,cases=scoped,product_imports=context['product_imports'])
-                        else:strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'])
-                    else:strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'])
+                            cumulative_strengthening_diff(before,preserved,after,cases=scoped,product_imports=context['product_imports'],
+                                                          prior_api=context.get('preserved_stateful_api'))
+                        else:strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'],
+                                                stateful_api=context.get('preserved_stateful_api'))
+                    else:strengthening_diff(before,after,cases=scoped,product_imports=context['product_imports'],
+                                            stateful_api=context.get('stateful_api'))
                 else:technical_repair_diff(before,after,cases=scoped)
     if contract==3:
         protect_repaired_baseline(project,store,previous['baseline'],candidate,authority['proposal']['test_paths'])

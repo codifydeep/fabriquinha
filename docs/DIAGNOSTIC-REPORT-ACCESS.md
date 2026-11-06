@@ -238,3 +238,12 @@ reconstructs the other edits and target mappings from the verified batch and
 uses the standard submission path to run fresh Green, all controls, and
 independent review. A changed product, changed freeze, repeated survivor, or
 missing replacement is refused. The full submission path remains available.
+
+A new scoped strengthening decision can explicitly name a public product
+class and its methods via `repair_scope.stateful_api`. The class and methods
+must be declared in the preserved source of an authorized product module.
+The test author may then construct a fresh local instance, call those methods
+and inspect returned data with bounded literal keys or indices. This permits a
+reachable sequence of domain operations while preserving every existing
+statement in the test. A previous authorization without this field retains its
+original grammar. Independent freeze and behavioral controls are mandatory.

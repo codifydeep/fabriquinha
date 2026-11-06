@@ -71,6 +71,22 @@ class ScopeTests(unittest.TestCase):
             self.scope['product_imports']=imports
             with self.subTest(imports=imports),self.assertRaises(ValueError):self.validate()
 
+    def test_stateful_authority_requires_a_local_public_class_and_declared_methods(self):
+        from tempfile import TemporaryDirectory
+        from fabriquinha.technical_repair import scope_input
+        self.store.manifest.return_value={'app.py':{}}
+        with TemporaryDirectory() as folder:
+            path=Path(folder)
+            (path/'app.py').write_text('from pathlib import Path\nclass Game:\n    def play(self): pass\n')
+            self.store.tree.return_value=path
+            self.scope.update(mode='strengthen',product_imports=['app'],
+                              stateful_api={'module':'app','class':'Game','methods':['play']})
+            result=self.validate()
+            self.assertEqual(scope_input(result)['stateful_api'],self.scope['stateful_api'])
+            for bad in ({'class':'Path'},{'methods':['clear']},{'methods':['__init__']},{'module':'os'}):
+                self.scope['stateful_api']={'module':'app','class':'Game','methods':['play'],**bad}
+                with self.subTest(bad=bad),self.assertRaises(ValueError):self.validate()
+
     def test_test_author_successor_requires_exact_prior_strict_authority(self):
         self.records['incident']['binding']['kind']='tests'
         self.scope.update(mode='strengthen',product_imports=['app'],parent_repair='parent')
