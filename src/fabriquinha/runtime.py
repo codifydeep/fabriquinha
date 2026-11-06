@@ -502,6 +502,8 @@ class Runtime:
             if transfers:self.release_issues['pending_review_transfers']=dict(cards=transfers,owner=(self.project.coordination_roles or {}).get('lead','lead'))
             capacity=self.project.max_workers if admission['ready'] and not transfers else 0
             provider=self.provider_status() if capacity else {'ready':True}
+            if self.control.read()['paused']:
+                return dispatch.DispatchResult()
             with provider_claim_guard(dispatch,conn,ready=provider['ready']):
                 return dispatch.dispatch_once(conn,spawn_fn=self.spawn,max_spawn=capacity,
                     max_in_progress=self.project.max_workers,max_in_progress_per_profile=1)

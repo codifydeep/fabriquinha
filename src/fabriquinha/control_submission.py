@@ -141,10 +141,24 @@ def unfinished_survivor(store, row, claim):
 
 
 def previous_submission(conn, store, run):
-    row = conn.execute('SELECT id,outcome,summary FROM task_runs WHERE task_id=? AND id<? ORDER BY id DESC LIMIT 1',
-                       (run.task, run.number)).fetchone()
-    if not row:
-        return None
+    before = run.number
+    while True:
+        row = conn.execute('SELECT id,outcome,summary,error,worker_pid,worker_started_at,ended_at FROM task_runs '
+                           'WHERE task_id=? AND id<? ORDER BY id DESC LIMIT 1', (run.task,before)).fetchone()
+        if row is None:
+            return None
+        if row['outcome'] != 'spawn_failed':
+            break
+        reason = 'operational pause; no worker started'
+        if (row['error'] != reason or row['worker_pid'] is not None or row['worker_started_at'] is not None
+                or not row['ended_at']):
+            return None
+        event = conn.execute("SELECT payload FROM task_events WHERE task_id=? AND run_id=? AND kind='spawn_failed' "
+                             "ORDER BY id DESC LIMIT 1", (run.task,row['id'])).fetchone()
+        observed = json.loads(event['payload']) if event else {}
+        if observed.get('error') != reason or observed.get('infrastructure') is not True or observed.get('retry_status') != 'ready':
+            return None
+        before = row['id']
     if row['outcome'] == 'scheduled':
         event = conn.execute("SELECT payload FROM task_events WHERE task_id=? AND run_id=? AND kind='scheduled' ORDER BY id DESC LIMIT 1",
                              (run.task, row['id'])).fetchone()
