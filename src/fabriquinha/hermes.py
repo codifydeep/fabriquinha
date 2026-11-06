@@ -425,7 +425,7 @@ def restrict_handlers(sandbox,allowed):
         def guard(handler,entry_name):
             @wraps(handler)
             def guarded(*args,**kwargs):
-                if entry_name in {'delivery_submit','delivery_repair_controls','delivery_validate','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
+                if entry_name in {'delivery_submit','delivery_replay_controls','delivery_repair_controls','delivery_validate','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
                 else:sandbox.ensure()
                 if entry_name=='terminal':
                     if len(args)!=1:raise ValueError('one terminal argument object required')
@@ -499,6 +499,17 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
                 parameters=dict(type='object',additionalProperties=False,properties={})),
             handler=lambda args,**kwargs:json.dumps(operations.validate(args)))
         gates.add('delivery_validate')
+        if getattr(quality,'fixture_replay',None):
+            def replay(args,**kwargs):
+                result=operations.replay_controls(args)
+                if on_terminal:on_terminal(result)
+                return json.dumps(result)
+            registry.register(name='delivery_replay_controls',toolset='fabriquinha_delivery',
+                schema=dict(name='delivery_replay_controls',description='Submit a full batch against newly reviewed tests. '
+                    'Use the same product mutations, starting with the previous survivors. Fresh Green, all controls, '
+                    'and independent review are required.',parameters=dict(type='object',additionalProperties=False,properties={})),
+                handler=replay)
+            gates.add('delivery_replay_controls')
         if getattr(quality, 'previous_controls', None):
             def repair(args, **kwargs):
                 result=operations.repair_controls(args)

@@ -350,3 +350,42 @@ def repair_proposals(store, previous, snapshot, freeze, replacements):
         else:
             raise ValueError('prior mutation lacks replayable edits or observed assertions; submit a full batch')
     return dict(mutations=proposals, targets=plan['targets'])
+
+
+def matching_product(store, left, right, tests_dir):
+    def product(snapshot):
+        return {p:meta for p,meta in store.manifest(snapshot).items() if not p.startswith(tests_dir+'/')}
+    return product(left)==product(right)
+
+
+def replay_after_fixture(conn, store, project, graph, context, current_freeze):
+    """Find reusable proposals in the same release's prior invalid-control succession."""
+    cases=set(context.get('cases',[]))
+    if not cases or context.get('protocol')!='technical-test-strengthening-1':
+        return None
+    history=graph.get('previous_graph')
+    visited=set()
+    while history and history not in visited:
+        visited.add(history)
+        record=store.receipt(history,kind='release_graph')
+        prior=record['payload']
+        if prior.get('project')!=project.fingerprint() or prior.get('plan_review')!=graph.get('plan_review'):
+            raise ValueError('foreign graph in fixture replay ancestry')
+        admission=prior.get('continuation_review')
+        if admission:
+            decision=store.receipt(admission)
+            if decision['kind']=='invalid_control_retry':
+                original=decision['payload']
+                if (decision['binding']!=record['binding'] or original['project']!=project.fingerprint()):
+                    raise ValueError('foreign correction in fixture replay ancestry')
+                if original['tests']==context['tests'] and original['snapshot']==context['implementation_snapshot']:
+                    batch=prior_batch_for_retry(conn,store,project,original)
+                    if batch:
+                        all_targets={case for item in batch['controls'] for case in item['targets']}
+                        survivors=[item for item in batch['controls'] if item['survived']]
+                        if (survivors and all(cases.intersection(item['targets']) for item in survivors)
+                                and all(item['edits'] for item in batch['controls'])
+                                and all_targets==set(current_freeze['control_cases'])):
+                            return batch
+        history=prior.get('previous_graph')
+    return None

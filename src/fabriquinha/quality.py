@@ -798,6 +798,22 @@ class DeliveryTools:
             next_action='Submit the complete negative-control set with delivery_submit; independent review remains required.',
             delivery_approval=False)
 
+    def replay_controls(self, args):
+        from .control_submission import matching_product
+        q,run=self.quality,self.run
+        q.check(run,'implementation')
+        selected=getattr(q,'fixture_replay',None)
+        if not selected or args!={}:raise ValueError('controller-selected fixture replay required')
+        batch,freeze=selected
+        plan=self.store.receipt(batch['submission'],kind='control_submission')['payload']
+        current=self.store.capture(self.sandbox.workspace)
+        if (self.board.input(run,'tests')!=freeze or freeze==plan['freeze']
+                or plan['project']!=q.project.fingerprint() or not matching_product(self.store,current,plan['snapshot'],q.project.tests_dir)):
+            raise ValueError('replay requires unchanged product and the exact independently revised freeze')
+        retained=sorted(batch['controls'],key=lambda item:not item['survived'])
+        return self.submit(dict(mutations=[item['edits'] for item in retained],
+                                targets=[item['targets'] for item in retained]))
+
     def repair_controls(self, args):
         from .control_submission import repair_proposals
         q, run = self.quality, self.run

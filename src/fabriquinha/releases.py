@@ -42,6 +42,14 @@ def continuation_context(continuation):
             else continuation['context']['submission_contract']),delivery_approval=False)
 
 
+def implementation_fixture_context(authority, key, frozen):
+    """The test author's previous baseline must never masquerade as the implementation freeze."""
+    return dict(review=authority['review'], cases=authority['context'].get('cases',[]),
+                protected_tests=dict(receipt=key,snapshot=frozen['snapshot'],files=frozen['tests']),
+                instruction='This is the independently accepted test inventory for the current implementation. '
+                            'A validated Green checks exactly these files.')
+
+
 def technical_document(authority, original):
     # A controller admission scopes a repair; it is not another architecture plan.
     return authority['context'] if authority and not authority.get('controller_admission') else original
@@ -328,13 +336,17 @@ class Releases:
         try:existing=(list(acceptance_manifest(folder,allow_empty=True)['criteria']) if mode==2 else
             [item['id'] for item in load_contract(folder)['checks']] if list(folder.glob('qa*.json')) else [])
         except (ValueError,OSError):existing='InvalidBrowserContract: review the immutable files; do not weaken existing scenarios'
-        controls=(quality.freeze(run,self.board.input(run,'tests'))['control_cases'] if run.kind=='implementation' else None)
+        freeze_key=self.board.input(run,'tests') if run.kind=='implementation' else None
+        current_freeze=quality.freeze(run,freeze_key) if freeze_key else None
+        controls=current_freeze['control_cases'] if current_freeze else None
         from .repairs import repair_authority,context_view
         authority=repair_authority(self.project,self.store,self.board,run)
         technical=technical_document(authority,proposed['payload']['document'])
+        repaired_implementation=bool(current_freeze and authority and authority['context'].get('repair_kind')=='fixture')
         result=dict(approved_brief=brief['payload']['document'],
             brief_authority=self.intake.authority(proposed['payload']['approval'],run.release),package=body['package'],criteria=body['criteria'],
-            repair=({**authority,'context':context_view(self.store,authority['context'])} if authority else None),
+            repair=(implementation_fixture_context(authority,freeze_key,current_freeze) if repaired_implementation else
+                    {**authority,'context':context_view(self.store,authority['context'])} if authority else None),
             required_control_cases=controls,
             architecture=technical['architecture'],observability=technical['observability'],
             execution=execution_context(self.project,browser_mode=mode),baseline=snapshot,existing_qa=existing,
@@ -379,7 +391,8 @@ class Releases:
             continuation=reviewed(self.project,self.store,graph['continuation_review'])
             if continuation['task']!=body['continuation_plan']:raise ValueError('exact continuation review required')
             if continuation['context'].get('repair_kind')=='fixture':
-                result['fixture_revision']=context_view(self.store,continuation['context'])
+                if run.kind=='tests' and authority:
+                    result['fixture_revision']=context_view(self.store,continuation['context'])
                 if run.kind=='tests' and authority:
                     result['tdd']=('Correct only additive setup in repair.proposal.test_paths. Preserve every old statement, assertion, '
                         'selector, timeout, helper and manifest. Independently review setup/action/assertion, not only failure status. '
@@ -402,10 +415,21 @@ class Releases:
                     if continuation['context'].get('probe_offer'):
                         result['tdd']=result['fixture_revision']['fixture_syntax']
                         result['browser']='Use the exact authorized_append from fixture_revision in its assigned case.'
-                elif run.kind=='implementation' and authority:
+                elif repaired_implementation:
                     result['tdd']=('Continue preserved product work using the newly reviewed frozen tests. Use delivery_validate for the full suite, '
                         'then submit fresh Green and the complete negative-control set for this exact revision. '
                         'Do not change tests, reuse old Green or infer approval from the fixture repair proposal.')
+                    if not run.reviewing:
+                        from .control_submission import replay_after_fixture
+                        with kbc.connect_closing() as conn:
+                            batch=replay_after_fixture(conn,self.store,self.project,graph,continuation['context'],current_freeze)
+                        if batch:
+                            quality.fixture_replay=(batch,freeze_key)
+                            result['replay_controls']=dict(count=len(batch['controls']),
+                                repaired_cases=continuation['context']['cases'],
+                                instruction='Use delivery_replay_controls with {} to test the entire earlier mutation set '
+                                'against the current freeze and product. The repaired survivor runs first. '
+                                'The tool runs fresh Green and all mutations; it does not reuse a previous result.')
             else:
                 result['submission_continuation']=continuation_context(continuation)
                 context=continuation['context']

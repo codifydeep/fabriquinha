@@ -255,3 +255,11 @@ in addition to the prior method list. The class, frozen test paths and cases
 stay scoped, and the product must actually define the method. The prior
 attempt is available as a diff for the author. It still requires a fresh
 submission, independent freeze and negative controls.
+
+After independent approval of a stronger fixture, implementation context shows
+the current freeze's receipt and file hashes. On identical product files,
+`delivery_replay_controls` can submit the earlier complete set of product
+edits against the **new** tests, starting with the previously surviving
+mutation. It is available only when the earlier proposal belongs to the same
+release history, maps all current required cases, and its surviving controls
+target the repaired cases. Every suite job runs on the new Green.
