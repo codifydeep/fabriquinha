@@ -798,6 +798,22 @@ class DeliveryTools:
             next_action='Submit the complete negative-control set with delivery_submit; independent review remains required.',
             delivery_approval=False)
 
+    def repair_controls(self, args):
+        from .control_submission import repair_proposals
+        q, run = self.quality, self.run
+        q.check(run, 'implementation')
+        prior = getattr(q, 'previous_controls', None)
+        if not prior or not isinstance(args, dict) or set(args) != {'replacements'}:
+            raise ValueError('controller-selected previous controls and exact replacements required')
+        snapshot = self.store.capture(self.sandbox.workspace)
+        freeze = self.board.input(run, 'tests')
+        expanded = repair_proposals(self.store, prior, snapshot, freeze, args['replacements'])
+        plan = self.store.receipt(prior['submission'], kind='control_submission')['payload']
+        for index, proposal in args['replacements'].items():
+            if self.mutants(snapshot, [proposal])[0] == plan['mutants'][int(index)-1]:
+                raise ValueError('replacement reproduces the surviving mutant; diagnose and change the control')
+        return self.submit(expanded)
+
     def submit(self,args):
         q,run=self.quality,self.run
         q.check(run,run.kind)

@@ -328,3 +328,25 @@ def prior_batch_for_retry(conn, store, project, context):
             if guidance:
                 return guidance
     return None
+
+
+def repair_proposals(store, previous, snapshot, freeze, replacements):
+    """Expand only previously observed edits, never re-use their validation credit."""
+    plan = store.receipt(previous['submission'], kind='control_submission')['payload']
+    if (plan['snapshot'] != snapshot or plan['freeze'] != freeze or previous['green'] != plan['green']
+            or previous['freeze'] != freeze or len(previous['controls']) != len(plan['mutants'])):
+        raise ValueError('prior batch requires the exact current product and independent freeze')
+    failed = {str(item['index']) for item in previous['controls'] if item['survived']}
+    if not failed or not isinstance(replacements, dict) or set(replacements) != failed:
+        raise ValueError('replace exactly the surviving mutation indices: '+', '.join(sorted(failed)))
+    proposals = []
+    for index, item in enumerate(previous['controls'], 1):
+        if index != item['index'] or item['targets'] != plan['targets'][index-1]:
+            raise ValueError('retained mutation order or frozen target map changed')
+        if item['survived']:
+            proposals.append(replacements[str(index)])
+        elif item['edits'] and item['observed']:
+            proposals.append(item['edits'])
+        else:
+            raise ValueError('prior mutation lacks replayable edits or observed assertions; submit a full batch')
+    return dict(mutations=proposals, targets=plan['targets'])

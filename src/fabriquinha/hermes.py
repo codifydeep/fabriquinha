@@ -425,7 +425,7 @@ def restrict_handlers(sandbox,allowed):
         def guard(handler,entry_name):
             @wraps(handler)
             def guarded(*args,**kwargs):
-                if entry_name in {'delivery_submit','delivery_validate','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
+                if entry_name in {'delivery_submit','delivery_repair_controls','delivery_validate','delivery_review','diagnostic_validate','diagnostic_decide'}:sandbox.board.ensure(sandbox.run)
                 else:sandbox.ensure()
                 if entry_name=='terminal':
                     if len(args)!=1:raise ValueError('one terminal argument object required')
@@ -499,6 +499,21 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
                 parameters=dict(type='object',additionalProperties=False,properties={})),
             handler=lambda args,**kwargs:json.dumps(operations.validate(args)))
         gates.add('delivery_validate')
+        if getattr(quality, 'previous_controls', None):
+            def repair(args, **kwargs):
+                result=operations.repair_controls(args)
+                if on_terminal:on_terminal(result)
+                return json.dumps(result)
+            survivors=[str(item['index']) for item in quality.previous_controls['controls'] if item['survived']]
+            proposal=schema['properties']['mutations']['items']
+            registry.register(name='delivery_repair_controls',toolset='fabriquinha_delivery',
+                schema=dict(name='delivery_repair_controls',
+                    description='Submit changes for surviving prior mutations only. Keep all other prior proposals '
+                                'and target mappings. Runs a fresh full Green and every control before review.',
+                    parameters=dict(type='object',additionalProperties=False,required=['replacements'],
+                        properties=dict(replacements=dict(type='object',additionalProperties=False,required=survivors,
+                            properties={i:proposal for i in survivors})))),handler=repair)
+            gates.add('delivery_repair_controls')
     return gates,operations
 
 

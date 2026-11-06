@@ -98,6 +98,30 @@ class ControlContinuation(unittest.TestCase):
         stale=self.store.record('diagnostic_decision',actor.binding(),{**choice,'experiment':None})
         with self.assertRaises(ValueError):invalid_control_retry(self.project,self.store,stale,pointer)
 
+    def test_compact_repair_refuses_same_survivor_and_queues_the_complete_fresh_batch(self):
+        from fabriquinha.quality import DeliveryTools
+        from unittest.mock import Mock
+        targets=[{'new':'assert the wrong result'},{'new':'assert the alternate wrong result'}]
+        prior=seal(self.q,self.run,self.green,self.mutants,targets=targets)
+        self.q.previous_controls=dict(submission=prior,green=self.green,freeze=self.freeze,controls=[
+            dict(index=1,survived=False,observed=['new'],targets=targets[0],edits={'app.py':'value=2'}),
+            dict(index=2,survived=True,observed=[],targets=targets[1],edits={'app.py':'value=3'})])
+        sandbox=SimpleNamespace(board=self.board,store=self.store,project=self.project,run=self.run,
+                                workspace=self.work,close=Mock())
+        ops=DeliveryTools(sandbox,self.q)
+        self.q.green=Mock(return_value=self.green);self.q.queue_controls=Mock(return_value={'scheduled':True})
+        with self.assertRaisesRegex(ValueError,'surviving mutant'):
+            ops.repair_controls({'replacements':{'2':{'app.py':'value=3'}}})
+        self.q.green.assert_not_called()
+        result=ops.repair_controls({'replacements':{'2':{'app.py':'value=4'}}})
+        self.assertEqual(result,{'scheduled':True})
+        self.q.green.assert_called_once_with(self.run,self.freeze,self.snapshot)
+        new=self.store.receipt(self.q.queue_controls.call_args.args[1],kind='control_submission')['payload']
+        self.assertEqual(new['targets'],targets)
+        self.assertEqual(new['mutants'][0],self.mutants[0])
+        self.assertNotEqual(new['mutants'][1],self.mutants[1])
+        self.assertFalse(self.reviews)
+
     def test_restart_new_claim_reuses_checks_and_hands_off_original_green(self):
         with self.assertRaises(NextControl):advance(self.q,replace(self.run,number=5),self.plan)
         self.assertFalse(self.reviews)

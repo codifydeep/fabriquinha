@@ -412,7 +412,14 @@ class Releases:
                     from .control_submission import prior_batch_for_retry
                     with kbc.connect_closing() as conn:
                         prior=prior_batch_for_retry(conn,self.store,self.project,context)
-                    if prior:result['submission_continuation']['previous_batch']=prior
+                    if prior:
+                        result['submission_continuation']['previous_batch']=prior
+                        if not run.reviewing and any(item['survived'] for item in prior['controls']):
+                            quality.previous_controls=prior
+                            result['submission_continuation']['repair_tool']=(
+                                'Use delivery_repair_controls with replacement edits for each surviving index. '
+                                'The controller reconstructs the other proposals and reruns the entire batch. '
+                                'Use delivery_submit if you need a different target map.')
                     result['submission_continuation']['rejected_mutant']=context['rejected_mutant']
                     quality.rejected_control=(context['snapshot'],context['rejected_mutant'])
         from .maintenance import run_authority

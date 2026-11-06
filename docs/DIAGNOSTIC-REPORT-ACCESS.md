@@ -230,3 +230,11 @@ on the exact product and freeze, including edits, survivors and assertion
 failures. It must submit a fresh batch. The controller refuses the same
 rejected mutant on unchanged source and limits this succession to one per
 product, freeze and rejected mutation.
+
+For a returned author with a replayable prior batch and the same product and
+freeze, `delivery_repair_controls` accepts only replacement product edits for
+all surviving indices. The worker supplies the changed controls. The controller
+reconstructs the other edits and target mappings from the verified batch and
+uses the standard submission path to run fresh Green, all controls, and
+independent review. A changed product, changed freeze, repeated survivor, or
+missing replacement is refused. The full submission path remains available.
