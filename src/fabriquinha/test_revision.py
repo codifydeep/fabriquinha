@@ -166,7 +166,8 @@ def strengthening_diff(before,after,*,cases,product_imports,stateful_api=None):
                     elif (isinstance(node,ast.Expr) and isinstance(node.value,ast.Call)
                           and isinstance(node.value.func,ast.Attribute) and isinstance(node.value.func.value,ast.Name)
                           and node.value.func.value.id=='self' and node.value.func.attr in
-                          ('assertEqual','assertNotEqual','assertTrue','assertFalse','assertIs','assertIsNot','assertIn','assertNotIn')):
+                          (('assertEqual','assertNotEqual','assertTrue','assertFalse','assertIs','assertIsNot','assertIn','assertNotIn')
+                           + (('assertIsNone','assertIsNotNone') if stateful_api else ()))):
                         for arg in node.value.args:expression(arg)
                         for kw in node.value.keywords:
                             if kw.arg!='msg':raise ValueError('only assertion message keyword permitted')

@@ -100,6 +100,7 @@ class ScopedInstanceStrengthening(unittest.TestCase):
                                   stateful_api=self.methods)
     def test_only_declared_receiver_methods_and_bounded_result_reads(self):
         self.validate(BEFORE+self.suffix)
+        self.validate(BEFORE+self.suffix.replace("assertIs(response[1], None)","assertIsNone(response[1])"))
         for bad in ('created.play(code,','table.close(code,'):
             with self.assertRaises(ValueError):self.validate(BEFORE+self.suffix.replace('table.play(code,',bad))
         for bad in ('response.__dict__','response[table]','response[-1]'):

@@ -31,9 +31,12 @@ def refused_instance_candidate(store, project, incident, previous):
     if not key:return False
     refusal=store.receipt(key,kind='submission_refusal')
     data=refusal['payload']
+    errors={'only explicit product calls and local literal setup allowed'}
+    if previous.get('stateful_api'):
+        errors.add('append only local product setup and explicit unittest assertions')
     if not (refusal['binding']==incident['binding'] and data.get('project')==project.fingerprint()
             and data.get('phase')=='tests' and data.get('operation')=='delivery_submit'
-            and data.get('delivery_approval') is False and data.get('error')=='only explicit product calls and local literal setup allowed'
+            and data.get('delivery_approval') is False and data.get('error') in errors
             and data.get('baseline')==previous['snapshot'] and facts['snapshot'] in (data['baseline'],data['snapshot'])):
         return False
     before=store.manifest(data['baseline']);after=store.manifest(data['snapshot'])
