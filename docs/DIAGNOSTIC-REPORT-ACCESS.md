@@ -200,3 +200,16 @@ to observe their previous state. The entire suffix is compared structurally and
 all preceding statements and other methods remain protected. The CTO must issue
 a fresh scoped repair decision before the author receives the template. The
 candidate still requires Red and independent review.
+
+Queued implementation submissions pair each mutation with a map of frozen case
+IDs to the behavior it violates and the assertion expected to catch it. The
+controller checks the complete map before starting Green. Authors can submit up
+to 16 independent mutations, so a package with 11 cases can exercise each case
+separately. The sealed submission retains the map across worker restarts.
+Only the observed suite results count toward coverage.
+
+When a sealed mutant raises a runtime error, its suite receipt identifies the
+implementation author, Green and freeze for diagnosis. The author must correct
+the mutant. A transport exception converted into a test assertion cannot
+demonstrate which user-visible behavior changed. Existing native triage limits
+still apply to resuming a failed author.

@@ -86,7 +86,22 @@ def suite_refusal_context(store,project,binding,key,current_snapshot):
     report=suite_report(data,diagnostic=True)
     if not any(report[field] for field in ('errors','skips','expected_failures','unexpected_successes')) and report.get('qa_preview',{}).get('status')!='failed':
         raise ValueError('negative quality report required, never a passing-job approval')
-    return dict(receipt=key,phase=identity['phase'],snapshot=identity['snapshot'],report=report,
+    control_issue = {}
+    if identity['phase'] == 'control' and identity.get('control_submission') and report['errors']:
+        plan = store.receipt(identity['control_submission'], kind='control_submission')
+        green = store.receipt(plan['payload']['green'], kind='green')
+        if (plan['binding'] != binding or green['binding'] != binding
+                or plan['payload']['project'] != project.fingerprint()
+                or green['payload']['project'] != project.fingerprint()
+                or plan['payload']['snapshot'] != green['payload']['snapshot']
+                or plan['payload']['freeze'] != green['payload']['freeze']
+                or identity['snapshot'] not in plan['payload']['mutants']):
+            raise ValueError('invalid control must belong to its sealed Green')
+        control_issue = dict(control_issue='invalid_mutation', owner=binding['author'],
+            green=plan['payload']['green'], freeze=plan['payload']['freeze'],
+            instruction='Return the invalid product mutation to its author. A runtime or transport error on a mutant '
+                        'earns no coverage. Preserve frozen tests and demonstrate the behavioral violation by assertion.')
+    return dict(**control_issue,receipt=key,phase=identity['phase'],snapshot=identity['snapshot'],report=report,
         matches_current_snapshot=identity['snapshot']==current_snapshot,delivery_approval=False,requires_fresh_validation=True)
 
 
@@ -137,6 +152,11 @@ class Diagnostic:
         value=reader(self.run) if reader else {}
         self.resolution=value if isinstance(value,dict) else {}
         self.experiment=None
+        self.invalid_mutation = False
+        if self.incident.get('suite_refusal'):
+            refused = suite_refusal_context(self.store, quality.project, self.original,
+                self.incident['suite_refusal'], self.incident['snapshot'])
+            self.invalid_mutation = refused.get('control_issue') == 'invalid_mutation'
         self.repair=None
         reader=getattr(self.board,'repair_for_task',None);key=reader(self.incident.get('source')) if reader else None
         if isinstance(key,str):
@@ -146,6 +166,13 @@ class Diagnostic:
 
     def actions(self):
         if getattr(self,'resolution',{}).get('role')=='investigate':return ['hold']
+        if getattr(self, 'invalid_mutation', False):
+            actions = ['hold']
+            if self.incident.get('resume_allowed', True):
+                actions.append('resume')
+            if self.level == 'lead':
+                actions.append('escalate')
+            return actions
         if (self.level=='cto' and self.coverage_correction()
                 and self.incident.get('source_state') in ('blocked','triage')
                 and self.incident.get('controller_effects')==[]):

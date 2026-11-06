@@ -37,7 +37,27 @@ def refusal_summary(report):
     result['detail_limit']='Bounded summary; complete report retained in the referenced suite job.'
     return result
 
-CONTROL_SUBMISSION_CONTRACT=('Submit the complete set of 1-8 mutations together in one delivery_submit call. '
+MAX_CONTROL_MUTATIONS = 16
+
+
+def validate_control_targets(required, count, targets):
+    if not isinstance(targets, list) or len(targets) != count or not 1 <= count <= MAX_CONTROL_MUTATIONS:
+        raise ValueError('provide one target map per mutation, in execution order')
+    required = set(required)
+    covered = set()
+    for entry in targets:
+        if not isinstance(entry, dict) or not entry or not entry.keys() <= required:
+            raise ValueError('each mutation must name independently frozen behavior targets')
+        if any(not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 1024 for reason in entry.values()):
+            raise ValueError('describe the violated behavior and expected assertion for each target')
+        covered.update(entry)
+    if covered != required:
+        raise ValueError('unplanned frozen control targets: ' + ', '.join(sorted(required - covered)))
+
+
+CONTROL_SUBMISSION_CONTRACT=('For queued submissions supply targets alongside mutations in matching order: '
+    'each entry maps exact frozen case IDs to the violated behavior and expected assertion. Put disputed controls first. '
+    'Submit the complete set of 1-16 mutations together in one delivery_submit call. '
     'Each mutation maps existing product paths to either complete replacement strings or exact edits {before: old text, after: new text}. '
     'Prefer exact edits: before must be nonempty and occur exactly once in the original Green file; no regex or commands. '
     'Each starts independently from the same Green snapshot; their failing behavior targets are combined within that call only. '
@@ -611,7 +631,7 @@ class Quality:
     def controls(self, run, green_id, mutants, *, collect_survivors=False):
         self.check(run, 'implementation')
         green = self.store.receipt(green_id, kind='green')
-        if green['binding'] != run.binding() or not 1 <= len(mutants) <= 8:
+        if green['binding'] != run.binding() or not 1 <= len(mutants) <= MAX_CONTROL_MUTATIONS:
             raise ValueError('controls must belong to the current Green execution')
         data = green['payload']; frozen = self.freeze(run, data['freeze'])
         if preview_drivers(self.project,'green'):
@@ -709,8 +729,8 @@ class Quality:
 def product_mutations(quality,snapshot,proposals):
     """Disposable experiments; never modify the author or protected tests."""
     store=quality.store
-    if not isinstance(proposals,list) or not 1<=len(proposals)<=8:
-        raise ValueError('one to eight bounded product mutations required')
+    if not isinstance(proposals,list) or not 1<=len(proposals)<=MAX_CONTROL_MUTATIONS:
+        raise ValueError('one to sixteen bounded product mutations required')
     manifest=store.manifest(snapshot);result=[];total=0
     for proposal in proposals:
         if not isinstance(proposal,dict) or not 1<=len(proposal)<=16:
@@ -782,6 +802,9 @@ class DeliveryTools:
         q,run=self.quality,self.run
         q.check(run,run.kind)
         required=set() if run.kind=='tests' else {'mutations'}
+        queued = run.kind == 'implementation' and getattr(q, 'queue_controls', None) is not None
+        if queued:
+            required.add('targets')
         if not isinstance(args,dict) or set(args)!=required:
             raise ValueError('submit accepts only the phase-specific evidence proposal')
         if self.submission is None:
@@ -798,12 +821,16 @@ class DeliveryTools:
                     raise ValueError(str(error)+'; rejected submission receipt '+q.submission_refusal) from error
             else:
                 frozen_id=self.board.input(run,'tests')
+                if queued:
+                    if not isinstance(args['mutations'], list):
+                        raise ValueError('ordered mutations required')
+                    validate_control_targets(q.freeze(run, frozen_id)['control_cases'], len(args['mutations']), args['targets'])
                 green=self.wait(lambda:q.green(run,frozen_id,snapshot))
                 mutants=self.mutants(snapshot,args['mutations'])
                 queue=getattr(q,'queue_controls',None)
                 if queue is not None:
                     from .control_submission import seal
-                    submission=seal(q,run,green,mutants)
+                    submission=seal(q,run,green,mutants,targets=args['targets'])
                     self.sandbox.close()
                     return queue(run,submission)
                 controls=self.wait(lambda:q.controls(run,green,mutants),jobs=len(mutants))

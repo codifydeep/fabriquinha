@@ -4,28 +4,30 @@ import json
 from .artifacts import digest
 from .board import Run
 from .effects import write_json, EffectBlocked
-from .quality import Quality
+from .quality import Quality, MAX_CONTROL_MUTATIONS, validate_control_targets
 
 
 class NextControl(Exception):
     """A bounded worker completed its local validation step."""
 
 
-def seal(quality, origin, green_key, mutants, *, legacy=False):
+def seal(quality, origin, green_key, mutants, *, legacy=False, targets=None):
     green = quality.store.receipt(green_key, kind='green')
     data = green['payload']
     if (green['binding'] != origin.binding() or origin.kind != 'implementation'
             or origin.reviewing or origin.actor != origin.author
             or data['project'] != quality.project.fingerprint()
-            or not 1 <= len(mutants) <= 8 or len(set(mutants)) != len(mutants)):
+            or not 1 <= len(mutants) <= MAX_CONTROL_MUTATIONS or len(set(mutants)) != len(mutants)):
         raise ValueError('exact author Green and distinct ordered mutations required')
+    if targets is not None:
+        validate_control_targets(quality.freeze(origin, data['freeze'])['control_cases'], len(mutants), targets)
     for mutant in mutants:
         if mutant == data['snapshot']:
             raise ValueError('control must change product')
         quality.protect(data['snapshot'], mutant, exact_tests=True)
     return quality.store.record('control_submission', origin.binding(), dict(
         green=green_key, snapshot=data['snapshot'], freeze=data['freeze'], mutants=list(mutants),
-        project=data['project'], legacy=legacy, delivery_approval=False))
+        project=data['project'], legacy=legacy, delivery_approval=False, **({'targets': targets} if targets is not None else {})))
 
 
 class OneControl:

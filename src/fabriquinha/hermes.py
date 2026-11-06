@@ -468,12 +468,16 @@ def register_delivery_tools(sandbox,quality,*,on_terminal=None):
         name='delivery_submit'
         schema=dict(type='object',additionalProperties=False,properties={})
         if sandbox.run.kind=='implementation':
-            schema.update(required=['mutations'],properties=dict(mutations=dict(type='array',minItems=1,maxItems=8,
+            schema.update(required=['mutations'],properties=dict(mutations=dict(type='array',minItems=1,maxItems=16,
                 items=dict(type='object',minProperties=1,maxProperties=16,
                            additionalProperties=dict(anyOf=[dict(type='string',maxLength=131072),
                                dict(type='object',additionalProperties=False,required=['before','after'],
                                     properties=dict(before=dict(type='string',minLength=1,maxLength=131072),
                                                     after=dict(type='string',maxLength=131072)))])))))
+            if getattr(quality, 'queue_controls', None) is not None:
+                schema['required'].append('targets')
+                schema['properties']['targets'] = dict(type='array', minItems=1, maxItems=16,
+                    items=dict(type='object', minProperties=1, additionalProperties=dict(type='string', minLength=1, maxLength=1024)))
         operation=operations.submit
         description=('Validate the actual workspace and request independent review. '
             'Tests phase: real Red. Implementation: Green and behavior-changing product mutations. '

@@ -46,6 +46,26 @@ class ControlContinuation(unittest.TestCase):
             snapshot=tree,phase=phase,image=self.project.validation_image,control_submission=self.runner.control_submission),
             sandbox=dict(network='none',snapshot='readonly',user='65534:65534')))
 
+    def test_runtime_error_in_a_sealed_mutant_routes_to_author_without_test_repair(self):
+        from fabriquinha.recovery import Diagnostic, suite_refusal_context
+        self.runner.control_submission=self.plan
+        job=self.store.receipt(self.execute(self.run,self.mutants[0],'control'))
+        payload=job['payload']
+        payload['report'].update(errors=['new'],failures=[])
+        key=self.store.record('suite_job',self.run.binding(),payload)
+        later=replace(self.run,number=5)
+        bind_claim(self.store,later,self.plan)
+        result=suite_refusal_context(self.store,self.project,later.binding(),key,self.snapshot)
+        self.assertEqual((result['owner'],result['control_issue'],result['green']),
+                         ('backend','invalid_mutation',self.green))
+        self.assertFalse(result['delivery_approval'])
+        diag=Diagnostic.__new__(Diagnostic)
+        diag.resolution={};diag.invalid_mutation=True;diag.level='cto'
+        diag.incident={'resume_allowed':True}
+        self.assertEqual(set(diag.actions()),{'hold','resume'})
+        diag.incident['resume_allowed']=False
+        self.assertEqual(diag.actions(),['hold'])
+
     def test_restart_new_claim_reuses_checks_and_hands_off_original_green(self):
         with self.assertRaises(NextControl):advance(self.q,replace(self.run,number=5),self.plan)
         self.assertFalse(self.reviews)
