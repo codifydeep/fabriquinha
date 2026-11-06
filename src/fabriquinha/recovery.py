@@ -164,8 +164,21 @@ class Diagnostic:
             self.repair=reviewed(self.q.project,self.store,key)
             if self.store.receipt(key)['binding']['release']!=self.run.release:raise ValueError('foreign corrective diagnosis')
 
+        self.control_return = None
+        if (self.level == 'cto' and self.original['kind'] == 'tests' and not self.original['reviewing']
+                and self.incident.get('source_state') == 'triage' and self.repair
+                and self.store.receipt(key)['kind'] == 'test_repair_admission'):
+            from .control_return import return_candidate
+            try:
+                self.control_return = return_candidate(quality.project, self.store, key,
+                    self.board.input(self.run, 'incident'))
+            except ValueError:
+                pass  # An ordinary fixture defect retains its existing recovery path.
+
     def actions(self):
         if getattr(self,'resolution',{}).get('role')=='investigate':return ['hold']
+        if getattr(self, 'control_return', None):
+            return ['return_controls', 'hold']
         if getattr(self, 'invalid_mutation', False):
             actions = ['hold']
             if self.incident.get('resume_allowed', True):
@@ -258,6 +271,11 @@ class Diagnostic:
         result=dict(incident={**self.incident,'workspace':'/workspace','recorded_failure_is_historical':True},failed_execution=self.original,execution=execution_context(self.q.project),
             workspace='/workspace',files=sorted(self.store.manifest(self.incident['snapshot'])),
             allowed_actions=self.actions(),limits='No source writes, approvals, breaker resets or controller repairs. A held incident must state a concrete next technical action.')
+        if getattr(self, 'control_return', None):
+            result['control_return'] = self.control_return
+            result['control_return_guidance'] = ('The sealed invalid mutation produced a runtime error. If the existing '
+                'assertions catch the behavior-changing alternative, choose return_controls after a current experiment. '
+                'This withdraws the unsuccessful fixture repair and assigns fresh controls to the implementation author.')
         if getattr(self,'resolution',{}):
             previous=self.store.receipt(self.resolution['diagnosis'],kind='diagnostic_decision')
             if previous['payload']['incident']!=self.board.input(self.run,'incident'):
@@ -641,7 +659,7 @@ class Diagnostic:
                     or step['owner'] not in self.q.project.technical_roles.values()
                     or any(not isinstance(step[k],str) or not 1<=len(step[k].strip())<=1200 for k in ('operation','expected_evidence','precondition'))):
                 raise ValueError('scoped hold requires a technical owner, concrete operation, expected evidence and unmet precondition')
-        if args['action'] in ('resume','return_author') and self.experiment is None:
+        if args['action'] in ('resume','return_author','return_controls') and self.experiment is None:
             raise ValueError('resume requires a real experiment in this execution')
         snapshot=self.incident['snapshot']
         if (not isinstance(args['reason'],str) or not 1<=len(args['reason'].strip())<=2000
@@ -1025,6 +1043,8 @@ class Recovery:
         if data['action']=='return_author':
             self.return_author(conn,task,receipt_id,receipt,incident)
             return
+        if data['action'] == 'return_controls':
+            return  # Release reconciliation verifies and materializes the immutable successor.
         if data['action'] in ('hold','repair_tests'):
             # Keep the hold receipt/source block, but do not strand a technical
             # impediment at Lead. CTO is the final technical decision owner.

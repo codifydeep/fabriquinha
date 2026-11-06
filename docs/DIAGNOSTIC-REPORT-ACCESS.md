@@ -213,3 +213,11 @@ implementation author, Green and freeze for diagnosis. The author must correct
 the mutant. A transport exception converted into a test assertion cannot
 demonstrate which user-visible behavior changed. Existing native triage limits
 still apply to resuming a failed author.
+
+When an invalid sealed mutation has already led to a fixture repair, the CTO
+can choose `return_controls` after a fresh experiment on the triaged fixture.
+This applies only while the fixture workspace matches its independently
+reviewed snapshot. The controller restores the exact native tests card and
+creates a Backend successor from the corresponding Green implementation. It
+publishes the replacement graph before activating workers. The successor must
+produce fresh Green, controls and independent implementation review.

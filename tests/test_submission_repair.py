@@ -229,7 +229,10 @@ class SubmissionRepairAdmission(unittest.TestCase):
     def test_cto_admitted_blocked_fixture_recovers_without_submission_retries(self):
         self.replacement_tail(fixture=True,direct=True)
 
-    def replacement_tail(self,fixture=False,direct=False):
+    def test_control_return_reuses_reviewed_freeze_and_survives_graph_write_failure(self):
+        self.replacement_tail(returning=True)
+
+    def replacement_tail(self,fixture=False,direct=False,returning=False):
         from fabriquinha.releases import Releases
         from fabriquinha.effects import write_json
         f=self.fixture;facts=self.evaluate()
@@ -270,10 +273,28 @@ class SubmissionRepairAdmission(unittest.TestCase):
             original['implementation']['status']='blocked'
             authority['controller_admission']=True
             authority['proposal']['test_paths']=['tests/test_existing.py']
+        if returning:
+            qa=task('abandoned-qa',dict(kind='tests',inputs={'repair_review':'parent'}),[],'triage',f.work)
+            impl=task('waiting-backend',dict(kind='implementation',inputs={'tests':'parent:abandoned-qa:tests','repair_review':'parent'}),['abandoned-qa'],'todo',f.work)
+            integ=task('waiting-integration',dict(kind='integration',inputs={'delivery':'parent:waiting-backend:delivery'}),['waiting-backend'],'todo',f.work)
+            graph={**graph,'items':[dict(package=items[0]['package'],cards=dict(tests=qa,implementation=impl,integration=integ)),*items[1:]],
+                   'previous_graph':old,'superseded_cards':sorted(original)}
+            second=dict(graph['items'][1])
+            # The active fixture graph had already redirected the dependent package.
+            qa2=task('qa2',dict(kind='tests',inputs={'baseline':'parent:waiting-integration:baseline','base_commit':'parent:waiting-integration:base_commit'}),['waiting-integration'],'todo',f.work)
+            be2=task('be2',dict(kind='implementation',inputs={'tests':'parent:qa2:tests'}),['qa2'],'todo',f.work)
+            dep2=task('dep2',dict(kind='integration',inputs={'delivery':'parent:be2:delivery'}),['be2'],'todo',f.work)
+            graph['items'][1]={**second,'cards':dict(tests=qa2,implementation=be2,integration=dep2)}
+            graph_key=f.store.record('release_graph',releases.binding(anchor),graph)
+            authority=dict(task=plan,proposal={'classification':'submission'},context=dict(source=qa['id'],
+                source_run=f.implementer.number,repair_kind='control_return',prior_graph=graph_key,snapshot=self.snapshot,
+                proof=dict(prior_graph=old,tests=self.freeze,implementation='implementation',implementation_run=f.implementer.number,
+                           owner='backend',snapshot=self.snapshot)))
+            releases.closed=Mock(return_value=(self.freeze,None,None))
         expected_count=6 if fixture else 5
         target=releases.folder(anchor)/('continuation-'+plan+'.json')
         def latest(connection,ident):
-            return SimpleNamespace(id=f.implementer.number,ended_at=1) if ident=='implementation' else None
+            return SimpleNamespace(id=f.implementer.number,ended_at=1) if ident in ('implementation','abandoned-qa') else None
         def create(connection,**kwargs):
             key=kwargs['idempotency_key']
             if key in keys:return keys[key]
@@ -290,11 +311,12 @@ class SubmissionRepairAdmission(unittest.TestCase):
         with patch('fabriquinha.repairs.native',return_value=(kb,None,None)),patch('fabriquinha.releases.native',return_value=(kb,None,None)),\
              patch('fabriquinha.repairs.reviewed',return_value=authority),patch('fabriquinha.executor.validation_files',return_value=('bundle',{})):
             operation=Repairs(releases)
-            if direct:operation.succession_parent=Mock(return_value=tasks[plan])
+            if returning or direct:operation.succession_parent=Mock(return_value=tasks[plan])
             from fabriquinha.effects import EffectBlocked
-            tasks['tests2'].status='running'
+            pending='qa2' if returning else 'tests2'
+            tasks[pending].status='running'
             with self.assertRaises(EffectBlocked):operation.materialize_submission(conn,anchor,graph,'approval')
-            tasks['tests2'].status='todo';self.assertEqual(created,[])
+            tasks[pending].status='todo';self.assertEqual(created,[])
             (f.work/'app.py').write_text('VALUE = 99\n')
             with self.assertRaises(ValueError):operation.materialize_submission(conn,anchor,graph,'approval')
             (f.work/'app.py').write_text('VALUE = 1\n');self.assertEqual(created,[])
@@ -307,6 +329,11 @@ class SubmissionRepairAdmission(unittest.TestCase):
             result=operation.materialize_submission(conn,anchor,graph,'approval')
             self.assertEqual(operation.materialize_submission(conn,anchor,graph,'approval'),result)
             self.assertEqual(len(created),expected_count);self.assertEqual(len(activated),expected_count)
+            if returning:
+                self.assertNotIn(first_tests['id'],result['superseded_cards'])
+                returned=result['items'][0]['cards']['implementation']
+                self.assertEqual(returned['body']['inputs'],{'tests':'parent:tests:tests'})
+                self.assertIn('tests',returned['parents'])
             if not fixture:self.assertEqual(result['items'][0]['cards']['tests'],first_tests)
             else:
                 self.assertEqual(result['submission_depth'],0 if direct else 2);self.assertEqual(result['fixture_depth'],4 if direct else 1)
@@ -321,7 +348,10 @@ class SubmissionRepairAdmission(unittest.TestCase):
                 self.assertEqual(new_first['tests']['body']['inputs']['baseline'],authority['context']['snapshot'])
                 self.assertEqual(new_first['implementation']['body']['inputs']['repair_review'],'approval')
             self.assertEqual({key:vars(tasks[key]) for key in original},original)
-            self.assertEqual(set(result['superseded_cards']),set(original)-(set() if fixture else {'tests'}))
+            expected_retired=set(original)-(set() if fixture else {'tests'})
+            if returning:
+                expected_retired.update(('be2','qa2','waiting-backend','waiting-integration','dep2','abandoned-qa'))
+            self.assertEqual(set(result['superseded_cards']),expected_retired)
 
 
 if __name__=='__main__':unittest.main()

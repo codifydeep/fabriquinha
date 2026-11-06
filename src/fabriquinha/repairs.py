@@ -285,6 +285,15 @@ def fixture_author_context(project,store,parent,incident,diagnosis,graph):
 
 def reviewed(project,store,key):
     record=store.receipt(key)
+    if record['kind'] == 'control_return_admission':
+        from .control_return import admission_context
+        data = record['payload']
+        expected = admission_context(project, store, data['proof']['parent'], data['current_diagnosis'], data['prior_graph'])
+        if data != expected or record['binding'] != store.receipt(data['prior_graph'])['binding']:
+            raise ValueError('control-return admission changed')
+        decision = store.receipt(data['current_diagnosis'], kind='diagnostic_decision')
+        return dict(review=key, proposal={'classification':'submission'}, context=data, context_id=key,
+                    task=decision['binding']['task'], controller_admission=True)
     if record['kind']=='fixture_author_admission':
         data=record['payload'];context=fixture_author_context(project,store,data['fixture_author_parent'],data['incident'],data['current_diagnosis'],data['prior_graph'])
         prior=store.receipt(data['prior_graph'],kind='release_graph')
@@ -873,16 +882,17 @@ class Repairs:
         """Immutable replacement tail; the source triage and completed tests remain."""
         from .executor import validation_files
         kb,_,_=native();authority=reviewed(self.project,self.store,approval);data=authority['context']
+        returning=data.get('repair_kind')=='control_return'
         fixture=data.get('repair_kind')=='fixture';reassessment=data.get('repair_kind')=='review'
         expected='reassess' if reassessment else 'test_contract' if fixture else 'submission'
-        if data.get('repair_kind') not in ('submission','fixture','review') or authority['proposal']['classification']!=expected:
+        if data.get('repair_kind') not in ('submission','fixture','review','control_return') or authority['proposal']['classification']!=expected:
             raise EffectBlocked('independently approved continuation required')
         previous=self.store.receipt(data['prior_graph'],kind='release_graph')
         if previous['binding']!=self.r.binding(anchor) or previous['payload']!=graph:
             raise ValueError('proposal must refer to the exact unchanged release graph')
         scoped_fixture=fixture and authority.get('controller_admission') is True
         scope_key=admit_fixture_scope(self.project,self.store,graph,self.r.binding(anchor),authority) if scoped_fixture else None
-        if ((not reassessment and not scoped_fixture and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
+        if ((not returning and not reassessment and not scoped_fixture and (graph.get('fixture_depth',0)>=1 if fixture else graph.get('submission_depth',0)>=2))
                 or any(i.get('repair_context') for i in graph['items'])):
             raise EffectBlocked('bounded pre-publication continuation exhausted or incompatible with deployed repair')
         if graph.get('validation_bundle')!=validation_files(self.project,self.store)[0]:
@@ -894,6 +904,23 @@ class Repairs:
         if source_phase not in ('tests','implementation'):raise ValueError('reviewable source phase required')
         replace_tests=fixture or reassessment and source_phase=='tests'
         if index is None:raise ValueError('continuation source missing from graph')
+        if returning:
+            proof = data['proof']
+            original = self.store.receipt(proof['prior_graph'], kind='release_graph')
+            if original['binding'] != self.r.binding(anchor) or graph.get('previous_graph') != proof['prior_graph']:
+                raise ValueError('control return requires the immediate previous release graph')
+            original_item = original['payload']['items'][index]
+            restored = original_item['cards']['tests']
+            if (source_phase != 'tests' or original_item['package'] != graph['items'][index]['package']
+                    or self.r.closed(restored['id'],'tests','tests_frozen')[0] != proof['tests']
+                    or original_item['cards']['implementation']['id'] != proof['implementation']):
+                raise ValueError('exact independently closed freeze and implementation required')
+            self.r.check_card(conn, restored)
+            former = self.r.check_card(conn, original_item['cards']['implementation'])
+            last = kb.latest_run(conn, former.id)
+            if (former.status != 'triage' or not last or not last.ended_at or last.id != proof['implementation_run']
+                    or former.assignee != proof['owner'] or Recovery(self.project,self.store,self.r.board).expired_effects(former.id)):
+                raise EffectBlocked('former implementation must be settled on the exact rejected run')
         if path.exists():
             record=self.store.receipt(json.loads(path.read_bytes())['receipt'],kind='release_graph')
             result=record['payload']
@@ -916,8 +943,13 @@ class Repairs:
                 cards={}
                 for phase in ('tests','implementation','integration'):
                     old=item['cards'][phase]
+                    if returning and n==index and phase=='tests':
+                        mapping[old['id']]=restored['id'];retired.append(old['id']);cards[phase]=restored
+                        continue
                     if n==index and phase=='tests' and not replace_tests:cards[phase]=old;continue
                     body=json.loads(json.dumps(old['body']));body['continuation_plan']=plan.id
+                    if returning and n==index and phase=='implementation':
+                        body['inputs'].pop('repair_review',None)
                     for name,value in body['inputs'].items():
                         if value.startswith('parent:'):
                             _,parent,key=value.split(':',2);body['inputs'][name]='parent:'+mapping.get(parent,parent)+':'+key
@@ -932,8 +964,9 @@ class Repairs:
                     workspace=self.store.root.parent/'work'/self.r.binding(anchor)['release']/('continuation-'+plan.id)/item['package']['id']/phase
                     workspace.mkdir(mode=0o777,parents=True,exist_ok=True);workspace.chmod(0o777)
                     if n==index and ((phase=='implementation' and not fixture and not reassessment) or (reassessment and phase==source_phase)):
-                        if not any(workspace.iterdir()):self.store.checkout(data['snapshot'],workspace)
-                        elif self.store.capture(workspace)!=data['snapshot']:raise ValueError('unfinished replacement workspace changed')
+                        start_snapshot=proof['snapshot'] if returning else data['snapshot']
+                        if not any(workspace.iterdir()):self.store.checkout(start_snapshot,workspace)
+                        elif self.store.capture(workspace)!=start_snapshot:raise ValueError('unfinished replacement workspace changed')
                     if fixture and n==index and phase=='tests' and data.get('preserve_snapshot'):
                         if not any(workspace.iterdir()):self.store.checkout(data['preserve_snapshot'],workspace)
                         elif self.store.capture(workspace)!=data['preserve_snapshot']:raise ValueError('coverage successor workspace changed')
@@ -949,6 +982,8 @@ class Repairs:
                 'submission_depth':graph.get('submission_depth',0)+(0 if fixture or reassessment else 1),
                 **({'fixture_depth':graph.get('fixture_depth',0)+1} if fixture else {}),
                 **({'fixture_repair_scope':scope_key} if scoped_fixture else {})}
+            if returning:
+                result['superseded_cards'] = sorted(set(result['superseded_cards']) - {restored['id']})
             receipt=self.store.record('release_graph',self.r.binding(anchor),result);write_json(path,{'receipt':receipt})
         # Transfer review before releasing any downstream worker. On restart the
         # native handoff is acknowledged without creating another author run.
@@ -1101,6 +1136,13 @@ class Repairs:
                         # Review holds belong to Recovery's CTO decision lane. They
                         # are not failed author submissions or syntax-repair authority.
                         if incident['binding'].get('reviewing') is True and decision['payload']['action']!='repair_tests':continue
+                        if decision['payload']['action']=='return_controls':
+                            from .control_return import admission_context
+                            prior=self.store.record('release_graph',self.r.binding(anchor),graph)
+                            context=admission_context(self.project,self.store,parent,key,prior)
+                            admission=self.store.record('control_return_admission',self.r.binding(anchor),context)
+                            result=self.materialize_submission(conn,anchor,graph,admission)
+                            return self.continue_submission(conn,anchor,spec,result)
                         if decision['payload']['action']=='repair_tests':
                             from .technical_repair import validate_scope, STRENGTHEN, scope_input
                             scope=decision['payload']['test_repair']
